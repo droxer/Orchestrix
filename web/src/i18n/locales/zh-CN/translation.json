@@ -223,6 +223,8 @@
     "view_list": "列表视图",
     "col_task": "任务",
     "linked": "已关联",
+    "drop_moved": "已将“{{title}}”移至{{status}}。",
+    "drop_needs_assignment": "移至“已分配”前，请先指定智能体或团队。",
     "no_tasks_title": "暂无任务",
     "no_tasks_body": "创建任务并分配给智能体。",
     "no_match_title": "没有匹配的任务",

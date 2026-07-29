@@ -239,6 +239,54 @@
   background: color-mix(in srgb, var(--surface-0) 88%, var(--surface-1));
 }
 
+/* Chip that trails the finger during a touch drag, standing in for the drag
+   image the browser draws for mouse drags. Offset off the fingertip so the
+   card title stays readable under the hand. */
+.backlog-drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  max-width: 200px;
+  overflow: hidden;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-0);
+  box-shadow: var(--shadow-2);
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--ink-1);
+  font: var(--type-body);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+/* Snapping re-snaps every small programmatic scrollLeft change back to the
+   current lane, which would cancel edge auto-scroll frame by frame. Suspend
+   it for the duration of a card drag. */
+.backlog-board[data-dragging="true"] {
+  scroll-snap-type: none;
+}
+
+/* ── Drag to change status ────────────────────────────────────────────
+   The lane under the pointer during a card drag. Status tones are a grey
+   brightness hierarchy that never fills (see palette.css), so accept and
+   refuse are told apart by SHAPE — solid ring accepts, dashed ring
+   refuses — rather than by hue. */
+.backlog-lane[data-drop] {
+  background: var(--surface-1);
+}
+
+.backlog-lane[data-drop="active"] {
+  box-shadow: inset 0 0 0 1px var(--ink-2);
+}
+
+.backlog-lane[data-drop="blocked"] {
+  outline: 1px dashed var(--ink-4);
+  outline-offset: -1px;
+  cursor: not-allowed;
+}
+
 .backlog-lane[data-status="backlog"] { --lane-accent: var(--ink-4); }
 .backlog-lane[data-status="assigned"] { --lane-accent: var(--info); }
 .backlog-lane[data-status="running"] { --lane-accent: var(--ink-1); }
@@ -310,6 +358,15 @@
 .backlog-task:hover {
   border-color: color-mix(in srgb, var(--ink-1) 12%, var(--line-1));
   background: var(--surface-1);
+}
+
+/* content-visibility: auto would let the browser skip painting the card
+   mid-drag; pin it visible so the card that is being moved stays legible. */
+.backlog-task[data-dragging="true"] {
+  content-visibility: visible;
+  opacity: 0.45;
+  border-color: color-mix(in srgb, var(--ink-1) 30%, var(--line-1));
+  cursor: grabbing;
 }
 
 .backlog-task[data-priority="high"] {

@@ -32,6 +32,10 @@ export function filterTasks(tasks: RelayTask[], filters: BacklogFilters, today =
   }).sort(compareTasks);
 }
 
+export function isTaskStatus(value: string | null | undefined): value is TaskStatus {
+  return typeof value === "string" && (TASK_STATUSES as string[]).includes(value);
+}
+
 export function tasksByStatus(tasks: RelayTask[]): Record<TaskStatus, RelayTask[]> {
   return TASK_STATUSES.reduce((acc, status) => {
     acc[status] = tasks.filter((task) => task.status === status);

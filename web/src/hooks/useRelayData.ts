@@ -12,6 +12,7 @@ const NODES_KEY = ["relay", "daemon-nodes"] as const;
 const SESSIONS_KEY = ["relay", "sessions"] as const;
 export const SESSIONS_QUERY_KEY = SESSIONS_KEY;
 const TASKS_KEY = ["relay", "tasks"] as const;
+export const TASKS_QUERY_KEY = TASKS_KEY;
 const POLL_INTERVAL_MS = 3000;
 
 type RelayDataResult = {

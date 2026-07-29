@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type CSSProperties, type DragEvent, type FormEvent, type TouchEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useRelayMutations } from "../hooks/useRelayMutations";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
@@ -11,7 +11,8 @@ import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
 import { type CurrentUser, type DaemonNodeMonitorRecord, type EmployeeAgent, type RelaySession, type RelayTask, type TaskStatus } from "../types";
 import { ActionApprove, ActionCalendar, ActionStart, ActionStop, NavRefresh, ViewBoard, ViewList } from "./icons";
-import { agentReadyForTask, canDiscussTask, discussionAgentsForTask, dueTone, filterTasks, TASK_PRIORITIES, TASK_STATUSES, tasksByStatus, type BacklogFilters } from "../lib/backlog";
+import { agentReadyForTask, canDiscussTask, discussionAgentsForTask, dueTone, filterTasks, isTaskStatus, TASK_PRIORITIES, TASK_STATUSES, tasksByStatus, type BacklogFilters } from "../lib/backlog";
+import { readDraggedTaskId, TASK_DRAG_MEDIA_TYPE, taskDropRejection } from "../lib/taskDrag";
 import { emptyBacklogForm, taskAssignmentMutationFields, taskBoardFormsEqual, type BacklogTaskFormState } from "../lib/taskBoardForm";
 import { TaskDrawer } from "./task-board/TaskDrawer";
 import { PageHeader } from "./PageHeader";
@@ -20,6 +21,9 @@ import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
 import { TaskAssignee, TaskExecutionBadge } from "./TaskAssignee";
 import { isTaskAssigneeCurrentUser, taskAssigneeDisplayName, teamReady } from "../lib/taskAssignment";
 import { useEmployeeNames } from "../hooks/useEmployeeNames";
+import { useEdgeAutoScroll } from "../hooks/useEdgeAutoScroll";
+import { useTouchTaskDrag } from "../hooks/useTouchTaskDrag";
+import { laneStatusAtPoint, type DragPoint } from "../lib/touchDrag";
 import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
 import { Button } from "./ui/button";
 import { FiltersBar } from "./FiltersBar";
@@ -55,6 +59,19 @@ function parseBacklogView(value: string | null): BacklogView {
 }
 
 const ACTIVE_STATUSES: TaskStatus[] = ["assigned", "running", "waiting_for_human", "review"];
+
+// Half the drag chip's max width. The chip is centred on the finger and sits
+// above it, so its centre has to stay this far from either screen edge — the
+// right edge is exactly where a drag lingers to auto-scroll the board.
+const DRAG_GHOST_HALF_WIDTH_PX = 104;
+
+function dragGhostStyle(point: DragPoint): CSSProperties {
+  const rightLimit = typeof window === "undefined"
+    ? point.x
+    : Math.max(window.innerWidth - DRAG_GHOST_HALF_WIDTH_PX, DRAG_GHOST_HALF_WIDTH_PX);
+  const x = Math.min(Math.max(point.x, DRAG_GHOST_HALF_WIDTH_PX), rightLimit);
+  return { transform: `translate3d(calc(${x}px - 50%), calc(${point.y}px - 220%), 0)` };
+}
 
 function activeFilterCount(filters: BacklogFilters): number {
   let count = 0;
@@ -198,6 +215,10 @@ function BacklogTaskCard({
   assigneeIsSelf,
   agentDisplayName,
   canDiscuss,
+  dragging,
+  onDragStart,
+  onDragEnd,
+  onTouchStart,
   onEdit,
   onStart,
   onToggleBlock,
@@ -210,6 +231,10 @@ function BacklogTaskCard({
   assigneeIsSelf?: boolean;
   agentDisplayName?: string;
   canDiscuss: boolean;
+  dragging: boolean;
+  onDragStart: (event: DragEvent<HTMLElement>) => void;
+  onDragEnd: () => void;
+  onTouchStart: (event: TouchEvent<HTMLElement>) => void;
   onEdit: () => void;
   onStart: () => void;
   onToggleBlock: () => void;
@@ -223,7 +248,15 @@ function BacklogTaskCard({
     task.status === "done";
 
   return (
-    <article className="backlog-task group list-virtual" data-priority={task.priority}>
+    <article
+      className="backlog-task group list-virtual"
+      data-priority={task.priority}
+      data-dragging={dragging ? "true" : undefined}
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onTouchStart={onTouchStart}
+    >
       <div className="backlog-task-badges">
         <PriorityBadge priority={task.priority} />
         <TaskExecutionBadge task={task} ready={ready} displayName={agentDisplayName} />
@@ -412,6 +445,23 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   const [formBaseline, setFormBaseline] = useState<BacklogTaskFormState | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dropLane, setDropLane] = useState<TaskStatus | null>(null);
+  const { track: trackBoardEdge, stop: stopBoardScroll } = useEdgeAutoScroll();
+  const boardRef = useRef<HTMLDivElement | null>(null);
+  const touchDrag = useTouchTaskDrag({
+    onStart: (taskId) => setDraggedTaskId(taskId),
+    onMove: (point) => {
+      if (boardRef.current) trackBoardEdge(boardRef.current, point.x);
+      const status = laneStatusAtPoint(document, point);
+      setDropLane(isTaskStatus(status) ? status : null);
+    },
+    onDrop: () => {
+      moveTaskToLane(draggedTaskId, dropLane);
+      endTaskDrag();
+    },
+    onCancel: endTaskDrag,
+  });
   const formDirty = Boolean(form && formBaseline && !taskBoardFormsEqual(form, formBaseline));
   const confirmDiscardChanges = useUnsavedChangesGuard(formDirty && !saving && !deleting);
   const backlogTasks = useMemo(() => tasks.filter((task) => !task.isRoutine), [tasks]);
@@ -419,6 +469,10 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   const grouped = useMemo(() => tasksByStatus(filteredTasks), [filteredTasks]);
   const hasFilterResults = filteredTasks.length > 0;
   const showEmptyBoard = backlogTasks.length === 0 || !hasFilterResults;
+  const draggedTask = useMemo(
+    () => (draggedTaskId ? backlogTasks.find((task) => task.id === draggedTaskId) ?? null : null),
+    [backlogTasks, draggedTaskId],
+  );
 
   function openTaskForm(next: BacklogTaskFormState) {
     setForm(next);
@@ -519,6 +573,87 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     writeViewPreference(VIEW_STORAGE_KEY, next);
   }
 
+  function beginTaskDrag(task: RelayTask, event: DragEvent<HTMLElement>) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData(TASK_DRAG_MEDIA_TYPE, task.id);
+    event.dataTransfer.setData("text/plain", task.title);
+    setDraggedTaskId(task.id);
+  }
+
+  function endTaskDrag() {
+    stopBoardScroll();
+    setDraggedTaskId(null);
+    setDropLane(null);
+  }
+
+  // The board hides its rightmost lanes on a laptop-width window and the
+  // browser does not auto-scroll an overflow container mid-drag, so a card
+  // dragged to the edge pulls the board along itself.
+  function boardDragOver(event: DragEvent<HTMLDivElement>) {
+    if (!draggedTask) return;
+    trackBoardEdge(event.currentTarget, event.clientX);
+  }
+
+  function boardDragLeave(event: DragEvent<HTMLDivElement>) {
+    // Crossing into a lane or a card also raises dragleave on the board; only
+    // a pointer that has left the board entirely should halt the scroll.
+    const next = event.relatedTarget;
+    if (next instanceof Node && event.currentTarget.contains(next)) return;
+    stopBoardScroll();
+  }
+
+  // The lane a drop would land in, and whether it would be refused. Only the
+  // hovered lane is decorated; a task's own lane stays neutral so hovering
+  // back over the origin does not read as an error.
+  function laneDropState(status: TaskStatus): "active" | "blocked" | undefined {
+    if (!draggedTask || dropLane !== status) return undefined;
+    const rejection = taskDropRejection(draggedTask, status);
+    if (!rejection) return "active";
+    return rejection === "needs_assignment" ? "blocked" : undefined;
+  }
+
+  function laneDragOver(status: TaskStatus, event: DragEvent<HTMLElement>) {
+    // Without preventDefault the browser never fires `drop` on this element.
+    if (!draggedTask) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = draggedTask.status === status ? "none" : "move";
+    if (dropLane !== status) setDropLane(status);
+  }
+
+  function laneDragLeave(event: DragEvent<HTMLElement>) {
+    // dragleave also fires when the pointer crosses into a child card, so keep
+    // the lane highlighted until the pointer truly leaves it.
+    const next = event.relatedTarget;
+    if (next instanceof Node && event.currentTarget.contains(next)) return;
+    setDropLane(null);
+  }
+
+  // The single commit path for both input methods: HTML5 drops from a mouse
+  // and press-and-hold drags from a finger.
+  function moveTaskToLane(taskId: string | null, status: TaskStatus | null) {
+    const task = taskId && status ? backlogTasks.find((candidate) => candidate.id === taskId) : undefined;
+    if (!task || !status) return;
+    const rejection = taskDropRejection(task, status);
+    if (rejection === "needs_assignment") {
+      announce({ message: t("backlog.drop_needs_assignment"), tone: "error" });
+      return;
+    }
+    if (rejection) return;
+    updateTaskMutation.mutate({ taskId: task.id, input: { status } }, {
+      onSuccess: () => announce({
+        message: t("backlog.drop_moved", { title: task.title, status: t(`backlog.statuses.${status}`) }),
+        tone: "success",
+      }),
+    });
+  }
+
+  function dropTaskInLane(status: TaskStatus, event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+    const taskId = readDraggedTaskId(event.dataTransfer) ?? draggedTaskId;
+    endTaskDrag();
+    moveTaskToLane(taskId, status);
+  }
+
   function taskHandlers(task: RelayTask) {
     const discussionAgents = discussionAgentsForTask(task, nodes, logicalAgents);
     const discussionAssignments = logicalAgents
@@ -606,9 +741,24 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
           })}
         </div>
       ) : (
-        <div className="backlog-board">
+        <div
+          ref={boardRef}
+          className="backlog-board"
+          data-dragging={draggedTask ? "true" : undefined}
+          onDragOver={boardDragOver}
+          onDragLeave={boardDragLeave}
+        >
           {TASK_STATUSES.map((status) => (
-            <section key={status} className="backlog-lane" data-status={status} aria-label={t(`backlog.statuses.${status}`)}>
+            <section
+              key={status}
+              className="backlog-lane"
+              data-status={status}
+              data-drop={laneDropState(status)}
+              aria-label={t(`backlog.statuses.${status}`)}
+              onDragOver={(event) => laneDragOver(status, event)}
+              onDragLeave={laneDragLeave}
+              onDrop={(event) => dropTaskInLane(status, event)}
+            >
               <header className="backlog-lane-head">
                 <span className="backlog-lane-label">{t(`backlog.statuses.${status}`)}</span>
                 <span className="backlog-lane-count">{grouped[status].length}</span>
@@ -630,6 +780,10 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
                       agentDisplayName={assignment.name}
                       ready={assignment.ready}
                       canDiscuss={canDiscussTask(task) && discussionAgents.length > 0}
+                      dragging={draggedTaskId === task.id}
+                      onDragStart={(event) => beginTaskDrag(task, event)}
+                      onDragEnd={endTaskDrag}
+                      onTouchStart={(event) => touchDrag.onTouchStart(task.id, event)}
                       {...taskHandlers(task)}
                     />
                   );
@@ -639,6 +793,14 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
           ))}
         </div>
       )}
+
+      {/* A touch drag has no browser-drawn drag image, so the card's identity
+          has to follow the finger explicitly. */}
+      {touchDrag.point && draggedTask ? (
+        <span className="backlog-drag-ghost" aria-hidden="true" style={dragGhostStyle(touchDrag.point)}>
+          {draggedTask.title}
+        </span>
+      ) : null}
 
       {form ? (
         <TaskDrawer
