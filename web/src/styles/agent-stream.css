@@ -299,12 +299,24 @@
 /* Syntax-highlight token colors live in styles/syntax.css (highlight.js
    `hljs-*` classes), shared with the workspace file preview. */
 
+/* As a bare block sharing the code's own left edge and line rhythm, the label
+   scanned as a stray token of the snippet ("ts" sitting above `export …`).
+   Make it unmistakably chrome: a bordered micro-caps chip on its own surface.
+   `sticky left:0` keeps it anchored when a wide snippet scrolls sideways. */
 .agent-code-lang {
+  position: sticky;
+  left: 0;
   display: block;
-  margin-bottom: var(--sp-1);
+  width: max-content;
+  margin-bottom: var(--sp-2);
+  padding: var(--sp-0-5) var(--sp-1-5);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-1);
+  background: var(--surface-1);
   color: var(--ink-3);
-  font: var(--type-label-strong);
-  text-transform: lowercase;
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
 }
 
 /* Reasoning tier kept for diagnostic/debug renderers. The main chat transcript

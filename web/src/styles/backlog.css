@@ -208,6 +208,11 @@
 
 /* ── Pipeline board ──────────────────────────────────────────────────── */
 
+/* Seven lanes at --backlog-lane-w overflow every desktop width (1904px of
+   content in a 1212px viewport), so a trailing lane is always sliced. Fade the
+   trailing edge so the cut reads as deliberate and signals more to scroll,
+   instead of a card that looks broken off. Mask only — the lane stays fully
+   scrollable and nothing is covered by an opaque overlay. */
 .backlog-board {
   min-height: 0;
   flex: 1;
@@ -217,6 +222,9 @@
   gap: 0;
   scroll-snap-type: x proximity;
   padding-bottom: var(--sp-2);
+  /* `black` here is an alpha carrier for the mask, not a palette colour — it
+     never paints. Kept as a keyword so it doesn't read as an untokenised hex. */
+  mask-image: linear-gradient(to right, black calc(100% - var(--sp-7)), transparent 100%);
 }
 
 .backlog-lane {
@@ -511,9 +519,18 @@
   50% { opacity: 1; }
 }
 
+/* The title is a Button, so it arrives with the primitive's `whitespace-nowrap`
+   and `shrink-0`. Left alone a long title is sliced at the card edge with no
+   ellipsis (text-overflow defaults to `clip`), hiding over half the text with
+   no cue. Wrap to two lines and clamp, matching .backlog-description. */
 .backlog-task-title {
-  display: block;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   width: 100%;
+  min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
@@ -522,6 +539,8 @@
   font: var(--type-label-strong);
   letter-spacing: var(--track-0);
   text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 

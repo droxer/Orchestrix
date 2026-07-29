@@ -9,6 +9,7 @@ import { ActionSearch } from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { StatusPill } from "./StatusPill";
 import { AgentWorkspacePage, type WorkspacePageTab } from "./AgentWorkspacePage";
+import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
 import { Badge } from "./ui/badge";
 import { describeAgentPlacements } from "../lib/agentPlacements";
@@ -230,6 +231,17 @@ export function AgentsPage({
       tabIndex={-1}
     >
       <div className="agents-roster" aria-label={t("agents_page.title")}>
+        {/* Agents was the only primary route with no PageHeader — it rendered
+            with zero headings in the document, so the panel had no title and
+            the page had no h1 for the accessibility tree. Mirrors TeamsPage. */}
+        <PageHeader
+          kicker={t("nav.workforce")}
+          title={t("agents_page.title")}
+          count={t("agents_page.sub", { count: activeAgents.length })}
+          titleVariant="display"
+          layout="stacked"
+        />
+
         {isDetailRoute ? null : (
           <RosterFilterBar
             query={query}

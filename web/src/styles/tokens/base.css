@@ -65,12 +65,22 @@ body {
   transform: translateY(0);
 }
 
-button,
+/* `color` must exclude the shadcn Button for the same reason `background` does
+   below: nearly all Relay CSS is unlayered, and unlayered author styles beat
+   Tailwind's `@layer utilities` no matter the specificity. Without this guard
+   `color: inherit` silently defeats every variant's text utility — a filled
+   `default` button then draws its label in the ambient --ink-2 on the --action
+   fill (1.44:1 dark / 1.81:1 light). Keep the two resets in sync. */
+button:not([data-slot="button"]),
 input,
 textarea,
 select {
   font: inherit;
   color: inherit;
+}
+
+button[data-slot="button"] {
+  font: inherit;
 }
 
 button,

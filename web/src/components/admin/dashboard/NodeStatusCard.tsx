@@ -10,14 +10,18 @@ interface NodeStatusCardProps {
   className?: string;
 }
 
-type Tone = "good" | "info" | "bad" | "muted";
+type Tone = "good" | "info" | "bad" | "warn" | "muted";
 type Slot = { key: string; tone: Tone; count: number; share: number };
 
+// One tone per state. `stale` used to share `bad` with `failed`, which rendered
+// two different node conditions in the identical --err value — indistinguishable
+// in both the meter and the dots. Stale is a warning (last-seen has lapsed), not
+// a failure, so it takes the --warn step that the dashboard was not yet using.
 const ORDER: Array<{ key: string; tone: Tone }> = [
   { key: "ready", tone: "good" },
   { key: "running", tone: "info" },
   { key: "failed", tone: "bad" },
-  { key: "stale", tone: "bad" },
+  { key: "stale", tone: "warn" },
   { key: "unknown", tone: "muted" },
 ];
 
