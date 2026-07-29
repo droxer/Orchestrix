@@ -54,10 +54,12 @@ export function TopEmployees({ employees, nodes, ranked, className }: TopEmploye
                   {t("admin.v2.dash_top_nodes", { count: row.nodeCount })}
                 </span>
               </div>
+              <span className="adm-dash-top-count tnum">{row.sessionCount}</span>
+              {/* Own grid line spanning name → count, so it reads as a row
+                  meter rather than an underline of the employee name. */}
               <div className="adm-dash-top-bar" aria-hidden="true">
                 <span style={{ width: `${Math.max(row.share * 100, 4)}%` }} />
               </div>
-              <span className="adm-dash-top-count tnum">{row.sessionCount}</span>
             </li>
           ))}
         </ol>

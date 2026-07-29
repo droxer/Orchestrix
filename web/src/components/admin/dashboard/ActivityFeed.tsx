@@ -13,8 +13,11 @@ interface ActivityFeedProps {
   className?: string;
 }
 
-const ICONS: Record<string, { Icon: LucideIcon; tone: "info" | "good" | "bad" | "muted" }> = {
-  "session.created": { Icon: ActivityPending, tone: "info" },
+// Feed entries are history, never live work, so none of them may take
+// --live — the accent means an agent is running right now. Shape carries the
+// kind (each row has its own icon); brightness carries the weight.
+const ICONS: Record<string, { Icon: LucideIcon; tone: "good" | "bad" | "muted" }> = {
+  "session.created": { Icon: ActivityPending, tone: "muted" },
   "session.completed": { Icon: ActivitySuccess, tone: "good" },
   "session.failed": { Icon: ActivityFailed, tone: "bad" },
   "task.created": { Icon: ActivityNewMessage, tone: "muted" },

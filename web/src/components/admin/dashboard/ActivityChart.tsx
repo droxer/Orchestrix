@@ -91,8 +91,8 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
       >
         <defs>
           <linearGradient id="adm-dash-area" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--color-info)" stopOpacity="0.18" />
-            <stop offset="100%" stopColor="var(--color-info)" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--ink-3)" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="var(--ink-3)" stopOpacity="0" />
           </linearGradient>
         </defs>
         {gridLines.map((y, i) => (
@@ -112,7 +112,7 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
           ref={lineRef}
           d={linePath}
           fill="none"
-          stroke="var(--color-info)"
+          stroke="var(--ink-2)"
           strokeWidth={1.5}
           className="adm-dash-chart-line"
           style={lineLength > 0 ? { "--chart-path-length": `${lineLength}px` } as CSSProperties : undefined}
@@ -124,7 +124,7 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
             y={tick.y + 3}
             fontSize={10}
             textAnchor="end"
-            fill="var(--color-muted-foreground)"
+            fill="var(--ink-4)"
             fontFamily="var(--font-sans)"
           >
             {tick.value}
@@ -137,7 +137,7 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
             y={HEIGHT - 8}
             fontSize={10}
             textAnchor="middle"
-            fill="var(--color-muted-foreground)"
+            fill="var(--ink-4)"
             fontFamily="var(--font-sans)"
           >
             {tick.label}

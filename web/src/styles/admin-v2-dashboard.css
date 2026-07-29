@@ -1,14 +1,21 @@
 /* =====================================================================
    Admin Dashboard  (adm-dash-* namespace)
-   Editorial control-room overview: oversized sans-tabular numerals,
-   hairline grids, monochrome ink actions. Reuses the admin-v2
-   tokens so the page reads as the same product as People and Fleet.
+
+   The control room, read as one instrument. Phosphor rules apply in full:
+   the page is grey until something is working, and the single chromatic
+   role --live marks nodes that are running an agent RIGHT NOW — nowhere
+   else. Ready is not green, completed is not green; only "in flight" is.
+
+   Composition is a 2:1 editorial split rather than a uniform card grid:
+   the wide column carries the two time-series, the rail carries the two
+   rosters, and their natural heights balance instead of leaving the
+   ragged holes the old three-across belt produced.
    ===================================================================== */
 
 .adm-dash {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-6);
+  gap: var(--sp-5);
   padding: var(--sp-6) var(--sp-7) var(--sp-8);
   min-width: 0;
   max-width: 1440px;
@@ -16,14 +23,17 @@
   width: 100%;
 }
 
-/* ── KPI row ──────────────────────────────────────────────────────────
-   Hero tile (Conversations) takes the 2fr track; three 1fr tiles fill the
-   rest. Keeps a single hero numeral as the page's first read. */
+/* ── KPI rail ─────────────────────────────────────────────────────────
+   One bordered instrument panel divided by hairlines, not four floating
+   cards — the summary is a single read. The hero tile takes the 2fr
+   track so the page has exactly one first-glance numeral. */
 .adm-dash-kpis {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 1fr;
   border: 1px solid var(--line-1);
-  background: var(--surface-0);
+  border-radius: var(--r-3);
+  background: var(--surface-1);
+  overflow: hidden;
 }
 
 /* Lean row — token usage not yet reported, so its tile is omitted and the
@@ -37,18 +47,11 @@
   position: relative;
 }
 
-@media (min-width: 1200px) {
-  .adm-dash-kpis {
-    margin-inline: calc(-1 * var(--sp-7));
-    width: calc(100% + 2 * var(--sp-7));
-  }
-}
-
 .adm-dash-tile {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
-  padding: var(--sp-4) var(--sp-4);
+  gap: var(--sp-2);
+  padding: var(--sp-5);
   border-right: 1px solid var(--line-1);
   min-width: 0;
 }
@@ -56,14 +59,16 @@
 .adm-dash-tile:last-child { border-right: none; }
 
 .adm-dash-tile--hero {
-  padding: var(--sp-4) var(--sp-6);
+  padding: var(--sp-5) var(--sp-6);
   gap: var(--sp-3);
+  background: var(--surface-0);
 }
 
 .adm-dash-tile-eyebrow {
   font: var(--type-micro);
-  letter-spacing: var(--track-0);
-  color: var(--ink-3);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-4);
 }
 
 .adm-dash-tile-value {
@@ -71,14 +76,21 @@
   letter-spacing: var(--track-display);
   color: var(--ink-1);
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 .adm-dash-tile--hero .adm-dash-tile-value {
   font-family: var(--font-display);
-  font-size: clamp(2.5rem, 4vw, 3.25rem);
-  font-weight: 500;
+  font-size: clamp(2.75rem, 4.4vw, 3.5rem);
+  font-weight: 700;
   line-height: 1;
   letter-spacing: var(--track-display);
+}
+
+/* Secondary tiles step down a full tier so the hero stays the only
+   display-scale numeral on the page. */
+.adm-dash-tile:not(.adm-dash-tile--hero) .adm-dash-tile-value {
+  font-size: var(--fs-6);
 }
 
 .adm-dash-tile-foot {
@@ -86,6 +98,8 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-3);
+  margin-top: auto;
+  padding-top: var(--sp-1);
   color: var(--ink-3);
 }
 
@@ -97,58 +111,56 @@
 .adm-dash-delta {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-1);
+  gap: var(--sp-1-5);
   font-size: var(--fs-2);
   font-family: var(--font-sans);
   letter-spacing: var(--track-0);
 }
 
-.adm-dash-delta.tone-up { color: var(--ok); }
-.adm-dash-delta.tone-down { color: var(--err); }
-.adm-dash-delta.tone-flat { color: var(--ink-3); }
+/* Direction is carried by the glyph; brightness carries emphasis. A rising
+   trend is not "good" and a falling one is not "bad" — Relay does not
+   moralise its own metrics, so neither takes a status hue. */
+.adm-dash-delta.tone-up { color: var(--ink-2); }
+.adm-dash-delta.tone-down { color: var(--ink-3); }
+.adm-dash-delta.tone-flat { color: var(--ink-4); }
+
+.adm-dash-delta-glyph {
+  font-size: var(--fs-1);
+  line-height: 1;
+}
 
 /* ── Layout ──────────────────────────────────────────────────────────
-   KPIs → belt (threads chart spans 2 cols + fleet / people / tokens)
-   → activity stream. */
-.adm-dash-belt {
+   KPI rail → 2:1 split (time-series | rosters) → activity stream. The two
+   columns are independent stacks, so a short card never drags a hole
+   through the row beside it. */
+.adm-dash-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--sp-6);
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--sp-5);
+  align-items: start;
 }
 
-.adm-dash-belt > .adm-dash-card--chart {
-  grid-column: span 2;
-}
-
-/* Lean belt — without the token card the three remaining cards read
-   cleanest as a full-width threads chart over fleet + people. */
-.adm-dash-belt--lean {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.adm-dash-belt--lean > .adm-dash-card--chart {
-  grid-column: 1 / -1;
+.adm-dash-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  min-width: 0;
 }
 
 .adm-dash-card {
   display: flex;
   flex-direction: column;
   gap: var(--sp-4);
-  padding: var(--sp-4);
+  padding: var(--sp-5);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-0);
+  border-radius: var(--r-3);
+  background: var(--surface-1);
   min-width: 0;
-  height: 100%;
   transition: border-color var(--t-fast) var(--ease);
 }
 
 .adm-dash-card:hover {
-  border-color: color-mix(in srgb, var(--ink-1) 24%, var(--line-1));
-}
-
-.adm-dash-belt > .adm-dash-card {
-  min-height: 0;
+  border-color: color-mix(in srgb, var(--ink-1) 20%, var(--line-1));
 }
 
 .adm-dash-card-head {
@@ -159,7 +171,7 @@
 
 .adm-dash-card-title {
   margin: 0;
-  font: var(--type-title);
+  font: var(--type-heading);
   letter-spacing: var(--track-display);
   color: var(--ink-1);
 }
@@ -168,10 +180,6 @@
   margin: 0;
   font-size: var(--fs-2);
   color: var(--ink-3);
-}
-
-.adm-dash-card--chart .adm-dash-chart {
-  max-height: 140px;
 }
 
 .adm-dash-card--feed {
@@ -223,33 +231,36 @@
   width: 100%;
   height: auto;
   display: block;
-  max-height: 260px;
+  max-height: 220px;
 }
 
 .adm-dash-chart--empty { opacity: 0.85; }
 
+/* Deliberately the shortest chart on the page. Token volume is supporting
+   evidence, not the headline — at full height its solid bars outweighed the
+   thread trend and the fleet readout combined. */
 .adm-dash-token-chart {
-  min-height: 120px;
-  max-height: 160px;
-}
-
-.adm-dash-belt .adm-dash-chart {
+  min-height: 110px;
   max-height: 140px;
 }
 
-/* Three stacked series in a monochrome palette: --ok (#7d848d) and --ink-4
-   (#6b727b) are adjacent steps and measured 1.29:1 against each other, so
-   output and cache merged into one flat band. Spread the fills across the
-   ramp (--action / --warn / --ink-4) and separate every stacked segment with
-   a hairline in the card surface, the same way .adm-dash-bar-seg does — the
-   boundary then reads regardless of how close two fills sit. */
+/* Token series read as a brightness ramp, stacked dimmest-at-the-base:
+   output is the product of the work and takes the brightest step, cache is
+   the bulk but the least interesting and sits underneath. None of them may
+   take --action — an action colour on a chart fill reads as "click me", and
+   it previously made Input the loudest mark on the entire page.
+
+   The hairline stroke is the fix from #58 and is kept: adjacent steps of a
+   monochrome ramp merge into one flat band without it, so a segment boundary
+   must be drawn rather than inferred from the fills. It matters more here,
+   not less, because the ramp deliberately uses neighbouring ink steps. */
 .adm-token-seg {
   stroke: var(--surface-1);
   stroke-width: 1;
 }
 
-.adm-token-seg--input { fill: var(--action); }
-.adm-token-seg--output { fill: var(--warn); }
+.adm-token-seg--output { fill: var(--ink-2); }
+.adm-token-seg--input { fill: var(--ink-3); }
 .adm-token-seg--cache { fill: var(--ink-4); }
 
 .adm-token-legend {
@@ -269,23 +280,23 @@
 .adm-token-dot {
   width: 8px;
   height: 8px;
-  border-radius: var(--r-full);
+  border-radius: var(--r-1);
   display: inline-block;
 }
 
-.adm-token-dot--input { background: var(--action); }
-.adm-token-dot--output { background: var(--warn); }
+.adm-token-dot--output { background: var(--ink-2); }
+.adm-token-dot--input { background: var(--ink-3); }
 .adm-token-dot--cache { background: var(--ink-4); }
 
 .adm-dash-empty {
   position: relative;
-  min-height: 200px;
-  max-height: 260px;
+  min-height: 180px;
+  max-height: 220px;
 }
 
 .adm-dash-empty--compact {
-  min-height: 120px;
-  max-height: 160px;
+  min-height: 150px;
+  max-height: 190px;
 }
 
 .adm-dash-empty-overlay {
@@ -304,11 +315,11 @@
   font: var(--type-label-strong);
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
-  color: var(--action);
+  color: var(--ink-3);
   padding: var(--sp-0-5) var(--sp-2);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-0);
+  border-radius: var(--r-1);
+  background: var(--surface-1);
 }
 
 .adm-dash-empty-copy {
@@ -316,16 +327,30 @@
   font-size: var(--fs-2);
   color: var(--ink-3);
   max-width: 28ch;
-  background: var(--surface-0);
+  background: var(--surface-1);
   padding: 0 var(--sp-2);
 }
 
-/* ── Fleet health: stacked bar + stat grid ────────────────────────── */
+/* ── Fleet health ─────────────────────────────────────────────────────
+   Five states have to be told apart in a 10px bar, and the Phosphor grey
+   ramp alone cannot do it — ready #7d848d against unknown #6b727b is one
+   step, and failed and stale resolve to the same --err. So each state is
+   double-encoded, exactly as StatusPill encodes "bad" by shape as well as
+   brightness:
+
+     running  --live      the one accent, and the only legal use here
+     failed   --err       brightest ink, solid
+     stale    --warn      distinguished from failed by hatch texture
+     ready    --ok        calm mid grey
+     unknown  --ink-4     dimmest
+
+   Data-viz exception to "hue is text/dot only, never fills": a bar segment
+   IS the datum. Canvas chrome elsewhere keeps status to text and dots. */
 .adm-dash-bar {
   display: flex;
   width: 100%;
-  height: 10px;
-  border: 1px solid var(--line-1);
+  height: 8px;
+  border-radius: var(--r-full);
   background: var(--line-2);
   overflow: hidden;
 }
@@ -333,18 +358,26 @@
 .adm-dash-bar-seg {
   display: block;
   height: 100%;
-  border-right: 1px solid var(--surface-0);
+  border-right: 1px solid var(--surface-1);
 }
 
 .adm-dash-bar-seg:last-child { border-right: none; }
-/* Data-viz exception to "hue is status text/dot only, never fills": a stacked
-   bar segment IS the datum, so it takes the status hue as its fill. Scoped to
-   the chart; canvas chrome elsewhere keeps status to text and dots. */
+
+.adm-dash-bar-seg.tone-live { background: var(--live); }
+.adm-dash-bar-seg.tone-bad { background: var(--err); }
 .adm-dash-bar-seg.tone-good { background: var(--ok); }
-.adm-dash-bar-seg.tone-info { background: var(--info); }
-.adm-dash-bar-seg.tone-bad  { background: var(--err); }
-.adm-dash-bar-seg.tone-warn { background: var(--warn); }
+
 .adm-dash-bar-seg.tone-muted { background: var(--ink-4); }
+
+.adm-dash-bar-seg.tone-warn {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--warn),
+    var(--warn) 2px,
+    transparent 2px,
+    transparent 4px
+  );
+}
 
 .adm-dash-bar-empty {
   flex: 1;
@@ -355,31 +388,19 @@
     var(--line-1) 6px,
     var(--line-1) 7px
   );
-  animation: adm-bar-hatch 1.2s var(--ease) forwards;
-}
-
-@keyframes adm-bar-hatch {
-  from { opacity: 0.4; }
-  to { opacity: 1; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .adm-dash-bar-empty {
-    animation: none;
-  }
 }
 
 .adm-dash-stat-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--sp-4);
+  gap: var(--sp-4) var(--sp-3);
   margin: 0;
 }
 
 .adm-dash-stat {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-0-5);
+  gap: var(--sp-1);
   min-width: 0;
 }
 
@@ -394,17 +415,35 @@
 }
 
 .adm-dash-stat-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--r-1);
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-full);
   background: currentColor;
+  flex-shrink: 0;
 }
 
 .adm-dash-stat.tone-good { color: var(--ok); }
-.adm-dash-stat.tone-info { color: var(--info); }
 .adm-dash-stat.tone-bad  { color: var(--err); }
 .adm-dash-stat.tone-warn { color: var(--warn); }
-.adm-dash-stat.tone-muted { color: var(--ink-3); }
+.adm-dash-stat.tone-muted { color: var(--ink-4); }
+
+/* The only chromatic role on the page, and only while count > 0: a live
+   node is an agent working right now. An idle fleet is entirely grey, so
+   colour density on this card is a utilisation readout. */
+.adm-dash-stat.tone-live { color: var(--live); }
+
+.adm-dash-stat.tone-live .adm-dash-stat-dot {
+  animation: adm-live-pulse var(--t-pulse) var(--ease) infinite;
+}
+
+@keyframes adm-live-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 45%, transparent); }
+  60% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--live) 0%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .adm-dash-stat.tone-live .adm-dash-stat-dot { animation: none; }
+}
 
 /* Bad drops out of the brightness race: --err is byte-identical to --action,
    so a solid dot reads as "primary/selected" rather than "problem". Hollow
@@ -418,12 +457,15 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--fs-5);
-  font-weight: 550;
-  line-height: 1.0;
+  font-weight: 700;
+  line-height: 1;
   letter-spacing: var(--track-display);
   color: var(--ink-1);
   font-variant-numeric: tabular-nums;
 }
+
+/* The running count is the one numeral allowed to carry --live. */
+.adm-dash-stat.tone-live .adm-dash-stat-value { color: var(--live); }
 
 /* ── Top employees ────────────────────────────────────────────────── */
 .adm-dash-top-list {
@@ -437,15 +479,16 @@
 
 .adm-dash-top-row {
   display: grid;
-  grid-template-columns: 24px 28px minmax(0, 1fr) minmax(40px, 1fr) auto;
+  grid-template-columns: 1.25rem 28px minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--sp-3);
+  gap: var(--sp-1) var(--sp-3);
 }
 
 .adm-dash-top-rank {
   font-size: var(--fs-2);
-  color: var(--ink-3);
+  color: var(--ink-4);
   letter-spacing: var(--track-caps);
+  font-variant-numeric: tabular-nums;
 }
 
 .adm-dash-top-meta {
@@ -464,26 +507,35 @@
 }
 
 .adm-dash-top-sub {
-  font-size: var(--fs-2);
-  color: var(--ink-3);
+  font-size: var(--fs-1);
+  color: var(--ink-4);
   letter-spacing: var(--track-caps);
 }
 
+/* The share bar spans the whole row on its own grid line rather than sitting
+   in a column of its own: at rail width a five-column row crushed the name to
+   an ellipsis after ~9 characters, and tucking the bar under just the name
+   made it read as a text underline. A full-row rule reads as a meter. */
 .adm-dash-top-bar {
   position: relative;
-  height: 4px;
-  background: var(--line-2);
+  grid-column: 3 / -1;
+  height: 2px;
+  overflow: hidden;
 }
 
 .adm-dash-top-bar > span {
   display: block;
   height: 100%;
-  background: var(--action);
-  min-width: 4px;
+  background: var(--ink-3);
+  min-width: 3px;
+  border-radius: var(--r-full);
 }
 
 .adm-dash-top-count {
+  font-family: var(--font-display);
   font-size: var(--fs-3);
+  font-weight: 700;
+  letter-spacing: var(--track-display);
   color: var(--ink-1);
   font-variant-numeric: tabular-nums;
 }
@@ -501,7 +553,7 @@
 .adm-dash-feed::before {
   content: "";
   position: absolute;
-  left: 11px;
+  left: 19px;
   top: var(--sp-3);
   bottom: var(--sp-3);
   width: 1px;
@@ -516,7 +568,7 @@
   align-items: start;
   position: relative;
   content-visibility: auto;
-  contain-intrinsic-size: auto 56px;
+  contain-intrinsic-size: auto 52px;
 }
 
 .adm-dash-feed-row:not(:last-child) {
@@ -531,15 +583,15 @@
   height: 24px;
   border-radius: var(--r-full);
   border: 1px solid currentColor;
-  background: var(--surface-0);
+  background: var(--surface-1);
   position: relative;
   z-index: 1;
 }
 
+/* No tone-live here: feed rows are history, not work in flight. */
 .adm-dash-feed-icon.tone-good { color: var(--ok); }
 .adm-dash-feed-icon.tone-bad  { color: var(--err); }
-.adm-dash-feed-icon.tone-info { color: var(--info); }
-.adm-dash-feed-icon.tone-muted { color: var(--ink-3); }
+.adm-dash-feed-icon.tone-muted { color: var(--ink-4); }
 
 .adm-dash-feed-body {
   display: flex;
@@ -550,7 +602,7 @@
 
 .adm-dash-feed-message {
   font-size: var(--fs-3);
-  color: var(--ink-1);
+  color: var(--ink-2);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -561,23 +613,23 @@
 }
 
 .adm-dash-feed-owner {
-  font-size: var(--fs-2);
-  color: var(--ink-3);
+  font-size: var(--fs-1);
+  color: var(--ink-4);
   letter-spacing: var(--track-caps);
 }
 
 .adm-dash-feed-time {
-  font-size: var(--fs-2);
-  color: var(--ink-3);
+  font-size: var(--fs-1);
+  color: var(--ink-4);
   letter-spacing: var(--track-caps);
   white-space: nowrap;
-  padding-top: var(--sp-0-5);
+  padding-top: var(--sp-1);
   font-variant-numeric: tabular-nums;
 }
 
 @media (min-width: 900px) {
   .adm-dash-feed-row {
-    grid-template-columns: 24px minmax(0, 1fr) 4.5rem;
+    grid-template-columns: 24px minmax(0, 1fr) 5rem;
   }
 
   .adm-dash-feed-time {
@@ -587,19 +639,49 @@
 
 /* ── Responsive ───────────────────────────────────────────────────── */
 @media (max-width: 1200px) {
-  .adm-dash-belt { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .adm-dash-belt > .adm-dash-card--chart { grid-column: 1 / -1; }
-  .adm-dash-belt > :last-child { grid-column: 1 / -1; }
+  .adm-dash-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 900px) {
-  .adm-dash-belt { grid-template-columns: minmax(0, 1fr); }
-  .adm-dash-belt > .adm-dash-card--chart { grid-column: auto; }
-  .adm-dash-belt > :last-child { grid-column: auto; }
+  .adm-dash {
+    padding: var(--sp-5) var(--sp-5) var(--sp-7);
+  }
+
   .adm-dash-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .adm-dash-tile { grid-column: span 1; }
   .adm-dash-tile--hero { grid-column: 1 / -1; border-right: none; border-bottom: 1px solid var(--line-1); }
   .adm-dash-tile--nodes { border-right: 1px solid var(--line-1); border-bottom: 1px solid var(--line-1); }
   .adm-dash-tile--employees { border-right: none; border-bottom: 1px solid var(--line-1); }
   .adm-dash-tile--tokens { grid-column: 1 / -1; border-right: none; }
+}
+
+/* Phone: stay two-up rather than collapsing to a single column — four stacked
+   full-width tiles pushed the first chart most of a screen below the fold. */
+@media (max-width: 640px) {
+  .adm-dash {
+    padding: var(--sp-4) var(--sp-4) var(--sp-6);
+    gap: var(--sp-4);
+  }
+
+  .adm-dash-col {
+    gap: var(--sp-4);
+  }
+
+  .adm-dash-tile {
+    padding: var(--sp-4);
+  }
+
+  .adm-dash-tile--hero {
+    padding: var(--sp-4);
+  }
+
+  .adm-dash-tile:not(.adm-dash-tile--hero) .adm-dash-tile-value {
+    font-size: var(--fs-5);
+  }
+
+  .adm-dash-card {
+    padding: var(--sp-4);
+  }
 }
