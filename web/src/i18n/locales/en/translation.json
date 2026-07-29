@@ -223,6 +223,8 @@
     "view_list": "List view",
     "col_task": "Task",
     "linked": "linked",
+    "drop_moved": "Moved “{{title}}” to {{status}}.",
+    "drop_needs_assignment": "Assign an agent or a team before moving a task to Assigned.",
     "no_tasks_title": "No tasks yet",
     "no_tasks_body": "Create a task and assign it to an agent.",
     "no_match_title": "No matching tasks",

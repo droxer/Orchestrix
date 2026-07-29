@@ -18,8 +18,8 @@ import {
   updateTask,
   updateTeam,
 } from "../api";
-import type { AgentRunInput, AgentTaskMode, CreateTaskInput, RelaySession, RunInput, TaskMutationInput, TeamMutationInput } from "../types";
-import { RELAY_QUERY_KEY, SESSIONS_QUERY_KEY } from "./useRelayData";
+import type { AgentRunInput, AgentTaskMode, CreateTaskInput, RelaySession, RelayTask, RunInput, TaskMutationInput, TeamMutationInput } from "../types";
+import { RELAY_QUERY_KEY, SESSIONS_QUERY_KEY, TASKS_QUERY_KEY } from "./useRelayData";
 import { useMutationError } from "./useMutationError";
 import { useDialogs } from "../components/ui/DialogProvider";
 import { TEAMS_QUERY_KEY } from "./useTeams";
@@ -103,10 +103,30 @@ export function useRelayMutations() {
     onError: onRelayError("Failed to create task", "errors.save_task"),
   });
 
+  // Status is applied to the cache up front so a card dragged between board
+  // lanes lands immediately instead of springing back until the PATCH returns.
+  // Only status is patched optimistically: it is a plain enum the board reads
+  // directly, whereas the drawer's other fields are normalized server-side and
+  // their latency is hidden by the drawer closing anyway.
   const updateTaskMutation = useMutation({
     mutationFn: ({ taskId, input }: { taskId: string; input: TaskMutationInput }) => updateTask(taskId, input),
-    onSuccess: () => void invalidateRelay(),
-    onError: onRelayError("Failed to update task", "errors.save_task"),
+    onMutate: async ({ taskId, input }: { taskId: string; input: TaskMutationInput }) => {
+      const status = input.status;
+      if (!status) return { previous: undefined };
+      await queryClient.cancelQueries({ queryKey: TASKS_QUERY_KEY });
+      const previous = queryClient.getQueryData<RelayTask[]>(TASKS_QUERY_KEY);
+      queryClient.setQueryData<RelayTask[]>(TASKS_QUERY_KEY, (current) =>
+        (current ?? []).map((task) => (task.id === taskId ? { ...task, status } : task)),
+      );
+      return { previous };
+    },
+    onError: (error, _input, context) => {
+      if (context?.previous) queryClient.setQueryData(TASKS_QUERY_KEY, context.previous);
+      onRelayError("Failed to update task", "errors.save_task")(error);
+    },
+    // Settled, not success: a rolled-back failure must resync from the server
+    // too, otherwise the board keeps showing the pre-mutation snapshot.
+    onSettled: () => void invalidateRelay(),
   });
 
   const deleteTaskMutation = useMutation({

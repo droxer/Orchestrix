@@ -223,6 +223,8 @@
     "view_list": "清單檢視",
     "col_task": "任務",
     "linked": "已關聯",
+    "drop_moved": "已將「{{title}}」移至{{status}}。",
+    "drop_needs_assignment": "移至「已分派」前，請先指定智能體或團隊。",
     "no_tasks_title": "尚無任務",
     "no_tasks_body": "建立任務並指派給智能體。",
     "no_match_title": "沒有符合的任務",
