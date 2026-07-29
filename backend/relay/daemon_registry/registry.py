@@ -71,6 +71,12 @@ DAEMON_NODE_LIVENESS_TIMEOUT_MS = int(
 DAEMON_RUN_TIMEOUT_MS = int(
     os.environ.get("RELAY_DAEMON_RUN_TIMEOUT_MS", str(15 * 60 * 1000))
 )
+# How often an idle daemon's heartbeat reaches the durable node row. Must stay
+# comfortably under DAEMON_NODE_LIVENESS_TIMEOUT_MS so a replica reading
+# persisted state never mistakes a live node for a stale one.
+DAEMON_NODE_SEEN_PERSIST_INTERVAL_SECONDS = float(
+    os.environ.get("RELAY_DAEMON_NODE_SEEN_PERSIST_INTERVAL_SECONDS", "5")
+)
 DAEMON_COMMAND_LEASE_SECONDS = float(
     os.environ.get("RELAY_DAEMON_COMMAND_LEASE_SECONDS", "60")
 )
@@ -297,6 +303,7 @@ class DaemonNodeRegistry:
         )
         self._last_reap_at = 0.0
         self._last_prune_at = 0.0
+        self._last_seen_persisted_at: dict[str, float] = {}
         self._load_persisted_state()
 
     def register(
@@ -746,6 +753,7 @@ class DaemonNodeRegistry:
         self.daemon_store.delete_node(sandbox_id)
         self.sandboxes.pop(sandbox_id, None)
         self.plain_node_tokens.pop(sandbox_id, None)
+        self._last_seen_persisted_at.pop(sandbox_id, None)
         for command_id, command in list(self.active_commands.items()):
             if (
                 command.get("sandboxId") == sandbox_id
@@ -2216,6 +2224,18 @@ class DaemonNodeRegistry:
             logger.warning("Unauthorized daemon node request", sandbox_id=sandbox_id)
             raise PermissionError("Unauthorized daemon node request.")
 
+    def _should_persist_seen(self, sandbox_id: str) -> bool:
+        """Rate-limit durable heartbeat writes. Caller must hold dispatch_lock."""
+        monotonic_now = time.monotonic()
+        last = self._last_seen_persisted_at.get(sandbox_id)
+        if (
+            last is not None
+            and monotonic_now - last < DAEMON_NODE_SEEN_PERSIST_INTERVAL_SECONDS
+        ):
+            return False
+        self._last_seen_persisted_at[sandbox_id] = monotonic_now
+        return True
+
     def _mark_seen(self, sandbox_id: str) -> None:
         with self.dispatch_lock:
             sandbox = self.sandboxes.get(sandbox_id)
@@ -2233,7 +2253,12 @@ class DaemonNodeRegistry:
             if "lastError" in patch and patch["lastError"] is None:
                 updated.pop("lastError", None)
             self.sandboxes[sandbox_id] = updated
-            self.daemon_store.mark_node_seen(sandbox_id, patch)
+            # An idle long poll calls this several times per second per node.
+            # The in-memory view above stays exact for this replica's liveness
+            # checks; the durable write is throttled well inside the liveness
+            # timeout so other replicas still see the node as online.
+            if revived or self._should_persist_seen(sandbox_id):
+                self.daemon_store.mark_node_seen(sandbox_id, patch)
             if revived:
                 logger.info(
                     "Daemon node came online",
