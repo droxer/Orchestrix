@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { bootstrapUser, login } from "../../api";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RelayMark } from "../RelayMark";
 
@@ -63,8 +64,7 @@ export function AdminLoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap 
         </p>
       </header>
       <form className="adm-form" onSubmit={(event) => void handleSubmit(event)}>
-        <label className="adm-field">
-          <span>{t("admin.username")}</span>
+        <Field label={t("admin.username")}>
           <Input
             name="username"
             className="code"
@@ -74,9 +74,8 @@ export function AdminLoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap 
             spellCheck={false}
             required
           />
-        </label>
-        <label className="adm-field">
-          <span>{t("admin.password")}</span>
+        </Field>
+        <Field label={t("admin.password")}>
           <Input
             name="password"
             className="code"
@@ -86,7 +85,7 @@ export function AdminLoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap 
             autoComplete="current-password"
             required
           />
-        </label>
+        </Field>
         {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
         <Button
           type="submit"
@@ -136,8 +135,7 @@ export function FirstAdminSetupScreen({ onBootstrapped, onSwitchToLogin }: First
         <p className="adm-auth-sub">{t("admin.bootstrap_sub")}</p>
       </header>
       <form className="adm-form" onSubmit={(event) => void handleSubmit(event)}>
-        <label className="adm-field">
-          <span>{t("admin.bootstrap_token")}</span>
+        <Field label={t("admin.bootstrap_token")}>
           <Input
             name="bootstrap-token"
             className="code"
@@ -148,9 +146,8 @@ export function FirstAdminSetupScreen({ onBootstrapped, onSwitchToLogin }: First
             spellCheck={false}
             required
           />
-        </label>
-        <label className="adm-field">
-          <span>{t("admin.username")}</span>
+        </Field>
+        <Field label={t("admin.username")}>
           <Input
             name="username"
             className="code"
@@ -160,9 +157,8 @@ export function FirstAdminSetupScreen({ onBootstrapped, onSwitchToLogin }: First
             spellCheck={false}
             required
           />
-        </label>
-        <label className="adm-field">
-          <span>{t("admin.password")}</span>
+        </Field>
+        <Field label={t("admin.password")}>
           <Input
             name="password"
             className="code"
@@ -172,7 +168,7 @@ export function FirstAdminSetupScreen({ onBootstrapped, onSwitchToLogin }: First
             autoComplete="new-password"
             required
           />
-        </label>
+        </Field>
         {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
         <Button
           type="submit"

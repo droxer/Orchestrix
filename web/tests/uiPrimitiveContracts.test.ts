@@ -22,6 +22,12 @@ function cssHex(block: string, token: string): string {
   return match[1];
 }
 
+/** Comments explain what a rule replaced, so they name the very classes these
+ *  assertions forbid. Strip them before matching against real code. */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+}
+
 describe("UI primitive contracts", () => {
   it("keeps control boundaries at 3:1 against every theme surface", async () => {
     const palette = await readFile(resolve("web/src/styles/tokens/palette.css"), "utf8");
@@ -83,6 +89,102 @@ describe("UI primitive contracts", () => {
     assert.match(source, /whitespace-normal/);
     assert.match(source, /overflow-wrap:anywhere/);
     assert.doesNotMatch(source, /ItemText className="[^"]*whitespace-nowrap/);
+  });
+
+  it("encodes destructive by shape because --err and --action share a value", async () => {
+    const palette = await readFile(resolve("web/src/styles/tokens/palette.css"), "utf8");
+    const dark = palette.match(/:root\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+    const light = palette.match(/html\[data-theme="light"\]\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+
+    // This is the whole reason a destructive button cannot be a tint: in the
+    // Phosphor palette the danger tone IS the action tone. If a future palette
+    // gives --err its own value, revisit the shape encoding below.
+    assert.equal(cssHex(dark, "err"), cssHex(dark, "action"));
+    assert.equal(cssHex(light, "err"), cssHex(light, "action"));
+
+    const button = await readFile(resolve("web/src/components/ui/button.tsx"), "utf8");
+    const destructive = button.match(/destructive:\s*\n?\s*"([^"]*)"/)?.[1] ?? "";
+    assert.ok(destructive, "destructive variant missing");
+
+    // A hairline ring at rest, a full contrast inversion on hover — never a
+    // translucent fill, which would be indistinguishable from `ghost`.
+    assert.match(destructive, /border-destructive/);
+    assert.match(destructive, /hover:bg-destructive\b/);
+    assert.match(destructive, /hover:text-on-primary/);
+    assert.doesNotMatch(destructive, /(?:^|\s)bg-destructive\//);
+  });
+
+  it("keeps floating chrome on the flat elevation role instead of a drop shadow", async () => {
+    const roles = await readFile(resolve("web/src/styles/tokens/roles.css"), "utf8");
+    assert.match(roles, /--shadow-1:\s*none/);
+    assert.match(roles, /--shadow-2:\s*0 0 0 1px var\(--line-1\)/);
+
+    for (const file of ["select.tsx", "card.tsx", "table.tsx"]) {
+      const source = await readFile(resolve(`web/src/components/ui/${file}`), "utf8");
+      assert.doesNotMatch(
+        stripComments(source),
+        /\bshadow-(?:xs|sm|md|lg|xl|2xl)\b/,
+        `${file} uses a Tailwind drop shadow; planes here separate by hairline`,
+      );
+    }
+  });
+
+  it("orders the button size tiers so lg and icon are not smaller than default", async () => {
+    const source = await readFile(resolve("web/src/components/ui/button.tsx"), "utf8");
+    // `default` and `icon` both track --control-h so a square icon button lines
+    // up with the buttons and inputs beside it.
+    assert.match(source, /default:\s*\n?\s*"h-\(--control-h\)/);
+    assert.match(source, /icon:\s*"size-\(--control-h\)"/);
+    // --control-h is 40px, so an `h-9` (36px) lg tier would invert the scale.
+    const lg = source.match(/lg:\s*"h-(\d+)/)?.[1];
+    assert.ok(lg && Number(lg) * 4 > 40, `lg resolves to ${lg}, not larger than --control-h`);
+  });
+
+  it("routes every dropdown through the Select primitive, not native <select>", async () => {
+    for (const file of [
+      "web/src/components/BacklogPage.tsx",
+      "web/src/components/RoutinesPage.tsx",
+      "web/src/components/AgentsPage.tsx",
+      "web/src/components/composer/DecisionBar.tsx",
+    ]) {
+      const source = await readFile(resolve(file), "utf8");
+      assert.doesNotMatch(
+        source,
+        /<select[\s>]/,
+        `${file} renders a native <select>; its popup would be OS chrome, not the app's`,
+      );
+    }
+    // Base UI resolves the trigger label from `items`; without it an unopened
+    // filter renders the raw value ("all") instead of its translation.
+    const filters = await readFile(resolve("web/src/components/FiltersBar.tsx"), "utf8");
+    assert.match(filters, /items=\{options\}/);
+  });
+
+  it("keeps the field label/hint/error stack in the Field primitive", async () => {
+    const drawers = await readFile(resolve("web/src/styles/admin-v2-drawers.css"), "utf8");
+    // The old `.adm-field > span` descendant rule styled label text without a
+    // component, so it only worked inside that one parent.
+    assert.doesNotMatch(drawers, /\.adm-field\s*\{/);
+    assert.doesNotMatch(drawers, /\.adm-field\s*>\s*span/);
+
+    const field = await readFile(resolve("web/src/components/ui/field.tsx"), "utf8");
+    assert.match(field, /data-slot="field"/);
+    // A nested <label> is invalid, so label text is a <span> unless the wrapper
+    // is a <div> carrying an explicit htmlFor target.
+    assert.match(field, /wrapper === "div" && htmlFor/);
+  });
+
+  it("shares one grid template between a table header and its rows", async () => {
+    const source = await readFile(resolve("web/src/components/ui/table.tsx"), "utf8");
+    // Head and rows both read --table-cols, so the two declarations that each
+    // surface used to hand-maintain cannot drift apart again.
+    const uses = source.match(/grid-cols-\(--table-cols\)/g) ?? [];
+    assert.equal(uses.length, 2, "header and row must both read --table-cols");
+    assert.match(source, /"--table-cols": columns/);
+    // div+ARIA, not <table>: these lists restack into cards below 820px.
+    for (const role of ["table", "row", "columnheader", "rowgroup", "cell"]) {
+      assert.match(source, new RegExp(`role: "${role}"`));
+    }
   });
 
   it("supports polite announcements for async workspace results", async () => {

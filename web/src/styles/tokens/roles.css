@@ -13,6 +13,17 @@
   --shadow-1: none;
   --shadow-2: 0 0 0 1px var(--line-1);
 
+  /* Row wash under the pointer. A partial --surface-1 rather than the flat
+     surface so the ruled hairlines stay visible through the hover. Was
+     hand-mixed identically in backlog.css, teams.css, and admin-v2-views.css. */
+  --row-hover: color-mix(in srgb, var(--surface-1) 60%, transparent);
+
+  /* Hairline under the pointer. Cards and rows that are themselves targets
+     strengthen their edge on hover rather than washing their fill, so a hovered
+     card never reads as loud as a selected one. Was hand-mixed at four separate
+     card call sites before it became a role. */
+  --line-strong: color-mix(in srgb, var(--ink-1) 20%, var(--line-1));
+
   /* Interactive control boundary / unchecked track. Unlike structural
      hairlines, this role must remain at least 3:1 against every surface so an
      unfocused field or switch state is still perceivable (WCAG 1.4.11). */

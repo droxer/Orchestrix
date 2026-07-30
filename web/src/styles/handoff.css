@@ -86,17 +86,20 @@
   gap: var(--sp-2);
 }
 
-.handoff-row label {
+/* Stronger than --type-label so a routing row reads as a decision, not a form.
+   Applies to the <Label> primitive here, hence the data-slot hook. */
+.handoff-row [data-slot="label"] {
   color: var(--ink-3);
   font: var(--type-label-strong);
 }
 
-.handoff-row select,
-.handoff-row input,
+/* The row's own selects/inputs are now the <Select> and <Input> primitives,
+   which own their chrome (control border, radius, focus ring). Only the
+   panel-level bare input below still needs the hand-built field treatment. */
 .handoff-panel > input {
   min-width: 0;
   height: var(--control-h);
-  border: 1px solid var(--line-1);
+  border: 1px solid var(--control-border);
   border-radius: var(--r-2);
   outline: 0;
   background: var(--surface-0);
@@ -105,12 +108,10 @@
   font-size: var(--fs-3);
 }
 
-.handoff-row--note input {
+.handoff-row--note [data-slot="input"] {
   grid-column: 2 / span 2;
 }
 
-.handoff-row select:focus-visible,
-.handoff-row input:focus-visible,
 .handoff-panel > input:focus-visible {
   border-color: var(--action);
   box-shadow: var(--focus-ring);

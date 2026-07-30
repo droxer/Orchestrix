@@ -2,6 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import { ActivityFailed, ActivityNewMessage, ActivityPending, ActivitySuccess } from "../../icons";
 import type { DashboardActivityItem } from "../../../api";
@@ -36,12 +44,12 @@ export function ActivityFeed({ items, employees, className }: ActivityFeedProps)
   }, []);
 
   return (
-    <section className={`adm-dash-card adm-dash-card--feed${className ? ` ${className}` : ""}`}>
-      <header className="adm-dash-card-head">
-        <h2 className="adm-dash-card-title">{t("admin.v2.dash_feed_title")}</h2>
-      </header>
+    <Card render={<section />} className={cn("adm-dash-card--feed", className)}>
+      <CardHeader>
+        <CardTitle render={<h2 />}>{t("admin.v2.dash_feed_title")}</CardTitle>
+      </CardHeader>
       {items.length === 0 ? (
-        <p className="adm-dash-card-hint">{t("admin.v2.dash_feed_empty")}</p>
+        <CardDescription>{t("admin.v2.dash_feed_empty")}</CardDescription>
       ) : (
         <ul className="adm-dash-feed">
           {items.map((item, index) => {
@@ -68,7 +76,7 @@ export function ActivityFeed({ items, employees, className }: ActivityFeedProps)
           })}
         </ul>
       )}
-    </section>
+    </Card>
   );
 }
 

@@ -28,6 +28,7 @@ import { ArtifactsEmpty } from "./artifact/ArtifactsEmpty";
 import { MetricItem, WorkspaceEmpty, WorkspaceLoading } from "./workspace/WorkspacePrimitives";
 import { Badge } from "./ui/badge";
 import { Button, buttonVariants } from "./ui/button";
+import { Field } from "@/components/ui/field";
 import { useDialogs } from "./ui/DialogProvider";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -380,8 +381,13 @@ function TeamProfile({
 
           {editing ? (
             <>
-              <label className="adm-field team-profile-lead-field">
-                <span>{t("teams.lead")}</span>
+              <Field
+                label={t("teams.lead")}
+                wrapper="div"
+                className="team-profile-lead-field"
+                error={validationError === "lead" ? t("teams.lead_required") : undefined}
+                errorId="team-profile-lead-error"
+              >
                 <Select value={leadId} disabled={busy || memberIds.length === 0} onValueChange={(value) => {
                   if (value) setLeadId(value);
                   setValidationError(null);
@@ -402,8 +408,7 @@ function TeamProfile({
                     ))}
                   </SelectContent>
                 </Select>
-                {validationError === "lead" ? <span id="team-profile-lead-error" className="text-sm text-danger" role="alert">{t("teams.lead_required")}</span> : null}
-              </label>
+              </Field>
               <div className="team-profile-inline-actions">
                 <span className="team-profile-inline-actions-spacer" />
                 <Button type="button" variant="ghost" onClick={() => void cancelEditing()} disabled={busy}>

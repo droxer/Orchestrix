@@ -10,6 +10,7 @@ import type {
 } from "../../types";
 import { Drawer } from "../ui/Drawer";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import {
@@ -160,11 +161,12 @@ export function AddEmployeeDrawer({
             </div>
           </div>
 
-          <label className="adm-field">
-            <span>
-              {t("admin.employee_id")}
-              <span className="adm-field-req" aria-hidden="true">*</span>
-            </span>
+          <Field
+            label={t("admin.employee_id")}
+            required
+            error={fieldErrors.employeeId}
+            errorId="add-emp-employee-id-error"
+          >
             <Input
               ref={employeeIdRef}
               data-modal-initial-focus
@@ -181,18 +183,9 @@ export function AddEmployeeDrawer({
               aria-invalid={Boolean(fieldErrors.employeeId) || undefined}
               aria-describedby={fieldErrors.employeeId ? "add-emp-employee-id-error" : undefined}
             />
-            {fieldErrors.employeeId ? (
-              <span id="add-emp-employee-id-error" className="text-sm text-danger" role="alert">
-                {fieldErrors.employeeId}
-              </span>
-            ) : null}
-          </label>
+          </Field>
 
-          <label className="adm-field">
-            <span>
-              {t("admin.display_name")}
-              <span className="adm-field-opt">{t("admin.v2.optional")}</span>
-            </span>
+          <Field label={t("admin.display_name")} optional={t("admin.v2.optional")}>
             <Input
               name="display-name"
               value={displayName}
@@ -200,13 +193,9 @@ export function AddEmployeeDrawer({
               autoComplete="off"
               placeholder={t("admin.v2.placeholder_display_name")}
             />
-          </label>
+          </Field>
 
-          <label className="adm-field">
-            <span>
-              {t("admin.email")}
-              <span className="adm-field-opt">{t("admin.v2.optional")}</span>
-            </span>
+          <Field label={t("admin.email")} optional={t("admin.v2.optional")}>
             <Input
               name="email"
               className="code"
@@ -217,7 +206,7 @@ export function AddEmployeeDrawer({
               spellCheck={false}
               placeholder={t("admin.v2.placeholder_email")}
             />
-          </label>
+          </Field>
         </section>
 
         <section className="adm-provision-section" aria-labelledby="adm-emp-credentials">
@@ -227,11 +216,12 @@ export function AddEmployeeDrawer({
             </h3>
           </header>
 
-          <label className="adm-field">
-            <span>
-              {t("admin.username")}
-              <span className="adm-field-req" aria-hidden="true">*</span>
-            </span>
+          <Field
+            label={t("admin.username")}
+            required
+            error={fieldErrors.username}
+            errorId="add-emp-username-error"
+          >
             <Input
               ref={usernameRef}
               name="username"
@@ -247,18 +237,14 @@ export function AddEmployeeDrawer({
               aria-invalid={Boolean(fieldErrors.username) || undefined}
               aria-describedby={fieldErrors.username ? "add-emp-username-error" : undefined}
             />
-            {fieldErrors.username ? (
-              <span id="add-emp-username-error" className="text-sm text-danger" role="alert">
-                {fieldErrors.username}
-              </span>
-            ) : null}
-          </label>
+          </Field>
 
-          <label className="adm-field">
-            <span>
-              {t("admin.password")}
-              <span className="adm-field-req" aria-hidden="true">*</span>
-            </span>
+          <Field
+            label={t("admin.password")}
+            required
+            error={fieldErrors.password}
+            errorId="add-emp-password-error"
+          >
             <Input
               ref={passwordRef}
               name="password"
@@ -273,12 +259,7 @@ export function AddEmployeeDrawer({
               aria-invalid={Boolean(fieldErrors.password) || undefined}
               aria-describedby={fieldErrors.password ? "add-emp-password-error" : undefined}
             />
-            {fieldErrors.password ? (
-              <span id="add-emp-password-error" className="text-sm text-danger" role="alert">
-                {fieldErrors.password}
-              </span>
-            ) : null}
-          </label>
+          </Field>
         </section>
 
         <section className="adm-provision-section" aria-labelledby="adm-emp-assignment">
@@ -292,8 +273,7 @@ export function AddEmployeeDrawer({
           {unassignedNodes.length === 0 ? (
             <p className="adm-form-hint adm-form-hint--notice">{t("admin.unassigned_hint")}</p>
           ) : (
-            <label className="adm-field">
-              <span>{t("admin.assign_node")}</span>
+            <Field label={t("admin.assign_node")} wrapper="div">
               <Select
                 value={selectedNodeId || null}
                 onValueChange={(value) => setSelectedNodeId(value ?? "")}
@@ -312,7 +292,7 @@ export function AddEmployeeDrawer({
                   ))}
                 </SelectContent>
               </Select>
-            </label>
+            </Field>
           )}
         </section>
 

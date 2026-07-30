@@ -34,6 +34,8 @@
   --color-surface-dark: var(--dark-surface);
   --color-hairline: var(--line-1);
   --color-hairline-soft: var(--line-2);
+  --color-hairline-strong: var(--line-strong);
+  --color-row-hover: var(--row-hover);
   --color-success: var(--ok);
   --color-danger: var(--err);
   --color-warning: var(--warn);
@@ -88,9 +90,15 @@
 :root {
   --background: var(--surface-0);
   --foreground: var(--ink-1);
-  --card: var(--surface-0);
+  /* Card = the raised plane, not the canvas. Pointing this at --surface-0 made
+     `bg-card` a no-op against the page background, so every card surface had to
+     re-declare its own fill. */
+  --card: var(--surface-1);
   --card-foreground: var(--ink-1);
-  --popover: var(--surface-0);
+  /* Popover = floating chrome (menus, select popups) and sits on the elevated
+     plane so it reads as above the canvas without a drop shadow. Flat
+     elevation: separation comes from --shadow-2's 1px ring, never a blur. */
+  --popover: var(--surface-3);
   --popover-foreground: var(--ink-1);
   --primary: var(--action);
   --primary-foreground: var(--on-action);

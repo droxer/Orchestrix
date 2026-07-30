@@ -2,6 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface DailyPoint {
   date: string;
@@ -78,10 +86,10 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
   }, [linePath]);
 
   return (
-    <section className={`adm-dash-card adm-dash-card--chart${className ? ` ${className}` : ""}`}>
-      <header className="adm-dash-card-head">
-        <h2 className="adm-dash-card-title">{t("admin.v2.dash_sessions_title")}</h2>
-      </header>
+    <Card render={<section />} className={cn("adm-dash-card--chart", className)}>
+      <CardHeader>
+        <CardTitle render={<h2 />}>{t("admin.v2.dash_sessions_title")}</CardTitle>
+      </CardHeader>
       <svg
         className="adm-dash-chart"
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
@@ -153,12 +161,12 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
           ))}
         </ul>
       ) : null}
-      <footer className="adm-dash-card-foot">
-        <span className="adm-dash-card-hint">
+      <CardFooter className="border-t">
+        <CardDescription render={<span />}>
           {ready ? t("admin.v2.dash_sessions_hint", { count: max }) : t("admin.v2.dash_loading")}
-        </span>
-      </footer>
-    </section>
+        </CardDescription>
+      </CardFooter>
+    </Card>
   );
 }
 

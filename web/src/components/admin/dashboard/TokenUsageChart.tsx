@@ -1,6 +1,13 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import type { TokenUsageSnapshot } from "../../../hooks/useTokenUsage";
 
 const WIDTH = 720;
@@ -71,10 +78,10 @@ export function TokenUsageChart({ snapshot, compact, className }: TokenUsageChar
 
   if (!snapshot.available || snapshot.daily.length === 0) {
     return (
-      <section className={`adm-dash-card${className ? ` ${className}` : ""}`}>
-        <header className="adm-dash-card-head">
-          <h2 className="adm-dash-card-title">{t("admin.v2.dash_tokens_title")}</h2>
-        </header>
+      <Card render={<section />} className={className}>
+        <CardHeader>
+          <CardTitle render={<h2 />}>{t("admin.v2.dash_tokens_title")}</CardTitle>
+        </CardHeader>
         <div className={`adm-dash-empty${compact ? " adm-dash-empty--compact" : ""}`}>
           <PlaceholderBars compact={compact} />
           <div className="adm-dash-empty-overlay">
@@ -83,7 +90,7 @@ export function TokenUsageChart({ snapshot, compact, className }: TokenUsageChar
             {coverageNote ? <p className="adm-dash-empty-copy">{coverageNote}</p> : null}
           </div>
         </div>
-      </section>
+      </Card>
     );
   }
 
@@ -105,17 +112,17 @@ export function TokenUsageChart({ snapshot, compact, className }: TokenUsageChar
   const barW = Math.max(4, (innerW - gap * Math.max(0, points.length - 1)) / Math.max(1, points.length));
 
   return (
-    <section className={`adm-dash-card${className ? ` ${className}` : ""}`}>
-      <header className="adm-dash-card-head">
-        <h2 className="adm-dash-card-title">{t("admin.v2.dash_tokens_title")}</h2>
-      </header>
-      <p className="adm-dash-card-hint">
+    <Card render={<section />} className={className}>
+      <CardHeader>
+        <CardTitle render={<h2 />}>{t("admin.v2.dash_tokens_title")}</CardTitle>
+      </CardHeader>
+      <CardDescription>
         {t("admin.v2.dash_tokens_summary", {
           input: numberFormat.format(visibleTotals.input),
           output: numberFormat.format(visibleTotals.output),
           cache: numberFormat.format(visibleTotals.cache),
         })}
-      </p>
+      </CardDescription>
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="adm-dash-chart adm-dash-token-chart"
@@ -171,7 +178,7 @@ export function TokenUsageChart({ snapshot, compact, className }: TokenUsageChar
         <span><i className="adm-token-dot adm-token-dot--input" aria-hidden="true" />{t("admin.v2.dash_tokens_input")}</span>
         <span><i className="adm-token-dot adm-token-dot--cache" aria-hidden="true" />{t("admin.v2.dash_tokens_cache")}</span>
       </div>
-      {coverageNote ? <p className="adm-dash-card-hint">{coverageNote}</p> : null}
-    </section>
+      {coverageNote ? <CardDescription>{coverageNote}</CardDescription> : null}
+    </Card>
   );
 }

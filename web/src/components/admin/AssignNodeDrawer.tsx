@@ -14,6 +14,7 @@ import { Drawer } from "../ui/Drawer";
 import { RunModeField, type RunLocation } from "./RunModeField";
 import { initialsOf, statusTone, visualStatus } from "./helpers";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { NodeProfileBadges } from "./NodeProfileBadges";
 import { NodePresence } from "./NodePresence";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
@@ -203,8 +204,13 @@ export function AssignNodeDrawer({
           </section>
         ) : (
           <section className="adm-assign-picker" aria-label={t("admin.employee")}>
-            <div className="adm-field">
-              <span id={employeeLabelId}>{t("admin.employee")}</span>
+            <Field
+              label={t("admin.employee")}
+              labelId={employeeLabelId}
+              wrapper="div"
+              error={fieldErrors.employeeId}
+              errorId="assign-node-employee-error"
+            >
               <Select
                 value={employeeId || null}
                 onValueChange={(value) => {
@@ -253,12 +259,7 @@ export function AssignNodeDrawer({
                   ))}
                 </SelectContent>
               </Select>
-              {fieldErrors.employeeId ? (
-                <span id="assign-node-employee-error" className="text-sm text-danger" role="alert">
-                  {fieldErrors.employeeId}
-                </span>
-              ) : null}
-            </div>
+            </Field>
           </section>
         )}
 
@@ -391,8 +392,7 @@ export function AssignNodeDrawer({
         {creatingNode ? (
           <fieldset className="adm-form-section">
             <legend className="adm-form-legend">{t("admin.v2.section_node")}</legend>
-            <label className="adm-field">
-              <span>{t("admin.v2.computer_name")}</span>
+            <Field label={t("admin.v2.computer_name")}>
               <input
                 name="assign-node-display-name"
                 autoComplete="off"
@@ -402,7 +402,7 @@ export function AssignNodeDrawer({
                 maxLength={64}
                 disabled={isBusy}
               />
-            </label>
+            </Field>
             <p className="adm-form-hint">{t("admin.v2.computer_name_hint")}</p>
             <RunModeField
               value={nodeLocation}
@@ -414,8 +414,7 @@ export function AssignNodeDrawer({
               disabled={isBusy}
             />
             {!isManaged ? (
-              <label className="adm-field">
-                <span>{t("workspace_label")}</span>
+              <Field label={t("workspace_label")}>
                 <input
                   ref={workspacePathRef}
                   name="assign-node-workspace-path"
@@ -435,7 +434,7 @@ export function AssignNodeDrawer({
                     {fieldErrors.workspacePath}
                   </span>
                 ) : null}
-              </label>
+              </Field>
             ) : null}
             <p className="adm-form-hint">
               {t("admin.v2.node_help_managed")}

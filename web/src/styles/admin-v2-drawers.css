@@ -190,37 +190,12 @@
   border-left: 2px solid var(--action);
 }
 
-.adm-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1-5);
-}
-
-.adm-field > span {
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--sp-1);
-  font: var(--type-label);
-  color: var(--ink-2);
-}
-
-.adm-field-req {
-  color: var(--action);
-  font-weight: 600;
-}
-
-.adm-field-opt {
-  font-style: normal;
-  font-size: var(--fs-1);
-  font-weight: 600;
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
-
-/* Admin form fields (.adm-input / select.adm-input) were replaced by the
-   shadcn <Input> and <Select> primitives during the Tailwind/shadcn
-   consolidation; the .adm-field label layout below is still in use. */
+/* Admin form fields (.adm-input / select.adm-input) were replaced by the shadcn
+   <Input> and <Select> primitives during the Tailwind/shadcn consolidation.
+   `.adm-field` and its `> span` label rule are gone the same way: the label /
+   required / optional / hint / error stack is now the <Field> primitive
+   (components/ui/field.tsx), which styles the label through <Label> instead of
+   a descendant selector that only worked inside this one parent. */
 
 .adm-form-hint {
   margin: 0;

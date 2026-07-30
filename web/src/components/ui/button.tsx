@@ -10,33 +10,50 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-[var(--action)] text-[var(--on-action)] hover:bg-[var(--action-hover)]",
+        default: "bg-primary text-primary-foreground hover:bg-primary-active",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+          "bg-secondary text-secondary-foreground hover:bg-surface-raised aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
+        /* Destructive is encoded by SHAPE, not hue. Phosphor allows exactly one
+           colour (--live), and --destructive/--err resolves to the same value as
+           --action, so a tinted wash would be indistinguishable from `ghost`.
+           Danger therefore reads through three non-chromatic signals: a visible
+           hairline ring where ghost has none, --err ink (a step brighter than
+           inherited body ink), and a full contrast inversion on hover/focus.
+           Same substitution StatusPill makes for its `bad` tone.
+           `text-on-primary` is the correct ink on an --err fill in both
+           registers: --err and --action share a value, so they share a contrast
+           partner. */
         destructive:
-          "bg-destructive/10 text-destructive hover:bg-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30",
-        link: "text-[var(--action)] underline-offset-4 hover:underline",
+          "border-destructive/45 text-destructive hover:border-destructive hover:bg-destructive hover:text-on-primary focus-visible:border-destructive focus-visible:shadow-(--focus-ring-danger)",
+        link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
         default:
           "h-(--control-h) gap-1.5 px-3 has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5",
         xs: "h-6 gap-1 rounded-md px-2 text-xs in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
         sm: "h-7 gap-1 rounded-md px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
-        lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+        /* One step ABOVE `default`. It previously resolved to 36px against a
+           40px --control-h, so `lg` rendered smaller than the default size;
+           44px also clears --touch-target on fine pointers. */
+        lg: "h-11 gap-1.5 px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
         /* Drawer/footer call-to-action: full control height with stronger
            label typography. Replaces the old `.adm-form-actions` descendant
            override so footer buttons are styled explicitly. */
         cta: "h-(--control-h) gap-1.5 px-4 text-2xs font-semibold",
-        icon: "size-8",
+        /* Square counterpart of `default`: the toolbar refresh buttons sit
+           directly beside default-size buttons, so the icon tier tracks
+           --control-h instead of a fixed 32px that rendered 8px short.
+           `icon-sm`/`icon-xs` remain the dense tiers for in-row chrome. */
+        icon: "size-(--control-h)",
         "icon-xs":
           "size-6 rounded-md in-data-[slot=button-group]:rounded-md [&_svg:not([class*='size-'])]:size-3",
         "icon-sm":
           "size-7 rounded-md in-data-[slot=button-group]:rounded-md",
-        "icon-lg": "size-9",
+        "icon-lg": "size-11",
       },
     },
     defaultVariants: {

@@ -3,6 +3,8 @@
 import type { FormEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -209,8 +211,7 @@ function BacklogFields({ form, onChange }: { form: BacklogTaskFormState; onChang
   const { t } = useTranslation();
   return (
     <>
-      <label className="adm-field">
-        <span>{t("backlog.status")}</span>
+      <Field label={t("backlog.status")}>
         <Select
           value={form.status}
           onValueChange={(value) => {
@@ -227,16 +228,15 @@ function BacklogFields({ form, onChange }: { form: BacklogTaskFormState; onChang
             ))}
           </SelectContent>
         </Select>
-      </label>
-      <label className="adm-field">
-        <span>{t("backlog.due")}</span>
+      </Field>
+      <Field label={t("backlog.due")}>
         <Input
           name="backlog-due-date"
           type="date"
           value={form.dueDate}
           onChange={(event) => onChange({ ...form, dueDate: event.target.value })}
         />
-      </label>
+      </Field>
     </>
   );
 }
@@ -245,8 +245,7 @@ function RoutineFields({ form, onChange }: { form: RoutineTaskFormState; onChang
   const { t } = useTranslation();
   return (
     <>
-      <label className="adm-field">
-        <span>{t("routine.type")}</span>
+      <Field label={t("routine.type")}>
         <Select
           value={form.routineType}
           onValueChange={(value) => {
@@ -263,9 +262,8 @@ function RoutineFields({ form, onChange }: { form: RoutineTaskFormState; onChang
             ))}
           </SelectContent>
         </Select>
-      </label>
-      <label className="adm-field">
-        <span>{t("routine.cadence")}</span>
+      </Field>
+      <Field label={t("routine.cadence")}>
         <Select
           value={form.routineCadence}
           onValueChange={(value) => {
@@ -289,9 +287,12 @@ function RoutineFields({ form, onChange }: { form: RoutineTaskFormState; onChang
             ))}
           </SelectContent>
         </Select>
-      </label>
-      <label className="adm-field task-drawer-next-run">
-        <span>{t("routine.next_run")}</span>
+      </Field>
+      <Field
+        label={t("routine.next_run")}
+        hint={t("routine.next_run_hint")}
+        className="task-drawer-next-run"
+      >
         <Input
           name={`${form.variant}-next-run-date`}
           type="date"
@@ -300,8 +301,7 @@ function RoutineFields({ form, onChange }: { form: RoutineTaskFormState; onChang
           readOnly={form.routineCadence !== "custom"}
           onChange={(event) => onChange({ ...form, routineNextRunDate: event.target.value })}
         />
-        <span className="adm-form-hint">{t("routine.next_run_hint")}</span>
-      </label>
+      </Field>
     </>
   );
 }
@@ -384,8 +384,7 @@ export function TaskDrawer({
     >
       <form className="adm-form task-board-drawer-form" onSubmit={onSubmit}>
         {meta}
-        <label className="adm-field">
-          <span>{t("backlog.title_field")}</span>
+        <Field label={t("backlog.title_field")}>
           <Input
             data-modal-initial-focus
             name={`${fieldPrefix}-title`}
@@ -393,20 +392,18 @@ export function TaskDrawer({
             value={form.title}
             onChange={(event) => updateBase({ title: event.target.value })}
           />
-        </label>
-        <label className="adm-field">
-          <span>{t("backlog.description")}</span>
+        </Field>
+        <Field label={t("backlog.description")}>
           <Textarea
             name={`${fieldPrefix}-description`}
             value={form.description}
             rows={5}
             onChange={(event) => updateBase({ description: event.target.value })}
           />
-        </label>
+        </Field>
         <div className="task-drawer-form-grid">
           {form.variant === "routine" ? <RoutineFields form={form} onChange={onChange} /> : null}
-          <label className="adm-field task-drawer-form-grid-full">
-            <span>{t("backlog.priority")}</span>
+          <Field label={t("backlog.priority")} wrapper="div" className="task-drawer-form-grid-full">
             <Select
               value={form.priority}
               onValueChange={(value) => {
@@ -423,10 +420,14 @@ export function TaskDrawer({
                 ))}
               </SelectContent>
             </Select>
-          </label>
+          </Field>
           {form.variant === "backlog" ? <BacklogFields form={form} onChange={onChange} /> : null}
-          <div className="adm-field task-assignment-field">
-            <label htmlFor={assignmentFieldId}>{t("backlog.assignment_label")}</label>
+          <Field
+            label={t("backlog.assignment_label")}
+            wrapper="div"
+            htmlFor={assignmentFieldId}
+            className="task-assignment-field"
+          >
             <Select
               value={taskAssignmentValue(form)}
               onValueChange={(value) => {
@@ -515,13 +516,13 @@ export function TaskDrawer({
               team={assignedTeamView}
               variant={form.variant}
             />
-          </div>
+          </Field>
         </div>
         {form.variant === "routine" ? (
           <>
-            <div className="adm-field routine-toggle">
+            <div className="routine-toggle">
               <span className="routine-toggle-text">
-                <span>{t("routine.enabled")}</span>
+                <Label render={<span />}>{t("routine.enabled")}</Label>
                 <span className="adm-form-hint">{t("routine.enabled_hint")}</span>
               </span>
               <Switch

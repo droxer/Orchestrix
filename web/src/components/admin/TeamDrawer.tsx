@@ -11,6 +11,7 @@ import {
 } from "../../lib/teamForm";
 import type { AgentTeam } from "../../types";
 import { Button } from "../ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "../ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { useDialogs } from "../ui/DialogProvider";
@@ -143,8 +144,7 @@ export function TeamDrawer({
   return (
     <Drawer open={open} onClose={() => { void requestClose(); }} title={team ? t("teams.edit") : t("teams.add")} subtitle={t("teams.drawer_subtitle")} width={500} closeLabel={t("dialog.cancel")} bodyClassName="adm-drawer-body--column">
       <form className="adm-form team-drawer-form" onSubmit={(event) => void submit(event)}>
-        <label className="adm-field">
-          <span>{t("teams.name")}</span>
+        <Field label={t("teams.name")}>
           <Input
             ref={nameRef}
             data-modal-initial-focus
@@ -154,10 +154,10 @@ export function TeamDrawer({
             required
             onChange={(event) => setName(event.target.value)}
           />
-        </label>
+        </Field>
         <fieldset
           ref={membersRef}
-          className="adm-field team-member-fieldset"
+          className="team-member-fieldset"
           tabIndex={-1}
           aria-invalid={validationError && validationError !== "lead" ? true : undefined}
           aria-describedby={validationError && validationError !== "lead" ? "team-members-error" : undefined}
@@ -197,8 +197,7 @@ export function TeamDrawer({
             </span>
           ) : null}
         </fieldset>
-        <label className="adm-field">
-          <span>{t("teams.lead")}</span>
+        <Field label={t("teams.lead")}>
           <Select value={leadId} disabled={memberIds.length === 0} onValueChange={(value) => {
             if (value) setLeadId(value);
             setValidationError(null);
@@ -218,7 +217,7 @@ export function TeamDrawer({
             </SelectContent>
           </Select>
           {validationError === "lead" ? <span id="team-lead-error" className="text-sm text-danger" role="alert">{t("teams.lead_required")}</span> : null}
-        </label>
+        </Field>
         <div className="adm-form-actions">
           {team ? <Button size="cta" type="button" variant="destructive" className="adm-form-actions-leading" onClick={() => void remove()} disabled={busy} loading={deleteTeamMutation.isPending}>{t("teams.delete")}</Button> : null}
           <Button size="cta" type="button" variant="ghost" onClick={() => { void requestClose(); }} disabled={busy}>{t("dialog.cancel")}</Button>

@@ -2,6 +2,13 @@
 
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { visualStatus } from "../../../lib/adminHelpers";
 import type { ControlPanelDaemonNodeRecord } from "../../../types";
 
@@ -53,10 +60,10 @@ export function NodeStatusCard({ nodes, className }: NodeStatusCardProps) {
   const grid = slots.filter((s) => s.key !== "unknown" || s.count > 0);
 
   return (
-    <section className={`adm-dash-card${className ? ` ${className}` : ""}`}>
-      <header className="adm-dash-card-head">
-        <h2 className="adm-dash-card-title">{t("admin.v2.dash_health_title")}</h2>
-      </header>
+    <Card render={<section />} className={className}>
+      <CardHeader>
+        <CardTitle render={<h2 />}>{t("admin.v2.dash_health_title")}</CardTitle>
+      </CardHeader>
 
       <div
         className="adm-dash-bar"
@@ -94,9 +101,9 @@ export function NodeStatusCard({ nodes, className }: NodeStatusCardProps) {
         ))}
       </dl>
 
-      <footer className="adm-dash-card-foot">
-        <span className="adm-dash-card-hint">{t("admin.v2.dash_health_total", { count: total })}</span>
-      </footer>
-    </section>
+      <CardFooter className="border-t">
+        <CardDescription render={<span />}>{t("admin.v2.dash_health_total", { count: total })}</CardDescription>
+      </CardFooter>
+    </Card>
   );
 }

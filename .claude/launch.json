@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "-w", "web"],
       "port": 5000
+    },
+    {
+      "name": "web-worktree",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "-w", "web", "--", "-p", "5050"],
+      "port": 5050
     }
   ]
 }
