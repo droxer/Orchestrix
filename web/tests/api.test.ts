@@ -155,7 +155,25 @@ describe("apiJson", () => {
       () => apiJson("/api/v1/sandboxes"),
       (error) => error instanceof RelayApiError
         && error.status === 401
+        && error.code === "Invalid token."
         && error.message === "Invalid token.",
+    );
+  });
+
+  it("preserves a stable task deletion error code", async () => {
+    globalThis.fetch = (async () => new Response(JSON.stringify({
+      detail: "task_execution_active",
+    }), {
+      status: 409,
+      statusText: "Conflict",
+      headers: { "Content-Type": "application/json" },
+    })) as typeof fetch;
+
+    await assert.rejects(
+      () => deleteTask("task 1"),
+      (error) => error instanceof RelayApiError
+        && error.status === 409
+        && error.code === "task_execution_active",
     );
   });
 
@@ -312,9 +330,12 @@ describe("apiJson", () => {
       requestedUrl = String(input);
       requestedMethod = init?.method ?? "GET";
       return new Response(JSON.stringify({
-        id: "task 1",
-        title: "Retire old task",
-        deletedAt: "2026-07-24T00:00:00Z",
+        outcome: "deleted",
+        task: {
+          id: "task 1",
+          title: "Retire old task",
+          deletedAt: "2026-07-24T00:00:00Z",
+        },
       }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -325,7 +346,8 @@ describe("apiJson", () => {
 
     assert.equal(requestedUrl, "/api/v1/tasks/task%201");
     assert.equal(requestedMethod, "DELETE");
-    assert.equal(result.deletedAt, "2026-07-24T00:00:00Z");
+    assert.equal(result.outcome, "deleted");
+    assert.equal(result.task.deletedAt, "2026-07-24T00:00:00Z");
   });
 
   it("fetches a workspace brief for a specific employee", async () => {

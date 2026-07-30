@@ -527,6 +527,8 @@ async def start_routine_occurrence_on_ready_node(
                 return None
     elif not occurrence:
         occurrence = _create_manual_occurrence(ctx, routine, agent, today_iso)
+        if not occurrence:
+            return None
     if occurrence.get("status") in {"running", "review"}:
         existing = _existing_occurrence_result(ctx, routine, occurrence)
         if existing:
@@ -550,7 +552,7 @@ def _create_manual_occurrence(
     routine: dict[str, Any],
     agent: str | None,
     scheduled_for: str,
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
     return ctx.task_store.create_routine_occurrence(
         routine["id"],
         scheduled_for,

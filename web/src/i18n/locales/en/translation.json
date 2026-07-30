@@ -39,6 +39,7 @@
     "admin_delete_employee": "Couldn't delete the employee. Check the connection and try again.",
     "copy_message": "Couldn't copy the message. Select the text and copy it manually.",
     "delete_task": "Couldn't delete the task. Check the connection and try again.",
+    "task_execution_active": "This task has active work. Cancel or finish its thread before deleting it.",
     "save_team": "Couldn't save the team. Check its members and try again.",
     "delete_team": "Couldn't delete the team. Check the connection and try again.",
     "team_unavailable": "The agent team is not currently available.",
@@ -253,7 +254,7 @@
     "delete_task": "Delete",
     "deleting": "Deleting…",
     "delete_title": "Delete task?",
-    "delete_body": "“{{title}}” will be removed from Backlog. Linked threads and run history will stay available.",
+    "delete_body": "“{{title}}” will be removed from Backlog. Linked threads, artifacts, and run history will stay available.",
     "toast_deleted": "Task deleted."
   },
   "workspace": {
@@ -422,8 +423,10 @@
     "no_activity": "No runs yet.",
     "next_run_hint": "Runs at the start of this day. Pick today or a later date.",
     "enabled_hint": "When off, the schedule is paused and nothing is dispatched.",
+    "delete_task": "Delete routine",
+    "deleting": "Deleting…",
     "delete_title": "Delete routine?",
-    "delete_body": "“{{title}}” and its schedule will be deleted. Current and past runs stay in Threads.",
+    "delete_body": "“{{title}}” and its schedule will be deleted. It will not run again. Existing occurrences and threads will stay available.",
     "toast_deleted": "Routine deleted."
   },
   "admin": {

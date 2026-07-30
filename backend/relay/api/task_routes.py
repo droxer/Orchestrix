@@ -13,6 +13,13 @@ from ..persistence.stores import (
     task_status,
     valid_agent,
 )
+from ..services.task_deletion import (
+    TaskDeletionError,
+    task_has_active_linked_session,
+)
+from ..services.task_deletion import (
+    delete_task as delete_task_record,
+)
 from ..services.task_dispatch import (
     implicit_group_assignments_for_task,
     start_task_on_ready_node,
@@ -247,18 +254,6 @@ def complete_linked_task_sessions(
         if session.get("status") in ("completed", "failed", "cancelled"):
             continue
         controller.complete_session(session_id, outcome)
-
-
-def task_has_active_linked_session(ctx: AppContextDep, task: dict[str, Any]) -> bool:
-    terminal = {"completed", "failed", "cancelled"}
-    for session_id in task.get("linkedSessionIds", []):
-        try:
-            session = ctx.session_store.get_session(session_id)
-        except (KeyError, FileNotFoundError):
-            continue
-        if session.get("status") not in terminal:
-            return True
-    return False
 
 
 @router.get("/tasks")
@@ -527,7 +522,7 @@ async def update_task(
         "assignedAgentId"
     ) or next_team_id != current.get("assignedTeamId")
     if (assignment_changed or assignee_changed) and task_has_active_linked_session(
-        ctx, current
+        ctx.session_store, current
     ):
         raise HTTPException(409, "task_execution_active")
     if next_is_routine and next_routine_enabled and not (next_agent_id or next_team_id):
@@ -583,14 +578,22 @@ async def delete_task(
     task_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
     actor = request_actor(request, ctx.auth_store)
-    get_task_for_actor(ctx.task_store, task_id, actor)
-    task = ctx.task_store.delete_task(task_id)
+    try:
+        result = delete_task_record(ctx, task_id, actor)
+    except TaskDeletionError as error:
+        status_code = {
+            "task_not_found": 404,
+            "task_delete_forbidden": 403,
+            "task_execution_active": 409,
+        }.get(error.code, 409)
+        raise HTTPException(status_code, error.code) from error
     logger.info(
         "Task deleted",
         task_id=task_id,
         actor=actor.get("employeeId") or actor.get("username"),
+        outcome=result["outcome"],
     )
-    return task
+    return result
 
 
 @router.put("/tasks/{task_id}/assignment")
@@ -599,7 +602,7 @@ async def assign_task(
 ) -> dict[str, Any]:
     actor = request_actor(request, ctx.auth_store)
     current = get_task_for_actor(ctx.task_store, task_id, actor)
-    if task_has_active_linked_session(ctx, current):
+    if task_has_active_linked_session(ctx.session_store, current):
         raise HTTPException(409, "task_execution_active")
     body = await json_body(request)
     assigned_agent_id = (
@@ -669,9 +672,8 @@ async def start_task(
     if assignments and task.get("assignedTeamId"):
         assignments = []
     if assignments and task.get("assignedAgentId"):
-        if (
-            len(assignments) != 1
-            or assignments[0].get("agentId") != task.get("assignedAgentId")
+        if len(assignments) != 1 or assignments[0].get("agentId") != task.get(
+            "assignedAgentId"
         ):
             raise HTTPException(409, "task_assignment_override")
         if not task.get("assignedAgent"):
@@ -829,7 +831,7 @@ async def pickup_task(
     current = get_task_for_actor(ctx.task_store, task_id, actor)
     if current.get("status") not in ("backlog", "assigned"):
         raise HTTPException(409, "task_not_dispatchable")
-    if task_has_active_linked_session(ctx, current):
+    if task_has_active_linked_session(ctx.session_store, current):
         raise HTTPException(409, "task_execution_active")
     if current.get("assignedTeamId"):
         raise HTTPException(409, "team_task_requires_team_start")

@@ -35,6 +35,14 @@ def _create_user(client: TestClient, username: str, *, employee_id: str) -> None
     assert response.status_code == 201
 
 
+def _login(client: TestClient, username: str, password: str = "userpass") -> None:
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"username": username, "password": password},
+    )
+    assert response.status_code == 200
+
+
 def _create_agent(
     client: TestClient,
     employee_id: str,
@@ -1118,8 +1126,12 @@ def test_assigned_task_rejects_run_assignment_override(monkeypatch) -> None:
             headers={"Authorization": "Bearer ui_token"},
         )
         assert registered.status_code == 200
-        assigned = _create_agent(client, "alice", executor_kind="codex", node_id="sbx_alice")
-        override = _create_agent(client, "alice", executor_kind="claude", node_id="sbx_alice")
+        assigned = _create_agent(
+            client, "alice", executor_kind="codex", node_id="sbx_alice"
+        )
+        override = _create_agent(
+            client, "alice", executor_kind="claude", node_id="sbx_alice"
+        )
         task = client.post(
             "/api/v1/tasks",
             json={
@@ -1355,20 +1367,99 @@ def test_task_delete_hides_task_from_list_and_get(monkeypatch) -> None:
 
         deleted = client.delete(f"/api/v1/tasks/{task_id}")
         assert deleted.status_code == 200
-        assert deleted.json()["deletedAt"]
+        assert deleted.json()["outcome"] == "deleted"
+        assert deleted.json()["task"]["deletedAt"]
+        assert deleted.json()["task"]["deletedByEmployeeId"] == "admin"
 
         again = client.delete(f"/api/v1/tasks/{task_id}")
         assert again.status_code == 200
-        assert again.json()["deletedAt"] == deleted.json()["deletedAt"]
+        assert again.json()["outcome"] == "already_deleted"
+        assert again.json()["task"]["deletedAt"] == deleted.json()["task"]["deletedAt"]
 
         listed = client.get("/api/v1/tasks")
         assert listed.status_code == 200
         assert all(task["id"] != task_id for task in listed.json()["tasks"])
+        assert client.get(f"/api/v1/tasks/{task_id}").status_code == 404
 
-        missing = client.delete(
-            "/api/v1/tasks/11111111-1111-4111-8111-111111111111"
-        )
+        missing = client.delete("/api/v1/tasks/11111111-1111-4111-8111-111111111111")
         assert missing.status_code == 404
+
+
+def test_task_delete_requires_owner_or_admin(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        _create_user(client, "bob", employee_id="bob")
+        task = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Owned by Alice",
+                "ownerEmployeeId": "alice",
+                "assigneeEmployeeId": "bob",
+            },
+        ).json()
+
+        _login(client, "bob")
+        forbidden = client.delete(f"/api/v1/tasks/{task['id']}")
+        assert forbidden.status_code == 403
+        assert forbidden.json()["detail"] == "task_delete_forbidden"
+
+        _login(client, "alice")
+        deleted = client.delete(f"/api/v1/tasks/{task['id']}")
+        assert deleted.status_code == 200
+        assert deleted.json()["outcome"] == "deleted"
+        assert deleted.json()["task"]["deletedByEmployeeId"] == "alice"
+
+
+def test_task_delete_rejects_active_dispatch_and_linked_thread(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        agent = _create_agent(client, "alice")
+        dispatching = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Dispatching",
+                "ownerEmployeeId": "alice",
+                "assigneeEmployeeId": "alice",
+                "assignedAgentId": agent["id"],
+                "status": "assigned",
+            },
+        ).json()
+        claimed = client.app.state.task_store.claim_task_for_dispatch(
+            dispatching["id"], "codex"
+        )
+        assert claimed is not None
+
+        claim_delete = client.delete(f"/api/v1/tasks/{dispatching['id']}")
+        assert claim_delete.status_code == 409
+        assert claim_delete.json()["detail"] == "task_execution_active"
+
+        running = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Already running",
+                "ownerEmployeeId": "alice",
+                "assigneeEmployeeId": "alice",
+            },
+        ).json()
+        session = client.app.state.session_store.create_session(
+            {
+                "workspacePath": root,
+                "taskGoal": "Run linked work",
+                "participants": ["human", "codex"],
+                "ownerEmployeeId": "alice",
+            }
+        )
+        client.app.state.task_store.link_session(running["id"], session["id"])
+
+        session_delete = client.delete(f"/api/v1/tasks/{running['id']}")
+        assert session_delete.status_code == 409
+        assert session_delete.json()["detail"] == "task_execution_active"
 
 
 def test_blocked_dispatch_reports_the_recorded_failure_not_progress(
@@ -1401,7 +1492,9 @@ def test_blocked_dispatch_reports_the_recorded_failure_not_progress(
     assert _unclaimable_dispatch(running, "claude")["code"] == "dispatch_in_progress"
 
     routine = {"status": "assigned", "isRoutine": True}
-    assert _unclaimable_dispatch(routine, "claude")["code"] == "routine_not_dispatchable"
+    assert (
+        _unclaimable_dispatch(routine, "claude")["code"] == "routine_not_dispatchable"
+    )
 
     mismatched = {"status": "assigned", "isRoutine": False, "assignedAgent": "codex"}
     assert _unclaimable_dispatch(mismatched, "claude")["code"] == "agent_mismatch"

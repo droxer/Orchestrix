@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any, Protocol
 
 
@@ -40,7 +41,14 @@ class TaskStore(Protocol):
         *,
         assignment: dict[str, Any] | None = None,
     ) -> dict[str, Any]: ...
-    def delete_task(self, task_id: str) -> dict[str, Any]: ...
+    def delete_task(
+        self,
+        task_id: str,
+        *,
+        deleted_by: str | None = None,
+        reject_active_claim: bool = False,
+        active_linked_session: Callable[[dict[str, Any]], bool] | None = None,
+    ) -> dict[str, Any]: ...
     def link_session(self, task_id: str, session_id: str) -> dict[str, Any]: ...
     def unlink_session(self, task_id: str, session_id: str) -> dict[str, Any]: ...
     def append_event(self, task_id: str, event: dict[str, Any]) -> dict[str, Any]: ...
@@ -83,7 +91,7 @@ class TaskStore(Protocol):
         scheduled_for: str,
         *,
         agent_override: str | None = None,
-    ) -> dict[str, Any]: ...
+    ) -> dict[str, Any] | None: ...
 
 
 class AgentStore(Protocol):

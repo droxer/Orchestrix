@@ -475,7 +475,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
     const confirmed = await confirm({
       title: t("routine.delete_title"),
       message: t("routine.delete_body", { title: form.title }),
-      confirmLabel: t("backlog.delete_task"),
+      confirmLabel: t("routine.delete_task"),
       cancelLabel: t("dialog.cancel"),
       tone: "danger",
     });

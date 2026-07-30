@@ -39,6 +39,7 @@
     "admin_delete_employee": "无法删除员工。请检查连接后重试。",
     "copy_message": "无法复制消息。请手动选中文字复制。",
     "delete_task": "无法删除任务。请检查连接后重试。",
+    "task_execution_active": "该任务仍有正在进行的工作。请先取消或完成关联话题，再删除任务。",
     "save_team": "无法保存团队。请检查成员后重试。",
     "delete_team": "无法删除团队。请检查连接后重试。",
     "team_unavailable": "智能体团队当前不可用。",
@@ -253,7 +254,7 @@
     "delete_task": "删除",
     "deleting": "正在删除…",
     "delete_title": "删除任务？",
-    "delete_body": "“{{title}}”将从待办中移除，关联的话题和运行历史仍会保留。",
+    "delete_body": "“{{title}}”将从待办中移除，关联的话题、产物和运行历史仍会保留。",
     "toast_deleted": "任务已删除。"
   },
   "workspace": {
@@ -422,8 +423,10 @@
     "no_activity": "暂无运行记录。",
     "next_run_hint": "例行任务会在当天开始时运行，请选择今天或之后的日期。",
     "enabled_hint": "关闭后计划将暂停，不会再派发运行。",
+    "delete_task": "删除例行任务",
+    "deleting": "正在删除…",
     "delete_title": "删除例行任务？",
-    "delete_body": "将删除“{{title}}”及其计划，当前和过去的运行记录仍会保留在话题中。",
+    "delete_body": "将删除“{{title}}”及其计划，并且不会再次运行。已有执行记录和话题仍会保留。",
     "toast_deleted": "例行任务已删除。"
   },
   "admin": {

@@ -5,9 +5,13 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
-from relay.persistence.session_store import DatabaseSessionStore
+from relay.persistence.session_store import DatabaseSessionStore, LocalSessionStore
 from relay.persistence.store_common import relay_task_event
-from relay.persistence.task_store import DatabaseTaskStore, LocalTaskStore
+from relay.persistence.task_store import (
+    DatabaseTaskStore,
+    LocalTaskStore,
+    TaskExecutionActiveError,
+)
 from sqlalchemy import text
 
 
@@ -670,7 +674,23 @@ def test_database_task_store_records_routine_occurrence_lineage() -> None:
         )
 
 
-def assert_store_delete_hides_task_everywhere(store) -> None:
+def assert_store_delete_hides_task_everywhere(store, session_store) -> None:
+    session = session_store.create_session(
+        {
+            "workspacePath": "/workspace",
+            "taskGoal": "Linked work",
+            "participants": ["human", "codex"],
+            "ownerEmployeeId": "alice",
+        }
+    )
+    late_session = session_store.create_session(
+        {
+            "workspacePath": "/workspace",
+            "taskGoal": "Too-late work",
+            "participants": ["human"],
+            "ownerEmployeeId": "alice",
+        }
+    )
     routine = store.create_task(
         {
             "title": "Due routine",
@@ -686,9 +706,32 @@ def assert_store_delete_hides_task_everywhere(store) -> None:
         {"title": "Dispatchable", "description": "", "priority": "high"}
     )
     assigned = store.assign_task(assigned["id"], "codex")
+    active = store.create_task(
+        {"title": "Claimed", "description": "", "priority": "normal"}
+    )
+    active = store.assign_task(active["id"], "codex")
+    linked = store.create_task(
+        {"title": "Linked", "description": "", "priority": "normal"}
+    )
+    store.link_session(linked["id"], session["id"])
+    with pytest.raises(TaskExecutionActiveError, match="task_execution_active"):
+        store.delete_task(
+            linked["id"],
+            active_linked_session=lambda task: (
+                session["id"] in task.get("linkedSessionIds", [])
+            ),
+        )
+    assert store.claim_task_for_dispatch(active["id"], "codex") is not None
+    with pytest.raises(TaskExecutionActiveError, match="task_execution_active"):
+        store.delete_task(active["id"], reject_active_claim=True)
 
-    deleted = store.delete_task(routine["id"])
+    deleted = store.delete_task(routine["id"], deleted_by="alice")
     assert deleted["deletedAt"]
+    assert deleted["deletedByEmployeeId"] == "alice"
+    deleted_event = next(
+        event for event in deleted["events"] if event["type"] == "task.deleted"
+    )
+    assert deleted_event["actorEmployeeId"] == "alice"
     again = store.delete_task(routine["id"])
     assert again["deletedAt"] == deleted["deletedAt"]
     assert (
@@ -696,8 +739,18 @@ def assert_store_delete_hides_task_everywhere(store) -> None:
         == 1
     )
 
-    deleted_assigned = store.delete_task(assigned["id"])
+    deleted_assigned = store.delete_task(assigned["id"], reject_active_claim=True)
     assert deleted_assigned["deletedAt"]
+
+    store.release_dispatch_claim(
+        active["id"], store.get_task(active["id"])["dispatchClaim"]["id"]
+    )
+    assert store.delete_task(active["id"], reject_active_claim=True)["deletedAt"]
+    assert store.delete_task(linked["id"], active_linked_session=lambda _task: False)[
+        "deletedAt"
+    ]
+    relinked = store.link_session(linked["id"], late_session["id"])
+    assert late_session["id"] not in relinked["linkedSessionIds"]
 
     assert store.list_tasks() == []
     assert store.list_due_routines("2026-06-25") == []
@@ -705,6 +758,7 @@ def assert_store_delete_hides_task_everywhere(store) -> None:
     assert store.claim_next_task_for_agent("codex") is None
     assert store.claim_task_for_dispatch(assigned["id"], "codex") is None
     assert store.promote_due_routine(routine["id"], "2026-06-25", "2026-07-02") is None
+    assert store.create_routine_occurrence(routine["id"], "2026-06-25") is None
 
     persisted = store.get_task(routine["id"])
     assert persisted["deletedAt"] == deleted["deletedAt"]
@@ -712,13 +766,17 @@ def assert_store_delete_hides_task_everywhere(store) -> None:
 
 def test_local_task_store_delete_hides_task_everywhere() -> None:
     with TemporaryDirectory() as root:
-        assert_store_delete_hides_task_everywhere(LocalTaskStore(root))
+        assert_store_delete_hides_task_everywhere(
+            LocalTaskStore(root), LocalSessionStore(root)
+        )
 
 
 def test_database_task_store_delete_hides_task_everywhere() -> None:
     with TemporaryDirectory() as root:
+        database_url = f"sqlite:///{root}/relay.db"
         assert_store_delete_hides_task_everywhere(
-            DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True)
+            DatabaseTaskStore(database_url, create_schema=True),
+            DatabaseSessionStore(database_url),
         )
 
 
