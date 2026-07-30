@@ -22,6 +22,7 @@ import { TASK_PRIORITIES, TASK_STATUSES } from "../../lib/backlog";
 import { TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, isoToday } from "../../lib/routine";
 import { assignmentOptionVisible, teamAvailability } from "../../lib/taskAssignment";
 import {
+  clearTaskAssignment,
   nextRoutineRunDate,
   parseTaskAssignmentValue,
   taskAssignmentValue,
@@ -297,6 +298,7 @@ function RoutineFields({ form, onChange }: { form: RoutineTaskFormState; onChang
           name={`${form.variant}-next-run-date`}
           type="date"
           min={isoToday()}
+          required={form.routineCadence === "custom" && form.routineEnabled}
           value={form.routineNextRunDate}
           readOnly={form.routineCadence !== "custom"}
           onChange={(event) => onChange({ ...form, routineNextRunDate: event.target.value })}
@@ -428,17 +430,7 @@ export function TaskDrawer({
                 if (value == null) return
                 const selection = parseTaskAssignmentValue(value);
                 if (selection.kind === "none") {
-                  onChange(
-                    form.variant === "routine"
-                      ? {
-                          ...form,
-                          assignedAgent: "",
-                          assignedAgentId: "",
-                          assignedTeamId: "",
-                          routineEnabled: false,
-                        }
-                      : { ...form, assignedAgent: "", assignedAgentId: "", assignedTeamId: "" },
-                  );
+                  onChange(clearTaskAssignment(form));
                   return;
                 }
                 if (selection.kind === "agent") {

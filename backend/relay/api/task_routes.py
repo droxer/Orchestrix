@@ -64,6 +64,8 @@ def logical_agent_for_assignment(
     agent = ctx.agent_store.get_agent(agent_id)
     if not agent or agent.get("deletedAt"):
         raise HTTPException(404, "Logical agent not found.")
+    if not agent.get("enabled", True):
+        raise HTTPException(409, "agent_disabled")
     allowed_employee_id = expected_employee_id or actor["employeeId"]
     if agent.get("supervisorEmployeeId") != allowed_employee_id:
         raise HTTPException(403, "Logical agent is not available to the task assignee.")
@@ -87,6 +89,8 @@ def team_for_assignment(
     team = ctx.team_store.get_team(team_id)
     if not team or team.get("deletedAt"):
         raise HTTPException(404, "Team not found.")
+    if not team.get("enabled", True):
+        raise HTTPException(409, "team_disabled")
     if team.get("ownerEmployeeId") != expected_employee_id:
         raise HTTPException(403, "Team is not available to the task assignee.")
     if not actor["isAdmin"] and team.get("ownerEmployeeId") != actor["employeeId"]:
@@ -192,7 +196,9 @@ def routine_fields(
         and resolved_cadence == "custom"
         and not effective_next_run
     ):
-        raise HTTPException(400, "An enabled custom routine requires a next-run date.")
+        raise HTTPException(
+            400, "routineNextRunDate is required for an enabled custom routine."
+        )
     return {
         "isRoutine": is_routine if is_routine is not None else next_is_routine,
         "routineType": routine_type or (current or {}).get("routineType") or "task",
@@ -241,6 +247,18 @@ def complete_linked_task_sessions(
         if session.get("status") in ("completed", "failed", "cancelled"):
             continue
         controller.complete_session(session_id, outcome)
+
+
+def task_has_active_linked_session(ctx: AppContextDep, task: dict[str, Any]) -> bool:
+    terminal = {"completed", "failed", "cancelled"}
+    for session_id in task.get("linkedSessionIds", []):
+        try:
+            session = ctx.session_store.get_session(session_id)
+        except (KeyError, FileNotFoundError):
+            continue
+        if session.get("status") not in terminal:
+            return True
+    return False
 
 
 @router.get("/tasks")
@@ -322,7 +340,10 @@ async def create_task(request: Request, ctx: AppContextDep) -> dict[str, Any]:
             "dueDate": date_field(body, "dueDate"),
             "status": status,
             **(
-                {"assignedAgent": agent, "assignedAgentId": assigned_agent_id}
+                {
+                    "assignedAgent": agent,
+                    "assignedAgentId": assigned_agent_id,
+                }
                 if agent and assigned_agent_id
                 else {}
             ),
@@ -461,13 +482,12 @@ async def update_task(
         or current.get("ownerEmployeeId")
         or actor["employeeId"]
     )
-    team = None
     if not (
         assigned_team_id
         and assigned_team_id == current.get("assignedTeamId")
         and not assignee_changed
     ):
-        team = team_for_assignment(
+        team_for_assignment(
             ctx,
             actor,
             assigned_team_id,
@@ -503,20 +523,42 @@ async def update_task(
         next_team_id = None
     if "assignedTeamId" in body and assigned_team_id:
         next_agent_id = None
+    assignment_changed = next_agent_id != current.get(
+        "assignedAgentId"
+    ) or next_team_id != current.get("assignedTeamId")
+    if (assignment_changed or assignee_changed) and task_has_active_linked_session(
+        ctx, current
+    ):
+        raise HTTPException(409, "task_execution_active")
     if next_is_routine and next_routine_enabled and not (next_agent_id or next_team_id):
         raise HTTPException(400, "An enabled routine requires an agent or team.")
-    if status == "assigned" and not (next_agent_id or next_team_id):
-        raise HTTPException(400, "assigned status requires an agent or team.")
-    assignment_change: dict[str, Any] | None = None
-    if logical_agent and assigned_agent_id != current.get("assignedAgentId"):
-        assignment_change = {"agent": agent, "agentId": assigned_agent_id}
-    elif team and assigned_team_id != current.get("assignedTeamId"):
-        assignment_change = {"teamId": assigned_team_id}
-    elif (
-        ("assignedAgentId" in body and not assigned_agent_id)
-        or ("assignedTeamId" in body and not assigned_team_id)
-    ) and not (next_agent_id or next_team_id):
-        assignment_change = {}
+    assignment_clear_requested = assignment_changed and not (
+        next_agent_id or next_team_id
+    )
+    if (status or current.get("status")) == "assigned" and not (
+        next_agent_id or next_team_id
+    ):
+        if assignment_clear_requested:
+            status = "backlog"
+        else:
+            raise HTTPException(400, "assigned status requires an agent or team.")
+    assignment_patch: dict[str, Any] = {}
+    if assignment_changed:
+        assignment_patch = {
+            "assignedAgentId": next_agent_id,
+            "assignedTeamId": next_team_id,
+            **(
+                {
+                    "assignedAgent": (
+                        logical_agent["executorKind"]
+                        if logical_agent
+                        else current.get("assignedAgent")
+                    )
+                }
+                if next_agent_id
+                else {}
+            ),
+        }
     task = ctx.task_store.update_task(
         task_id,
         {
@@ -527,8 +569,8 @@ async def update_task(
             "dueDate": due_date,
             "assigneeEmployeeId": assignee,
             **routine,
+            **assignment_patch,
         },
-        assignment=assignment_change,
     )
     if status == "done":
         complete_linked_task_sessions(ctx, task, "Task marked done.")
@@ -557,6 +599,8 @@ async def assign_task(
 ) -> dict[str, Any]:
     actor = request_actor(request, ctx.auth_store)
     current = get_task_for_actor(ctx.task_store, task_id, actor)
+    if task_has_active_linked_session(ctx, current):
+        raise HTTPException(409, "task_execution_active")
     body = await json_body(request)
     assigned_agent_id = (
         string_field(body, "agentId") or string_field(body, "assignedAgentId") or None
@@ -585,8 +629,11 @@ async def assign_task(
             raise HTTPException(409, error.code) from error
         return ctx.task_store.update_task(
             task_id,
-            {"status": "assigned"},
-            assignment={"teamId": assigned_team_id},
+            {
+                "status": "assigned",
+                "assignedAgentId": None,
+                "assignedTeamId": assigned_team_id,
+            },
         )
     logical_agent = logical_agent_for_assignment(
         ctx,
@@ -600,10 +647,11 @@ async def assign_task(
         raise HTTPException(400, "agentId is required for task assignment.")
     return ctx.task_store.update_task(
         task_id,
-        {"status": "assigned"},
-        assignment={
-            "agent": logical_agent["executorKind"],
-            "agentId": assigned_agent_id,
+        {
+            "status": "assigned",
+            "assignedAgent": logical_agent["executorKind"],
+            "assignedAgentId": assigned_agent_id,
+            "assignedTeamId": None,
         },
     )
 
@@ -772,13 +820,17 @@ async def start_task(
     return result
 
 
-@router.post("/tasks/{task_id}/pickups", status_code=201)
+@router.post("/tasks/{task_id}/pickups", status_code=202)
 async def pickup_task(
     task_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
     actor = request_actor(request, ctx.auth_store)
     body = await json_body(request)
     current = get_task_for_actor(ctx.task_store, task_id, actor)
+    if current.get("status") not in ("backlog", "assigned"):
+        raise HTTPException(409, "task_not_dispatchable")
+    if task_has_active_linked_session(ctx, current):
+        raise HTTPException(409, "task_execution_active")
     if current.get("assignedTeamId"):
         raise HTTPException(409, "team_task_requires_team_start")
     agent_id = string_field(body, "agentId") or string_field(body, "assignedAgentId")
@@ -793,39 +845,34 @@ async def pickup_task(
     if not logical_agent or not agent_id:
         raise HTTPException(400, "agentId is required to pick up a task.")
     agent = logical_agent["executorKind"]
-    ctx.task_store.update_task(
-        task_id, {"assigneeEmployeeId": logical_agent["supervisorEmployeeId"]}
-    )
-    task = ctx.task_store.set_task_assignment(task_id, agent, agent_id)
-    workspace_path = string_field(body, "workspacePath") or "/workspace"
-    thread_ownership = task_thread_ownership(
-        task, team_store=ctx.team_store, agent_store=ctx.agent_store
-    )
-    controller = SessionController(
-        ctx.session_store,
-        task_store=ctx.task_store,
-        task_id=task["id"],
-        workspace_path=workspace_path,
-        **thread_ownership,
-    )
-    session = controller.create_session(task_goal_text(task), ["human", agent])
     mode = agent_task_mode(body.get("mode"))
-    controller.assign_session(
-        session["id"], [{"agentId": agent_id, "agent": agent, "mode": mode}]
+    task = ctx.task_store.update_task(
+        task_id,
+        {
+            "assigneeEmployeeId": logical_agent["supervisorEmployeeId"],
+            "status": "assigned",
+            "assignedAgent": agent,
+            "assignedAgentId": agent_id,
+            "assignedTeamId": None,
+        },
     )
-    task = ctx.task_store.record_activity(
-        task["id"],
-        f"{agent} picked up the task.",
-        {"agent": agent, "sessionId": session["id"]},
+    result = await start_task_on_ready_node(
+        ctx,
+        task,
+        actor,
+        mode=mode,
+        assignments=[{"agentId": agent_id, "agent": agent, "mode": mode}],
     )
+    if not result:
+        raise HTTPException(409, "task_not_dispatchable")
     logger.info(
         "Task picked up",
         task_id=task_id,
-        session_id=session["id"],
+        session_id=(result.get("session") or {}).get("id"),
         agent=agent,
         mode=mode,
     )
-    return {"task": task, "session": ctx.session_store.get_session(session["id"])}
+    return result
 
 
 @router.get("/tasks/{task_id}/events")

@@ -202,8 +202,24 @@ def task_update_events(
         )
     }
     events = [relay_task_event("task.updated", task_id, updated)]
-    if assignment is not None:
-        events.extend(task_assignment_events(task_id, assignment))
+    assignment_supplied = "assignedAgentId" in payload or "assignedTeamId" in payload
+    resolved_assignment = assignment
+    if resolved_assignment is None and assignment_supplied:
+        agent_id = payload.get("assignedAgentId")
+        team_id = payload.get("assignedTeamId")
+        if agent_id and team_id:
+            raise ValueError("task_agent_and_team_conflict")
+        if team_id:
+            resolved_assignment = {"teamId": team_id}
+        elif agent_id:
+            agent = payload.get("assignedAgent")
+            if not agent:
+                raise ValueError("assignedAgent is required with assignedAgentId")
+            resolved_assignment = {"agent": agent, "agentId": agent_id}
+        else:
+            resolved_assignment = {}
+    if resolved_assignment is not None:
+        events.extend(task_assignment_events(task_id, resolved_assignment))
     if payload.get("status"):
         events.append(
             relay_task_event("task.status", task_id, {"status": payload["status"]})

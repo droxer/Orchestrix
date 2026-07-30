@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  clearTaskAssignment,
   emptyBacklogForm,
   emptyRoutineForm,
   nextRoutineRunDate,
@@ -87,6 +88,22 @@ describe("taskBoardForm", () => {
     assert.equal(assignmentOptionVisible(undefined, "alice", true), true);
     assert.equal(assignmentOptionVisible("alice", "alice", false), true);
     assert.equal(assignmentOptionVisible("bob", "alice", false), false);
+  });
+
+  it("returns an unassigned assigned task to backlog", () => {
+    const form = {
+      ...emptyBacklogForm(user),
+      status: "assigned" as const,
+      assignedAgentId: "agent-1",
+    };
+
+    assert.deepEqual(clearTaskAssignment(form), {
+      ...form,
+      status: "backlog",
+      assignedAgent: "",
+      assignedAgentId: "",
+      assignedTeamId: "",
+    });
   });
 });
 

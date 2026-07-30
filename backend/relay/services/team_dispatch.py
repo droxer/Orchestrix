@@ -8,8 +8,14 @@ TEAM_UNAVAILABLE_MESSAGE = "The agent team is not currently available."
 
 
 class TeamDispatchError(ValueError):
-    def __init__(self, code: str = "team_unavailable"):
+    def __init__(
+        self,
+        code: str = "team_unavailable",
+        *,
+        permanent: bool = False,
+    ):
         self.code = code
+        self.permanent = permanent
         super().__init__(code)
 
 
@@ -71,6 +77,7 @@ def resolve_team_task_assignments(
     agent_store: Any,
     placement_store: Any,
     daemon_nodes: list[dict[str, Any]],
+    mode: str = "action",
 ) -> list[dict[str, Any]]:
     _team, agents = _task_team_agents(
         task,
@@ -78,7 +85,7 @@ def resolve_team_task_assignments(
         agent_store=agent_store,
     )
     return resolve_agent_assignments(
-        [_team_member_assignment(agent) for agent in agents],
+        [_team_member_assignment(agent, mode=mode) for agent in agents],
         employee_id=task_execution_employee_id(task),
         is_admin=False,
         agent_store=agent_store,
@@ -96,31 +103,31 @@ def _task_team_agents(
     team_id = task.get("assignedTeamId")
     team = team_store.get_team(team_id) if team_store and team_id else None
     employee_id = task_execution_employee_id(task)
-    if (
-        not team
-        or team.get("deletedAt")
-        or not team.get("enabled", True)
-        or team.get("ownerEmployeeId") != employee_id
-    ):
-        raise TeamDispatchError()
+    if not team or team.get("deletedAt"):
+        raise TeamDispatchError("team_not_found", permanent=True)
+    if not team.get("enabled", True):
+        raise TeamDispatchError("team_disabled", permanent=True)
+    if team.get("ownerEmployeeId") != employee_id:
+        raise TeamDispatchError("team_forbidden", permanent=True)
     members = list(team.get("memberAgentIds") or [])
     lead = team.get("leadAgentId")
     if not isinstance(lead, str) or lead not in members:
-        raise TeamDispatchError()
+        raise TeamDispatchError("team_invalid", permanent=True)
     ordered_member_ids = [lead, *(member for member in members if member != lead)]
     agents = [agent_store.get_agent(member) for member in ordered_member_ids]
-    if any(
-        not agent or agent.get("deletedAt") or not agent.get("enabled", True)
-        for agent in agents
-    ):
-        raise TeamDispatchError()
+    if any(not agent or agent.get("deletedAt") for agent in agents):
+        raise TeamDispatchError("team_invalid", permanent=True)
+    if any(not agent.get("enabled", True) for agent in agents):
+        raise TeamDispatchError("team_disabled", permanent=True)
     return team, agents
 
 
-def _team_member_assignment(agent: dict[str, Any]) -> dict[str, Any]:
+def _team_member_assignment(
+    agent: dict[str, Any], *, mode: str = "action"
+) -> dict[str, Any]:
     return {
         "agentId": agent["id"],
         "agent": agent["executorKind"],
-        "mode": "action",
+        "mode": mode,
         **({"role": agent["defaultRole"]} if agent.get("defaultRole") else {}),
     }

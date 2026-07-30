@@ -129,6 +129,22 @@ export function taskAssignmentMutationFields(
   };
 }
 
+export function clearTaskAssignment(form: TaskBoardFormState): TaskBoardFormState {
+  const cleared = {
+    ...form,
+    assignedAgent: "" as const,
+    assignedAgentId: "",
+    assignedTeamId: "",
+  };
+  if (cleared.variant === "routine") {
+    return { ...cleared, routineEnabled: false };
+  }
+  return {
+    ...cleared,
+    status: cleared.status === "assigned" ? "backlog" : cleared.status,
+  };
+}
+
 export function teamAssignmentPatch(teamId: string): Pick<
   TaskBoardFormBase,
   "assignedAgent" | "assignedAgentId" | "assignedTeamId"
