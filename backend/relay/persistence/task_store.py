@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from datetime import date as _date
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -268,6 +269,8 @@ class LocalTaskStore:
     ) -> dict[str, Any]:
         with self._lock:
             current = self.get_task(task_id)
+            if skip_linked_session_id and current.get("deletedAt"):
+                return current
             if skip_linked_session_id and skip_linked_session_id in current.get(
                 "linkedSessionIds", []
             ):
@@ -308,12 +311,15 @@ class LocalTaskStore:
         *,
         deleted_by: str | None = None,
         reject_active_claim: bool = False,
+        active_linked_session: Callable[[dict[str, Any]], bool] | None = None,
     ) -> dict[str, Any]:
         with self._lock:
             task = self.get_task(task_id)
             if task.get("deletedAt"):
                 return task
             if reject_active_claim and dispatch_claim_active(task):
+                raise TaskExecutionActiveError("task_execution_active")
+            if active_linked_session and active_linked_session(task):
                 raise TaskExecutionActiveError("task_execution_active")
             logger.info("Task deleted", task_id=task_id, deleted_by=deleted_by)
             return self.append_event(
@@ -486,9 +492,11 @@ class LocalTaskStore:
         scheduled_for: str,
         *,
         agent_override: AgentName | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         with self._lock:
             routine = self.get_task(routine_id)
+            if routine.get("deletedAt"):
+                return None
             existing = _open_routine_occurrence(
                 routine,
                 self.get_task,
@@ -761,6 +769,7 @@ class DatabaseTaskStore:
         *,
         skip_linked_session_id: str | None = None,
         reject_active_claim: bool = False,
+        active_linked_session: Callable[[dict[str, Any]], bool] | None = None,
     ) -> dict[str, Any]:
         for attempt in range(3):
             try:
@@ -769,6 +778,7 @@ class DatabaseTaskStore:
                     events,
                     skip_linked_session_id=skip_linked_session_id,
                     reject_active_claim=reject_active_claim,
+                    active_linked_session=active_linked_session,
                 )
             except (IntegrityError, _TaskWriteConflict):
                 if attempt == 2:
@@ -783,6 +793,7 @@ class DatabaseTaskStore:
         *,
         skip_linked_session_id: str | None = None,
         reject_active_claim: bool = False,
+        active_linked_session: Callable[[dict[str, Any]], bool] | None = None,
     ) -> dict[str, Any]:
         with store_transaction(self.engine) as conn:
             if skip_linked_session_id:
@@ -804,7 +815,11 @@ class DatabaseTaskStore:
             deleting = any(event.get("type") == "task.deleted" for event in events)
             if deleting and current.get("deletedAt"):
                 return current
+            if skip_linked_session_id and current.get("deletedAt"):
+                return current
             if reject_active_claim and dispatch_claim_active(current):
+                raise TaskExecutionActiveError("task_execution_active")
+            if active_linked_session and active_linked_session(current):
                 raise TaskExecutionActiveError("task_execution_active")
             if skip_linked_session_id and skip_linked_session_id in current.get(
                 "linkedSessionIds", []
@@ -891,6 +906,7 @@ class DatabaseTaskStore:
         *,
         deleted_by: str | None = None,
         reject_active_claim: bool = False,
+        active_linked_session: Callable[[dict[str, Any]], bool] | None = None,
     ) -> dict[str, Any]:
         task = self.get_task(task_id)
         if task.get("deletedAt"):
@@ -906,6 +922,7 @@ class DatabaseTaskStore:
                 )
             ],
             reject_active_claim=reject_active_claim,
+            active_linked_session=active_linked_session,
         )
 
     def list_due_routines(self, today: str) -> list[dict[str, Any]]:
@@ -1172,7 +1189,7 @@ class DatabaseTaskStore:
         scheduled_for: str,
         *,
         agent_override: AgentName | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
@@ -1186,6 +1203,8 @@ class DatabaseTaskStore:
             if not row:
                 raise KeyError(routine_id)
             routine = row["snapshot"] or {}
+            if routine.get("deletedAt"):
+                return None
 
             def load_occurrence(occurrence_id: str) -> dict[str, Any]:
                 occurrence_row = (

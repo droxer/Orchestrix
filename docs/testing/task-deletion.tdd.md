@@ -59,6 +59,34 @@ UV_CACHE_DIR=.uv-cache uv run --project backend --extra dev pytest backend/tests
 
 Focused result: backend `3 passed` and `2 passed`; web `21 passed`.
 
+## Review follow-up RED/GREEN
+
+The independent spec review found two concurrency gaps: linked-session state
+was checked before the serialized task write, and manual occurrence creation
+did not reject a deleted routine definition.
+
+RED command:
+
+```text
+UV_CACHE_DIR=.uv-cache uv run --project backend --extra dev pytest backend/tests/unit/test_task_store.py -k delete -q
+```
+
+Result before the follow-up fix: `2 failed`; both persistence adapters rejected
+the new serialized linked-session predicate interface. RED checkpoint:
+`ef94859 test: reproduce deletion coordination races`.
+
+GREEN commands:
+
+```text
+UV_CACHE_DIR=.uv-cache uv run --project backend --extra dev pytest backend/tests/unit/test_task_store.py -k 'delete or manual_routine' -q
+UV_CACHE_DIR=.uv-cache uv run --project backend --extra dev pytest backend/tests/api/test_tasks.py -k task_delete -q
+```
+
+Result: `4 passed` and `3 passed`. The store contract now proves that active
+linked sessions block deletion inside the serialized write, late session links
+cannot attach to a tombstoned task, and deleted routines cannot create manual
+occurrences.
+
 ## Coverage and known gaps
 
 The focused tests cover the new lifecycle module through the HTTP adapter and
@@ -69,7 +97,7 @@ single configured coverage command with a committed 80% threshold, so coverage
 is represented by unit, persistence-contract, HTTP-integration, and web-contract
 tests rather than a percentage claim.
 
-The design's explicit high-contention database race is guarded by the same
-row-locked, optimistic event append used for task claims. Tests verify the
-serialized precondition in both adapters; they do not attempt a probabilistic
-thread race against SQLite.
+The design's explicit high-contention database races are guarded by the same
+row-locked, optimistic event append used for task claims and session links.
+Tests verify the serialized preconditions in both adapters; they do not attempt
+a probabilistic thread race against SQLite.

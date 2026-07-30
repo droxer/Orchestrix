@@ -54,14 +54,14 @@ def delete_task(
     if task.get("deletedAt"):
         return {"task": task, "outcome": "already_deleted"}
 
-    if task_has_active_linked_session(ctx.session_store, task):
-        raise TaskDeletionError("task_execution_active")
-
     try:
         deleted = ctx.task_store.delete_task(
             task_id,
             deleted_by=actor_employee_id,
             reject_active_claim=True,
+            active_linked_session=lambda current: task_has_active_linked_session(
+                ctx.session_store, current
+            ),
         )
     except TaskExecutionActiveError as error:
         raise TaskDeletionError("task_execution_active") from error
