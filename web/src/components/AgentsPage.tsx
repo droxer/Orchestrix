@@ -135,6 +135,7 @@ function RosterRow({
               ready={ready}
               availability={agent.enabled ? agent.availability : undefined}
               imageUrl={agent.profileImageUrl}
+              name={agent.displayName}
             />
           </span>
           <span className="agents-roster-row-main">

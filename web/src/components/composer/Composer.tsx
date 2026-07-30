@@ -23,7 +23,6 @@ export type ComposerHandle = {
 const ComposerView = forwardRef<ComposerHandle, {
   composerMode: AgentTaskMode;
   setComposerMode: Dispatch<SetStateAction<AgentTaskMode>>;
-  activeAgent: AgentName;
   logicalAgents: EmployeeAgent[];
   activeLogicalAgentId: string | null;
   onLogicalAgentPicked: (agent: EmployeeAgent) => void;
@@ -41,7 +40,7 @@ const ComposerView = forwardRef<ComposerHandle, {
   running: boolean;
   onSend: () => void;
   onCancelRun: () => void;
-}>(function Composer({ composerMode, setComposerMode, activeAgent, logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, activeAgentDisplayName, selectedEmployee, initializingThread, runtimeNodes, runtimeNodeId, selectedRuntimeNode, activeRuntimeNode, onRuntimeNodeChange, running, onSend, onCancelRun }, ref) {
+}>(function Composer({ composerMode, setComposerMode, logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, activeAgentDisplayName, selectedEmployee, initializingThread, runtimeNodes, runtimeNodeId, selectedRuntimeNode, activeRuntimeNode, onRuntimeNodeChange, running, onSend, onCancelRun }, ref) {
   const { t } = useTranslation();
   const composer = useComposer();
   const {
@@ -116,7 +115,6 @@ const ComposerView = forwardRef<ComposerHandle, {
                 <ThreadRuntimeReadout node={activeRuntimeNode} />
               ) : null}
               <AgentSelect
-                activeAgent={activeAgent}
                 logicalAgents={logicalAgents}
                 activeLogicalAgentId={activeLogicalAgentId}
                 onLogicalAgentPicked={onLogicalAgentPicked}

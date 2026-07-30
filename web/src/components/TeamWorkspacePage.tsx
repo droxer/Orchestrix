@@ -21,6 +21,7 @@ import type { AgentTeam, ArtifactIndexItem, WorkspaceBriefResponse, WorkspaceBri
 import { ActionEdit, AdminDelete, NavRefresh, ViewBoard } from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { PageHeader } from "./PageHeader";
+import { IdentityMonogram } from "./IdentityMonogram";
 import { TeamMark } from "./TeamMark";
 import { ProfileImage, ProfileImagePicker } from "./ProfileImagePicker";
 import { ArtifactBody } from "./artifact/ArtifactBody";
@@ -249,7 +250,7 @@ function TeamProfile({
           <ProfileImagePicker
             imageUrl={team.profileImageUrl}
             name={team.name}
-            fallback={<TeamMark size={23} />}
+            fallback={<IdentityMonogram name={team.name} size={22} />}
             editable
             disabled={busy}
             onUpload={uploadImage}
@@ -366,6 +367,7 @@ function TeamProfile({
                         ready={ready}
                         availability={member.enabled ? member.availability : undefined}
                         imageUrl={member.profileImageUrl}
+                        name={member.displayName}
                       />
                       <span className="team-profile-member-copy">
                         <strong>{member.displayName}</strong>
@@ -658,7 +660,7 @@ export function TeamWorkspacePage({
               <ProfileImage
                 src={team.profileImageUrl}
                 alt=""
-                fallback={<TeamMark size={15} />}
+                fallback={<IdentityMonogram name={team.name} size={10} />}
               />
             </span>
             {team.name}

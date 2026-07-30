@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { getControlPanelAgent } from "../../api";
 import { agentLabel } from "../../lib/plan";
 import type { ControlPanelDaemonNodeRecord, EmployeeAgent, EmployeeRecord } from "../../types";
-import { AgentMark } from "../AgentMark";
+import { IdentityMonogram } from "../IdentityMonogram";
 import { AgentProfilePanel } from "../AgentProfilePanel";
 import { ProfileImage } from "../ProfileImagePicker";
 import { Drawer } from "../ui/Drawer";
@@ -84,7 +84,7 @@ export function AgentProfileDrawer({
           <ProfileImage
             src={agent.profileImageUrl}
             alt=""
-            fallback={<AgentMark agent={agent.executorKind} size={22} />}
+            fallback={<IdentityMonogram name={agent.displayName} size={11} />}
             className="adm-drawer-title-profile-image"
           />
           <span translate="no">{agent.displayName}</span>

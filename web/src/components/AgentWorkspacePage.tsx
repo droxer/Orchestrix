@@ -18,6 +18,7 @@ import { agentLabel } from "../lib/plan";
 import { isWorkspaceRetryableError, workspaceFilesEmptyState, workspaceHomeStatus } from "../lib/workspaceHome";
 import { NavRefresh, WorkspaceFile, WorkspaceFolder } from "./icons";
 import { AgentMark } from "./AgentMark";
+import { IdentityMonogram } from "./IdentityMonogram";
 import { compactDate, compactDueDate } from "../lib/workspaceFormat";
 import { MetricItem, WorkspaceEmpty, WorkspaceLoading } from "./workspace/WorkspacePrimitives";
 import { PageHeader } from "./PageHeader";
@@ -320,7 +321,7 @@ export function AgentWorkspacePage({
               <ProfileImage
                 src={agent.profileImageUrl}
                 alt=""
-                fallback={<AgentMark agent={agent.executorKind} size={14} />}
+                fallback={<IdentityMonogram name={displayName} size={10} />}
               />
             </span>
             {displayName}

@@ -3,7 +3,9 @@ import { describe, it } from "node:test";
 
 import {
   buildExecutorDisplayNameMap,
+  buildLogicalAgentImageMap,
   displayNameForExecutor,
+  imageForAgentRun,
   isEmployeeAgentRoutable,
   isLogicalAgentRoutable,
   labelForExecutor,
@@ -84,5 +86,23 @@ describe("agentDisplayNames", () => {
     assert.equal(displayNameForExecutor("kimi", []), "Kimi");
     assert.equal(labelForExecutor("pi", undefined), "Pi");
     assert.equal(labelForExecutor("pi", { pi: "Planner" }), "Planner");
+  });
+
+  it("resolves a turn's profile image by logical agent id, not executor kind", () => {
+    // Two agents share an executor kind; only the one that ran the turn may
+    // lend it a face. Agents with no upload stay out of the map — their
+    // default profile image is the monogram, which needs no lookup.
+    const logicalAgents = [
+      agent({ id: "a1", displayName: "Researcher", executorKind: "claude", profileImageUrl: "/img/a1.png" }),
+      agent({ id: "a2", displayName: "Reviewer", executorKind: "claude" }),
+    ];
+    const images = buildLogicalAgentImageMap(logicalAgents);
+
+    assert.deepEqual(images, { a1: "/img/a1.png" });
+    assert.equal(imageForAgentRun({ agentId: "a1" }, images), "/img/a1.png");
+    assert.equal(imageForAgentRun({ agentId: "a2" }, images), undefined);
+    // A legacy run carries no logical identity to resolve against.
+    assert.equal(imageForAgentRun({}, images), undefined);
+    assert.equal(imageForAgentRun({ agentId: "a1" }, undefined), undefined);
   });
 });

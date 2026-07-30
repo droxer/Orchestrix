@@ -2,7 +2,8 @@ import type { CSSProperties } from "react";
 import type { LogicalAgentAvailability, RelayTask } from "../types";
 import { cn } from "@/lib/utils";
 import { AgentStateBadge } from "./AgentStateBadge";
-import { TeamMark } from "./TeamMark";
+import { IdentityMonogram } from "./IdentityMonogram";
+import { identityHue } from "../lib/identity";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -18,14 +19,6 @@ import { useTranslation } from "react-i18next";
 function initialFor(name: string): string {
   const trimmed = name.trim();
   return trimmed ? trimmed[0]!.toUpperCase() : "?";
-}
-
-function hueFor(name: string): number {
-  let hash = 0;
-  for (let i = 0; i < name.length; i += 1) {
-    hash = (hash * 31 + name.charCodeAt(i)) % 360;
-  }
-  return hash;
 }
 
 export function TaskAssignee({
@@ -59,7 +52,7 @@ export function TaskAssignee({
           <span
             className="task-assignee-avatar"
             aria-hidden="true"
-            style={{ "--avatar-hue": hueFor(name) } as CSSProperties}
+            style={{ "--avatar-hue": identityHue(name) } as CSSProperties}
           >
             {assigned ? initialFor(name) : null}
           </span>
@@ -85,10 +78,11 @@ export function TaskExecutionBadge({
   const { t } = useTranslation();
   if (task.assignedTeamId) {
     const name = displayName ?? task.assignedTeamId;
-    // Mirror AgentStateBadge: a monochrome identity glyph carries the team,
-    // the readiness pip carries status (same tri-state mapping — busy =
-    // info, pending = warn, never collapsed to bad while healthy), and the
-    // full label is sr-only text + tooltip so cards stay scannable.
+    // Mirror AgentStateBadge: the team's default profile image (name monogram
+    // on its identity hue) carries identity, the readiness pip carries status
+    // (same tri-state mapping — busy = info, pending = warn, never collapsed
+    // to bad while healthy), and the full label is sr-only text + tooltip so
+    // cards stay scannable.
     const tone = availability
       ? availability === "ready"
         ? "tone-good"
@@ -108,10 +102,10 @@ export function TaskExecutionBadge({
     const label = `${t("teams.assignment_badge", { name })} · ${stateLabel}`;
     return (
       <span className={cn("agent-state", "agent-state--team", tone)} title={label}>
-        <TeamMark size={14} />
+        <IdentityMonogram name={name} size={9} />
         <span className="sr-only">{label}</span>
       </span>
     );
   }
-  return <AgentStateBadge agent={task.assignedAgent} ready={ready} availability={availability} />;
+  return <AgentStateBadge agent={task.assignedAgent} ready={ready} availability={availability} name={displayName} />;
 }

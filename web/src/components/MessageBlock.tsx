@@ -8,7 +8,9 @@ import { AgentStream } from "./AgentStream";
 import { MessageTurnActions } from "./MessageTurnActions";
 import type { AgentName, AgentTaskMode } from "../types";
 import { AGENT_NAMES } from "../types";
-import { labelForAgentRun, labelForExecutor } from "../lib/agentDisplayNames";
+import { imageForAgentRun, labelForAgentRun, labelForExecutor } from "../lib/agentDisplayNames";
+import { IdentityMonogram } from "./IdentityMonogram";
+import { ProfileImage } from "./ProfileImagePicker";
 import { formatCompactTokens } from "../lib/tokenUsage";
 import { parsePlanSteps, type PlanStep } from "../lib/plan";
 import type { RelayArtifact } from "relay-core";
@@ -170,6 +172,9 @@ type MessageBlockProps = {
   /** Display name per logical agent id, so a turn is attributed to the agent
    * that ran it rather than to whichever agent shares its executor kind. */
   logicalAgentNames?: Record<string, string>;
+  /** Uploaded profile image per logical agent id; agents without one fall
+   * back to the name monogram, so this map only carries the exceptions. */
+  logicalAgentImages?: Record<string, string>;
   onOpenArtifact?: (artifact: RelayArtifact) => void;
   onRetryAgent?: (agent: AgentName, mode: AgentTaskMode, agentId?: string) => void;
   retryDisabled?: boolean;
@@ -181,6 +186,7 @@ export function MessageBlock({
   grouped = false,
   agentDisplayNames,
   logicalAgentNames,
+  logicalAgentImages,
   onOpenArtifact,
   onRetryAgent,
   retryDisabled = false,
@@ -209,7 +215,11 @@ export function MessageBlock({
         aria-label={t("message.agent_header", { employee: agentName })}
       >
         <span className="rail-node rail-node-agent" aria-hidden="true">
-          <AgentMark agent={message.agent} size={12} />
+          <ProfileImage
+            src={imageForAgentRun(message, logicalAgentImages)}
+            alt=""
+            fallback={<IdentityMonogram name={agentName} size={8} />}
+          />
         </span>
         <div className="turn-body">
           <header>
