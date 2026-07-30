@@ -24,9 +24,9 @@ from relay.persistence.agent_placement_store import LocalAgentPlacementStore
 from relay.persistence.agent_store import LocalAgentStore
 from relay.persistence.daemon_store import DatabaseDaemonStore, LocalDaemonStore
 from relay.persistence.session_store import LocalSessionStore
-from relay.persistence.store_common import _read_jsonl
+from relay.persistence.store_common import _read_jsonl, new_database_id
 from relay.sessions import SessionController
-from sqlalchemy import select
+from sqlalchemy import event, select
 
 
 def database_daemon_store(root: str) -> DatabaseDaemonStore:
@@ -4384,3 +4384,254 @@ def test_idempotent_run_request_id_is_a_uuid() -> None:
     assert str(UUID(derived)) == derived
     assert derived == _idempotent_run_request_id("claim_ms64xmg1_j1r8cs")
     assert derived != _idempotent_run_request_id("claim_other")
+
+
+def test_node_agent_maps_round_trip_through_the_child_table() -> None:
+    """The five per-agent maps are stored as daemon_node_agents rows but must
+    come back on the node dict exactly as they went in, including staying absent
+    when empty."""
+    with TemporaryDirectory() as root:
+        store = database_daemon_store(root)
+        store.register_node(
+            {
+                "id": "sbx_alice",
+                "employeeId": "alice",
+                "status": "ready",
+                "agents": {"claude": "ready", "codex": "missing"},
+                "agentDetails": {"claude": {"adapter": "cli"}},
+                "disabledAgents": ["codex"],
+                "agentRoleDefaults": {"claude": "planner"},
+                "agentRoleOverrides": {"codex": "reviewer"},
+                "createdAt": "2026-07-30T00:00:00.000Z",
+                "updatedAt": "2026-07-30T00:00:00.000Z",
+            }
+        )
+
+        node = store.get_node("sbx_alice")
+
+        assert node["agents"] == {"claude": "ready", "codex": "missing"}
+        assert node["agentDetails"] == {"claude": {"adapter": "cli"}}
+        assert node["disabledAgents"] == ["codex"]
+        assert node["agentRoleDefaults"] == {"claude": "planner"}
+        assert node["agentRoleOverrides"] == {"codex": "reviewer"}
+        assert store.list_nodes() == [node]
+
+
+def test_node_agent_maps_stay_absent_when_empty() -> None:
+    with TemporaryDirectory() as root:
+        store = database_daemon_store(root)
+        store.register_node(
+            {
+                "id": "sbx_bare",
+                "status": "ready",
+                "agents": {"claude": "ready"},
+                "createdAt": "2026-07-30T00:00:00.000Z",
+                "updatedAt": "2026-07-30T00:00:00.000Z",
+            }
+        )
+
+        node = store.get_node("sbx_bare")
+
+        assert node["agents"] == {"claude": "ready"}
+        for key in (
+            "agentDetails",
+            "disabledAgents",
+            "agentRoleDefaults",
+            "agentRoleOverrides",
+        ):
+            assert key not in node
+
+
+def test_rewriting_a_node_drops_agents_no_longer_reported() -> None:
+    with TemporaryDirectory() as root:
+        store = database_daemon_store(root)
+        base = {
+            "id": "sbx_alice",
+            "status": "ready",
+            "createdAt": "2026-07-30T00:00:00.000Z",
+            "updatedAt": "2026-07-30T00:00:00.000Z",
+        }
+        store.register_node({**base, "agents": {"claude": "ready", "codex": "ready"}})
+        store.register_node({**base, "agents": {"claude": "ready"}})
+
+        assert store.get_node("sbx_alice")["agents"] == {"claude": "ready"}
+
+
+def test_deleting_a_node_removes_its_agent_rows() -> None:
+    with TemporaryDirectory() as root:
+        store = database_daemon_store(root)
+        store.register_node(
+            {
+                "id": "sbx_alice",
+                "status": "ready",
+                "agents": {"claude": "ready"},
+                "createdAt": "2026-07-30T00:00:00.000Z",
+                "updatedAt": "2026-07-30T00:00:00.000Z",
+            }
+        )
+
+        store.delete_node("sbx_alice")
+
+        with store.engine.begin() as conn:
+            remaining = conn.execute(select(store.node_agents)).mappings().all()
+        assert remaining == []
+
+
+def node_agent_write_counter(store) -> list[str]:
+    """Record every INSERT/DELETE aimed at daemon_node_agents."""
+    writes: list[str] = []
+
+    @event.listens_for(store.engine, "before_cursor_execute")
+    def _record(conn, cursor, statement, parameters, context, executemany):
+        collapsed = " ".join(statement.split()).upper()
+        if "DAEMON_NODE_AGENTS" in collapsed and collapsed.startswith(
+            ("INSERT", "DELETE")
+        ):
+            writes.append(collapsed.split()[0])
+
+    return writes
+
+
+def test_heartbeats_do_not_rewrite_unchanged_agent_rows() -> None:
+    """`mark_node_seen` runs several times per second per node. It must not churn
+    the child table when the node reports the same agents as last time."""
+    with TemporaryDirectory() as root:
+        store = database_daemon_store(root)
+        store.register_node(
+            {
+                "id": "sbx_alice",
+                "status": "ready",
+                "agents": {"claude": "ready", "codex": "ready"},
+                "agentDetails": {"claude": {"adapter": "cli"}},
+                "createdAt": "2026-07-30T00:00:00.000Z",
+                "updatedAt": "2026-07-30T00:00:00.000Z",
+            }
+        )
+
+        writes = node_agent_write_counter(store)
+        for _ in range(5):
+            store.mark_node_seen("sbx_alice", {"status": "ready"})
+
+        assert writes == []
+        assert store.get_node("sbx_alice")["agents"] == {
+            "claude": "ready",
+            "codex": "ready",
+        }
+
+
+def test_heartbeat_that_changes_agents_does_rewrite() -> None:
+    with TemporaryDirectory() as root:
+        store = database_daemon_store(root)
+        store.register_node(
+            {
+                "id": "sbx_alice",
+                "status": "ready",
+                "agents": {"claude": "ready"},
+                "createdAt": "2026-07-30T00:00:00.000Z",
+                "updatedAt": "2026-07-30T00:00:00.000Z",
+            }
+        )
+
+        writes = node_agent_write_counter(store)
+        store.mark_node_seen("sbx_alice", {"agents": {"claude": "missing"}})
+
+        assert writes == ["DELETE", "INSERT"]
+        assert store.get_node("sbx_alice")["agents"] == {"claude": "missing"}
+
+
+def test_repeat_registrations_do_not_grow_the_event_log() -> None:
+    """Daemons re-register on a heartbeat (every 5 minutes by default), and node
+    events are deliberately never pruned. Appending one per heartbeat grows
+    daemon_events without bound and adds nothing: the only consumer,
+    `_managed_runtime_identity_map`, folds them into a dict where repeats of an
+    unchanged payload are discarded."""
+    with TemporaryDirectory() as root:
+        store = database_daemon_store(root)
+        payload = {
+            "id": "sbx_alice",
+            "employeeId": "alice",
+            "status": "ready",
+            "agents": {"claude": "ready"},
+            "nodeTokenHash": "sha256:hash",
+            "createdAt": "2026-07-30T00:00:00.000Z",
+            "updatedAt": "2026-07-30T00:00:00.000Z",
+        }
+        for beat in range(5):
+            store.register_node(
+                {**payload, "lastSeenAt": f"2026-07-30T00:0{beat}:00.000Z"}
+            )
+
+        events = stored_daemon_event_types(store)
+
+        assert events.count("daemon.node.registered") == 1
+
+
+def test_a_materially_changed_registration_is_still_recorded() -> None:
+    with TemporaryDirectory() as root:
+        store = database_daemon_store(root)
+        payload = {
+            "id": "sbx_alice",
+            "status": "ready",
+            "agents": {"claude": "ready"},
+            "createdAt": "2026-07-30T00:00:00.000Z",
+            "updatedAt": "2026-07-30T00:00:00.000Z",
+        }
+        store.register_node(dict(payload))
+        store.register_node({**payload, "agents": {"claude": "ready", "codex": "ready"}})
+        store.register_node({**payload, "employeeId": "alice"})
+
+        events = stored_daemon_event_types(store)
+
+        assert events.count("daemon.node.registered") == 3
+
+
+def test_managed_runtime_identity_survives_deduplicated_registrations() -> None:
+    """The event log is the only record of a node incarnation once `delete_node`
+    hard-deletes the row, so deduplicating must not lose the managed linkage."""
+    with TemporaryDirectory() as root:
+        store = database_daemon_store(root)
+        payload = {
+            "id": "runtime_alice",
+            "managedNodeId": "computer_alice",
+            "status": "ready",
+            "agents": {"claude": "ready"},
+            "createdAt": "2026-07-30T00:00:00.000Z",
+            "updatedAt": "2026-07-30T00:00:00.000Z",
+        }
+        for _ in range(4):
+            store.register_node(dict(payload))
+        store.delete_node("runtime_alice")
+
+        assert store.historical_managed_node_id("runtime_alice") == "computer_alice"
+
+
+def test_dead_heartbeat_events_are_prunable() -> None:
+    """`daemon.node.seen` was emitted per heartbeat by a since-removed path and
+    nothing reads it, but it fell outside the prunable prefix, so it accumulated
+    permanently. It must age out on the retention cutoff."""
+    with TemporaryDirectory() as root:
+        store = database_daemon_store(root)
+        store.register_node(
+            {
+                "id": "sbx_alice",
+                "status": "ready",
+                "agents": {"claude": "ready"},
+                "createdAt": "2026-07-30T00:00:00.000Z",
+                "updatedAt": "2026-07-30T00:00:00.000Z",
+            }
+        )
+        store.append_daemon_event(
+            {
+                "id": new_database_id(),
+                "type": "daemon.node.seen",
+                "nodeId": "sbx_alice",
+                "timestamp": "2026-07-30T00:00:00.000Z",
+            }
+        )
+
+        store.prune_terminal_records(retention_seconds=0, per_node_limit=0)
+
+        remaining = stored_daemon_event_types(store)
+        assert "daemon.node.seen" not in remaining
+        # The registration record is what survives a hard node delete, so it stays.
+        assert "daemon.node.registered" in remaining

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import fcntl
+import json
 from collections import defaultdict
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from threading import RLock
 from typing import Any
@@ -23,6 +24,7 @@ from sqlalchemy import (
     delete,
     func,
     insert,
+    or_,
     select,
     text,
     update,
@@ -55,10 +57,22 @@ from .store_common import (
 TERMINAL_DAEMON_STATUSES = frozenset({"completed", "failed", "cancelled"})
 # Command-lifecycle events describe records that `prune_terminal_records`
 # deletes, so they are pruned on the same retention cutoff. Node-lifecycle
-# events are kept indefinitely: `delete_node` hard-deletes the node row, which
-# makes the event log the only surviving record of a node incarnation (see
-# `historical_managed_runtime_ids`).
+# events are otherwise kept indefinitely: `delete_node` hard-deletes the node
+# row, which makes the event log the only surviving record of a node incarnation
+# (see `historical_managed_runtime_ids`).
 PRUNABLE_DAEMON_EVENT_PREFIX = "daemon.command."
+# `daemon.node.seen` is the exception. It was appended per heartbeat by a path
+# that has since stopped emitting it, nothing has ever read it, and it carries no
+# node payload -- so unlike `daemon.node.registered` it records nothing about an
+# incarnation and only accumulates.
+PRUNABLE_DAEMON_EVENT_TYPES = frozenset({"daemon.node.seen"})
+
+
+def daemon_event_is_prunable(event_type: str) -> bool:
+    return (
+        event_type.startswith(PRUNABLE_DAEMON_EVENT_PREFIX)
+        or event_type in PRUNABLE_DAEMON_EVENT_TYPES
+    )
 ACTIVE_RUN_REQUEST_STATUSES = frozenset({"running", "dispatching", "finalizing"})
 DISPATCH_CLAIM_ID_STATE_KEY = "_relay_dispatch_claim_id"
 DISPATCH_CLAIM_EXPIRES_STATE_KEY = "_relay_dispatch_claim_expires_at"
@@ -71,6 +85,44 @@ def _node_for_storage(node: dict[str, Any]) -> dict[str, Any]:
     stored = {**node, "token": None}
     stored.pop("nodeToken", None)
     return stored
+
+
+# Advance on every heartbeat by design, so they say nothing about whether a
+# registration is materially new.
+_NODE_LIVENESS_FIELDS = ("updatedAt", "lastSeenAt")
+_NODE_LIVENESS_COLUMNS = frozenset({"updated_at", "last_seen_at"})
+
+
+def _comparable_node_value(value: Any) -> Any:
+    """Normalize a stored node value for comparison.
+
+    SQLite hands back naive datetimes where the incoming row holds UTC-aware
+    ones, so compare timestamps in their formatted form.
+    """
+    return _format_iso(value) if isinstance(value, datetime) else value
+
+
+def node_registration_changed(
+    previous: dict[str, Any] | None, node: dict[str, Any]
+) -> bool:
+    """Whether a registration differs from what is already stored.
+
+    Daemons re-register on a heartbeat, and `daemon.node.*` events are never
+    pruned (they are the only record of a node incarnation once `delete_node`
+    removes the row). Appending an event per heartbeat therefore grows
+    `daemon_events` without bound while telling
+    `_managed_runtime_identity_map` nothing it does not already know, since it
+    folds the events into a dict keyed by node id.
+    """
+    if previous is None:
+        return True
+    return {
+        key: value
+        for key, value in previous.items()
+        if key not in _NODE_LIVENESS_FIELDS
+    } != {
+        key: value for key, value in node.items() if key not in _NODE_LIVENESS_FIELDS
+    }
 
 
 def infer_node_location(node: dict[str, Any]) -> str | None:
@@ -222,10 +274,14 @@ class LocalDaemonStore:
     def register_node(self, sandbox: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
             node = _node_for_storage(sandbox)
+            changed = node_registration_changed(self.get_node(node["id"]), node)
             self._write_node(node)
-            self.append_daemon_event(
-                daemon_event("daemon.node.registered", {"node": node})
-            )
+            # The row always advances lastSeenAt; only a material change is worth
+            # an event. See node_registration_changed.
+            if changed:
+                self.append_daemon_event(
+                    daemon_event("daemon.node.registered", {"node": node})
+                )
             return node
 
     def mark_node_seen(
@@ -885,7 +941,7 @@ class LocalDaemonStore:
             event
             for event in events
             if not (
-                str(event.get("type", "")).startswith(PRUNABLE_DAEMON_EVENT_PREFIX)
+                daemon_event_is_prunable(str(event.get("type", "")))
                 and str(event.get("timestamp", "")) <= cutoff
             )
         ]
@@ -1165,6 +1221,9 @@ class DatabaseDaemonStore:
         Column("role_default", Text, nullable=True),
         Column("role_override", Text, nullable=True),
         PrimaryKeyConstraint("node_id", "agent", name="pk_daemon_node_agents"),
+        # The point of normalizing: "which nodes can run codex" is an index
+        # lookup instead of a scan over every node's JSON.
+        Index("ix_daemon_node_agents_agent_status", "agent", "status"),
     )
     commands = Table(
         "daemon_commands",
@@ -1281,17 +1340,35 @@ class DatabaseDaemonStore:
             create_all_tables(self.engine)
 
     def _write_node_agents(self, conn: Any, node_pk: str, node: dict[str, Any]) -> None:
-        """Replace a node's daemon_node_agents rows.
+        """Replace a node's daemon_node_agents rows, but only if they changed.
 
-        Delete-then-insert rather than a merge: the five maps are always written as
-        a complete set, so an agent dropped from the payload must disappear.
+        Delete-then-insert rather than a merge, because the five maps are always
+        written as a complete set: an agent dropped from the payload has to
+        disappear. The equality check in front of it matters -- every node write
+        funnels through here, including `mark_node_seen`, which fires several
+        times per second per node and almost never changes the agent set. Without
+        it each heartbeat would delete and reinsert every row, churning the table
+        and its indexes for nothing.
         """
+        desired = node_agent_rows(node, node_pk)
+        current = (
+            conn.execute(
+                select(self.node_agents)
+                .where(self.node_agents.c.node_id == node_pk)
+                .order_by(self.node_agents.c.agent)
+            )
+            .mappings()
+            .all()
+        )
+        if [_node_agent_identity(row) for row in current] == [
+            _node_agent_identity(row) for row in desired
+        ]:
+            return
         conn.execute(
             delete(self.node_agents).where(self.node_agents.c.node_id == node_pk)
         )
-        rows = node_agent_rows(node, node_pk)
-        if rows:
-            conn.execute(insert(self.node_agents), rows)
+        if desired:
+            conn.execute(insert(self.node_agents), desired)
 
     def _save_node(
         self, conn: Any, node: dict[str, Any], *, database_id: str | None = None
@@ -1310,13 +1387,56 @@ class DatabaseDaemonStore:
             conn.execute(insert(self.nodes).values(**values))
         self._write_node_agents(conn, node_pk, node)
 
+    def _node_state_changed(self, conn: Any, node: dict[str, Any]) -> bool:
+        """Whether writing `node` would change anything already persisted.
+
+        Compares the persisted representation rather than the caller's dict: a
+        node read back carries defaults the incoming payload omits, so comparing
+        the two dicts directly reports a change every time.
+        """
+        node_pk = node["id"]
+        row = (
+            conn.execute(select(self.nodes).where(self.nodes.c.id == node_pk))
+            .mappings()
+            .first()
+        )
+        if row is None:
+            return True
+        desired = node_to_row(node, database_id=node_pk)
+        if {
+            key: _comparable_node_value(value)
+            for key, value in desired.items()
+            if key not in _NODE_LIVENESS_COLUMNS
+        } != {
+            key: _comparable_node_value(row[key])
+            for key in desired
+            if key not in _NODE_LIVENESS_COLUMNS
+        }:
+            return True
+        current = (
+            conn.execute(
+                select(self.node_agents)
+                .where(self.node_agents.c.node_id == node_pk)
+                .order_by(self.node_agents.c.agent)
+            )
+            .mappings()
+            .all()
+        )
+        return [_node_agent_identity(item) for item in current] != [
+            _node_agent_identity(item) for item in node_agent_rows(node, node_pk)
+        ]
+
     def register_node(self, sandbox: dict[str, Any]) -> dict[str, Any]:
         node = _node_for_storage(sandbox)
         with store_transaction(self.engine) as conn:
+            changed = self._node_state_changed(conn, node)
             self._save_node(conn, node)
-            self._append_daemon_event(
-                conn, daemon_event("daemon.node.registered", {"node": node})
-            )
+            # The row always advances lastSeenAt; only a material change is worth
+            # an event. See node_registration_changed.
+            if changed:
+                self._append_daemon_event(
+                    conn, daemon_event("daemon.node.registered", {"node": node})
+                )
         return node
 
     def mark_node_seen(
@@ -1477,6 +1597,11 @@ class DatabaseDaemonStore:
             conn.execute(delete(self.runs).where(self.runs.c.node_id == node_pk))
             conn.execute(
                 delete(self.commands).where(self.commands.c.node_id == node_pk)
+            )
+            # Deleted explicitly like the other children: SQLite does not
+            # enforce ON DELETE CASCADE unless foreign_keys=ON.
+            conn.execute(
+                delete(self.node_agents).where(self.node_agents.c.node_id == node_pk)
             )
             conn.execute(delete(self.nodes).where(self.nodes.c.id == node_pk))
             self._append_daemon_event(
@@ -2296,7 +2421,12 @@ class DatabaseDaemonStore:
             deleted_events = (
                 conn.execute(
                     delete(self.events).where(
-                        self.events.c.type.startswith(PRUNABLE_DAEMON_EVENT_PREFIX),
+                        or_(
+                            self.events.c.type.startswith(
+                                PRUNABLE_DAEMON_EVENT_PREFIX
+                            ),
+                            self.events.c.type.in_(PRUNABLE_DAEMON_EVENT_TYPES),
+                        ),
                         self.events.c.timestamp <= _parse_iso(cutoff),
                     )
                 ).rowcount
@@ -2499,6 +2629,24 @@ def node_to_row(
         "updated_at": _parse_iso(node["updatedAt"]),
         "last_seen_at": _parse_iso(node.get("lastSeenAt")),
     }
+
+
+def _node_agent_identity(row: Any) -> tuple[Any, ...]:
+    """Comparable form of a daemon_node_agents row.
+
+    Normalizes across the two sides being compared: values built in Python and
+    values read back from the database, where `details` is a re-parsed mapping
+    and `disabled` may arrive as 0/1.
+    """
+    details = row["details"]
+    return (
+        row["agent"],
+        row["status"],
+        json.dumps(details, sort_keys=True) if details is not None else None,
+        bool(row["disabled"]),
+        row["role_default"] or None,
+        row["role_override"] or None,
+    )
 
 
 def node_agent_rows(node: dict[str, Any], node_pk: str) -> list[dict[str, Any]]:
