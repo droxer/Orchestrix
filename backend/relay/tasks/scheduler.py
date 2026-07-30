@@ -294,12 +294,19 @@ class TaskScheduler:
                         daemon_nodes=daemon_nodes,
                     )
                 node = self.registry.get(assignments[0]["daemonNodeId"])
-            except TeamDispatchError:
+            except TeamDispatchError as error:
                 self._record_dispatch_deferred(
                     task,
-                    "team_unavailable",
-                    TEAM_UNAVAILABLE_MESSAGE,
+                    error.code,
+                    (
+                        f"The assigned team cannot execute this task ({error.code})."
+                        if error.permanent
+                        else TEAM_UNAVAILABLE_MESSAGE
+                    ),
+                    state="rejected" if error.permanent else "queued",
                 )
+                if error.permanent:
+                    self.task_store.update_task(task["id"], {"status": "blocked"})
                 skipped += 1
                 continue
             except AgentRoutingError as error:
@@ -310,6 +317,7 @@ class TaskScheduler:
                     task, dispatch_reason_code(error.code), str(error), state=state
                 )
                 if error.code in PERMANENT_DISPATCH_CODES:
+                    self.task_store.update_task(task["id"], {"status": "blocked"})
                     skipped += 1
                     continue
                 node = None

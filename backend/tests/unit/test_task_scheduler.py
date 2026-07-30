@@ -836,11 +836,12 @@ def test_scheduler_dispatches_all_team_members_lead_first() -> None:
             assert result.skipped == 1
             assert registry.take_commands("sbx_alice", "node_token") == []
             updated = task_store.get_task(second["id"])
-            assert updated["status"] == "assigned"
-            assert updated["dispatchOutcome"]["code"] == "team_unavailable"
+            assert updated["status"] == "blocked"
+            assert updated["dispatchOutcome"]["state"] == "rejected"
+            assert updated["dispatchOutcome"]["code"] == "team_disabled"
             assert (
                 updated["dispatchOutcome"]["message"]
-                == "The agent team is not currently available."
+                == "The assigned team cannot execute this task (team_disabled)."
             )
 
     asyncio.run(run_flow())
@@ -957,7 +958,11 @@ def test_scheduler_records_team_unavailable_without_claiming() -> None:
             placements = LocalAgentPlacementStore(root)
             member = agent_store.create_agent(
                 "alice",
-                {"displayName": "Unavailable", "executorKind": "codex", "enabled": False},
+                {
+                    "displayName": "Unavailable",
+                    "executorKind": "codex",
+                    "enabled": False,
+                },
             )
             backend = ServerDaemonNodeBackend(
                 registry,
@@ -991,7 +996,9 @@ def test_scheduler_records_team_unavailable_without_claiming() -> None:
 
             updated = task_store.get_task(task["id"])
             assert result.dispatched == 0
-            assert updated["dispatchOutcome"]["code"] == "team_unavailable"
+            assert updated["status"] == "blocked"
+            assert updated["dispatchOutcome"]["state"] == "rejected"
+            assert updated["dispatchOutcome"]["code"] == "team_disabled"
             assert "dispatchClaim" not in updated
 
     asyncio.run(run_flow())

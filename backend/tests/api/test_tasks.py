@@ -1075,6 +1075,8 @@ def test_task_rejects_invalid_routine_fields(monkeypatch) -> None:
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        agent = _create_agent(client, "alice")
 
         invalid_type = client.post(
             "/api/v1/tasks",
@@ -1111,6 +1113,124 @@ def test_task_rejects_invalid_routine_fields(monkeypatch) -> None:
         )
         assert invalid_enabled.status_code == 400
         assert "routineEnabled" in invalid_enabled.json()["detail"]
+
+        enabled_custom_without_date = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Never scheduled",
+                "assigneeEmployeeId": "alice",
+                "assignedAgentId": agent["id"],
+                "isRoutine": True,
+                "routineCadence": "custom",
+                "routineEnabled": True,
+                "routineNextRunDate": "",
+            },
+        )
+        assert enabled_custom_without_date.status_code == 400
+        assert "routineNextRunDate" in enabled_custom_without_date.json()["detail"]
+
+
+def test_clearing_an_assigned_task_returns_it_to_backlog(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        agent = _create_agent(client, "alice")
+        task = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Requeue me",
+                "assigneeEmployeeId": "alice",
+                "assignedAgentId": agent["id"],
+                "status": "assigned",
+            },
+        ).json()
+
+        cleared = client.patch(
+            f"/api/v1/tasks/{task['id']}",
+            json={
+                "status": "assigned",
+                "assignedAgentId": None,
+                "assignedTeamId": None,
+            },
+        )
+
+        assert cleared.status_code == 200
+        assert cleared.json()["status"] == "backlog"
+        assert "assignedAgent" not in cleared.json()
+        assert "assignedAgentId" not in cleared.json()
+        assert "assignedTeamId" not in cleared.json()
+
+
+def test_active_task_assignment_cannot_change(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        first = _create_agent(client, "alice", executor_kind="codex")
+        second = _create_agent(client, "alice", executor_kind="claude")
+        task = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Already running",
+                "assigneeEmployeeId": "alice",
+                "assignedAgentId": first["id"],
+                "createSession": True,
+            },
+        ).json()
+        session_id = task["linkedSessionIds"][0]
+        client.app.state.session_store.append_event(
+            session_id,
+            {
+                "id": "20000000-0000-4000-8000-000000000001",
+                "type": "session.status",
+                "sessionId": session_id,
+                "timestamp": "2026-07-30T00:00:00.000Z",
+                "status": "running",
+                "phase": "assigned",
+            },
+        )
+
+        reassigned = client.patch(
+            f"/api/v1/tasks/{task['id']}",
+            json={"assignedAgentId": second["id"]},
+        )
+
+        assert reassigned.status_code == 409
+        assert reassigned.json()["detail"] == "task_execution_active"
+        unchanged = client.get(f"/api/v1/tasks/{task['id']}").json()
+        assert unchanged["assignedAgentId"] == first["id"]
+
+
+def test_pickup_rejects_terminal_tasks_without_creating_a_session(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        agent = _create_agent(client, "alice")
+        task = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Already done",
+                "assigneeEmployeeId": "alice",
+                "assignedAgentId": agent["id"],
+                "status": "done",
+            },
+        ).json()
+
+        pickup = client.post(
+            f"/api/v1/tasks/{task['id']}/pickups",
+            json={"agentId": agent["id"]},
+        )
+
+        assert pickup.status_code == 409
+        assert pickup.json()["detail"] == "task_not_dispatchable"
+        assert (
+            client.get(f"/api/v1/tasks/{task['id']}").json()["linkedSessionIds"] == []
+        )
 
 
 def test_task_delete_hides_task_from_list_and_get(monkeypatch) -> None:

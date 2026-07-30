@@ -525,6 +525,17 @@ def test_agent_pickup_thread_is_owned_by_the_task_assignee(monkeypatch) -> None:
         _bootstrap(client)
         _employee(client, "alice")
         _employee(client, "requester")
+        app.state.registry.register(
+            {
+                "sandboxId": "test_node_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
         agent = _agent(client, "alice", "Builder", "codex")
         task = app.state.task_store.create_task(
             {
@@ -538,11 +549,16 @@ def test_agent_pickup_thread_is_owned_by_the_task_assignee(monkeypatch) -> None:
             f"/api/v1/tasks/{task['id']}/pickups", json={"agentId": agent["id"]}
         )
 
-        assert pickup.status_code == 201
+        assert pickup.status_code == 202
         payload = pickup.json()
         assert payload["task"]["assigneeEmployeeId"] == "alice"
         assert payload["session"]["ownerEmployeeId"] == "alice"
         assert payload["session"]["ownerAgentId"] == agent["id"]
+        duplicate = client.post(
+            f"/api/v1/tasks/{task['id']}/pickups", json={"agentId": agent["id"]}
+        )
+        assert duplicate.status_code == 409
+        assert duplicate.json()["detail"] == "task_not_dispatchable"
 
 
 def test_task_owner_can_edit_delegated_team_task_without_reassigning_it(
@@ -740,6 +756,77 @@ def test_task_assigned_to_team_starts_all_members_lead_first_in_assignee_thread(
         [support_command] = app.state.registry.take_commands("node_alice", "node_token")
         assert support_command["logicalAgentId"] == support["id"]
         assert support_command["agent"] == "claude"
+
+
+def test_team_task_start_propagates_review_mode_to_every_member(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        _employee(client, "alice")
+        app.state.registry.register(
+            {
+                "sandboxId": "node_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex", "claude"],
+                "status": "ready",
+            }
+        )
+        lead = _agent(client, "alice", "Lead", "codex")
+        support = _agent(client, "alice", "Support", "claude")
+        for agent in (lead, support):
+            assert (
+                client.post(
+                    f"/api/v1/admin/agents/{agent['id']}/placements",
+                    json={"daemonNodeId": "node_alice"},
+                ).status_code
+                == 201
+            )
+        team = client.post(
+            "/api/v1/admin/teams",
+            json={
+                "ownerEmployeeId": "alice",
+                "name": "Reviewers",
+                "leadAgentId": lead["id"],
+                "memberAgentIds": [lead["id"], support["id"]],
+            },
+        ).json()["team"]
+        task = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Review with the team",
+                "assigneeEmployeeId": "alice",
+                "assignedTeamId": team["id"],
+            },
+        ).json()
+
+        started = client.post(
+            f"/api/v1/tasks/{task['id']}/runs", json={"mode": "review"}
+        )
+
+        assert started.status_code == 202
+        [lead_command] = app.state.registry.take_commands("node_alice", "node_token")
+        assert lead_command["mode"] == "review"
+        app.state.registry.handle_event(
+            "node_alice",
+            {
+                "type": "run.completed",
+                "commandId": lead_command["id"],
+                "sessionId": lead_command["sessionId"],
+                "runId": lead_command["runId"],
+                "agent": "codex",
+                "mode": "review",
+                "exitCode": 0,
+                "agentLog": "lead review",
+            },
+            "node_token",
+        )
+        [support_command] = app.state.registry.take_commands("node_alice", "node_token")
+        assert support_command["mode"] == "review"
 
 
 def test_unroutable_team_start_requests_capacity_and_queues_scheduler_retry(
@@ -1061,7 +1148,7 @@ def test_empty_team_cannot_create_a_task_thread_without_lead_ownership(
         )
 
         assert create_with_thread.status_code == 409
-        assert create_with_thread.json()["detail"] == "team_unavailable"
+        assert create_with_thread.json()["detail"] == "team_invalid"
 
         task = client.post(
             "/api/v1/tasks",
@@ -1075,7 +1162,7 @@ def test_empty_team_cannot_create_a_task_thread_without_lead_ownership(
             "/api/v1/threads", json={"taskGoal": "No lead thread", "taskId": task["id"]}
         )
         assert linked.status_code == 409
-        assert linked.json()["detail"] == "team_unavailable"
+        assert linked.json()["detail"] == "team_invalid"
 
 
 def test_assign_endpoint_rejects_unavailable_team(monkeypatch) -> None:
@@ -1116,4 +1203,4 @@ def test_assign_endpoint_rejects_unavailable_team(monkeypatch) -> None:
             f"/api/v1/tasks/{task['id']}/assignment", json={"teamId": team["id"]}
         )
         assert rejected.status_code == 409
-        assert rejected.json()["detail"] == "team_unavailable"
+        assert rejected.json()["detail"] == "team_disabled"

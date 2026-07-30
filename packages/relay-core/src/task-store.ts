@@ -170,6 +170,13 @@ export type RelayTaskEvent =
     }
   | {
       id: string;
+      type: "task.session_unlinked";
+      taskId: string;
+      timestamp: string;
+      sessionId: string;
+    }
+  | {
+      id: string;
       type: "task.activity";
       taskId: string;
       timestamp: string;
@@ -267,6 +274,8 @@ export function materializeTaskEvents(events: RelayTaskEvent[]): RelayTask {
       task.deletedAt = event.timestamp;
     } else if (event.type === "task.session_linked") {
       if (!task.linkedSessionIds.includes(event.sessionId)) task.linkedSessionIds.push(event.sessionId);
+    } else if (event.type === "task.session_unlinked") {
+      task.linkedSessionIds = task.linkedSessionIds.filter((sessionId) => sessionId !== event.sessionId);
     } else if (event.type === "task.activity") {
       task.activity.push(event.activity);
     }

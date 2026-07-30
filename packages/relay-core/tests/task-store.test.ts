@@ -21,4 +21,20 @@ describe("task team assignment events", () => {
     assert.equal(rebuilt.assignedAgent, undefined);
     assert.equal(rebuilt.assignedAgentId, undefined);
   });
+
+  it("removes a linked session when the backend records an unlink event", () => {
+    const taskId = "task-2";
+
+    const rebuilt = materializeTaskEvents([
+      relayTaskEvent("task.created", taskId, {
+        title: "Session lifecycle",
+        description: "",
+        priority: "normal",
+      }),
+      relayTaskEvent("task.session_linked", taskId, { sessionId: "session-1" }),
+      relayTaskEvent("task.session_unlinked", taskId, { sessionId: "session-1" }),
+    ]);
+
+    assert.deepEqual(rebuilt.linkedSessionIds, []);
+  });
 });

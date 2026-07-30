@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from relay.app import create_app
 from relay.persistence.stores import relay_event
+from relay.sessions import SessionController
 
 
 def _bootstrap(client: TestClient) -> None:
@@ -86,13 +87,18 @@ def test_task_artifacts_dedupes_regenerated_file_across_sessions(monkeypatch) ->
             "admin", {"displayName": "Artifact Reviewer", "executorKind": "claude"}
         )
 
-        # A second run of the same task regenerates deck.pptx in a new session.
-        pickup = client.post(
-            f"/api/v1/tasks/{task['id']}/pickups",
-            json={"agentId": agent["id"], "workspacePath": ws},
+        # A second linked thread regenerates deck.pptx in a new session.
+        controller = SessionController(
+            app.state.session_store,
+            task_store=app.state.task_store,
+            task_id=task["id"],
+            workspace_path=ws,
+            owner_employee_id="admin",
+            owner_agent_id=agent["id"],
         )
-        assert pickup.status_code == 201, pickup.text
-        second_session = pickup.json()["session"]["id"]
+        second_session = controller.create_session(task["title"], ["human", "claude"])[
+            "id"
+        ]
 
         stale = _workspace_artifact(ws, "deck.pptx", artifact_id="20000000-0000-4000-8000-000000000003", created_at="2026-06-29T00:00:00.000Z", content_type=PPTX_TYPE)
         fresh = _workspace_artifact(ws, "deck.pptx", artifact_id="20000000-0000-4000-8000-000000000004", created_at="2026-07-02T00:00:00.000Z", content_type=PPTX_TYPE)
