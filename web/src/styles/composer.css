@@ -195,8 +195,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
-  height: 28px;
-  padding: 0 10px;
+  height: var(--sp-6);
+  padding: 0 var(--sp-3);
   border: 0;
   border-radius: var(--r-2);
   background: var(--surface-2);
@@ -328,7 +328,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-3);
-  padding: var(--sp-1) var(--sp-3) 10px var(--composer-inline);
+  padding: var(--sp-1) var(--sp-3) var(--sp-3) var(--composer-inline);
 }
 
 .composer-footer-left,

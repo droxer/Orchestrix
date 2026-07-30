@@ -210,20 +210,8 @@
   height: 6px;
   border-radius: var(--r-full);
   background: var(--live);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 55%, transparent);
-  animation: header-agent-busy-pulse var(--t-pulse) var(--ease) infinite;
-}
-
-@keyframes header-agent-busy-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 45%, transparent);
-    opacity: 1;
-  }
-  55% {
-    box-shadow: 0 0 0 5px transparent;
-    opacity: 0.72;
-  }
+  --pulse-color: var(--live);
+  animation: pulse-ring var(--t-pulse) var(--ease) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -341,34 +329,36 @@
 
 /* Staggered reveal — first dozen turns fade-rise on mount, at the row tier
    of the shared `rise` keyframe (tokens/base.css). */
+/* 1x --t-stagger: a dense turn ladder, so a long transcript reveals as one
+   sweep rather than twelve separate arrivals. */
 .transcript-inner > .transcript-turn {
   --rise-from: var(--rise-sm);
 }
 
 .transcript-inner > .transcript-turn:nth-child(1) .msg,
-.transcript-inner > .transcript-turn:nth-child(1) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 30ms; }
+.transcript-inner > .transcript-turn:nth-child(1) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 1); }
 .transcript-inner > .transcript-turn:nth-child(2) .msg,
-.transcript-inner > .transcript-turn:nth-child(2) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 60ms; }
+.transcript-inner > .transcript-turn:nth-child(2) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 2); }
 .transcript-inner > .transcript-turn:nth-child(3) .msg,
-.transcript-inner > .transcript-turn:nth-child(3) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 90ms; }
+.transcript-inner > .transcript-turn:nth-child(3) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 3); }
 .transcript-inner > .transcript-turn:nth-child(4) .msg,
-.transcript-inner > .transcript-turn:nth-child(4) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 120ms; }
+.transcript-inner > .transcript-turn:nth-child(4) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 4); }
 .transcript-inner > .transcript-turn:nth-child(5) .msg,
-.transcript-inner > .transcript-turn:nth-child(5) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 150ms; }
+.transcript-inner > .transcript-turn:nth-child(5) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 5); }
 .transcript-inner > .transcript-turn:nth-child(6) .msg,
-.transcript-inner > .transcript-turn:nth-child(6) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 180ms; }
+.transcript-inner > .transcript-turn:nth-child(6) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 6); }
 .transcript-inner > .transcript-turn:nth-child(7) .msg,
-.transcript-inner > .transcript-turn:nth-child(7) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 210ms; }
+.transcript-inner > .transcript-turn:nth-child(7) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 7); }
 .transcript-inner > .transcript-turn:nth-child(8) .msg,
-.transcript-inner > .transcript-turn:nth-child(8) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 240ms; }
+.transcript-inner > .transcript-turn:nth-child(8) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 8); }
 .transcript-inner > .transcript-turn:nth-child(9) .msg,
-.transcript-inner > .transcript-turn:nth-child(9) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 270ms; }
+.transcript-inner > .transcript-turn:nth-child(9) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 9); }
 .transcript-inner > .transcript-turn:nth-child(10) .msg,
-.transcript-inner > .transcript-turn:nth-child(10) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 300ms; }
+.transcript-inner > .transcript-turn:nth-child(10) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 10); }
 .transcript-inner > .transcript-turn:nth-child(11) .msg,
-.transcript-inner > .transcript-turn:nth-child(11) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 330ms; }
+.transcript-inner > .transcript-turn:nth-child(11) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 11); }
 .transcript-inner > .transcript-turn:nth-child(12) .msg,
-.transcript-inner > .transcript-turn:nth-child(12) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 360ms; }
+.transcript-inner > .transcript-turn:nth-child(12) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 12); }
 
 @media (prefers-reduced-motion: reduce) {
   .transcript-inner > .transcript-turn .msg,
@@ -567,8 +557,11 @@
   }
 }
 
+/* Local by necessity, not by preference: this ring is spaced off the canvas
+   by a second shadow, which the shared single-shadow pulse-ring cannot carry.
+   The tint tracks pulse-ring's 40% so it reads at the same strength. */
 @keyframes agent-rail-pulse {
-  0%   { box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 2px color-mix(in srgb, var(--live) 45%, transparent); }
+  0%   { box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 2px color-mix(in srgb, var(--live) 40%, transparent); }
   100% { box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 9px color-mix(in srgb, var(--live) 0%, transparent); }
 }
 
@@ -652,8 +645,8 @@
 .msg-turn-action {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  height: 26px;
+  gap: var(--sp-1-5);
+  height: var(--sp-6);
   padding: 0 var(--sp-3);
   border: 1px solid transparent;
   border-radius: var(--r-2);
@@ -693,7 +686,7 @@
   font: var(--type-label);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 719px) {
   .msg-turn-action-label {
     position: absolute;
     width: 1px;

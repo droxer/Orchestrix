@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { getAgentArtifacts, getWorkspaceBrief, listAgentWorkspaceFiles, readAgentWorkspaceFile } from "../api";
@@ -675,7 +675,12 @@ function ActivitiesPane({
 
 function ActivitySection({ title, count, index = 0, children }: { title: string; count: number; index?: number; children: ReactNode }) {
   return (
-    <section className="workspace-activity-section" style={{ animationDelay: `${40 + index * 80}ms` }}>
+    <section
+      className="workspace-activity-section"
+      /* The delay itself belongs to the stylesheet (calc off --t-stagger);
+         only the section's position in the ladder is data. */
+      style={{ "--stagger-index": index } as CSSProperties}
+    >
       <header className="workspace-activity-head">
         <h2>{title}</h2>
         <span className="tnum">{count}</span>

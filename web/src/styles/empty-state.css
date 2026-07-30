@@ -12,15 +12,16 @@
   animation: rise var(--t-slow) var(--ease) forwards;
 }
 
-.relay-enter-delay-1 { animation-delay: 60ms; }
-.relay-enter-delay-2 { animation-delay: 140ms; }
-.relay-enter-delay-3 { animation-delay: 220ms; }
-.relay-enter-delay-4 { animation-delay: 300ms; }
-.relay-enter-delay-5 { animation-delay: 380ms; }
-.relay-enter-delay-6 { animation-delay: 460ms; }
-.relay-enter-delay-7 { animation-delay: 540ms; }
-.relay-enter-delay-8 { animation-delay: 620ms; }
-.relay-enter-delay-9 { animation-delay: 700ms; }
+/* 2x --t-stagger: sparse block ladder, one beat per line of an empty state. */
+.relay-enter-delay-1 { animation-delay: calc(var(--t-stagger) * 2); }
+.relay-enter-delay-2 { animation-delay: calc(var(--t-stagger) * 4); }
+.relay-enter-delay-3 { animation-delay: calc(var(--t-stagger) * 6); }
+.relay-enter-delay-4 { animation-delay: calc(var(--t-stagger) * 8); }
+.relay-enter-delay-5 { animation-delay: calc(var(--t-stagger) * 10); }
+.relay-enter-delay-6 { animation-delay: calc(var(--t-stagger) * 12); }
+.relay-enter-delay-7 { animation-delay: calc(var(--t-stagger) * 14); }
+.relay-enter-delay-8 { animation-delay: calc(var(--t-stagger) * 16); }
+.relay-enter-delay-9 { animation-delay: calc(var(--t-stagger) * 18); }
 
 @media (prefers-reduced-motion: reduce) {
   .relay-enter {

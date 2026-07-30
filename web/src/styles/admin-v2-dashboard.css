@@ -169,12 +169,12 @@
 .adm-dash-chart-line {
   stroke-dasharray: var(--chart-path-length, 1000);
   stroke-dashoffset: var(--chart-path-length, 1000);
-  animation: adm-chart-draw 1.1s var(--ease) 0.15s forwards;
+  animation: adm-chart-draw var(--t-draw) var(--ease) 0.15s forwards;
 }
 
 .adm-dash-chart-area {
   opacity: 0;
-  animation: adm-chart-area-in 0.8s var(--ease) 0.5s forwards;
+  animation: adm-chart-area-in var(--t-draw) var(--ease) 0.5s forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -396,12 +396,8 @@
 .adm-dash-stat.tone-live { color: var(--live); }
 
 .adm-dash-stat.tone-live .adm-dash-stat-dot {
-  animation: adm-live-pulse var(--t-pulse) var(--ease) infinite;
-}
-
-@keyframes adm-live-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 45%, transparent); }
-  60% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--live) 0%, transparent); }
+  --pulse-color: var(--live);
+  animation: pulse-ring var(--t-pulse) var(--ease) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

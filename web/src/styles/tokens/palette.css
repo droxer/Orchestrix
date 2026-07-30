@@ -7,9 +7,28 @@
    (retains the monochrome ramp of 2026-07-20-monochrome-tokens-design.md,
    replaces its typography and adds the --live role)
 
-   Breakpoints (reference — custom properties can't drive @media):
-   mobile 820px · tablet 1040px · login-stack 879px · admin-drawer 768px
-   admin-compact 640px · preferences 600px · artifact-chip 560px */
+   Breakpoints (reference — custom properties can't drive @media, so this
+   list is the only registry there is; keep it honest when you add a query).
+
+     480px   narrow phone — backlog card grid, login stack
+     560px   artifact chip row
+     600px   dialog stack
+     640px   compact — dashboard, admin shell, composer, workspace panes
+     720px   transcript grid drops its fixed time column. Written as the
+             complementary pair `min-width: 720px` / `max-width: 719px`;
+             never use `max-width: 720px`, which overlaps the wide rule at
+             exactly 720px.
+     768px   admin drawer + admin shell collapse
+     820px   MOBILE — the app-wide tier (14 rules). Default to this one.
+     900px   dashboard + backlog medium
+    1040px   TABLET — the app-wide tier
+    1100px   multi-pane → single pane (agents, backlog, teams, workspace)
+    1200px   dashboard widest
+
+   Two rules of thumb: a new query should reuse a tier above rather than
+   invent a neighbour (700/800/1024 were each ~20px from a real tier and have
+   been folded into 720/820/1040), and one component gets one breakpoint —
+   don't split a component's responsive behaviour across two files. */
 
 :root {
   /* Dark register (default) */
@@ -51,9 +70,10 @@
      screen's colour density is therefore a utilisation readout — a busy
      workforce glows, an idle one is bare.
      10.94:1 on --surface-0, 10.36:1 on --surface-1. Do not brighten: the
-     obvious lighter green #0f8a4e measures 4.14:1 and fails AA. */
+     obvious lighter green #0f8a4e measures 4.14:1 and fails AA.
+     Deliberately no --live-wash companion: a wash is a fill, and this colour
+     is never a fill. Tint a ring (see pulse-ring) or an ink, nothing else. */
   --live: #3ee08a;
-  --live-wash: color-mix(in srgb, var(--live) 7%, transparent);
 
   /* ----- Pinned registers -----
      Surfaces that must NOT follow the active theme: the pre-auth login
@@ -117,10 +137,24 @@
   --thread-w: 318px;
   --header-h: 64px;
 
-  /* Z layers — popover < drawer < sheet < float < dialog. */
-  --z-popover: 20;
+  /* Z layers — surface < drawer < float < dialog.
+     Only three tiers are real, and every one of them has consumers.
+
+     --z-drawer  anchored side surfaces (admin drawer, mobile nav)
+     --z-float   anything that escapes its container and follows the pointer
+                 or an anchor: menus, tooltips, select popups, drag ghosts
+     --z-dialog  modal surfaces that own the whole screen + the skip link
+
+     There is deliberately no `popover` tier BELOW `drawer`. The old scale had
+     one (popover 20 < drawer 30) and it was unusable by construction: a select
+     opened inside a drawer would render behind the drawer. Anchored chrome
+     always floats above the surface it was opened from, so it belongs at
+     --z-float. A removed `sheet` tier (50) likewise never had an occupant.
+
+     Values 1/2/3 appear throughout the surface CSS for LOCAL stacking inside
+     an already-positioned component. Those are correct as literals — they
+     order siblings, not app layers, and must not be promoted to tokens. */
   --z-drawer: 30;
-  --z-sheet: 50;
   --z-float: 120;
   --z-dialog: 300;
 
@@ -131,6 +165,9 @@
   --fs-3: 1rem;      /* 14px */
   --fs-4: 1.0714rem; /* 15px */
   --fs-heading: 1.1429rem; /* 16px — section headings */
+  --fs-subhead: 1.2857rem; /* 18px — in-message h1; the one step between a
+                              section heading and a pane title, so a heading
+                              inside agent prose never rivals --fs-title */
   --fs-number: 1.3571rem;  /* 19px — KPI numerals */
   --fs-title: 1.4286rem;   /* 20px — conversation / pane titles */
   --fs-5: 1.5714rem; /* 22px */
@@ -173,6 +210,18 @@
      to sit in peripheral vision without pulling focus. */
   --t-pulse: 1.6s;
   --t-pulse-calm: 2.6s;
+
+  /* Draw — content that renders itself over real time rather than changing
+     state: a chart stroke arriving, a skeleton shimmer sweeping. Too long to
+     be --t-slow (a 320ms chart draw reads as a flicker), too purposeful to be
+     an ambient pulse. Was spelled 0.8s / 1.1s / 1.2s at four call sites. */
+  --t-draw: 1.1s;
+
+  /* Stagger — the base step for a reveal ladder (list rows, activity
+     sections, empty-state lines). Ladders multiply it (`calc(var(--t-stagger)
+     * 3)`); dense ladders use 1×, sparse ones 2×. One base keeps every
+     cascade on the same rhythm instead of the 40/80/90ms mix it replaced. */
+  --t-stagger: 40ms;
 
   /* Rise distance — the single travel for fade-and-rise entrances.
      --rise-sm for rows inside a scroller, --rise for panes and views. */

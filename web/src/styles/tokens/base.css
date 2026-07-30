@@ -193,12 +193,28 @@ select:focus-visible {
   --touch-target: 44px;
 }
 
-/* Generic ring/fade pulse — the one pattern behind the live/run indicators
-   (agent-stream pulse, agent live pulse, avatar pulse). The ring reads
-   --pulse-color so callers can re-tint; it falls back to --info. */
+/* Generic ring/fade pulse — the one pattern behind every live/run indicator
+   (agent-stream pulse, agent live pulse, avatar pulse, dashboard live stat,
+   header busy pip). The ring reads --pulse-color so callers can re-tint; it
+   falls back to --info. Set the cadence at the call site with --t-pulse
+   (active work) or --t-pulse-calm (passive presence).
+
+   Do NOT hand-roll a second ring keyframe to vary the tint percentage — that
+   is what produced four different "live" ring strengths (40/45/55%) across
+   four files. The single exception is a ring that must layer a second shadow
+   underneath it (chat.css `agent-rail-pulse` spaces its ring off the canvas),
+   which a one-shadow keyframe cannot express. */
 @keyframes pulse-ring {
   0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pulse-color, var(--info)) 40%, transparent); }
   100% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--pulse-color, var(--info)) 0%, transparent); }
+}
+
+/* Opacity blink — the non-ring liveness pattern, for glyphs that breathe in
+   place rather than emit a ring (task status dot, login mark). Travel is read
+   from --blink-from so callers pick their floor without a new keyframe. */
+@keyframes blink {
+  0%, 100% { opacity: var(--blink-from, 0); }
+  50%      { opacity: 1; }
 }
 
 /* Fade-and-rise entrance — the one pattern behind every view, pane, card,

@@ -376,7 +376,7 @@
 .artifact-index-filter-btn:hover {
   background: var(--surface-2);
   color: var(--ink-1);
-  border-color: color-mix(in srgb, var(--ink-1) 24%, var(--line-1));
+  border-color: var(--line-strong);
 }
 
 .artifact-index-list {
@@ -507,7 +507,7 @@
 
 .artifact-preview-action-btn:hover {
   background: var(--surface-3);
-  border-color: color-mix(in srgb, var(--ink-1) 24%, var(--line-1));
+  border-color: var(--line-strong);
 }
 
 .artifact-preview-action-btn:focus-visible {

@@ -253,7 +253,8 @@
   margin: 0;
   font-family: var(--font-mono);
   font-size: var(--fs-3);
-  animation: login-pulse var(--t-pulse) var(--ease) infinite;
+  --blink-from: 0.55;
+  animation: blink var(--t-pulse) var(--ease) infinite;
 }
 
 .login-checking-text::after {
@@ -266,11 +267,6 @@
 }
 
 /* ---------- Motion --------------------------------------------------- */
-
-@keyframes login-pulse {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 1; }
-}
 
 /* ---------- Responsive ----------------------------------------------- */
 
