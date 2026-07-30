@@ -21,7 +21,7 @@ from ..services.team_dispatch import (
     task_thread_ownership,
 )
 from ..sessions import SessionArchivedError, SessionController, SessionRunInFlightError
-from .deps import AppContextDep
+from .deps import AppContext, AppContextDep
 from .helpers import (
     agent_task_mode,
     artifact_index_item,
@@ -41,15 +41,28 @@ from .helpers import (
 router = APIRouter()
 
 
-ACTIVE_TASK_STATUSES = frozenset({"assigned", "running", "waiting_for_human", "review", "blocked"})
+ACTIVE_TASK_STATUSES = frozenset(
+    {"assigned", "running", "waiting_for_human", "review", "blocked"}
+)
 ACTIVE_SESSION_STATUSES = frozenset({"running", "waiting_for_human"})
 
 
-def session_artifact(session: dict[str, Any], artifact_id: str) -> dict[str, Any] | None:
-    return next((artifact for artifact in session.get("artifacts", []) if artifact.get("id") == artifact_id), None)
+def session_artifact(
+    session: dict[str, Any], artifact_id: str
+) -> dict[str, Any] | None:
+    return next(
+        (
+            artifact
+            for artifact in session.get("artifacts", [])
+            if artifact.get("id") == artifact_id
+        ),
+        None,
+    )
 
 
-def workspace_artifact_path(session: dict[str, Any], artifact: dict[str, Any]) -> Path | None:
+def workspace_artifact_path(
+    session: dict[str, Any], artifact: dict[str, Any]
+) -> Path | None:
     workspace_path = session.get("workspacePath")
     artifact_path = artifact.get("path")
     if not workspace_path or not artifact_path:
@@ -114,8 +127,12 @@ def task_brief_item(task: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def employee_for_workspace_brief(actor: dict[str, Any], requested_employee: str | None) -> str:
-    requested = requested_employee.strip() if isinstance(requested_employee, str) else ""
+def employee_for_workspace_brief(
+    actor: dict[str, Any], requested_employee: str | None
+) -> str:
+    requested = (
+        requested_employee.strip() if isinstance(requested_employee, str) else ""
+    )
     if requested and actor["isAdmin"]:
         return requested
     if requested and requested != actor["employeeId"]:
@@ -124,7 +141,9 @@ def employee_for_workspace_brief(actor: dict[str, Any], requested_employee: str 
 
 
 def managed_agent_workspace_subpath(agent_id: str) -> Path:
-    encoded = base64.urlsafe_b64encode(agent_id.encode("utf-8")).decode("ascii").rstrip("=")
+    encoded = (
+        base64.urlsafe_b64encode(agent_id.encode("utf-8")).decode("ascii").rstrip("=")
+    )
     return Path("agents") / f"agent-{encoded}"
 
 
@@ -134,14 +153,19 @@ def agent_supervisor_employee_id(agent: dict[str, Any]) -> str | None:
     return owner if isinstance(owner, str) and owner else None
 
 
-def agent_for_workspace(ctx: Any, actor: dict[str, Any], requested_agent: str | None) -> dict[str, Any] | None:
+def agent_for_workspace(
+    ctx: AppContext, actor: dict[str, Any], requested_agent: str | None
+) -> dict[str, Any] | None:
     agent_id = requested_agent.strip() if isinstance(requested_agent, str) else ""
     if not agent_id:
         return None
     agent = ctx.agent_store.get_agent(agent_id)
     if not agent or agent.get("deletedAt"):
         raise HTTPException(404, "Agent not found.")
-    if not actor["isAdmin"] and agent_supervisor_employee_id(agent) != actor["employeeId"]:
+    if (
+        not actor["isAdmin"]
+        and agent_supervisor_employee_id(agent) != actor["employeeId"]
+    ):
         raise HTTPException(403, "Cannot read another employee's agent workspace.")
     return agent
 
@@ -153,7 +177,7 @@ def session_uses_agent(session: dict[str, Any], agent_id: str) -> bool:
 
 
 def ensure_sessions_managed_affinity(
-    ctx: Any, sessions: list[dict[str, Any]]
+    ctx: AppContext, sessions: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
     unresolved_runtime_ids = {
         session["daemonNodeId"]
@@ -180,14 +204,20 @@ def ensure_sessions_managed_affinity(
     ]
 
 
-def ensure_session_managed_affinity(ctx: Any, session: dict[str, Any]) -> dict[str, Any]:
+def ensure_session_managed_affinity(
+    ctx: AppContext, session: dict[str, Any]
+) -> dict[str, Any]:
     return ensure_sessions_managed_affinity(ctx, [session])[0]
 
 
 @router.get("/threads")
 async def list_sessions(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
-    visible = [session for session in ctx.session_store.list_sessions() if actor["isAdmin"] or session.get("ownerEmployeeId") == actor["employeeId"]]
+    visible = [
+        session
+        for session in ctx.session_store.list_sessions()
+        if actor["isAdmin"] or session.get("ownerEmployeeId") == actor["employeeId"]
+    ]
     return {"sessions": ensure_sessions_managed_affinity(ctx, visible)}
 
 
@@ -211,7 +241,11 @@ def artifact_index_limit(raw: str | None) -> int:
 async def list_artifacts(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     requested_employee = request.query_params.get("employeeId")
-    if requested_employee and not actor["isAdmin"] and requested_employee != actor["employeeId"]:
+    if (
+        requested_employee
+        and not actor["isAdmin"]
+        and requested_employee != actor["employeeId"]
+    ):
         raise HTTPException(403, "Cannot list artifacts for another employee.")
     workspace_path = request.query_params.get("workspacePath")
     limit = artifact_index_limit(request.query_params.get("limit"))
@@ -226,7 +260,9 @@ async def list_artifacts(request: Request, ctx: AppContextDep) -> dict[str, Any]
             continue
         for artifact in workspace_artifacts(session):
             artifacts.append(artifact_index_item(session, artifact))
-    ordered = sorted(artifacts, key=lambda item: item.get("createdAt") or "", reverse=True)
+    ordered = sorted(
+        artifacts, key=lambda item: item.get("createdAt") or "", reverse=True
+    )
     return {"artifacts": ordered[:limit]}
 
 
@@ -239,7 +275,11 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
     team = ctx.team_store.get_team(requested_team_id) if requested_team_id else None
     if requested_team_id and (not team or team.get("deletedAt")):
         raise HTTPException(404, "Team not found.")
-    if team and not actor["isAdmin"] and team.get("ownerEmployeeId") != actor["employeeId"]:
+    if (
+        team
+        and not actor["isAdmin"]
+        and team.get("ownerEmployeeId") != actor["employeeId"]
+    ):
         raise HTTPException(403, "Cannot read another employee's team workspace.")
 
     agent = agent_for_workspace(ctx, actor, request.query_params.get("agentId"))
@@ -282,10 +322,7 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
     for node in ctx.registry.monitor_nodes():
         active_node_runs = node.get("activeRuns", [])
         has_authorized_run = (
-            any(
-                run.get("logicalAgentId") == agent["id"]
-                for run in active_node_runs
-            )
+            any(run.get("logicalAgentId") == agent["id"] for run in active_node_runs)
             if agent
             else any(
                 run.get("sessionId") in team_session_ids for run in active_node_runs
@@ -310,7 +347,10 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
     tasks = [
         task
         for task in ctx.task_store.list_tasks()
-        if (task.get("ownerEmployeeId") == employee_id or task.get("assigneeEmployeeId") == employee_id)
+        if (
+            task.get("ownerEmployeeId") == employee_id
+            or task.get("assigneeEmployeeId") == employee_id
+        )
         and (not agent or task.get("assignedAgentId") == agent["id"])
         and (not team or task.get("assignedTeamId") == team["id"])
     ]
@@ -320,24 +360,43 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
         for artifact in workspace_artifacts(session)
     ]
 
-    recent_sessions = sorted(sessions, key=lambda item: item.get("updatedAt") or "", reverse=True)[:8]
-    active_tasks = [task for task in tasks if task.get("status") in ACTIVE_TASK_STATUSES]
-    recent_artifacts = sorted(artifacts, key=lambda item: item.get("createdAt") or "", reverse=True)[:12]
+    recent_sessions = sorted(
+        sessions, key=lambda item: item.get("updatedAt") or "", reverse=True
+    )[:8]
+    active_tasks = [
+        task for task in tasks if task.get("status") in ACTIVE_TASK_STATUSES
+    ]
+    recent_artifacts = sorted(
+        artifacts, key=lambda item: item.get("createdAt") or "", reverse=True
+    )[:12]
 
     return {
         "employeeId": employee_id,
         **({"agentId": agent["id"]} if agent else {}),
         **({"teamId": team["id"]} if team else {}),
         "nodes": nodes,
-        "activeRuns": sorted(active_runs, key=lambda item: item.get("startedAt") or "", reverse=True),
+        "activeRuns": sorted(
+            active_runs, key=lambda item: item.get("startedAt") or "", reverse=True
+        ),
         "sessions": [session_brief_item(session) for session in recent_sessions],
-        "tasks": [task_brief_item(task) for task in sorted(active_tasks, key=lambda item: item.get("updatedAt") or "", reverse=True)[:10]],
+        "tasks": [
+            task_brief_item(task)
+            for task in sorted(
+                active_tasks, key=lambda item: item.get("updatedAt") or "", reverse=True
+            )[:10]
+        ],
         "artifacts": recent_artifacts,
         "metrics": {
             "nodeCount": len(nodes),
             "activeRunCount": len(active_runs),
             "sessionCount": len(sessions),
-            "activeSessionCount": len([session for session in sessions if session.get("status") in ACTIVE_SESSION_STATUSES]),
+            "activeSessionCount": len(
+                [
+                    session
+                    for session in sessions
+                    if session.get("status") in ACTIVE_SESSION_STATUSES
+                ]
+            ),
             "taskCount": len(tasks),
             "activeTaskCount": len(active_tasks),
             "artifactCount": len(artifacts),
@@ -354,7 +413,14 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
     if not task_goal:
         raise HTTPException(400, "taskGoal is required.")
     assignments = assignment_list(body.get("assignments"))
-    owner_agent_id = next((assignment.get("agentId") for assignment in assignments if assignment.get("agentId")), None)
+    owner_agent_id = next(
+        (
+            assignment.get("agentId")
+            for assignment in assignments
+            if assignment.get("agentId")
+        ),
+        None,
+    )
     workspace_path = string_field(body, "workspacePath") or "/workspace"
     daemon_node_id = string_field(body, "daemonNodeId") or string_field(
         body, "daemon_node_id"
@@ -381,9 +447,13 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
         except TeamDispatchError as error:
             raise HTTPException(409, error.code) from error
         expected_owner = thread_ownership.get("owner_employee_id")
-        requested_owner = string_field(body, "ownerEmployeeId") or string_field(body, "employeeId")
+        requested_owner = string_field(body, "ownerEmployeeId") or string_field(
+            body, "employeeId"
+        )
         if requested_owner and requested_owner != expected_owner:
-            raise HTTPException(403, "Session owner must match the linked task assignee.")
+            raise HTTPException(
+                403, "Session owner must match the linked task assignee."
+            )
         owner = expected_owner or owner
         if owner and "owner_employee_id" not in thread_ownership:
             thread_ownership["owner_employee_id"] = owner
@@ -405,7 +475,9 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
                 },
             )
         if owner and node.get("employeeId") != owner:
-            raise HTTPException(403, "The selected computer belongs to another employee.")
+            raise HTTPException(
+                403, "The selected computer belongs to another employee."
+            )
         managed_node_id = node.get("managedNodeId")
     controller = SessionController(
         ctx.session_store,
@@ -418,16 +490,27 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
     )
     session = controller.create_session(
         task_goal,
-        list(dict.fromkeys(["human", *(assignment["agent"] for assignment in assignments)])),
+        list(
+            dict.fromkeys(
+                ["human", *(assignment["agent"] for assignment in assignments)]
+            )
+        ),
     )
     if assignments:
         controller.assign_session(session["id"], assignments)
-    logger.info("Session created", session_id=session["id"], workspace_path=workspace_path, owner=owner)
+    logger.info(
+        "Session created",
+        session_id=session["id"],
+        workspace_path=workspace_path,
+        owner=owner,
+    )
     return ctx.session_store.get_session(session["id"])
 
 
 @router.get("/threads/{session_id}")
-async def get_session(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+async def get_session(
+    session_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     return ensure_session_managed_affinity(
         ctx, get_session_for_actor(ctx.session_store, session_id, actor)
@@ -466,7 +549,9 @@ async def update_session(
 
 
 @router.post("/threads/{session_id}/cancellations", status_code=202)
-async def cancel_session_run(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+async def cancel_session_run(
+    session_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     session = get_session_for_actor(ctx.session_store, session_id, actor)
     body = await json_body(request)
@@ -475,7 +560,9 @@ async def cancel_session_run(session_id: str, request: Request, ctx: AppContextD
         (
             item
             for item in ctx.registry.monitor_nodes()
-            if any(run.get("sessionId") == session_id for run in item.get("activeRuns", []))
+            if any(
+                run.get("sessionId") == session_id for run in item.get("activeRuns", [])
+            )
         ),
         None,
     )
@@ -507,14 +594,20 @@ async def cancel_session_run(session_id: str, request: Request, ctx: AppContextD
 
 
 @router.post("/threads/{session_id}/assignments")
-async def assign_session(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+async def assign_session(
+    session_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     get_session_for_actor(ctx.session_store, session_id, actor)
     body = await json_body(request)
     assignments = assignment_list(body.get("assignments"))
     if not assignments:
         raise HTTPException(400, "assignments must include at least one agent.")
-    controller = SessionController(ctx.session_store, task_store=ctx.task_store, owner_employee_id=actor["employeeId"])
+    controller = SessionController(
+        ctx.session_store,
+        task_store=ctx.task_store,
+        owner_employee_id=actor["employeeId"],
+    )
     try:
         controller.assign_session(session_id, assignments)
     except SessionArchivedError:
@@ -525,7 +618,9 @@ async def assign_session(session_id: str, request: Request, ctx: AppContextDep) 
 
 
 @router.delete("/threads/{session_id}", status_code=204)
-async def delete_session(session_id: str, request: Request, ctx: AppContextDep) -> Response:
+async def delete_session(
+    session_id: str, request: Request, ctx: AppContextDep
+) -> Response:
     actor = request_actor(request, ctx.auth_store)
     controller = SessionController(
         ctx.session_store,
@@ -549,14 +644,22 @@ async def delete_session(session_id: str, request: Request, ctx: AppContextDep) 
 
 
 @router.post("/threads/{session_id}/decisions")
-async def decision(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+async def decision(
+    session_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     get_session_for_actor(ctx.session_store, session_id, actor)
     body = await json_body(request)
     kind = body.get("kind")
     if kind not in ("approve", "reject", "cancel", "rerun", "handoff", "mark_done"):
-        raise HTTPException(400, "kind must be approve, reject, cancel, rerun, handoff, or mark_done.")
-    controller = SessionController(ctx.session_store, task_store=ctx.task_store, owner_employee_id=actor["employeeId"])
+        raise HTTPException(
+            400, "kind must be approve, reject, cancel, rerun, handoff, or mark_done."
+        )
+    controller = SessionController(
+        ctx.session_store,
+        task_store=ctx.task_store,
+        owner_employee_id=actor["employeeId"],
+    )
     result = controller.record_decision(
         session_id,
         kind,
@@ -568,22 +671,35 @@ async def decision(session_id: str, request: Request, ctx: AppContextDep) -> dic
 
 
 @router.post("/threads/{session_id}/handoffs")
-async def handoff(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+async def handoff(
+    session_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     get_session_for_actor(ctx.session_store, session_id, actor)
     body = await json_body(request)
     target_agent = valid_agent(body.get("targetAgent"))
     if not target_agent:
-        raise HTTPException(400, f"targetAgent must be one of: {', '.join(AGENT_NAMES)}.")
+        raise HTTPException(
+            400, f"targetAgent must be one of: {', '.join(AGENT_NAMES)}."
+        )
     mode = agent_task_mode(body.get("mode"))
-    controller = SessionController(ctx.session_store, task_store=ctx.task_store, owner_employee_id=actor["employeeId"])
+    controller = SessionController(
+        ctx.session_store,
+        task_store=ctx.task_store,
+        owner_employee_id=actor["employeeId"],
+    )
     result = controller.handoff_session(
         session_id,
         target_agent,
         [{"agent": target_agent, "mode": mode, "role": role_name(body.get("role"))}],
         string_field(body, "note") or None,
     )
-    logger.info("Session handoff recorded", session_id=session_id, target_agent=target_agent, mode=mode)
+    logger.info(
+        "Session handoff recorded",
+        session_id=session_id,
+        target_agent=target_agent,
+        mode=mode,
+    )
     return result
 
 
@@ -616,7 +732,9 @@ def _event_start_index(events: list[Any], after_event_id: str | None) -> int:
 
 
 @router.get("/threads/{session_id}/events")
-async def session_events(session_id: str, request: Request, ctx: AppContextDep) -> StreamingResponse:
+async def session_events(
+    session_id: str, request: Request, ctx: AppContextDep
+) -> StreamingResponse:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     # Authorize before the stream opens so 403/404 surface as normal responses.
     get_session_for_actor(ctx.session_store, session_id, actor)
@@ -632,7 +750,9 @@ async def session_events(session_id: str, request: Request, ctx: AppContextDep) 
         # advances Last-Event-ID as frames arrive. Prefer that live cursor over
         # the URL's initial `after` value so a reconnect does not replay the
         # entire stream window.
-        after_event_id = request.headers.get("last-event-id") or request.query_params.get("after")
+        after_event_id = request.headers.get(
+            "last-event-id"
+        ) or request.query_params.get("after")
         sent: int | None = None
         start = time.monotonic()
         last_heartbeat = start
@@ -657,7 +777,14 @@ async def session_events(session_id: str, request: Request, ctx: AppContextDep) 
                 return
             now = time.monotonic()
             if now - last_heartbeat >= _STREAM_HEARTBEAT_SECONDS:
-                yield _sse_frame({"timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")}, event="heartbeat")
+                yield _sse_frame(
+                    {
+                        "timestamp": datetime.now(timezone.utc)
+                        .isoformat()
+                        .replace("+00:00", "Z")
+                    },
+                    event="heartbeat",
+                )
                 last_heartbeat = now
             if now - start >= _STREAM_MAX_SECONDS:
                 yield _sse_frame({"status": status, "reason": "timeout"}, event="done")
@@ -672,7 +799,9 @@ async def session_events(session_id: str, request: Request, ctx: AppContextDep) 
 
 
 @router.get("/threads/{session_id}/artifacts/{artifact_id}")
-async def read_artifact(session_id: str, artifact_id: str, request: Request, ctx: AppContextDep) -> Any:
+async def read_artifact(
+    session_id: str, artifact_id: str, request: Request, ctx: AppContextDep
+) -> Any:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     session = get_session_for_actor(ctx.session_store, session_id, actor)
     artifact = session_artifact(session, artifact_id)
@@ -689,9 +818,14 @@ async def read_artifact(session_id: str, artifact_id: str, request: Request, ctx
         read_content = getattr(ctx.session_store, "read_artifact_content", None)
         content = read_content(session_id, artifact_id) if read_content else None
         if content is not None:
-            return Response(content, media_type=artifact.get("contentType") or "application/octet-stream")
+            return Response(
+                content,
+                media_type=artifact.get("contentType") or "application/octet-stream",
+            )
         raise HTTPException(404, "Artifact not found.")
     try:
-        return PlainTextResponse(ctx.session_store.read_artifact(session_id, artifact_id))
+        return PlainTextResponse(
+            ctx.session_store.read_artifact(session_id, artifact_id)
+        )
     except (KeyError, FileNotFoundError, OSError):
         raise HTTPException(404, "Artifact not found.")

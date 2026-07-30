@@ -92,6 +92,35 @@ def assigned_node_location(node: dict[str, Any]) -> str:
     return "employee-device"
 
 
+NodeSettingValue = str | None | list[str] | dict[str, str]
+
+
+def node_setting_update(
+    node_id: str,
+    node: dict[str, Any],
+    *,
+    field: str,
+    value: NodeSettingValue,
+    event_type: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    if isinstance(value, list):
+        normalized_value: NodeSettingValue = list(value)
+    elif isinstance(value, dict):
+        normalized_value = dict(value)
+    else:
+        normalized_value = value
+
+    updated = {**node, "updatedAt": now_iso()}
+    if normalized_value:
+        updated[field] = normalized_value
+    else:
+        updated.pop(field, None)
+    return updated, daemon_event(
+        event_type,
+        {"nodeId": node_id, field: normalized_value},
+    )
+
+
 def _terminal_timestamp(record: dict[str, Any]) -> str:
     return (
         record.get("completedAt")
@@ -244,21 +273,15 @@ class LocalDaemonStore:
         node = self.get_node(node_id)
         if not node:
             raise KeyError(node_id)
-        updated = {**node, "updatedAt": now_iso()}
-        if disabled_agents:
-            updated["disabledAgents"] = list(disabled_agents)
-        else:
-            updated.pop("disabledAgents", None)
-        self._write_node(updated)
-        self.append_daemon_event(
-            daemon_event(
-                "daemon.node.disabled_agents_updated",
-                {
-                    "nodeId": node_id,
-                    "disabledAgents": list(disabled_agents),
-                },
-            )
+        updated, event = node_setting_update(
+            node_id,
+            node,
+            field="disabledAgents",
+            value=disabled_agents,
+            event_type="daemon.node.disabled_agents_updated",
         )
+        self._write_node(updated)
+        self.append_daemon_event(event)
         return updated
 
     def update_node_display_name(
@@ -267,18 +290,15 @@ class LocalDaemonStore:
         node = self.get_node(node_id)
         if not node:
             raise KeyError(node_id)
-        updated = {**node, "updatedAt": now_iso()}
-        if display_name:
-            updated["displayName"] = display_name
-        else:
-            updated.pop("displayName", None)
-        self._write_node(updated)
-        self.append_daemon_event(
-            daemon_event(
-                "daemon.node.display_name_updated",
-                {"nodeId": node_id, "displayName": display_name},
-            )
+        updated, event = node_setting_update(
+            node_id,
+            node,
+            field="displayName",
+            value=display_name,
+            event_type="daemon.node.display_name_updated",
         )
+        self._write_node(updated)
+        self.append_daemon_event(event)
         return updated
 
     def update_node_agent_role_defaults(
@@ -287,21 +307,15 @@ class LocalDaemonStore:
         node = self.get_node(node_id)
         if not node:
             raise KeyError(node_id)
-        updated = {**node, "updatedAt": now_iso()}
-        if role_defaults:
-            updated["agentRoleDefaults"] = dict(role_defaults)
-        else:
-            updated.pop("agentRoleDefaults", None)
-        self._write_node(updated)
-        self.append_daemon_event(
-            daemon_event(
-                "daemon.node.agent_role_defaults_updated",
-                {
-                    "nodeId": node_id,
-                    "agentRoleDefaults": dict(role_defaults),
-                },
-            )
+        updated, event = node_setting_update(
+            node_id,
+            node,
+            field="agentRoleDefaults",
+            value=role_defaults,
+            event_type="daemon.node.agent_role_defaults_updated",
         )
+        self._write_node(updated)
+        self.append_daemon_event(event)
         return updated
 
     def update_node_agent_role_overrides(
@@ -310,21 +324,15 @@ class LocalDaemonStore:
         node = self.get_node(node_id)
         if not node:
             raise KeyError(node_id)
-        updated = {**node, "updatedAt": now_iso()}
-        if role_overrides:
-            updated["agentRoleOverrides"] = dict(role_overrides)
-        else:
-            updated.pop("agentRoleOverrides", None)
-        self._write_node(updated)
-        self.append_daemon_event(
-            daemon_event(
-                "daemon.node.agent_role_overrides_updated",
-                {
-                    "nodeId": node_id,
-                    "agentRoleOverrides": dict(role_overrides),
-                },
-            )
+        updated, event = node_setting_update(
+            node_id,
+            node,
+            field="agentRoleOverrides",
+            value=role_overrides,
+            event_type="daemon.node.agent_role_overrides_updated",
         )
+        self._write_node(updated)
+        self.append_daemon_event(event)
         return updated
 
     def unassign_node_employee(self, node_id: str) -> dict[str, Any]:
@@ -904,9 +912,7 @@ class LocalDaemonStore:
     def historical_managed_node_id(self, runtime_id: str) -> str | None:
         return self.historical_managed_node_ids({runtime_id}).get(runtime_id)
 
-    def historical_managed_node_ids(
-        self, runtime_ids: set[str]
-    ) -> dict[str, str]:
+    def historical_managed_node_ids(self, runtime_ids: set[str]) -> dict[str, str]:
         events_path = self.events_dir / "events.jsonl"
         if not events_path.exists():
             return {}
@@ -1363,24 +1369,17 @@ class DatabaseDaemonStore:
         node = self.get_node(node_id)
         if not node:
             raise KeyError(node_id)
-        updated = {**node, "updatedAt": now_iso()}
-        if disabled_agents:
-            updated["disabledAgents"] = list(disabled_agents)
-        else:
-            updated.pop("disabledAgents", None)
+        updated, event = node_setting_update(
+            node_id,
+            node,
+            field="disabledAgents",
+            value=disabled_agents,
+            event_type="daemon.node.disabled_agents_updated",
+        )
         with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, node_id)
             self._save_node(conn, updated, database_id=node_pk)
-            self._append_daemon_event(
-                conn,
-                daemon_event(
-                    "daemon.node.disabled_agents_updated",
-                    {
-                        "nodeId": node_id,
-                        "disabledAgents": list(disabled_agents),
-                    },
-                ),
-            )
+            self._append_daemon_event(conn, event)
         return updated
 
     def update_node_display_name(
@@ -1389,21 +1388,17 @@ class DatabaseDaemonStore:
         node = self.get_node(node_id)
         if not node:
             raise KeyError(node_id)
-        updated = {**node, "updatedAt": now_iso()}
-        if display_name:
-            updated["displayName"] = display_name
-        else:
-            updated.pop("displayName", None)
+        updated, event = node_setting_update(
+            node_id,
+            node,
+            field="displayName",
+            value=display_name,
+            event_type="daemon.node.display_name_updated",
+        )
         with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, node_id)
             self._save_node(conn, updated, database_id=node_pk)
-            self._append_daemon_event(
-                conn,
-                daemon_event(
-                    "daemon.node.display_name_updated",
-                    {"nodeId": node_id, "displayName": display_name},
-                ),
-            )
+            self._append_daemon_event(conn, event)
         return updated
 
     def update_node_agent_role_defaults(
@@ -1412,24 +1407,17 @@ class DatabaseDaemonStore:
         node = self.get_node(node_id)
         if not node:
             raise KeyError(node_id)
-        updated = {**node, "updatedAt": now_iso()}
-        if role_defaults:
-            updated["agentRoleDefaults"] = dict(role_defaults)
-        else:
-            updated.pop("agentRoleDefaults", None)
+        updated, event = node_setting_update(
+            node_id,
+            node,
+            field="agentRoleDefaults",
+            value=role_defaults,
+            event_type="daemon.node.agent_role_defaults_updated",
+        )
         with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, node_id)
             self._save_node(conn, updated, database_id=node_pk)
-            self._append_daemon_event(
-                conn,
-                daemon_event(
-                    "daemon.node.agent_role_defaults_updated",
-                    {
-                        "nodeId": node_id,
-                        "agentRoleDefaults": dict(role_defaults),
-                    },
-                ),
-            )
+            self._append_daemon_event(conn, event)
         return updated
 
     def update_node_agent_role_overrides(
@@ -1438,24 +1426,17 @@ class DatabaseDaemonStore:
         node = self.get_node(node_id)
         if not node:
             raise KeyError(node_id)
-        updated = {**node, "updatedAt": now_iso()}
-        if role_overrides:
-            updated["agentRoleOverrides"] = dict(role_overrides)
-        else:
-            updated.pop("agentRoleOverrides", None)
+        updated, event = node_setting_update(
+            node_id,
+            node,
+            field="agentRoleOverrides",
+            value=role_overrides,
+            event_type="daemon.node.agent_role_overrides_updated",
+        )
         with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, node_id)
             self._save_node(conn, updated, database_id=node_pk)
-            self._append_daemon_event(
-                conn,
-                daemon_event(
-                    "daemon.node.agent_role_overrides_updated",
-                    {
-                        "nodeId": node_id,
-                        "agentRoleOverrides": dict(role_overrides),
-                    },
-                ),
-            )
+            self._append_daemon_event(conn, event)
         return updated
 
     def unassign_node_employee(self, node_id: str) -> dict[str, Any]:
@@ -1524,9 +1505,7 @@ class DatabaseDaemonStore:
     def get_node(self, node_id: str) -> dict[str, Any] | None:
         with store_transaction(self.engine) as conn:
             row = (
-                conn.execute(
-                    select(self.nodes).where(self.nodes.c.id == node_id)
-                )
+                conn.execute(select(self.nodes).where(self.nodes.c.id == node_id))
                 .mappings()
                 .first()
             )
@@ -1692,9 +1671,7 @@ class DatabaseDaemonStore:
             )
             if not row:
                 return
-            conn.execute(
-                delete(self.runs).where(self.runs.c.command_id == command_id)
-            )
+            conn.execute(delete(self.runs).where(self.runs.c.command_id == command_id))
             conn.execute(delete(self.commands).where(self.commands.c.id == row["id"]))
 
     def update_staged_command(
@@ -2353,9 +2330,7 @@ class DatabaseDaemonStore:
     def historical_managed_node_id(self, runtime_id: str) -> str | None:
         return self.historical_managed_node_ids({runtime_id}).get(runtime_id)
 
-    def historical_managed_node_ids(
-        self, runtime_ids: set[str]
-    ) -> dict[str, str]:
+    def historical_managed_node_ids(self, runtime_ids: set[str]) -> dict[str, str]:
         with store_transaction(self.engine) as conn:
             payloads = conn.scalars(
                 select(self.events.c.payload).where(
@@ -2425,9 +2400,7 @@ class DatabaseDaemonStore:
                 )
             )
             run_row = (
-                conn.execute(
-                    select(self.runs).where(self.runs.c.id == event["runId"])
-                )
+                conn.execute(select(self.runs).where(self.runs.c.id == event["runId"]))
                 .mappings()
                 .first()
             )
@@ -2493,9 +2466,7 @@ class DatabaseDaemonStore:
         conn.execute(insert(self.events).values(**daemon_event_to_row(event)))
 
     def _node_pk(self, conn: Any, node_id: str) -> str:
-        node_pk = conn.scalar(
-            select(self.nodes.c.id).where(self.nodes.c.id == node_id)
-        )
+        node_pk = conn.scalar(select(self.nodes.c.id).where(self.nodes.c.id == node_id))
         if not node_pk:
             raise KeyError(node_id)
         return node_pk
@@ -2739,11 +2710,7 @@ def run_to_row(
 def row_to_run(row: Any) -> dict[str, Any]:
     return {
         "nodeId": row["node_id"],
-        **(
-            {"commandId": row["command_id"]}
-            if row.get("command_id")
-            else {}
-        ),
+        **({"commandId": row["command_id"]} if row.get("command_id") else {}),
         "sessionId": row["session_id"],
         "runId": str(row["id"]),
         "agent": row["agent"],
@@ -2817,9 +2784,7 @@ def row_to_run_request(row: Any) -> dict[str, Any]:
             else {}
         ),
         **(
-            {"currentRunId": row["current_run_id"]}
-            if row.get("current_run_id")
-            else {}
+            {"currentRunId": row["current_run_id"]} if row.get("current_run_id") else {}
         ),
         **({"currentAgent": row["current_agent"]} if row.get("current_agent") else {}),
         **({"currentMode": row["current_mode"]} if row.get("current_mode") else {}),

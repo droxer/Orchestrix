@@ -95,6 +95,70 @@ def _task_session_unlink_events(task_id: str, session_id: str) -> list[dict[str,
     ]
 
 
+def task_creation_events(task_id: str, payload: dict[str, Any]) -> list[dict[str, Any]]:
+    created_payload = {
+        "title": payload["title"],
+        "description": payload.get("description", ""),
+        "priority": payload.get("priority", "normal"),
+    }
+    for field in (
+        "ownerEmployeeId",
+        "assigneeEmployeeId",
+        "dueDate",
+        "routineType",
+        "routineCadence",
+        "routineNextRunDate",
+        "sourceRoutineId",
+        "scheduledFor",
+    ):
+        if payload.get(field):
+            created_payload[field] = payload[field]
+    for field in ("isRoutine", "routineEnabled"):
+        if field in payload:
+            created_payload[field] = payload[field]
+
+    events = [relay_task_event("task.created", task_id, created_payload)]
+    if payload.get("assignedAgent") or payload.get("assignedTeamId"):
+        assignment = {}
+        for field, event_field in (
+            ("assignedAgent", "agent"),
+            ("assignedAgentId", "agentId"),
+            ("assignedTeamId", "teamId"),
+        ):
+            if payload.get(field):
+                assignment[event_field] = payload[field]
+        events.append(relay_task_event("task.assigned", task_id, assignment))
+    if payload.get("status") and payload["status"] != "backlog":
+        events.append(
+            relay_task_event("task.status", task_id, {"status": payload["status"]})
+        )
+    return events
+
+
+def task_update_events(task_id: str, payload: dict[str, Any]) -> list[dict[str, Any]]:
+    updated = {
+        field: payload.get(field)
+        for field in (
+            "title",
+            "description",
+            "priority",
+            "assigneeEmployeeId",
+            "dueDate",
+            "isRoutine",
+            "routineType",
+            "routineCadence",
+            "routineNextRunDate",
+            "routineEnabled",
+        )
+    }
+    events = [relay_task_event("task.updated", task_id, updated)]
+    if payload.get("status"):
+        events.append(
+            relay_task_event("task.status", task_id, {"status": payload["status"]})
+        )
+    return events
+
+
 class LocalTaskStore:
     def __init__(self, root_dir: str | Path = DEFAULT_RELAY_DATA_DIR):
         self.root_dir = Path(root_dir)
@@ -107,97 +171,7 @@ class LocalTaskStore:
             task_id = new_database_id()
             self._task_dir(task_id).mkdir(parents=True, exist_ok=True)
             logger.debug("Creating task", task_id=task_id, title=payload.get("title"))
-            events = [
-                relay_task_event(
-                    "task.created",
-                    task_id,
-                    {
-                        "title": payload["title"],
-                        "description": payload.get("description", ""),
-                        "priority": payload.get("priority", "normal"),
-                        **(
-                            {"ownerEmployeeId": payload["ownerEmployeeId"]}
-                            if payload.get("ownerEmployeeId")
-                            else {}
-                        ),
-                        **(
-                            {"assigneeEmployeeId": payload["assigneeEmployeeId"]}
-                            if payload.get("assigneeEmployeeId")
-                            else {}
-                        ),
-                        **(
-                            {"dueDate": payload["dueDate"]}
-                            if payload.get("dueDate")
-                            else {}
-                        ),
-                        **(
-                            {"isRoutine": payload["isRoutine"]}
-                            if "isRoutine" in payload
-                            else {}
-                        ),
-                        **(
-                            {"routineType": payload["routineType"]}
-                            if payload.get("routineType")
-                            else {}
-                        ),
-                        **(
-                            {"routineCadence": payload["routineCadence"]}
-                            if payload.get("routineCadence")
-                            else {}
-                        ),
-                        **(
-                            {"routineNextRunDate": payload["routineNextRunDate"]}
-                            if payload.get("routineNextRunDate")
-                            else {}
-                        ),
-                        **(
-                            {"routineEnabled": payload["routineEnabled"]}
-                            if "routineEnabled" in payload
-                            else {}
-                        ),
-                        **(
-                            {"sourceRoutineId": payload["sourceRoutineId"]}
-                            if payload.get("sourceRoutineId")
-                            else {}
-                        ),
-                        **(
-                            {"scheduledFor": payload["scheduledFor"]}
-                            if payload.get("scheduledFor")
-                            else {}
-                        ),
-                    },
-                )
-            ]
-            if payload.get("assignedAgent") or payload.get("assignedTeamId"):
-                events.append(
-                    relay_task_event(
-                        "task.assigned",
-                        task_id,
-                        {
-                            **(
-                                {"agent": payload["assignedAgent"]}
-                                if payload.get("assignedAgent")
-                                else {}
-                            ),
-                            **(
-                                {"agentId": payload["assignedAgentId"]}
-                                if payload.get("assignedAgentId")
-                                else {}
-                            ),
-                            **(
-                                {"teamId": payload["assignedTeamId"]}
-                                if payload.get("assignedTeamId")
-                                else {}
-                            ),
-                        },
-                    )
-                )
-            if payload.get("status") and payload["status"] != "backlog":
-                events.append(
-                    relay_task_event(
-                        "task.status", task_id, {"status": payload["status"]}
-                    )
-                )
+            events = task_creation_events(task_id, payload)
             task = materialize_task_events(events)
             self._events_path(task_id).write_text(
                 "".join(
@@ -279,30 +253,8 @@ class LocalTaskStore:
         return ordered[:limit] if limit is not None else ordered
 
     def update_task(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        task = self.append_event(
-            task_id,
-            relay_task_event(
-                "task.updated",
-                task_id,
-                {
-                    "title": payload.get("title"),
-                    "description": payload.get("description"),
-                    "priority": payload.get("priority"),
-                    "assigneeEmployeeId": payload.get("assigneeEmployeeId"),
-                    "dueDate": payload.get("dueDate"),
-                    "isRoutine": payload.get("isRoutine"),
-                    "routineType": payload.get("routineType"),
-                    "routineCadence": payload.get("routineCadence"),
-                    "routineNextRunDate": payload.get("routineNextRunDate"),
-                    "routineEnabled": payload.get("routineEnabled"),
-                },
-            ),
-        )
-        if payload.get("status"):
-            task = self.append_event(
-                task_id,
-                relay_task_event("task.status", task_id, {"status": payload["status"]}),
-            )
+        for event in task_update_events(task_id, payload):
+            task = self.append_event(task_id, event)
         return task
 
     def claim_next_task_for_agent(
@@ -598,9 +550,7 @@ class DatabaseTaskStore:
         ),
         Column("session_id", entity_uuid_type(), nullable=False),
         Column("created_at", DateTime(timezone=True), nullable=False),
-        UniqueConstraint(
-            "task_id", "session_id", name="uq_task_sessions_task_session"
-        ),
+        UniqueConstraint("task_id", "session_id", name="uq_task_sessions_task_session"),
     )
 
     def __init__(self, database_url: str, *, create_schema: bool = False):
@@ -652,95 +602,7 @@ class DatabaseTaskStore:
         logger.debug(
             "Creating database task", task_id=task_id, title=payload.get("title")
         )
-        events = [
-            relay_task_event(
-                "task.created",
-                task_id,
-                {
-                    "title": payload["title"],
-                    "description": payload.get("description", ""),
-                    "priority": payload.get("priority", "normal"),
-                    **(
-                        {"ownerEmployeeId": payload["ownerEmployeeId"]}
-                        if payload.get("ownerEmployeeId")
-                        else {}
-                    ),
-                    **(
-                        {"assigneeEmployeeId": payload["assigneeEmployeeId"]}
-                        if payload.get("assigneeEmployeeId")
-                        else {}
-                    ),
-                    **(
-                        {"dueDate": payload["dueDate"]}
-                        if payload.get("dueDate")
-                        else {}
-                    ),
-                    **(
-                        {"isRoutine": payload["isRoutine"]}
-                        if "isRoutine" in payload
-                        else {}
-                    ),
-                    **(
-                        {"routineType": payload["routineType"]}
-                        if payload.get("routineType")
-                        else {}
-                    ),
-                    **(
-                        {"routineCadence": payload["routineCadence"]}
-                        if payload.get("routineCadence")
-                        else {}
-                    ),
-                    **(
-                        {"routineNextRunDate": payload["routineNextRunDate"]}
-                        if payload.get("routineNextRunDate")
-                        else {}
-                    ),
-                    **(
-                        {"routineEnabled": payload["routineEnabled"]}
-                        if "routineEnabled" in payload
-                        else {}
-                    ),
-                    **(
-                        {"sourceRoutineId": payload["sourceRoutineId"]}
-                        if payload.get("sourceRoutineId")
-                        else {}
-                    ),
-                    **(
-                        {"scheduledFor": payload["scheduledFor"]}
-                        if payload.get("scheduledFor")
-                        else {}
-                    ),
-                },
-            )
-        ]
-        if payload.get("assignedAgent") or payload.get("assignedTeamId"):
-            events.append(
-                relay_task_event(
-                    "task.assigned",
-                    task_id,
-                    {
-                        **(
-                            {"agent": payload["assignedAgent"]}
-                            if payload.get("assignedAgent")
-                            else {}
-                        ),
-                        **(
-                            {"agentId": payload["assignedAgentId"]}
-                            if payload.get("assignedAgentId")
-                            else {}
-                        ),
-                        **(
-                            {"teamId": payload["assignedTeamId"]}
-                            if payload.get("assignedTeamId")
-                            else {}
-                        ),
-                    },
-                )
-            )
-        if payload.get("status") and payload["status"] != "backlog":
-            events.append(
-                relay_task_event("task.status", task_id, {"status": payload["status"]})
-            )
+        events = task_creation_events(task_id, payload)
         task = materialize_task_events(events)
         with store_transaction(self.engine) as conn:
             task_row = task_to_row(task, version=len(events))
@@ -835,9 +697,7 @@ class DatabaseTaskStore:
                     conn.execute(
                         delete(self.task_sessions)
                         .where(self.task_sessions.c.task_id == task_pk)
-                        .where(
-                            self.task_sessions.c.session_id == event["sessionId"]
-                        )
+                        .where(self.task_sessions.c.session_id == event["sessionId"])
                     )
         logger.debug(
             "Database task events appended",
@@ -849,9 +709,7 @@ class DatabaseTaskStore:
     def _lock_session_for_link(self, conn: Any, session_id: str) -> None:
         lock_clause = "" if self.engine.dialect.name == "sqlite" else " FOR KEY SHARE"
         session_pk = conn.scalar(
-            text(
-                "SELECT id FROM sessions WHERE id = :session_id" + lock_clause
-            ),
+            text("SELECT id FROM sessions WHERE id = :session_id" + lock_clause),
             {"session_id": session_id},
         )
         if not session_pk:
@@ -861,9 +719,7 @@ class DatabaseTaskStore:
         with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
-                    select(self.tasks.c.snapshot).where(
-                        self.tasks.c.id == task_id
-                    )
+                    select(self.tasks.c.snapshot).where(self.tasks.c.id == task_id)
                 )
                 .mappings()
                 .first()
@@ -945,30 +801,8 @@ class DatabaseTaskStore:
         return live[:limit] if limit is not None else live
 
     def update_task(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        task = self.append_event(
-            task_id,
-            relay_task_event(
-                "task.updated",
-                task_id,
-                {
-                    "title": payload.get("title"),
-                    "description": payload.get("description"),
-                    "priority": payload.get("priority"),
-                    "assigneeEmployeeId": payload.get("assigneeEmployeeId"),
-                    "dueDate": payload.get("dueDate"),
-                    "isRoutine": payload.get("isRoutine"),
-                    "routineType": payload.get("routineType"),
-                    "routineCadence": payload.get("routineCadence"),
-                    "routineNextRunDate": payload.get("routineNextRunDate"),
-                    "routineEnabled": payload.get("routineEnabled"),
-                },
-            ),
-        )
-        if payload.get("status"):
-            task = self.append_event(
-                task_id,
-                relay_task_event("task.status", task_id, {"status": payload["status"]}),
-            )
+        for event in task_update_events(task_id, payload):
+            task = self.append_event(task_id, event)
         return task
 
     def claim_next_task_for_agent(
@@ -1234,11 +1068,15 @@ class DatabaseTaskStore:
     def unlink_session_in_transaction(
         self, conn: Any, task_id: str, session_id: str
     ) -> dict[str, Any]:
-        row = conn.execute(
-            select(self.tasks.c.id, self.tasks.c.snapshot, self.tasks.c.version)
-            .where(self.tasks.c.id == task_id)
-            .with_for_update()
-        ).mappings().first()
+        row = (
+            conn.execute(
+                select(self.tasks.c.id, self.tasks.c.snapshot, self.tasks.c.version)
+                .where(self.tasks.c.id == task_id)
+                .with_for_update()
+            )
+            .mappings()
+            .first()
+        )
         if not row:
             raise KeyError(task_id)
         current = row["snapshot"] or {}

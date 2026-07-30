@@ -1163,7 +1163,7 @@ def test_blocked_dispatch_reports_the_recorded_failure_not_progress(
     created no thread — sending the operator looking for a thread that does not
     exist. The recorded outcome is what they need instead.
     """
-    from relay.api.task_routes import _unclaimable_dispatch
+    from relay.services.task_dispatch import _unclaimable_dispatch
 
     failed = {
         "status": "assigned",

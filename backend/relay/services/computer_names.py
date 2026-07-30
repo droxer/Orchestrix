@@ -1,9 +1,23 @@
 from __future__ import annotations
 
 import unicodedata
-from typing import Any
+from typing import Any, Protocol
+
+from ..persistence.protocols import ManagedNodeStore
 
 MAX_COMPUTER_DISPLAY_NAME_LENGTH = 64
+
+
+class ComputerRegistry(Protocol):
+    def get(self, node_id: str) -> dict[str, Any] | None: ...
+    def set_display_name(
+        self, node_id: str, display_name: str | None
+    ) -> dict[str, Any]: ...
+
+
+class ComputerContext(Protocol):
+    registry: ComputerRegistry
+    managed_node_store: ManagedNodeStore
 
 
 def normalize_computer_display_name(value: Any) -> str | None:
@@ -23,7 +37,7 @@ def normalize_computer_display_name(value: Any) -> str | None:
     return display_name
 
 
-def computer_display_name(ctx: Any, node: dict[str, Any]) -> str:
+def computer_display_name(ctx: ComputerContext, node: dict[str, Any]) -> str:
     managed_node = (
         ctx.managed_node_store.get_node(node["managedNodeId"])
         if node.get("managedNodeId")
@@ -34,12 +48,12 @@ def computer_display_name(ctx: Any, node: dict[str, Any]) -> str:
     )
 
 
-def present_computer(ctx: Any, node: dict[str, Any]) -> dict[str, Any]:
+def present_computer(ctx: ComputerContext, node: dict[str, Any]) -> dict[str, Any]:
     return {**node, "displayName": computer_display_name(ctx, node)}
 
 
 def rename_computer_for_actor(
-    ctx: Any,
+    ctx: ComputerContext,
     actor: dict[str, Any],
     node_id: str,
     requested_display_name: Any,

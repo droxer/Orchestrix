@@ -78,7 +78,16 @@ class FakeManagedBackend implements ManagedNodeBackend {
   }
   async updateProvisioningAttempt(_nodeId: string, _attemptId: string, patch: Record<string, unknown>): Promise<ProvisioningAttemptRecord> {
     this.updates.push(patch);
-    return { ...(await this.createProvisioningAttempt("mnode_alice")).attempt, ...patch } as ProvisioningAttemptRecord;
+    const current = this.attempts.find((attempt) => attempt.id === _attemptId);
+    if (current) Object.assign(current, patch);
+    if (patch.status === "failed" || patch.status === "succeeded" || patch.status === "cancelled") {
+      const node = this.nodes.find((candidate) => candidate.id === _nodeId);
+      if (node?.activeAttemptId === _attemptId) node.activeAttemptId = undefined;
+    }
+    return {
+      ...(current ?? (await this.createProvisioningAttempt(_nodeId)).attempt),
+      ...patch,
+    } as ProvisioningAttemptRecord;
   }
 }
 
@@ -87,6 +96,7 @@ class FakeProvider implements ManagedNodeProvider {
   readonly calls: EnsureManagedNodeInput[] = [];
   stopCalls = 0;
   status: "running" | "stopped" | "unknown" = "running";
+  /** Set to make `ensure` reject, exercising the provisioning backoff path. */
   ensureError?: Error;
   async ensure(input: EnsureManagedNodeInput): Promise<ProviderInstance> {
     this.calls.push(input);
@@ -153,6 +163,7 @@ test("recent heartbeat loss does not replace a healthy provider instance", async
     nodes: 1,
     started: 0,
     skipped: 1,
+    healthy: 0,
     failed: 0,
   });
   assert.equal(provider.stopCalls, 0);
@@ -240,7 +251,7 @@ test("managed reconciler creates an attempt and starts the declared provider", a
 
   const result = await reconciler.reconcileOnce();
 
-  assert.deepEqual(result, { nodes: 1, started: 1, skipped: 0, failed: 0 });
+  assert.deepEqual(result, { nodes: 1, started: 1, skipped: 0, healthy: 0, failed: 0 });
   assert.equal(provider.calls[0].enrollmentCredential, "grant.secret");
   assert.equal(provider.calls[0].workspaceId, "employee:alice:home");
   assert.deepEqual(backend.updates, [
@@ -283,7 +294,13 @@ test("managed reconciler does not provision ready or stopped nodes", async () =>
     workspacePathForNode: () => "/tmp",
   });
 
-  assert.deepEqual(await reconciler.reconcileOnce(), { nodes: 2, started: 0, skipped: 2, failed: 0 });
+  assert.deepEqual(await reconciler.reconcileOnce(), {
+    nodes: 2,
+    started: 0,
+    skipped: 2,
+    healthy: 1,
+    failed: 0,
+  });
   assert.equal(provider.calls.length, 0);
 });
 
@@ -336,7 +353,13 @@ test("managed reconciler keeps an online busy daemon running", async () => {
     workspacePathForNode: () => "/workspaces/alice",
   });
 
-  assert.deepEqual(await reconciler.reconcileOnce(), { nodes: 1, started: 0, skipped: 1, failed: 0 });
+  assert.deepEqual(await reconciler.reconcileOnce(), {
+    nodes: 1,
+    started: 0,
+    skipped: 1,
+    healthy: 1,
+    failed: 0,
+  });
   assert.equal(provider.calls.length, 0);
 });
 
@@ -375,6 +398,7 @@ test("managed reconciler retries blocked runtime retirement without failing the 
     nodes: 1,
     started: 0,
     skipped: 1,
+    healthy: 0,
     failed: 0,
   });
   assert.equal(ready.phase, "ready");
@@ -412,6 +436,7 @@ test("stopping a managed computer waits for runtime drain before provider stop",
     nodes: 1,
     started: 0,
     skipped: 1,
+    healthy: 0,
     failed: 0,
   });
   assert.equal(provider.stopCalls, 0);
@@ -537,6 +562,61 @@ test("managed reconciler retries after a tracked provider process exits", async 
 
   assert.equal((await reconciler.reconcileOnce()).started, 1);
   assert.equal(provider.calls.length, 2);
+});
+test("managed reconciler backs off when an active provider instance disappears", async () => {
+  const node = {
+    ...managedNode(),
+    phase: "registering" as const,
+    activeAttemptId: "attempt_1",
+  };
+  const attempt = {
+    id: "attempt_1",
+    managedNodeId: node.id,
+    generation: node.generation,
+    attemptNumber: 3,
+    status: "registering",
+    providerInstanceId: "missing-instance",
+    startedAt: node.createdAt,
+    updatedAt: node.updatedAt,
+  } satisfies ProvisioningAttemptRecord;
+  const backend = new FakeManagedBackend([node], [], [attempt]);
+  const provider = new FakeProvider();
+  provider.status = "stopped";
+  let clock = Date.parse("2026-07-10T00:00:00Z");
+  const reconciler = new ManagedNodeReconciler({
+    backend,
+    providers: [provider],
+    backendUrl: "http://backend.test",
+    workspacePathForNode: () => "/workspaces/alice",
+    retryBaseMs: 10_000,
+    retryMaxMs: 60_000,
+    now: () => clock,
+  });
+
+  assert.deepEqual(await reconciler.reconcileOnce(), {
+    nodes: 1,
+    started: 0,
+    skipped: 0,
+    healthy: 0,
+    failed: 1,
+  });
+  assert.equal(provider.calls.length, 0);
+  assert.deepEqual(backend.updates.at(-1), {
+    status: "failed",
+    errorCode: "controller_recovered_unknown_instance",
+    errorMessage: "The controller could not recover the provider instance; a new attempt will be created.",
+    retryAt: new Date(clock + 40_000).toISOString(),
+  });
+
+  clock += 10_000;
+  assert.deepEqual(await reconciler.reconcileOnce(), {
+    nodes: 1,
+    started: 0,
+    skipped: 1,
+    healthy: 0,
+    failed: 0,
+  });
+  assert.equal(provider.calls.length, 0);
 });
 
 test("managed daemon env drops ambient identity that would bypass enrollment", () => {

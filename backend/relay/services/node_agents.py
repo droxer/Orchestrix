@@ -1,15 +1,30 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Protocol
 
 from loguru import logger
 
 from ..daemon_registry.scheduling import workspace_identity
 from ..persistence.agent_placement_store import create_node_placement
+from ..persistence.protocols import AgentPlacementStore, AgentStore, TeamStore
 from .team_membership import remove_agent_from_teams
 
 
-def assert_node_agent_runs_drained(ctx: Any, node_id: str) -> None:
+class NodeAgentRegistry(Protocol):
+    daemon_store: Any
+    dispatch_lock: Any
+
+    def monitor_nodes(self) -> list[dict[str, Any]]: ...
+
+
+class NodeAgentContext(Protocol):
+    registry: NodeAgentRegistry
+    agent_store: AgentStore
+    agent_placement_store: AgentPlacementStore
+    team_store: TeamStore
+
+
+def assert_node_agent_runs_drained(ctx: NodeAgentContext, node_id: str) -> None:
     registry = getattr(ctx, "registry", None)
     daemon_store = getattr(registry, "daemon_store", None)
     if not daemon_store:
@@ -27,12 +42,15 @@ def assert_node_agent_runs_drained(ctx: Any, node_id: str) -> None:
         )
 
 
-def employee_is_live(ctx: Any, employee_id: str) -> bool:
+def employee_is_live(ctx: NodeAgentContext, employee_id: str) -> bool:
     """Whether the employee exists and has not been soft-deleted.
 
     `employees.deleted_at` only filters listings, so without this check a node
     that keeps registering re-materializes compatibility agents for an employee
     whose agents were just deleted.
+
+    `auth_store` is not part of NodeAgentContext, so it is read defensively —
+    test doubles and reduced contexts may not carry one.
     """
     auth_store = getattr(ctx, "auth_store", None)
     if auth_store is None:
@@ -48,7 +66,7 @@ def employee_is_live(ctx: Any, employee_id: str) -> bool:
     return True
 
 
-def sync_node_agents(ctx: Any, node: dict[str, Any]) -> None:
+def sync_node_agents(ctx: NodeAgentContext, node: dict[str, Any]) -> None:
     """Materialize stable compatibility agents for legacy node capabilities."""
     employee_id = node.get("employeeId")
     if not employee_id:
@@ -142,7 +160,7 @@ def _missing_agent_table(error: Exception) -> bool:
     return "no such table" in message or "does not exist" in message
 
 
-def _managed_runtime_ids(ctx: Any, managed_node_id: str) -> set[str]:
+def _managed_runtime_ids(ctx: NodeAgentContext, managed_node_id: str) -> set[str]:
     registry = getattr(ctx, "registry", None)
     if not registry:
         return set()
@@ -161,7 +179,7 @@ def _managed_runtime_ids(ctx: Any, managed_node_id: str) -> set[str]:
 
 
 def _rebind_managed_node_placements(
-    ctx: Any,
+    ctx: NodeAgentContext,
     node: dict[str, Any],
     employee_id: str,
 ) -> None:
@@ -221,7 +239,7 @@ def _belongs_to_other_computer(
 
 
 def _migrate_managed_compatibility_agent(
-    ctx: Any,
+    ctx: NodeAgentContext,
     node: dict[str, Any],
     employee_id: str,
     executor_kind: str,
@@ -268,7 +286,10 @@ def _migrate_managed_compatibility_agent(
 
 
 def _retire_superseded_locked(
-    ctx: Any, node: dict[str, Any], employee_id: str, executor_kind: str
+    ctx: NodeAgentContext,
+    node: dict[str, Any],
+    employee_id: str,
+    executor_kind: str,
 ) -> list[str]:
     registry = getattr(ctx, "registry", None)
     dispatch_lock = getattr(registry, "dispatch_lock", None)
@@ -281,7 +302,10 @@ def _retire_superseded_locked(
 
 
 def retire_superseded_compatibility_agents(
-    ctx: Any, node: dict[str, Any], employee_id: str, executor_kind: str
+    ctx: NodeAgentContext,
+    node: dict[str, Any],
+    employee_id: str,
+    executor_kind: str,
 ) -> list[str]:
     """Retire duplicate compatibility agents left behind when this computer
     re-registered under a new node id.
@@ -396,9 +420,7 @@ def _compatibility_key_for(employee_id: str, node_id: str, executor_kind: str) -
     return f"{employee_id}:{node_id}:{executor_kind}"
 
 
-
-
-def _agent_placed_on_node(ctx: Any, agent_id: str, node_id: str) -> bool:
+def _agent_placed_on_node(ctx: NodeAgentContext, agent_id: str, node_id: str) -> bool:
     return any(
         placement.get("daemonNodeId") == node_id
         for placement in ctx.agent_placement_store.list_placements(agent_id=agent_id)
@@ -406,7 +428,7 @@ def _agent_placed_on_node(ctx: Any, agent_id: str, node_id: str) -> bool:
 
 
 def _retire_compatibility_agent(
-    ctx: Any, agent: dict[str, Any], employee_id: str
+    ctx: NodeAgentContext, agent: dict[str, Any], employee_id: str
 ) -> bool:
     """Remove an agent's live placements and delete it once it holds none.
 
@@ -426,7 +448,7 @@ def _retire_compatibility_agent(
     return True
 
 
-def _node_has_active_work(ctx: Any, node_id: str) -> bool:
+def _node_has_active_work(ctx: NodeAgentContext, node_id: str) -> bool:
     daemon_store = getattr(getattr(ctx, "registry", None), "daemon_store", None)
     if not daemon_store:
         return False
@@ -440,7 +462,7 @@ def _node_has_active_work(ctx: Any, node_id: str) -> bool:
     )
 
 
-def remove_node_agents(ctx: Any, node_id: str) -> list[str]:
+def remove_node_agents(ctx: NodeAgentContext, node_id: str) -> list[str]:
     """Retire a node's compatibility agents under the dispatch lifecycle lock."""
     registry = getattr(ctx, "registry", None)
     dispatch_lock = getattr(registry, "dispatch_lock", None)
@@ -450,7 +472,7 @@ def remove_node_agents(ctx: Any, node_id: str) -> list[str]:
     return _remove_node_agents_locked(ctx, node_id)
 
 
-def _remove_node_agents_locked(ctx: Any, node_id: str) -> list[str]:
+def _remove_node_agents_locked(ctx: NodeAgentContext, node_id: str) -> list[str]:
     """Delete agents and placements bound to a deleted computer.
 
     An agent lives on exactly one computer (one agent = one computer) and its

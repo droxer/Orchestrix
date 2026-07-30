@@ -23,6 +23,8 @@ export interface ManagedReconcileResult {
   nodes: number;
   started: number;
   skipped: number;
+  /** Online managed computers that already satisfy the desired running state. */
+  healthy: number;
   failed: number;
 }
 
@@ -53,7 +55,7 @@ export function provisioningRetryDelayMs(
  * Changing provider config bumps the generation, which resets the backoff so an
  * admin fixing a misconfiguration is not left waiting out the previous delay.
  */
-export function provisioningRetryAt(
+function provisioningRetryAt(
   attempts: ProvisioningAttemptRecord[],
   generation: number,
 ): number | undefined {
@@ -97,6 +99,7 @@ export class ManagedNodeReconciler {
     const daemonById = new Map(daemonNodes.map((node) => [node.id, node]));
     let started = 0;
     let skipped = 0;
+    let healthy = 0;
     let failed = 0;
     for (const node of nodes) {
       const provider = this.providers.get(node.provider);
@@ -162,6 +165,7 @@ export class ManagedNodeReconciler {
         const daemon = node.activeDaemonNodeId ? daemonById.get(node.activeDaemonNodeId) : undefined;
         if (daemon?.online && !daemon.stale && (daemon.status === "ready" || daemon.status === "busy" || daemon.status === "running")) {
           skipped += 1;
+          healthy += 1;
           continue;
         }
         const attempts = await this.backend.listProvisioningAttempts(node.id);
@@ -207,11 +211,24 @@ export class ManagedNodeReconciler {
           continue;
         }
         if (active) {
+          const retryDelayMs = provisioningRetryDelayMs(
+            active.attemptNumber,
+            this.retryBaseMs,
+            this.retryMaxMs,
+          );
           await this.backend.updateProvisioningAttempt(node.id, active.id, {
             status: "failed",
             errorCode: "controller_recovered_unknown_instance",
             errorMessage: "The controller could not recover the provider instance; a new attempt will be created.",
+            retryAt: new Date(this.now() + retryDelayMs).toISOString(),
           });
+          this.logger?.warn("managed node provider instance disappeared", {
+            nodeId: node.id,
+            provider: node.provider,
+            retryDelayMs,
+          });
+          failed += 1;
+          continue;
         }
       }
       const retryAt = provisioningRetryAt(attempts, node.generation);
@@ -265,7 +282,7 @@ export class ManagedNodeReconciler {
         });
       }
     }
-    return { nodes: nodes.length, started, skipped, failed };
+    return { nodes: nodes.length, started, skipped, healthy, failed };
   }
 
   private async retireRuntimeWhenDrained(node: ManagedNodeRecord): Promise<boolean> {
