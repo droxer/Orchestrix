@@ -102,6 +102,52 @@ def _task_mode(value: Any) -> str:
     return value if value in ("action", "review", "ask") else "action"
 
 
+def _unclaimable_dispatch(task: dict[str, Any], agent: str | None) -> DispatchInfo:
+    """Explain why a task could not be claimed for dispatch.
+
+    A held claim does not prove work is under way. An unclassified failure
+    keeps its claim on purpose, so a partially started run is never dispatched
+    twice — which means the operator is told "in progress" about a dispatch
+    that already failed and created no thread. Surface the recorded outcome
+    instead, and name the other refusals rather than folding them in too.
+    """
+    if task.get("isRoutine"):
+        return {
+            "state": "queued",
+            "code": "routine_not_dispatchable",
+            "message": "Routines are dispatched by their schedule, not directly.",
+        }
+    assigned_agent = task.get("assignedAgent")
+    if agent and assigned_agent and assigned_agent != agent:
+        return {
+            "state": "queued",
+            "code": "agent_mismatch",
+            "message": f"This task is assigned to {assigned_agent}, not {agent}.",
+        }
+    if task.get("status") != "assigned":
+        return {
+            "state": "queued",
+            "code": "task_not_assigned",
+            "message": f"A {task.get('status')} task cannot be dispatched.",
+        }
+    outcome = task.get("dispatchOutcome") or {}
+    code = outcome.get("code")
+    if outcome.get("state") == "queued" and code:
+        return {
+            "state": "queued",
+            "code": code,
+            "message": (
+                "The last dispatch attempt failed and no thread was created: "
+                f"{outcome.get('message') or code}"
+            ),
+        }
+    return {
+        "state": "queued",
+        "code": "dispatch_in_progress",
+        "message": "This task already has a dispatch in progress.",
+    }
+
+
 def implicit_group_assignments_for_task(
     ctx: TaskDispatchContext, task: dict[str, Any]
 ) -> list[dict[str, Any]]:
@@ -326,11 +372,12 @@ class TaskDispatcher:
         )
         if not claimed:
             current = self.ctx.task_store.get_task(self.task["id"])
+            refusal = _unclaimable_dispatch(current, claim_agent)
             return _result(
                 current,
-                "queued",
-                code="dispatch_in_progress",
-                message="This task already has a dispatch in progress.",
+                refusal["state"],
+                code=refusal.get("code"),
+                message=refusal.get("message"),
             )
         self.task = claimed
         self.claim_id = (self.task.get("dispatchClaim") or {}).get("id")

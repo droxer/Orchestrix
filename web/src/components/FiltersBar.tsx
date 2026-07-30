@@ -3,6 +3,13 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "./ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import { ActionSearch } from "./icons";
 
 interface FiltersBarProps {
@@ -76,5 +83,52 @@ export function FiltersBar({
         <div className="backlog-filter-secondary">{children}</div>
       ) : null}
     </div>
+  );
+}
+
+/* One dropdown vocabulary. The filter rows used native <select> elements, so
+   the popup list was OS chrome — a different surface, radius, type scale, and
+   highlight colour from the <Select> popup used everywhere else in the app, and
+   untouched by the theme. This wraps the primitive so a filter stays the
+   one-liner it was at the call site. */
+export function FilterSelect<T extends string>({
+  name,
+  label,
+  value,
+  onValueChange,
+  options,
+  className,
+}: {
+  name: string;
+  label: string;
+  value: T;
+  onValueChange: (value: T) => void;
+  options: readonly { value: T; label: string }[];
+  className?: string;
+}) {
+  return (
+    <Select
+      value={value}
+      /* `items` is what lets the trigger show a label before the popup has ever
+         been mounted. Without it Base UI has no value→label map yet and renders
+         the raw value, so an unopened filter read "all" instead of "All
+         statuses". */
+      items={options}
+      onValueChange={(next) => {
+        if (next == null) return;
+        onValueChange(next as T);
+      }}
+    >
+      <SelectTrigger name={name} aria-label={label} className={className ?? "w-full"}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((option) => (
+          <SelectItem key={option.value} value={option.value} label={option.label}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

@@ -17,6 +17,14 @@ import { TeamDrawer } from "./admin/TeamDrawer";
 import { TeamWorkspacePage } from "./TeamWorkspacePage";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
 
 export function TeamsPage({
   currentUser,
@@ -71,16 +79,20 @@ export function TeamsPage({
           ) : sortedTeams.length === 0 ? (
             <RelayEmptyState title={t("teams.empty_title")} body={t("teams.empty_body")} />
           ) : (
-            <div className="teams-table" role="table" aria-label={t("teams.title")}>
-              <div className="teams-table-head" role="row">
-                <span className="teams-table-col" role="columnheader">{t("teams.name")}</span>
-                <span className="teams-table-col teams-table-col--status" role="columnheader">{t("teams.col_status")}</span>
-              </div>
-              <ul className="teams-list" role="rowgroup">
+            <Table
+              className="teams-table"
+              columns="minmax(0, 1fr) auto"
+              aria-label={t("teams.title")}
+            >
+              <TableHeader>
+                <TableHead>{t("teams.name")}</TableHead>
+                <TableHead className="text-right">{t("teams.col_status")}</TableHead>
+              </TableHeader>
+              <TableBody render={<ul className="teams-list" />}>
                 {sortedTeams.map((team) => {
                   const memberNames = team.members.map((member) => member.displayName).join(", ");
                   return (
-                    <li key={team.id} className="teams-list-row" role="row" data-selected={team.id === selectedTeam?.id ? "true" : "false"}>
+                    <TableRow key={team.id} render={<li />} className="teams-list-row" data-selected={team.id === selectedTeam?.id ? "true" : "false"}>
                       <button
                         type="button"
                         className="teams-list-row-select"
@@ -94,11 +106,11 @@ export function TeamsPage({
                             fallback={<TeamMark size={16} />}
                           />
                         </span>
-                        <span className="teams-list-identity" role="cell">
+                        <TableCell render={<span />} className="teams-list-identity">
                           <span className="teams-list-title">{team.name}</span>
                           <small className="teams-list-sub">{team.lead?.displayName ?? t("teams.unavailable")} · {memberNames || t("teams.no_members")}</small>
-                        </span>
-                        <span className="teams-list-status" role="cell">
+                        </TableCell>
+                        <TableCell render={<span />} className="teams-list-status">
                           {/* "ready" is the default healthy state and stays
                               implicit; other roster states get named. */}
                           {!team.enabled ? (
@@ -106,13 +118,13 @@ export function TeamsPage({
                           ) : teamAvailability(team) !== "ready" ? (
                             <StatusPill value={teamAvailability(team)} />
                           ) : null}
-                        </span>
+                        </TableCell>
                       </button>
-                    </li>
+                    </TableRow>
                   );
                 })}
-              </ul>
-            </div>
+              </TableBody>
+            </Table>
           )}
         </div>
       </div>

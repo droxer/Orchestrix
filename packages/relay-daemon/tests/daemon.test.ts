@@ -115,9 +115,31 @@ test("BoxLite home is isolated from the global default and stable per workspace"
 
   const resolved = resolveBoxliteHome(workspace, undefined);
 
-  assert.match(resolved, /\/\.relay\/boxlite\/relay-workspace-[a-f0-9]{12}$/);
+  assert.match(resolved, /\/\.relay\/boxlite\/[a-f0-9]{12}$/);
   assert.notEqual(resolved, `${process.env.HOME}/.boxlite`);
   assert.equal(resolveBoxliteHome(workspace, resolved), resolved);
+});
+
+test("BoxLite home leaves room for runtime sockets in managed workspaces", () => {
+  const workspace = join(
+    process.cwd(),
+    ".relay",
+    "employee-workspaces",
+    "5dadd571-0557-4288-8378-90af89b20c6e",
+  );
+
+  const resolved = resolveBoxliteHome(workspace, undefined);
+  const otherWorkspace = resolveBoxliteHome(
+    join(process.cwd(), ".relay", "employee-workspaces", "b10e0f0d-70d6-4b61-8249-bf9582d45480"),
+    undefined,
+  );
+  const readySocket = join(resolved, "boxes", "Te1OnCQiUQlF", "sockets", "ready.sock");
+
+  assert.notEqual(resolved, otherWorkspace);
+  assert.ok(
+    Buffer.byteLength(readySocket) < 104,
+    `BoxLite ready socket exceeds the macOS Unix socket path limit: ${readySocket}`,
+  );
 });
 
 test("BoxLite home locks allow different homes at the same time", async (t: TestContext) => {

@@ -674,3 +674,140 @@ def test_managed_reprovision_collects_agents_for_missing_old_runtimes(
         placements.list_placements(agent_id=original_agent_id)[0]["daemonNodeId"]
         == "runtime_new"
     )
+
+
+def test_managed_sync_does_not_steal_an_employee_device_agent(tmp_path: Path) -> None:
+    """A device agent must not ping-pong between its device and a managed node.
+
+    The managed Computer's sync claims placements carrying its managedNodeId,
+    and the device's sync claims back the agents keyed to the device. If either
+    side leaves a stale Computer identity behind, the two rebind the same
+    placement back and forth forever and every thread pinned to one node starts
+    rejecting the agent with workspace_unavailable.
+    """
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    ctx = SimpleNamespace(agent_store=agents, agent_placement_store=placements)
+    device = {
+        "id": "device_node",
+        "employeeId": "alice",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+    }
+    managed = {
+        "id": "managed_runtime",
+        "managedNodeId": "computer_managed",
+        "employeeId": "alice",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+    }
+
+    sync_node_agents(ctx, device)
+    sync_node_agents(ctx, managed)
+
+    device_agent = next(
+        agent
+        for agent in agents.list_agents(supervisor_employee_id="alice")
+        if agent["compatibilityKey"] == "alice:device_node:claude"
+    )
+    # Seed the observed broken state: the device agent's placement was moved to
+    # the managed runtime while its own node was briefly offline, so it now
+    # carries the managed Computer's identity.
+    [seeded] = placements.list_placements(agent_id=device_agent["id"])
+    placements.rebind_placement(
+        seeded["id"], "managed_runtime", managed_node_id="computer_managed"
+    )
+
+    for _ in range(3):
+        sync_node_agents(ctx, device)
+        sync_node_agents(ctx, managed)
+
+    [placement] = placements.list_placements(agent_id=device_agent["id"])
+    assert placement["daemonNodeId"] == "device_node"
+    assert placement.get("managedNodeId") is None
+
+    managed_agent = next(
+        agent
+        for agent in agents.list_agents(supervisor_employee_id="alice")
+        if agent["compatibilityKey"] == "alice:computer_managed:claude"
+    )
+    [managed_placement] = placements.list_placements(agent_id=managed_agent["id"])
+    assert managed_placement["daemonNodeId"] == "managed_runtime"
+    assert managed_placement["managedNodeId"] == "computer_managed"
+
+
+def test_managed_runtime_replacement_still_rebinds_its_own_agents(
+    tmp_path: Path,
+) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    ctx = SimpleNamespace(agent_store=agents, agent_placement_store=placements)
+    first = {
+        "id": "runtime_one",
+        "managedNodeId": "computer_managed",
+        "employeeId": "alice",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+    }
+    sync_node_agents(ctx, first)
+
+    replacement = {**first, "id": "runtime_two"}
+    sync_node_agents(ctx, replacement)
+
+    agent = next(
+        agent
+        for agent in agents.list_agents(supervisor_employee_id="alice")
+        if agent["compatibilityKey"] == "alice:computer_managed:claude"
+    )
+    [placement] = placements.list_placements(agent_id=agent["id"])
+    assert placement["daemonNodeId"] == "runtime_two"
+    assert placement["managedNodeId"] == "computer_managed"
+
+
+def test_soft_deleted_employee_does_not_get_agents_rematerialized(
+    tmp_path: Path,
+) -> None:
+    """Deleting an employee deletes their agents; the next node registration
+    must not resurrect them."""
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    auth_store = SimpleNamespace(
+        list_employees=lambda: [{"id": "bob"}],  # alice was soft-deleted
+    )
+    ctx = SimpleNamespace(
+        agent_store=agents,
+        agent_placement_store=placements,
+        auth_store=auth_store,
+    )
+    node = {
+        "id": "node_alice",
+        "employeeId": "alice",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+    }
+
+    sync_node_agents(ctx, node)
+
+    assert agents.list_agents(supervisor_employee_id="alice") == []
+    assert placements.list_placements(daemon_node_id="node_alice") == []
+
+
+def test_live_employee_still_gets_agents_materialized(tmp_path: Path) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    auth_store = SimpleNamespace(list_employees=lambda: [{"id": "alice"}])
+    ctx = SimpleNamespace(
+        agent_store=agents,
+        agent_placement_store=placements,
+        auth_store=auth_store,
+    )
+    node = {
+        "id": "node_alice",
+        "employeeId": "alice",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+    }
+
+    sync_node_agents(ctx, node)
+
+    assert len(agents.list_agents(supervisor_employee_id="alice")) == 1

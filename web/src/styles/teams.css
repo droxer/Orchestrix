@@ -38,48 +38,16 @@
   padding: 0;
 }
 
-/* Shared table language (backlog + admin lists): ruled rows under a sticky
-   column header, one grid declaration shared by head and rows, wash hover,
-   role=table semantics. Per-cell micro labels appear only in the stacked
-   ≤820px card, where the header is hidden. */
-.teams-table-head,
-.teams-list-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--sp-3);
-}
-
-.teams-table-head {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  padding: var(--sp-2) var(--sp-3);
-  border-bottom: 1px solid var(--line-1);
-  background: var(--surface-0);
-}
-
-.teams-table-col {
-  font: var(--type-micro);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
-
-.teams-table-col--status {
-  text-align: right;
-}
+/* The table language itself — sticky header, shared grid template, ruled rows,
+   hover wash, selection accent — now lives in the <Table> primitive
+   (components/ui/table.tsx), which the four other lists in the app can share
+   instead of each re-declaring it. This surface keeps only what is specific to
+   a team row. */
 
 .teams-list {
   margin: 0;
   padding: 0;
   list-style: none;
-}
-
-.teams-list-row {
-  border-left: 2px solid transparent;
-  padding: var(--sp-3);
-  border-bottom: 1px solid var(--line-2);
-  transition: background var(--t-fast) var(--ease);
 }
 
 .teams-list-row-select {
@@ -117,14 +85,7 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--action) 28%, var(--line-1));
 }
 
-.teams-list-row:hover {
-  background: color-mix(in srgb, var(--surface-1) 60%, transparent);
-}
-
-.teams-list-row[data-selected="true"] {
-  border-left-color: var(--action);
-  background: var(--action-soft);
-}
+/* Hover wash and the selected accent/wash come from <TableRow>. */
 
 .teams-list-row:focus-within {
   box-shadow: var(--focus-ring);
@@ -323,13 +284,14 @@
     padding: var(--sp-3);
   }
 
-  .teams-table-head {
+  /* Stacked-card mode: the column header is meaningless once rows restack, so
+     it is hidden and each cell grows its own micro label instead. This is the
+     reason the primitive is div+ARIA rather than a real <table>. */
+  .teams-table [data-slot="table-header"] {
     display: none;
   }
 
   .teams-list-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--sp-3);
     padding: var(--sp-4) var(--sp-3);
   }
 

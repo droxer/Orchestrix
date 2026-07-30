@@ -4,6 +4,15 @@ import type { AgentTaskMode, EmployeeAgent } from "../../types";
 import { isEmployeeAgentRoutable } from "../../lib/agentDisplayNames";
 import { ActionApprove, ActionHandoff, ActionRoute } from "../icons";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import { useDialogs } from "../ui/DialogProvider";
 
 type DecisionAction = "approve" | "reject" | "rerun" | "mark_done" | "handoff";
@@ -55,6 +64,23 @@ export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHando
 
   const busy = pendingAction !== null;
 
+  const agentOptions = logicalAgents.map((agent) => {
+    const disabled = !isEmployeeAgentRoutable(agent);
+    return {
+      value: agent.id,
+      label: disabled
+        ? t("thread.agent_disabled_option", { agent: agent.displayName })
+        : agent.displayName,
+      disabled,
+    };
+  });
+
+  const modeOptions: { value: AgentTaskMode; label: string }[] = [
+    { value: "action", label: t("mode.action") },
+    { value: "ask", label: t("mode.ask") },
+    { value: "review", label: t("mode.review") },
+  ];
+
   return (
     <>
       <div className="decision-bar">
@@ -73,29 +99,40 @@ export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHando
             <span className="handoff-panel-title">{t("handoff.title")}</span>
           </div>
           <div className="handoff-row">
-            <label htmlFor="handoff-agent">{t("handoff.route_to")}</label>
-            <select id="handoff-agent" name="handoff-agent" value={handoffAgentId} onChange={(e) => setHandoffAgentId(e.target.value)}>
-              {logicalAgents.map((agent) => {
-                const isDisabled = !isEmployeeAgentRoutable(agent);
-                return (
-                  <option key={agent.id} value={agent.id} disabled={isDisabled}>
-                    {isDisabled ? t("thread.agent_disabled_option", { agent: agent.displayName }) : agent.displayName}
-                  </option>
-                );
-              })}
-            </select>
+            <Label htmlFor="handoff-agent">{t("handoff.route_to")}</Label>
+            {/* `items` resolves the trigger label before the popup first mounts;
+                without it the trigger would show the raw agent id. */}
+            <Select value={handoffAgentId} items={agentOptions} onValueChange={(value) => { if (value != null) setHandoffAgentId(value); }}>
+              <SelectTrigger id="handoff-agent" name="handoff-agent" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {agentOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value} label={option.label} disabled={option.disabled}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="handoff-row">
-            <label htmlFor="handoff-mode">{t("handoff.mode")}</label>
-            <select id="handoff-mode" name="handoff-mode" value={handoffMode} onChange={(e) => setHandoffMode(e.target.value as AgentTaskMode)}>
-              <option value="action">{t("mode.action")}</option>
-              <option value="ask">{t("mode.ask")}</option>
-              <option value="review">{t("mode.review")}</option>
-            </select>
+            <Label htmlFor="handoff-mode">{t("handoff.mode")}</Label>
+            <Select value={handoffMode} items={modeOptions} onValueChange={(value) => { if (value != null) setHandoffMode(value as AgentTaskMode); }}>
+              <SelectTrigger id="handoff-mode" name="handoff-mode" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {modeOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value} label={option.label}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="handoff-row handoff-row--note">
-            <label htmlFor="handoff-note">{t("handoff.note_label")}</label>
-            <input id="handoff-note" name="handoff-note" autoComplete="off" placeholder={t("handoff.note_placeholder")} value={handoffNote} onChange={(e) => setHandoffNote(e.target.value)} />
+            <Label htmlFor="handoff-note">{t("handoff.note_label")}</Label>
+            <Input id="handoff-note" name="handoff-note" autoComplete="off" placeholder={t("handoff.note_placeholder")} value={handoffNote} onChange={(e) => setHandoffNote(e.target.value)} />
           </div>
           <div className="handoff-actions">
             <Button variant="ghost" type="button" disabled={busy} onClick={() => setHandoffOpen(false)}>{t("handoff.cancel")}</Button>

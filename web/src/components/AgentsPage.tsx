@@ -12,6 +12,7 @@ import { AgentWorkspacePage, type WorkspacePageTab } from "./AgentWorkspacePage"
 import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
 import { Badge } from "./ui/badge";
+import { FilterSelect } from "./FiltersBar";
 import { describeAgentPlacements } from "../lib/agentPlacements";
 
 interface AgentsPageProps {
@@ -84,19 +85,17 @@ function RosterFilterBar({
           onChange={(event) => onQueryChange(event.target.value)}
         />
       </div>
-      <select
+      <FilterSelect
         className="agents-roster-select"
         name="agents-availability-filter"
+        label={t("agents_page.filter_availability")}
         value={availability}
-        aria-label={t("agents_page.filter_availability")}
-        onChange={(event) => onAvailabilityChange(event.target.value as AvailabilityFilter)}
-      >
-        {AVAILABILITY_FILTERS.map((filter) => (
-          <option key={filter} value={filter}>
-            {t(`agents_page.filter_${filter}`)}
-          </option>
-        ))}
-      </select>
+        onValueChange={onAvailabilityChange}
+        options={AVAILABILITY_FILTERS.map((filter) => ({
+          value: filter,
+          label: t(`agents_page.filter_${filter}`),
+        }))}
+      />
     </div>
   );
 }

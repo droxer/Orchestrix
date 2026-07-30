@@ -334,7 +334,7 @@ class DaemonNodeRegistry:
         now = now_iso()
         existing = self.sandboxes.get(payload["sandboxId"])
         if (
-            existing and (existing.get("nodeTokenHash") or existing.get("tokenHash"))
+            existing and existing.get("nodeTokenHash")
         ) and not daemon_node_token_matches(existing, payload["token"]):
             logger.warning(
                 "Unauthorized daemon node registration", sandbox_id=payload["sandboxId"]
@@ -351,7 +351,6 @@ class DaemonNodeRegistry:
             hash_daemon_node_token(ui_token)
             if ui_token
             else (existing or {}).get("uiTokenHash")
-            or (existing or {}).get("tokenHash")
         )
         agents, agent_details = agent_registration_state(payload)
         executor_capabilities = [
@@ -468,14 +467,17 @@ class DaemonNodeRegistry:
             "runCapacityByMode": run_capacity_by_mode,
             "uiTokenHash": next_ui_hash,
             "nodeTokenHash": hash_daemon_node_token(payload.get("token"))
-            or (existing or {}).get("nodeTokenHash")
-            or (existing or {}).get("tokenHash"),
+            or (existing or {}).get("nodeTokenHash"),
             "createdAt": (existing or {}).get("createdAt", now),
             "updatedAt": now,
             "lastSeenAt": now,
         }
         self.sandboxes[sandbox["id"]] = sandbox
         self._remember_control_panel_node_token(sandbox, payload.get("token"))
+        # Retire the superseded rows before inserting, or the new incarnation
+        # collides with them on uq_daemon_nodes_computer.
+        if not retired_at:
+            self._retire_superseded_incarnations(sandbox)
         self.daemon_store.register_node(sandbox)
         logger.info(
             "Daemon node registered",
@@ -485,6 +487,54 @@ class DaemonNodeRegistry:
             agents={agent: status for agent, status in sandbox["agents"].items()},
         )
         return sandbox
+
+    def _superseded_incarnations(self, sandbox: dict[str, Any]) -> list[dict[str, Any]]:
+        """Live node rows describing the same Computer as `sandbox`.
+
+        A Computer is identified by (employeeId, workspaceId) for an employee
+        device and by managedNodeId for a managed one -- never by the daemon's
+        own sandboxId, which changes whenever the daemon process is replaced.
+        """
+        managed_node_id = sandbox.get("managedNodeId")
+        employee_id = sandbox.get("employeeId")
+        workspace_id = sandbox.get("workspaceId")
+        if not managed_node_id and not (employee_id and workspace_id):
+            return []
+        return [
+            node
+            for node in self.sandboxes.values()
+            if node["id"] != sandbox["id"]
+            and not node.get("retiredAt")
+            and (
+                node.get("managedNodeId") == managed_node_id
+                if managed_node_id
+                else (
+                    not node.get("managedNodeId")
+                    and node.get("employeeId") == employee_id
+                    and node.get("workspaceId") == workspace_id
+                )
+            )
+        ]
+
+    def _retire_superseded_incarnations(self, sandbox: dict[str, Any]) -> None:
+        for node in self._superseded_incarnations(sandbox):
+            retired_at = now_iso()
+            self.sandboxes[node["id"]] = {
+                **node,
+                "retiredAt": retired_at,
+                "status": "stopped",
+                "updatedAt": retired_at,
+            }
+            self.daemon_store.mark_node_seen(
+                node["id"], {"retiredAt": retired_at, "status": "stopped"}
+            )
+            logger.info(
+                "Retired superseded daemon node incarnation",
+                sandbox_id=node["id"],
+                superseded_by=sandbox["id"],
+                employee_id=node.get("employeeId"),
+                workspace_id=node.get("workspaceId"),
+            )
 
     def _registration_display_name(
         self,
@@ -1430,7 +1480,19 @@ class DaemonNodeRegistry:
                     TERMINAL_EVENT_STATE_KEY
                 )
                 if isinstance(terminal_event, dict):
-                    self._claim_and_advance_run_request(terminal_event)
+                    # Reaping runs inside monitor_nodes(), which most routes
+                    # call, so one request that cannot be finalized must not
+                    # take the rest of the API down with it. Log and move on;
+                    # the claim lease brings it back on the next pass.
+                    try:
+                        self._claim_and_advance_run_request(terminal_event)
+                    except Exception as error:
+                        logger.exception(
+                            "Failed finalizing a stale run request",
+                            run_request_id=request.get("id"),
+                            node_id=request.get("nodeId"),
+                            error=str(error),
+                        )
                 continue
             command_id = request.get("currentCommandId")
             if not command_id:
@@ -1920,7 +1982,17 @@ class DaemonNodeRegistry:
                 sandbox, run_request, event, artifact_snapshot, assignment
             )
         if event["exitCode"] != 0:
-            outcome = f"{assignment['agent']} {mode} failed with exit code {event['exitCode']}."
+            # Agent-first assignments carry agentId/executorKind and no "agent"
+            # key, so indexing it here raised before the request could be marked
+            # failed — leaving it finalizing forever and re-raising on every
+            # reap pass. Resolve the label the way scheduling.py does.
+            agent_label = (
+                assignment.get("agentDisplayName")
+                or assignment.get("executorKind")
+                or assignment.get("agent")
+                or "Agent"
+            )
+            outcome = f"{agent_label} {mode} failed with exit code {event['exitCode']}."
             if session_before.get("status") != "failed":
                 controller.fail_session(run_request["sessionId"], outcome)
             self.daemon_store.update_run_request_if_claimed(
@@ -2248,7 +2320,11 @@ class DaemonNodeRegistry:
             sandbox = self.sandboxes.get(sandbox_id)
             if not sandbox:
                 return
-            revived = sandbox["status"] in ("stopped", "provisioning", "failed")
+            revived = not sandbox.get("retiredAt") and sandbox["status"] in (
+                "stopped",
+                "provisioning",
+                "failed",
+            )
             patch = {"status": "ready", "lastError": None} if revived else {}
             now = now_iso()
             updated = {
@@ -2282,7 +2358,9 @@ class DaemonNodeRegistry:
         for sandbox in nodes:
             node_location = infer_node_location(sandbox)
             waiting_status = (
-                "running"
+                "stopped"
+                if sandbox.get("retiredAt")
+                else "running"
                 if sandbox["id"] in active_node_ids
                 else "provisioning"
                 if sandbox.get("status") == "provisioning"
@@ -2292,7 +2370,19 @@ class DaemonNodeRegistry:
                 **sandbox,
                 **({"nodeLocation": node_location} if node_location else {}),
                 "status": waiting_status,
-                "agents": {agent: "unknown" for agent in AGENT_NAMES},
+                # A successful authenticated command poll proves that the same
+                # daemon identity is live again. Keep its last registered
+                # capability state during backend recovery so liveness cannot
+                # become ready while every Logical Agent stays unavailable
+                # until the daemon's next periodic registration.
+                "agents": (
+                    {agent: "unknown" for agent in AGENT_NAMES}
+                    if sandbox.get("retiredAt")
+                    else {
+                        agent: (sandbox.get("agents") or {}).get(agent, "unknown")
+                        for agent in AGENT_NAMES
+                    }
+                ),
                 "updatedAt": now_iso(),
                 "lastError": sandbox.get("lastError")
                 or "Waiting for daemon node registration.",

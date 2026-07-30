@@ -4,10 +4,13 @@ import json
 import os
 from collections.abc import Callable
 from datetime import datetime, timezone
+from contextlib import contextmanager
 from pathlib import Path
+from threading import RLock, local
 from typing import Any
 
-from sqlalchemy import Column, Text, Uuid
+from sqlalchemy import JSON, Column, MetaData, Text, Uuid, create_engine
+from sqlalchemy.dialects.postgresql import JSONB
 
 from ..core.ids import new_database_id, now_iso
 from ..core.models import (
@@ -22,10 +25,101 @@ from ..core.models import (
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RELAY_DATA_DIR = REPO_ROOT / ".relay"
 
+# Every database-backed store registers its tables here. One MetaData is what
+# lets foreign keys cross aggregate boundaries (agents -> employees, placements
+# -> daemon_nodes) and lets `tests/unit/test_schema_drift.py` compare the
+# migrated schema against the declared one.
+#
+# Snapshot convention: stores that keep a `snapshot` JSON column treat it as the
+# authoritative record. Sibling columns (display_name, executor_kind, status, …)
+# are derived projections used only for filtering, ordering, and uniqueness;
+# they are rewritten from the snapshot on every write. A migration that edits a
+# snapshot must update the derived columns in the same statement.
+metadata = MetaData()
+
 
 def entity_uuid_type() -> Any:
     """Native UUID in PostgreSQL, with TEXT retained for SQLite test stores."""
     return Uuid(as_uuid=False).with_variant(Text(), "sqlite")
+
+
+_ENGINES: dict[str, Any] = {}
+_ENGINE_LOCK = RLock()
+
+
+def shared_engine(database_url: str) -> Any:
+    """One Engine per database URL, shared by every store.
+
+    Stores used to build an Engine each, so eight connection pools pointed at
+    the same database and no operation could span two stores in one
+    transaction. Sharing the Engine is what lets `transaction()` make a
+    multi-store write -- deleting an employee, say -- atomic.
+    """
+    with _ENGINE_LOCK:
+        engine = _ENGINES.get(database_url)
+        if engine is None:
+            engine = create_engine(database_url, future=True)
+            _ENGINES[database_url] = engine
+        return engine
+
+
+def create_all_tables(engine: Any) -> None:
+    """Create every Relay table on `engine`.
+
+    Always creates the whole schema, never one store's slice: foreign keys now
+    cross store boundaries, so `agents` cannot be created without `employees`
+    also being registered on the shared MetaData. The import is deferred to
+    here because `relay.persistence.schema` imports the stores that import this
+    module.
+    """
+    from . import schema  # noqa: PLC0415 - deferred to break the import cycle
+
+    schema.metadata.create_all(engine)
+
+
+_TRANSACTION_STATE = local()
+
+
+@contextmanager
+def store_transaction(engine: Any) -> Any:
+    """Open a transaction on `engine`, or join the enclosing one.
+
+    Every store method opens one of these instead of `engine.begin()`. On its
+    own it behaves identically. Wrapped in an outer `store_transaction` on the
+    same engine, the inner ones enlist in it rather than committing separately,
+    which is what makes a cascade that spans stores -- deleting an employee and
+    its agents, placements, teams, and nodes -- atomic.
+
+    The bookkeeping is thread-local, so a transaction on one thread never leaks
+    into a store call on another.
+    """
+    connections = getattr(_TRANSACTION_STATE, "connections", None)
+    if connections is None:
+        connections = {}
+        _TRANSACTION_STATE.connections = connections
+
+    key = id(engine)
+    joined = connections.get(key)
+    if joined is not None:
+        yield joined
+        return
+
+    with engine.begin() as connection:
+        connections[key] = connection
+        try:
+            yield connection
+        finally:
+            connections.pop(key, None)
+
+
+def json_type() -> Any:
+    """JSONB in PostgreSQL, plain JSON for SQLite test stores.
+
+    Migrations have always created `jsonb`; declaring bare `JSON` here made
+    `create_all` produce `json` columns instead, which sort and index
+    differently.
+    """
+    return JSON().with_variant(JSONB(), "postgresql")
 
 
 def database_id_column() -> Column[Any]:

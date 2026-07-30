@@ -663,3 +663,45 @@ def test_saturated_placement_returns_capacity_exhausted(tmp_path: Path) -> None:
         )
 
     assert error.value.code == "capacity_exhausted"
+
+
+def test_device_compatibility_agent_does_not_borrow_managed_capacity(
+    tmp_path: Path,
+) -> None:
+    """A device's stand-in agent stays on its device when that device is down.
+
+    Placing it on the employee's managed Computer would relocate it for good,
+    so every thread already pinned to the device would start rejecting it with
+    workspace_unavailable.
+    """
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.ensure_compatibility_agent("alice", "claude", "device_node")
+    original = placements.create_placement(agent, "device_node")
+    offline_device = {
+        **node("device_node", "claude"),
+        "employeeId": "alice",
+        "online": False,
+        "stale": True,
+        "status": "stopped",
+    }
+    managed = {
+        **node("managed_runtime", "claude"),
+        "employeeId": "alice",
+        "managedNodeId": "computer_managed",
+    }
+
+    with pytest.raises(AgentRoutingError) as error:
+        resolve_agent_assignments(
+            [{"agentId": agent["id"], "mode": "action"}],
+            employee_id="alice",
+            is_admin=False,
+            agent_store=agents,
+            placement_store=placements,
+            daemon_nodes=[offline_device, managed],
+        )
+
+    assert error.value.code == "node_offline"
+    [preserved] = placements.list_placements(agent_id=agent["id"])
+    assert preserved["id"] == original["id"]
+    assert preserved["daemonNodeId"] == "device_node"

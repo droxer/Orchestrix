@@ -926,6 +926,10 @@ def test_employee_cannot_dispatch_a_team_across_shared_workspace_nodes(
             ).status_code
             == 201
         )
+        # Two distinct Computers (distinct machine ids) that happen to mount the
+        # same shared workspace path. Sharing a workspaceId would make them one
+        # Computer registered twice, and the later registration would retire the
+        # earlier one.
         for node_id, executor in (("node_a", "claude"), ("node_b", "codex")):
             app.state.registry.register(
                 {
@@ -933,7 +937,7 @@ def test_employee_cannot_dispatch_a_team_across_shared_workspace_nodes(
                     "employeeId": "alice",
                     "token": f"token_{node_id}",
                     "workspacePath": "/workspace/shared",
-                    "workspaceId": "workspace:alice:shared",
+                    "workspaceId": f"machine:alice:{node_id}",
                     "protocolVersion": 1,
                     "supportedAgents": [executor],
                     "maxConcurrentRuns": 2,
@@ -1631,3 +1635,97 @@ def test_manual_start_materializes_a_legacy_task_assignment(monkeypatch) -> None
         assert (
             started.json()["session"]["agentRuns"][0]["logicalAgentId"] == agent["id"]
         )
+
+
+def test_failed_agent_first_run_finalizes_instead_of_wedging(monkeypatch) -> None:
+    """A non-zero exit on an agent-first run must reach a terminal state.
+
+    Agent-first assignments carry agentId/executorKind and no "agent" key, so
+    the failure branch used to raise while finalizing. The request stayed
+    `finalizing` forever, re-raising on every reap pass — and because reaping
+    runs inside monitor_nodes(), that took most of the API down with it.
+    """
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                },
+            ).status_code
+            == 201
+        )
+        app.state.registry.register(
+            {
+                "sandboxId": "node_a",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        agent = client.post(
+            "/api/v1/admin/agents",
+            json={
+                "supervisorEmployeeId": "alice",
+                "displayName": "Elon Musk",
+                "executorKind": "codex",
+            },
+        ).json()["agent"]
+        assert (
+            client.post(
+                f"/api/v1/admin/agents/{agent['id']}/placements",
+                json={"daemonNodeId": "node_a"},
+            ).status_code
+            == 201
+        )
+
+        run = client.post(
+            "/api/v1/agent-runs",
+            json={
+                "taskGoal": "Build the feature",
+                "assignments": [{"agentId": agent["id"], "mode": "action"}],
+            },
+        )
+        assert run.status_code == 202
+        session_id = run.json()["id"]
+        [command] = client.get(
+            "/api/v1/daemon-nodes/node_a/commands?leaseMode=explicit&leaseSeconds=10",
+            headers={"Authorization": "Bearer node_token"},
+        ).json()["commands"]
+
+        completed = client.post(
+            "/api/v1/daemon-nodes/node_a/events",
+            json={
+                "type": "run.completed",
+                "commandId": command["id"],
+                "leaseId": command["leaseId"],
+                "sessionId": session_id,
+                "runId": command["runId"],
+                "agent": command["agent"],
+                "mode": command["mode"],
+                "exitCode": 1,
+                "agentLog": "boom",
+            },
+            headers={"Authorization": "Bearer node_token"},
+        )
+        assert completed.status_code == 200
+
+        # monitor_nodes() drives the reaper; it must not raise, and the request
+        # must not be left active.
+        app.state.registry.monitor_nodes()
+        active = [
+            request
+            for request in app.state.registry.daemon_store.list_active_run_requests()
+            if request["sessionId"] == session_id
+        ]
+        assert active == []
+        assert client.get(f"/api/v1/threads/{session_id}").json()["status"] == "failed"

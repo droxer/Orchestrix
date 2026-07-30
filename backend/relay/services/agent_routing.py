@@ -8,6 +8,7 @@ from ..daemon_registry.scheduling import (
     workspace_identity_record,
 )
 from ..persistence.agent_placement_store import create_node_placement, placement_status
+from ..persistence.agent_store import compatibility_computer_id
 
 
 class AgentRoutingError(ValueError):
@@ -305,6 +306,12 @@ def _agent_placements_with_managed_capacity(
         # routing. Administrators can place the agent explicitly instead.
         return placements
     required_managed_node_id = next(iter(managed_node_ids), None)
+    own_computer_id = compatibility_computer_id(agent)
+    if own_computer_id is not None and own_computer_id != required_managed_node_id:
+        # This agent stands in for one specific Computer. Borrowing managed
+        # capacity while that Computer is offline would move it there for good,
+        # stranding every thread already pinned to its own Computer.
+        return placements
     placed_node_ids = {placement["daemonNodeId"] for placement in placements}
     managed_candidate = min(
         (

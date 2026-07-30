@@ -58,7 +58,7 @@ backend:
 	$(if $(filter command line environment,$(origin BACKEND_PORT)),BACKEND_PORT="$(BACKEND_PORT)" )UV_CACHE_DIR=.uv-cache uv run --project backend relay
 
 backend-test:
-	UV_CACHE_DIR=.uv-cache uv run --project backend --extra dev pytest
+	UV_CACHE_DIR=.uv-cache uv run --project backend --extra dev pytest backend/tests
 
 backend-migrate:
 	$(if $(DATABASE_URL),RELAY_DATABASE_URL="$(DATABASE_URL)" )UV_CACHE_DIR=.uv-cache uv run --project backend --extra dev alembic -c backend/alembic.ini upgrade head

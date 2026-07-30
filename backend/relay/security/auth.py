@@ -14,10 +14,9 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
-    MetaData,
+    Index,
     Table,
     Text,
-    create_engine,
     delete,
     insert,
     select,
@@ -32,8 +31,12 @@ from ..persistence.store_common import (
     _parse_iso,
     _read_json,
     _write_json,
+    create_all_tables,
     database_id_column,
     entity_uuid_type,
+    metadata as shared_metadata,
+    shared_engine,
+    store_transaction,
 )
 
 DEFAULT_SESSION_TTL_SECONDS = 7 * 24 * 60 * 60  # 1 week
@@ -313,7 +316,7 @@ class UserAuthStore:
 
 
 class DatabaseUserAuthStore:
-    metadata = MetaData()
+    metadata = shared_metadata
 
     departments = Table(
         "departments",
@@ -328,6 +331,7 @@ class DatabaseUserAuthStore:
         ),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
+        Index("ix_departments_parent_department_id", "parent_department_id"),
     )
     employees = Table(
         "employees",
@@ -344,6 +348,7 @@ class DatabaseUserAuthStore:
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
         Column("deleted_at", DateTime(timezone=True), nullable=True),
+        Index("ix_employees_department_id", "department_id"),
     )
     users = Table(
         "auth_users",
@@ -364,6 +369,8 @@ class DatabaseUserAuthStore:
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
         CheckConstraint("role in ('admin', 'user')", name="ck_auth_users_role"),
+        Index("ix_auth_users_role", "role"),
+        Index("ix_auth_users_employee_id", "employee_id"),
     )
     sessions = Table(
         "auth_sessions",
@@ -378,6 +385,8 @@ class DatabaseUserAuthStore:
         ),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("expires_at", DateTime(timezone=True), nullable=False),
+        Index("ix_auth_sessions_user_id", "user_id"),
+        Index("ix_auth_sessions_expires_at", "expires_at"),
     )
 
     def __init__(
@@ -387,13 +396,13 @@ class DatabaseUserAuthStore:
         session_ttl_seconds: int = DEFAULT_SESSION_TTL_SECONDS,
         create_schema: bool = False,
     ):
-        self.engine = create_engine(database_url, future=True)
+        self.engine = shared_engine(database_url)
         self.session_ttl_seconds = session_ttl_seconds
         if create_schema:
-            self.metadata.create_all(self.engine)
+            create_all_tables(self.engine)
 
     def has_users(self) -> bool:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             return conn.execute(select(self.users.c.id).limit(1)).first() is not None
 
     def create_user(
@@ -434,7 +443,7 @@ class DatabaseUserAuthStore:
             "updatedAt": _format_iso(now),
         }
         try:
-            with self.engine.begin() as conn:
+            with store_transaction(self.engine) as conn:
                 employee = self._ensure_employee(
                     conn,
                     employee_id,
@@ -467,7 +476,7 @@ class DatabaseUserAuthStore:
             patch["theme"] = theme
         if language is not None:
             patch["language"] = language
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             result = conn.execute(
                 update(self.users).where(self.users.c.id == user_id).values(**patch)
             )
@@ -490,7 +499,7 @@ class DatabaseUserAuthStore:
         department_id = department_id.strip()
         if not department_id:
             raise ValueError("departmentId is required.")
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             return self._ensure_department(
                 conn,
                 department_id,
@@ -499,7 +508,7 @@ class DatabaseUserAuthStore:
             )
 
     def list_departments(self) -> list[dict[str, Any]]:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             rows = (
                 conn.execute(select(self.departments).order_by(self.departments.c.name))
                 .mappings()
@@ -519,7 +528,7 @@ class DatabaseUserAuthStore:
         employee_id = employee_id.strip()
         if not employee_id:
             raise ValueError("employeeId is required.")
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             return self._ensure_employee(
                 conn,
                 employee_id,
@@ -530,7 +539,7 @@ class DatabaseUserAuthStore:
             )
 
     def list_employees(self) -> list[dict[str, Any]]:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             department_rows = conn.execute(select(self.departments)).mappings().all()
             departments = {
                 str(row["id"]): row_to_department(row) for row in department_rows
@@ -553,7 +562,7 @@ class DatabaseUserAuthStore:
         if not employee_id:
             raise ValueError("employeeId is required.")
         now = datetime.now(timezone.utc)
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.employees).where(self.employees.c.id == employee_id)
@@ -575,7 +584,7 @@ class DatabaseUserAuthStore:
 
     def authenticate(self, username: str, password: str) -> dict[str, Any] | None:
         username = username.strip().lower()
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.users).where(self.users.c.username == username)
@@ -630,7 +639,7 @@ class DatabaseUserAuthStore:
             "createdAt": _format_iso(now),
             "expiresAt": _format_iso(expires_at),
         }
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             conn.execute(
                 insert(self.sessions).values(
                     **database_session_to_row(
@@ -643,7 +652,7 @@ class DatabaseUserAuthStore:
     def get_session_by_token(self, token: str | None) -> dict[str, Any] | None:
         if not token:
             return None
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.sessions).where(
@@ -667,7 +676,7 @@ class DatabaseUserAuthStore:
         return session
 
     def get_user_by_id(self, user_id: str) -> dict[str, Any] | None:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(select(self.users).where(self.users.c.id == user_id))
                 .mappings()
@@ -688,7 +697,7 @@ class DatabaseUserAuthStore:
             return user if employee and not employee.get("deleted_at") else None
 
     def delete_session(self, token: str) -> bool:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             result = conn.execute(
                 delete(self.sessions).where(
                     self.sessions.c.token_hash == hash_session_token(token)
@@ -697,7 +706,7 @@ class DatabaseUserAuthStore:
         return result.rowcount > 0
 
     def cleanup_expired_sessions(self) -> int:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             result = conn.execute(
                 delete(self.sessions).where(
                     self.sessions.c.expires_at <= datetime.now(timezone.utc)
@@ -706,7 +715,7 @@ class DatabaseUserAuthStore:
         return result.rowcount
 
     def list_users(self) -> list[dict[str, Any]]:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             rows = (
                 conn.execute(select(self.users).order_by(self.users.c.created_at))
                 .mappings()

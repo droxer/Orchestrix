@@ -9,7 +9,11 @@ const secondaryBadgeClasses =
   "border-transparent bg-secondary text-secondary-foreground [a]:hover:bg-secondary/90"
 
 const badgeVariants = cva(
-  "group/badge inline-flex w-fit shrink-0 items-center justify-center gap-1 truncate overflow-hidden rounded-sm border px-3 py-1 text-xs font-semibold whitespace-nowrap transition-[color,box-shadow,border-color,background-color] focus-visible:shadow-[var(--focus-ring)] focus-visible:ring-0 [&>svg]:pointer-events-none [&>svg]:size-3",
+  /* px-2/py-0.5/font-medium per shadcn latest. The former px-3/py-1/semibold
+     made a chip read as heavy as a small button, which fought the status pills
+     it sits beside in table rows and on cards. Radius stays --r-1 (the chip
+     tier in palette.css), not shadcn's rounded-md. */
+  "group/badge inline-flex w-fit shrink-0 items-center justify-center gap-1 truncate overflow-hidden rounded-sm border px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow,border-color,background-color] focus-visible:shadow-[var(--focus-ring)] focus-visible:ring-0 [&>svg]:pointer-events-none [&>svg]:size-3",
   {
     variants: {
       variant: {

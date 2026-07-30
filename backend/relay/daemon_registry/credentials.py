@@ -27,13 +27,15 @@ def _hash_matches(expected: str | None, token: str | None) -> bool:
 
 
 def _credential_hash(sandbox: dict[str, Any], field: str) -> str | None:
-    """Read a split credential hash, with one isolated legacy migration path."""
+    """Read a split credential hash.
+
+    Migration 0049 backfilled the pre-split `tokenHash` into whichever of
+    `uiTokenHash`/`nodeTokenHash` was empty, so there is no legacy field left to
+    fall back to.
+    """
     explicit = sandbox.get(field)
     if isinstance(explicit, str) and explicit:
         return explicit
-    legacy = sandbox.get("tokenHash")
-    if isinstance(legacy, str) and legacy:
-        return legacy
     return hash_daemon_node_token(sandbox.get("token"))
 
 
@@ -46,11 +48,7 @@ def daemon_node_token_matches(sandbox: dict[str, Any], token: str | None) -> boo
 
 
 def sandbox_ui_auth_error(sandbox: dict[str, Any], token: str | None) -> str | None:
-    if (
-        not sandbox.get("uiTokenHash")
-        and not sandbox.get("tokenHash")
-        and not sandbox.get("token")
-    ):
+    if not sandbox.get("uiTokenHash") and not sandbox.get("token"):
         return "Sandbox token is required." if sandbox.get("nodeTokenHash") else None
     if not token:
         return "Sandbox token is required."
@@ -60,11 +58,7 @@ def sandbox_ui_auth_error(sandbox: dict[str, Any], token: str | None) -> str | N
 
 
 def sandbox_node_auth_error(sandbox: dict[str, Any], token: str | None) -> str | None:
-    if (
-        not sandbox.get("nodeTokenHash")
-        and not sandbox.get("tokenHash")
-        and not sandbox.get("token")
-    ):
+    if not sandbox.get("nodeTokenHash") and not sandbox.get("token"):
         return None
     if not token:
         return "Daemon node token is required."

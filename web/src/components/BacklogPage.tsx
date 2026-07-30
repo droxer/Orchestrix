@@ -26,7 +26,8 @@ import { useTouchTaskDrag } from "../hooks/useTouchTaskDrag";
 import { laneStatusAtPoint, type DragPoint } from "../lib/touchDrag";
 import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
 import { Button } from "./ui/button";
-import { FiltersBar } from "./FiltersBar";
+import { FiltersBar, FilterSelect } from "./FiltersBar";
+import { Input } from "./ui/input";
 
 interface BacklogPageProps {
   tasks: RelayTask[];
@@ -150,40 +151,43 @@ function BacklogFiltersBar({
       activeCount={activeFilterCount(filters)}
       onClear={() => onChange(initialFilters)}
     >
-      <select
+      <FilterSelect
         name="backlog-status-filter"
+        label={t("backlog.status")}
         value={filters.status}
-        aria-label={t("backlog.status")}
-        onChange={(event) => onChange({ ...filters, status: event.target.value as BacklogFilters["status"] })}
-      >
-        <option value="all">{t("backlog.all_statuses")}</option>
-        {TASK_STATUSES.map((status) => (
-          <option key={status} value={status}>{t(`backlog.statuses.${status}`)}</option>
-        ))}
-      </select>
-      <select
+        onValueChange={(status) => onChange({ ...filters, status })}
+        options={[
+          { value: "all" as const, label: t("backlog.all_statuses") },
+          ...TASK_STATUSES.map((status) => ({
+            value: status,
+            label: t(`backlog.statuses.${status}`),
+          })),
+        ]}
+      />
+      <FilterSelect
         name="backlog-priority-filter"
+        label={t("backlog.priority")}
         value={filters.priority}
-        aria-label={t("backlog.priority")}
-        onChange={(event) => onChange({ ...filters, priority: event.target.value as BacklogFilters["priority"] })}
-      >
-        <option value="all">{t("backlog.all_priorities")}</option>
-        {TASK_PRIORITIES.map((priority) => (
-          <option key={priority} value={priority}>{t(`backlog.priorities.${priority}`)}</option>
-        ))}
-      </select>
-      <select
+        onValueChange={(priority) => onChange({ ...filters, priority })}
+        options={[
+          { value: "all" as const, label: t("backlog.all_priorities") },
+          ...TASK_PRIORITIES.map((priority) => ({
+            value: priority,
+            label: t(`backlog.priorities.${priority}`),
+          })),
+        ]}
+      />
+      <FilterSelect
         name="backlog-agent-filter"
+        label={t("backlog.agent")}
         value={filters.agent}
-        aria-label={t("backlog.agent")}
-        onChange={(event) => onChange({ ...filters, agent: event.target.value as BacklogFilters["agent"] })}
-      >
-        <option value="all">{t("backlog.all_agents")}</option>
-        {agents.map((agent) => (
-          <option key={agent.id} value={agent.id}>{agent.displayName}</option>
-        ))}
-      </select>
-      <input
+        onValueChange={(agent) => onChange({ ...filters, agent })}
+        options={[
+          { value: "all", label: t("backlog.all_agents") },
+          ...agents.map((agent) => ({ value: agent.id, label: agent.displayName })),
+        ]}
+      />
+      <Input
         name="backlog-assignee-filter"
         autoComplete="off"
         spellCheck={false}
@@ -192,17 +196,18 @@ function BacklogFiltersBar({
         aria-label={t("backlog.assignee_filter")}
         onChange={(event) => onChange({ ...filters, assignee: event.target.value })}
       />
-      <select
+      <FilterSelect
         name="backlog-due-filter"
+        label={t("backlog.due")}
         value={filters.due}
-        aria-label={t("backlog.due")}
-        onChange={(event) => onChange({ ...filters, due: event.target.value as BacklogFilters["due"] })}
-      >
-        <option value="all">{t("backlog.all_due")}</option>
-        <option value="overdue">{t("backlog.overdue")}</option>
-        <option value="today">{t("backlog.today")}</option>
-        <option value="unscheduled">{t("backlog.unscheduled")}</option>
-      </select>
+        onValueChange={(due) => onChange({ ...filters, due })}
+        options={[
+          { value: "all", label: t("backlog.all_due") },
+          { value: "overdue", label: t("backlog.overdue") },
+          { value: "today", label: t("backlog.today") },
+          { value: "unscheduled", label: t("backlog.unscheduled") },
+        ]}
+      />
     </FiltersBar>
   );
 }

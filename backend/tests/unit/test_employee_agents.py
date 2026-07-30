@@ -112,6 +112,33 @@ def test_database_agent_store_matches_local_contract(tmp_path: Path) -> None:
     ]
 
 
+@pytest.mark.parametrize("store_kind", ["local", "database"])
+def test_deleted_agent_releases_compatibility_identity(
+    tmp_path: Path, store_kind: str
+) -> None:
+    store = (
+        LocalAgentStore(tmp_path / "local")
+        if store_kind == "local"
+        else DatabaseAgentStore(
+            f"sqlite:///{tmp_path}/agents.db", create_schema=True
+        )
+    )
+    original = store.ensure_compatibility_agent(
+        "alice", "claude", "runtime-1", computer_id="computer-1"
+    )
+
+    deleted = store.delete_agent(original["id"])
+    replacement = store.ensure_compatibility_agent(
+        "alice", "claude", "runtime-2", computer_id="computer-1"
+    )
+
+    # The identity is released because uniqueness is scoped to live agents, not
+    # because the deleted agent forgets which Computer it belonged to.
+    assert deleted["compatibilityKey"] == "alice:computer-1:claude"
+    assert replacement["id"] != original["id"]
+    assert replacement["compatibilityKey"] == "alice:computer-1:claude"
+
+
 def test_database_agent_store_normalizes_legacy_owner_snapshot(tmp_path: Path) -> None:
     database_url = f"sqlite:///{tmp_path}/legacy-agents.db"
     store = DatabaseAgentStore(database_url, create_schema=True)
@@ -131,10 +158,16 @@ def test_database_agent_store_normalizes_legacy_owner_snapshot(tmp_path: Path) -
 
 
 def test_database_enforces_employee_scoped_normalized_agent_names() -> None:
-    unique_columns = {
-        tuple(sorted(column.name for column in constraint.columns))
-        for constraint in DatabaseAgentStore.agents.constraints
-        if isinstance(constraint, UniqueConstraint)
+    unique_indexes = {
+        index.name: tuple(sorted(column.name for column in index.columns))
+        for index in DatabaseAgentStore.agents.indexes
+        if index.unique
     }
 
-    assert ("display_name_key", "supervisor_employee_id") in unique_columns
+    # Scoped to live agents, so a soft delete frees the name without having to
+    # erase its own key columns.
+    assert unique_indexes["uq_agents_live_supervisor_display_name"] == (
+        "display_name_key",
+        "supervisor_employee_id",
+    )
+    assert unique_indexes["uq_agents_live_compatibility_key"] == ("compatibility_key",)

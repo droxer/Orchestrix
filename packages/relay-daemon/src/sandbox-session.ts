@@ -6,7 +6,7 @@ import {
 import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import {
   DEVBOX_IMAGE,
   GUEST_WORKSPACE,
@@ -56,8 +56,7 @@ export function resolveBoxliteHome(hostWorkspace: string, override = process.env
   if (explicit) return resolve(explicit);
   const workspacePath = resolve(hostWorkspace);
   const digest = createHash("sha256").update(workspacePath).digest("hex").slice(0, 12);
-  const label = basename(workspacePath).replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 48) || "workspace";
-  return join(homedir(), ".relay", "boxlite", `${label}-${digest}`);
+  return join(homedir(), ".relay", "boxlite", digest);
 }
 
 export function resetAgentReadiness(): void {

@@ -51,6 +51,10 @@ PROVISIONING_ATTEMPT_STATUSES = frozenset({
     "cancelled",
 })
 TERMINAL_ATTEMPT_STATUSES = frozenset({"succeeded", "failed", "cancelled"})
+# Terminal attempts retained per node. A node that cannot provision produces one
+# attempt (and one enrollment grant) per reconcile pass, so unbounded history
+# would grow the store forever and slow every list_attempts scan with it.
+ATTEMPT_HISTORY_LIMIT = 20
 
 
 @dataclass(frozen=True)
@@ -74,6 +78,21 @@ def _parse_timestamp(value: str) -> datetime:
 def _validate_managed_sandbox_mode(value: Any) -> None:
     if value not in MANAGED_NODE_SANDBOX_MODES:
         raise ValueError("Managed nodes require sandboxMode boxlite.")
+
+
+def _validate_provider(payload: dict[str, Any]) -> None:
+    """Reject a malformed provider name.
+
+    The set of usable providers belongs to whichever supervisor reconciles the
+    node, not to the backend, so an unknown-but-well-formed name is reported by
+    the reconciler as a ProviderAvailable condition instead of being rejected
+    here. Only shapes no reconciler could ever resolve are refused.
+    """
+    if "provider" not in payload or payload["provider"] is None:
+        return
+    provider = payload["provider"]
+    if not isinstance(provider, str) or not provider.strip():
+        raise ValueError("provider must be a non-empty string.")
 
 
 def _managed_node_policy_slot(node: dict[str, Any]) -> tuple[Any, ...]:
@@ -116,6 +135,7 @@ class LocalManagedNodeStore:
         if desired_state not in MANAGED_NODE_DESIRED_STATES:
             raise ValueError("desiredState must be running, stopped, or deleted.")
         _validate_managed_sandbox_mode(sandbox_mode)
+        _validate_provider(payload)
         if not employee_id:
             raise ValueError("employeeId is required for a dedicated managed node.")
         slot_lock = nullcontext() if _policy_slot_locked else self._policy_slot_lock()
@@ -286,6 +306,7 @@ class LocalManagedNodeStore:
             unknown = set(patch) - allowed_fields
             if unknown:
                 raise ValueError(f"Unsupported managed node field(s): {', '.join(sorted(unknown))}.")
+            _validate_provider(patch)
             desired_state = patch.get("desiredState", node["desiredState"])
             if desired_state not in MANAGED_NODE_DESIRED_STATES:
                 raise ValueError("desiredState must be running, stopped, or deleted.")
@@ -369,7 +390,39 @@ class LocalManagedNodeStore:
             _write_json(self.attempts_dir / f"{safe_name(attempt['id'])}.json", attempt)
             _write_json(self.grants_dir / f"{safe_name(grant_id)}.json", grant)
             self._write_node({**node, "activeAttemptId": attempt["id"], "phase": "allocating", "updatedAt": now})
+            self._prune_attempt_history(node_id)
             return attempt, f"{grant_id}.{secret}"
+
+    def _prune_attempt_history(self, node_id: str) -> None:
+        """Drop the oldest terminal attempts, and any grant they still own."""
+        terminal = [
+            attempt
+            for attempt in self.list_attempts(node_id)
+            if attempt.get("status") in TERMINAL_ATTEMPT_STATUSES
+        ]
+        stale = terminal[: max(len(terminal) - ATTEMPT_HISTORY_LIMIT, 0)]
+        for attempt in stale:
+            (self.attempts_dir / f"{safe_name(attempt['id'])}.json").unlink(
+                missing_ok=True
+            )
+        self._sweep_grants({attempt["id"] for attempt in stale})
+
+    def _sweep_grants(self, discarded_attempt_ids: set[str]) -> None:
+        """Delete grants that can no longer authorize an enrollment.
+
+        Consumed grants are left to expire on their own so a replayed
+        credential still reports why it was refused.
+        """
+        now = datetime.now(timezone.utc)
+        for path in self.grants_dir.glob("*.json"):
+            try:
+                grant = _read_json(path)
+            except (FileNotFoundError, ValueError):
+                continue
+            expires_at = grant.get("expiresAt")
+            expired = bool(expires_at) and _parse_timestamp(expires_at) <= now
+            if grant.get("attemptId") in discarded_attempt_ids or expired:
+                path.unlink(missing_ok=True)
 
     def list_attempts(self, node_id: str) -> list[dict[str, Any]]:
         attempts = [_read_json(path) for path in self.attempts_dir.glob("*.json")]

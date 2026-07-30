@@ -8,11 +8,22 @@ from threading import RLock
 from typing import Any, Literal
 from urllib.parse import urlparse, urlunsplit
 
-from sqlalchemy import JSON, Column, DateTime, MetaData, Table, Text, create_engine, insert, select, update
+from sqlalchemy import JSON, Column, DateTime, Table, Text, insert, select, update
 from cryptography.fernet import Fernet, InvalidToken
 
 from ..core.ids import new_relay_id, now_iso
-from ..persistence.store_common import _append_jsonl, _parse_iso, _read_json, _write_json, database_id_column
+from ..persistence.store_common import (
+    _append_jsonl,
+    _parse_iso,
+    _read_json,
+    _write_json,
+    database_id_column,
+    create_all_tables,
+    json_type,
+    shared_engine,
+    store_transaction,
+    metadata as shared_metadata,
+)
 
 ChatProvider = Literal["discord", "telegram", "lark"]
 ChatIntegrationStatus = Literal["draft", "active", "degraded", "disabled"]
@@ -507,25 +518,25 @@ class LocalChatIntegrationStore:
 
 
 class DatabaseChatIntegrationStore(LocalChatIntegrationStore):
-    metadata = MetaData()
+    metadata = shared_metadata
 
     documents = Table(
         "chat_documents",
         metadata,
         database_id_column(),
         Column("document_key", Text, nullable=False, unique=True),
-        Column("payload", JSON, nullable=False),
+        Column("payload", json_type(), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
     )
 
     def __init__(self, database_url: str, *, create_schema: bool = False):
         self._lock = RLock()
-        self.engine = create_engine(database_url, future=True)
+        self.engine = shared_engine(database_url)
         self._transaction_connection = None
         raw_key = os.environ.get("RELAY_CHAT_SECRET_KEY", "").strip()
         self._secret_cipher = Fernet(raw_key.encode()) if raw_key else None
         if create_schema:
-            self.metadata.create_all(self.engine)
+            create_all_tables(self.engine)
 
     def create_integration(self, payload: dict[str, Any], actor: str | None = None) -> dict[str, Any]:
         return self._atomic(lambda: super(DatabaseChatIntegrationStore, self).create_integration(payload, actor))
@@ -680,7 +691,7 @@ class DatabaseChatIntegrationStore(LocalChatIntegrationStore):
         if conn is not None:
             row = conn.execute(select(self.documents.c.payload).where(self.documents.c.document_key == key)).mappings().first()
         else:
-            with self.engine.begin() as connection:
+            with store_transaction(self.engine) as connection:
                 row = connection.execute(
                     select(self.documents.c.payload).where(self.documents.c.document_key == key)
                 ).mappings().first()
@@ -694,7 +705,7 @@ class DatabaseChatIntegrationStore(LocalChatIntegrationStore):
         if conn is not None:
             self._upsert_document(conn, key, payload, now)
             return
-        with self.engine.begin() as connection:
+        with store_transaction(self.engine) as connection:
             self._upsert_document(connection, key, payload, now)
 
     def _upsert_document(self, conn: Any, key: str, payload: Any, now: Any) -> None:
@@ -708,7 +719,7 @@ class DatabaseChatIntegrationStore(LocalChatIntegrationStore):
         with self._lock:
             if self._transaction_connection is not None:
                 return operation()
-            with self.engine.begin() as conn:
+            with store_transaction(self.engine) as conn:
                 self._transaction_connection = conn
                 try:
                     return operation()

@@ -11,6 +11,7 @@ import type {
 import { Drawer } from "../ui/Drawer";
 import { RunModeField, type RunLocation } from "./RunModeField";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import {
@@ -148,8 +149,7 @@ export function AddNodeDrawer({
               {t("admin.v2.run_mode")}
             </h3>
           </header>
-          <label className="adm-field">
-            <span>{t("admin.v2.computer_name")}</span>
+          <Field label={t("admin.v2.computer_name")} hint={t("admin.v2.computer_name_hint")}>
             <Input
               name="add-node-display-name"
               autoComplete="off"
@@ -159,8 +159,7 @@ export function AddNodeDrawer({
               maxLength={64}
               disabled={isBusy}
             />
-          </label>
-          <p className="adm-form-hint">{t("admin.v2.computer_name_hint")}</p>
+          </Field>
           <RunModeField
             value={nodeLocation}
             onChange={(location) => {
@@ -171,31 +170,27 @@ export function AddNodeDrawer({
             disabled={isBusy}
           />
           {!isManaged ? (
-            <>
-              <label className="adm-field">
-                <span>{t("workspace_label")}</span>
-                <Input
-                  ref={workspacePathRef}
-                  name="add-node-workspace-path"
-                  autoComplete="off"
-                  value={workspacePath}
-                  onChange={(event) => {
-                    setWorkspacePath(event.target.value);
-                    clearFieldError("workspacePath");
-                  }}
-                  placeholder="/Users/alice/project"
-                  disabled={isBusy}
-                  aria-invalid={Boolean(fieldErrors.workspacePath) || undefined}
-                  aria-describedby={fieldErrors.workspacePath ? "add-node-workspace-path-error" : undefined}
-                />
-                {fieldErrors.workspacePath ? (
-                  <span id="add-node-workspace-path-error" className="text-sm text-danger" role="alert">
-                    {fieldErrors.workspacePath}
-                  </span>
-                ) : null}
-              </label>
-              <p className="adm-form-hint">{t("admin.v2.workspace_path_hint")}</p>
-            </>
+            <Field
+              label={t("workspace_label")}
+              hint={t("admin.v2.workspace_path_hint")}
+              error={fieldErrors.workspacePath}
+              errorId="add-node-workspace-path-error"
+            >
+              <Input
+                ref={workspacePathRef}
+                name="add-node-workspace-path"
+                autoComplete="off"
+                value={workspacePath}
+                onChange={(event) => {
+                  setWorkspacePath(event.target.value);
+                  clearFieldError("workspacePath");
+                }}
+                placeholder="/Users/alice/project"
+                disabled={isBusy}
+                aria-invalid={Boolean(fieldErrors.workspacePath) || undefined}
+                aria-describedby={fieldErrors.workspacePath ? "add-node-workspace-path-error" : undefined}
+              />
+            </Field>
           ) : null}
           <aside
             className={`adm-provision-outcome ${isManaged ? "is-managed" : "is-local"}`}
@@ -220,8 +215,13 @@ export function AddNodeDrawer({
             </span>
           </header>
 
-          <div className="adm-field">
-            <span id={employeeLabelId}>{t("admin.employee")}</span>
+          <Field
+            label={t("admin.employee")}
+            labelId={employeeLabelId}
+            wrapper="div"
+            error={fieldErrors.employeeId}
+            errorId="add-node-employee-error"
+          >
             <Select
               value={employeeId || null}
               onValueChange={(value) => {
@@ -241,7 +241,12 @@ export function AddNodeDrawer({
                 <SelectValue
                   placeholder={employees.length === 0 ? t("admin.no_employees") : t("admin.select_employee")}
                 >
-                  {(value: string) => {
+                  {(value: string | null) => {
+                    if (!value) {
+                      return employees.length === 0
+                        ? t("admin.no_employees")
+                        : t("admin.select_employee");
+                    }
                     const employee = employees.find((e) => e.id === value);
                     if (!employee) return `@${value}`;
                     return employee.displayName && employee.displayName !== employee.id
@@ -261,12 +266,7 @@ export function AddNodeDrawer({
                 ))}
               </SelectContent>
             </Select>
-            {fieldErrors.employeeId ? (
-              <span id="add-node-employee-error" className="text-sm text-danger" role="alert">
-                {fieldErrors.employeeId}
-              </span>
-            ) : null}
-          </div>
+          </Field>
 
           {!selectedEmployee ? (
             <p className="adm-form-hint">

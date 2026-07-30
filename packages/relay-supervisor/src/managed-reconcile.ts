@@ -50,6 +50,11 @@ export function provisioningRetryDelayMs(
   return Math.min(baseMs * 2 ** exponent, maxMs);
 }
 
+/**
+ * The latest retry deadline recorded for the node's current generation.
+ * Changing provider config bumps the generation, which resets the backoff so an
+ * admin fixing a misconfiguration is not left waiting out the previous delay.
+ */
 function provisioningRetryAt(
   attempts: ProvisioningAttemptRecord[],
   generation: number,

@@ -473,6 +473,7 @@
   display: inline-flex;
 }
 
+.sidenav-panel[data-expanded="true"] .sidenav-btn .sidenav-badge,
 .sidenav-more-item .sidenav-badge {
   margin-left: auto;
 }

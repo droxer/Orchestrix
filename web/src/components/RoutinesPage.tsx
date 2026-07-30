@@ -25,7 +25,7 @@ import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
 import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
 import { Button, buttonVariants } from "./ui/button";
-import { FiltersBar } from "./FiltersBar";
+import { FiltersBar, FilterSelect } from "./FiltersBar";
 import { hrefForRoute } from "../lib/appRoute";
 
 interface RoutinesPageProps {
@@ -127,26 +127,53 @@ function RoutineFiltersBar({ filters, agents, onChange }: { filters: RoutineFilt
       activeCount={activeFilterCount(filters)}
       onClear={() => onChange(initialFilters)}
     >
-      <select name="routine-type-filter" value={filters.type} aria-label={t("routine.type")} onChange={(event) => onChange({ ...filters, type: event.target.value as RoutineFilters["type"] })}>
-        <option value="all">{t("routine.all_types")}</option>
-        {TASK_ROUTINE_TYPES.map((type) => <option key={type} value={type}>{t(`routine.types.${type}`)}</option>)}
-      </select>
-      <select name="routine-cadence-filter" value={filters.cadence} aria-label={t("routine.cadence")} onChange={(event) => onChange({ ...filters, cadence: event.target.value as RoutineFilters["cadence"] })}>
-        <option value="all">{t("routine.all_cadences")}</option>
-        {TASK_ROUTINE_CADENCES.map((cadence) => <option key={cadence} value={cadence}>{t(`routine.cadences.${cadence}`)}</option>)}
-      </select>
-      <select name="routine-agent-filter" value={filters.agent} aria-label={t("backlog.agent")} onChange={(event) => onChange({ ...filters, agent: event.target.value as RoutineFilters["agent"] })}>
-        <option value="all">{t("backlog.all_agents")}</option>
-        {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.displayName}</option>)}
-      </select>
-      <input name="routine-assignee-filter" autoComplete="off" spellCheck={false} value={filters.assignee} placeholder={t("backlog.assignee_filter")} aria-label={t("backlog.assignee_filter")} onChange={(event) => onChange({ ...filters, assignee: event.target.value })} />
-      <select name="routine-state-filter" value={filters.state} aria-label={t("routine.state")} onChange={(event) => onChange({ ...filters, state: event.target.value as RoutineFilters["state"] })}>
-        <option value="all">{t("routine.all_states")}</option>
-        <option value="enabled">{t("routine.enabled")}</option>
-        <option value="disabled">{t("routine.disabled")}</option>
-        <option value="due">{t("routine.due")}</option>
-        <option value="unscheduled">{t("routine.unscheduled")}</option>
-      </select>
+      <FilterSelect
+        name="routine-type-filter"
+        label={t("routine.type")}
+        value={filters.type}
+        onValueChange={(type) => onChange({ ...filters, type })}
+        options={[
+          { value: "all" as const, label: t("routine.all_types") },
+          ...TASK_ROUTINE_TYPES.map((type) => ({ value: type, label: t(`routine.types.${type}`) })),
+        ]}
+      />
+      <FilterSelect
+        name="routine-cadence-filter"
+        label={t("routine.cadence")}
+        value={filters.cadence}
+        onValueChange={(cadence) => onChange({ ...filters, cadence })}
+        options={[
+          { value: "all" as const, label: t("routine.all_cadences") },
+          ...TASK_ROUTINE_CADENCES.map((cadence) => ({
+            value: cadence,
+            label: t(`routine.cadences.${cadence}`),
+          })),
+        ]}
+      />
+      <FilterSelect
+        name="routine-agent-filter"
+        label={t("backlog.agent")}
+        value={filters.agent}
+        onValueChange={(agent) => onChange({ ...filters, agent })}
+        options={[
+          { value: "all", label: t("backlog.all_agents") },
+          ...agents.map((agent) => ({ value: agent.id, label: agent.displayName })),
+        ]}
+      />
+      <Input name="routine-assignee-filter" autoComplete="off" spellCheck={false} value={filters.assignee} placeholder={t("backlog.assignee_filter")} aria-label={t("backlog.assignee_filter")} onChange={(event) => onChange({ ...filters, assignee: event.target.value })} />
+      <FilterSelect
+        name="routine-state-filter"
+        label={t("routine.state")}
+        value={filters.state}
+        onValueChange={(state) => onChange({ ...filters, state })}
+        options={[
+          { value: "all", label: t("routine.all_states") },
+          { value: "enabled", label: t("routine.enabled") },
+          { value: "disabled", label: t("routine.disabled") },
+          { value: "due", label: t("routine.due") },
+          { value: "unscheduled", label: t("routine.unscheduled") },
+        ]}
+      />
     </FiltersBar>
   );
 }

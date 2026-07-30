@@ -195,15 +195,14 @@
   padding: 0 var(--sp-7) var(--sp-3);
 }
 
-.backlog-filter-secondary select,
-.backlog-filter-secondary input {
-  min-height: var(--control-h);
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-0);
-  padding: 9px var(--sp-3);
-  color: var(--ink-1);
-  font: var(--type-body);
+/* Filters are <FilterSelect> (the shadcn Select) and <Input> now, so they carry
+   their own chrome. The rule they replaced bordered these fields with --line-1,
+   the *structural* hairline, where every other field in the app uses
+   --control-border — the role that roles.css requires to stay 3:1 against the
+   surface so an unfocused control is perceivable (WCAG 1.4.11). Only the grid
+   sizing belongs to this surface. */
+.backlog-filter-secondary > [data-slot="select-trigger"] {
+  width: 100%;
 }
 
 /* ── Pipeline board ──────────────────────────────────────────────────── */
@@ -1061,12 +1060,10 @@
   margin-right: auto;
 }
 
-/* .adm-field > span sets label typography; re-assert hint styling for hints
-   that are direct field children. */
-.adm-field > .adm-form-hint {
-  font: var(--type-body-sm);
-  color: var(--ink-3);
-}
+/* Removed with `.adm-field`: this re-asserted a 14px (--type-body-sm) hint for
+   hints that were direct field children, which made the task drawer's next-run
+   hint one step larger than every other field hint in the app. Field hints now
+   come through <Field hint> at the shared 13px. */
 
 /* ── Task drawer generated artifacts ──────────────────────────────── */
 
@@ -1778,7 +1775,8 @@
 
 /* The enabled switch is its own full-width row beneath the field grid — a
    horizontal label+control pair, not a grid cell. */
-.adm-field.routine-toggle {
+.routine-toggle {
+  display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;

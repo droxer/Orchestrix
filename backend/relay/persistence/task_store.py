@@ -17,12 +17,11 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
-    MetaData,
+    Index,
     Table,
     Text,
     UniqueConstraint,
     case,
-    create_engine,
     delete,
     insert,
     inspect,
@@ -44,6 +43,11 @@ from .store_common import (
     _write_json,
     database_id_column,
     entity_uuid_type,
+    create_all_tables,
+    json_type,
+    shared_engine,
+    store_transaction,
+    metadata as shared_metadata,
     materialize_task_events,
     new_database_id,
     now_iso,
@@ -478,7 +482,7 @@ class LocalTaskStore:
 
 
 class DatabaseTaskStore:
-    metadata = MetaData()
+    metadata = shared_metadata
 
     tasks = Table(
         "tasks",
@@ -490,19 +494,31 @@ class DatabaseTaskStore:
         Column("status", Text, nullable=False),
         Column("assigned_agent", Text, nullable=True),
         Column("assigned_agent_id", entity_uuid_type(), nullable=True),
-        Column("assigned_team_id", Text, nullable=True),
-        Column("owner_employee_id", Text, nullable=True),
-        Column("assignee_employee_id", Text, nullable=True),
+        Column("assigned_team_id", entity_uuid_type(), nullable=True),
+        Column("owner_employee_id", entity_uuid_type(), nullable=True),
+        Column("assignee_employee_id", entity_uuid_type(), nullable=True),
         Column("due_date", Date, nullable=True),
         Column("is_routine", Boolean, nullable=False, default=False),
         Column("routine_type", Text, nullable=True),
         Column("routine_cadence", Text, nullable=True),
         Column("routine_next_run_date", Date, nullable=True),
         Column("routine_enabled", Boolean, nullable=False, default=False),
-        Column("snapshot", JSON, nullable=False),
+        Column("snapshot", json_type(), nullable=False),
         Column("version", BigInteger, nullable=False),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
+        Index("ix_tasks_updated_at", "updated_at"),
+        Index("ix_tasks_status", "status"),
+        Index("ix_tasks_assigned_agent", "assigned_agent"),
+        Index("ix_tasks_assigned_agent_id", "assigned_agent_id"),
+        Index("ix_tasks_assigned_team_id", "assigned_team_id"),
+        Index("ix_tasks_owner_employee_id", "owner_employee_id"),
+        Index("ix_tasks_assignee_employee_id", "assignee_employee_id"),
+        Index("ix_tasks_due_date", "due_date"),
+        Index("ix_tasks_priority", "priority"),
+        Index("ix_tasks_is_routine", "is_routine"),
+        Index("ix_tasks_routine_next_run_date", "routine_next_run_date"),
+        Index("ix_tasks_routine_enabled", "routine_enabled"),
     )
     events = Table(
         "task_events",
@@ -517,8 +533,10 @@ class DatabaseTaskStore:
         Column("sequence", BigInteger, nullable=False),
         Column("type", Text, nullable=False),
         Column("timestamp", DateTime(timezone=True), nullable=False),
-        Column("payload", JSON, nullable=False),
+        Column("payload", json_type(), nullable=False),
         UniqueConstraint("task_id", "sequence", name="uq_task_events_task_sequence"),
+        Index("ix_task_events_task_id", "task_id"),
+        Index("ix_task_events_timestamp", "timestamp"),
     )
     task_sessions = Table(
         "task_sessions",
@@ -536,9 +554,9 @@ class DatabaseTaskStore:
     )
 
     def __init__(self, database_url: str, *, create_schema: bool = False):
-        self.engine = create_engine(database_url, future=True)
+        self.engine = shared_engine(database_url)
         if create_schema:
-            self.metadata.create_all(self.engine)
+            create_all_tables(self.engine)
 
     def verify_schema(self) -> None:
         schema = inspect(self.engine)
@@ -586,7 +604,7 @@ class DatabaseTaskStore:
         )
         events = task_creation_events(task_id, payload)
         task = materialize_task_events(events)
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             task_row = task_to_row(task, version=len(events))
             conn.execute(insert(self.tasks).values(**task_row))
             for sequence, event in enumerate(events):
@@ -627,7 +645,7 @@ class DatabaseTaskStore:
         *,
         skip_linked_session_id: str | None = None,
     ) -> dict[str, Any]:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             if skip_linked_session_id:
                 self._lock_session_for_link(conn, skip_linked_session_id)
             row = (
@@ -698,7 +716,7 @@ class DatabaseTaskStore:
             raise KeyError(f"Unknown session {session_id}.")
 
     def get_task(self, task_id: str) -> dict[str, Any]:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.tasks.c.snapshot).where(self.tasks.c.id == task_id)
@@ -711,7 +729,7 @@ class DatabaseTaskStore:
         return row["snapshot"]
 
     def list_tasks(self) -> list[dict[str, Any]]:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             rows = (
                 conn.execute(
                     select(self.tasks.c.snapshot).order_by(
@@ -735,7 +753,7 @@ class DatabaseTaskStore:
             today_date = _parse_date(today)
         except ValueError:
             return []
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             rows = (
                 conn.execute(
                     select(self.tasks.c.snapshot)
@@ -777,7 +795,7 @@ class DatabaseTaskStore:
                 self.tasks.c.created_at.asc(),
             )
         )
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             rows = conn.execute(statement).mappings().all()
         live = [row["snapshot"] for row in rows if not row["snapshot"].get("deletedAt")]
         return live[:limit] if limit is not None else live
@@ -811,7 +829,7 @@ class DatabaseTaskStore:
     def claim_task_for_dispatch(
         self, task_id: str, agent: AgentName, message: str | None = None
     ) -> dict[str, Any] | None:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.tasks.c.id, self.tasks.c.snapshot, self.tasks.c.version)
@@ -913,7 +931,7 @@ class DatabaseTaskStore:
         *,
         agent_override: AgentName | None = None,
     ) -> dict[str, Any] | None:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.tasks.c.id, self.tasks.c.snapshot, self.tasks.c.version)

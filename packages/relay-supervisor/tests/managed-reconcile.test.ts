@@ -3,8 +3,12 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { ManagedNodeReconciler, workspaceIdForManagedNode } from "../src/managed-reconcile.js";
-import { LocalProcessProvider } from "../src/providers.js";
+import {
+  ManagedNodeReconciler,
+  provisioningRetryDelayMs,
+  workspaceIdForManagedNode,
+} from "../src/managed-reconcile.js";
+import { LocalProcessProvider, managedDaemonEnv } from "../src/providers.js";
 import type { ControlPanelDaemonNodeRecord } from "relay-core";
 import type {
   EnsureManagedNodeInput,
@@ -92,8 +96,11 @@ class FakeProvider implements ManagedNodeProvider {
   readonly calls: EnsureManagedNodeInput[] = [];
   stopCalls = 0;
   status: "running" | "stopped" | "unknown" = "running";
+  /** Set to make `ensure` reject, exercising the provisioning backoff path. */
+  ensureError?: Error;
   async ensure(input: EnsureManagedNodeInput): Promise<ProviderInstance> {
     this.calls.push(input);
+    if (this.ensureError) throw this.ensureError;
     return { id: `${input.node.id}:${input.node.generation}` };
   }
   async inspect(): Promise<"running" | "stopped" | "unknown"> { return this.status; }
@@ -610,4 +617,98 @@ test("managed reconciler backs off when an active provider instance disappears",
     failed: 0,
   });
   assert.equal(provider.calls.length, 0);
+});
+
+test("managed daemon env drops ambient identity that would bypass enrollment", () => {
+  const previous = {
+    RELAY_SANDBOX_ID: process.env.RELAY_SANDBOX_ID,
+    RELAY_DAEMON_TOKEN: process.env.RELAY_DAEMON_TOKEN,
+    RELAY_EMPLOYEE_ID: process.env.RELAY_EMPLOYEE_ID,
+  };
+  process.env.RELAY_SANDBOX_ID = "sbx_stale";
+  process.env.RELAY_DAEMON_TOKEN = "stale_token";
+  process.env.RELAY_EMPLOYEE_ID = "stale_employee";
+  try {
+    const env = managedDaemonEnv({
+      node: managedNode(),
+      attempt: {
+        id: "attempt_1",
+        managedNodeId: "mnode_alice",
+        generation: 1,
+        attemptNumber: 1,
+        status: "pending",
+        startedAt: "2026-07-10T00:00:00Z",
+        updatedAt: "2026-07-10T00:00:00Z",
+      },
+      backendUrl: "http://127.0.0.1:8790",
+      enrollmentCredential: "grant.secret",
+      workspacePath: "/tmp/ws",
+      workspaceId: "employee:alice:home",
+    });
+
+    assert.equal(env.RELAY_SANDBOX_ID, undefined);
+    assert.equal(env.RELAY_DAEMON_TOKEN, undefined);
+    assert.equal(env.RELAY_DAEMON_NODE_TOKEN, undefined);
+    assert.equal(env.RELAY_EMPLOYEE_ID, undefined);
+    assert.equal(env.RELAY_ENROLLMENT_TOKEN, "grant.secret");
+    assert.equal(env.RELAY_WORKSPACE_ID, "employee:alice:home");
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
+test("provisioning retry delay grows exponentially and is capped", () => {
+  assert.equal(provisioningRetryDelayMs(1, 1_000, 60_000), 1_000);
+  assert.equal(provisioningRetryDelayMs(2, 1_000, 60_000), 2_000);
+  assert.equal(provisioningRetryDelayMs(4, 1_000, 60_000), 8_000);
+  assert.equal(provisioningRetryDelayMs(50, 1_000, 60_000), 60_000);
+});
+
+test("a failed provider ensure backs off instead of retrying every pass", async () => {
+  const node = managedNode();
+  const backend = new FakeManagedBackend([node]);
+  const provider = new FakeProvider();
+  provider.ensureError = new Error("provider is down");
+  let clock = Date.parse("2026-07-10T00:00:00Z");
+  const reconciler = new ManagedNodeReconciler({
+    backend,
+    providers: [provider],
+    backendUrl: "http://127.0.0.1:8790",
+    workspacePathForNode: () => "/tmp/ws",
+    retryBaseMs: 10_000,
+    retryMaxMs: 60_000,
+    now: () => clock,
+  });
+
+  const first = await reconciler.reconcileOnce();
+  assert.equal(first.failed, 1);
+  const failure = backend.updates.at(-1);
+  assert.equal(failure?.status, "failed");
+  assert.equal(failure?.retryAt, new Date(clock + 10_000).toISOString());
+
+  backend.attempts.push({
+    id: "attempt_1",
+    managedNodeId: node.id,
+    generation: 1,
+    attemptNumber: 1,
+    status: "failed",
+    retryAt: String(failure?.retryAt),
+    startedAt: "2026-07-10T00:00:00Z",
+    updatedAt: "2026-07-10T00:00:00Z",
+  });
+  node.activeAttemptId = undefined;
+
+  clock += 5_000;
+  const backedOff = await reconciler.reconcileOnce();
+  assert.equal(backedOff.failed, 0);
+  assert.equal(backedOff.skipped, 1);
+  assert.equal(provider.calls.length, 1);
+
+  clock += 10_000;
+  const resumed = await reconciler.reconcileOnce();
+  assert.equal(resumed.failed, 1);
+  assert.equal(provider.calls.length, 2);
 });

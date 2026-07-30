@@ -35,7 +35,13 @@
   gap: var(--sp-7);
 }
 
+/* Was `.adm-field team-member-fieldset`, borrowing the field stack from a class
+   that is now the <Field> component. A <legend> is not a <Label>, so it carries
+   the label type role here rather than inheriting it from a descendant rule. */
 .team-member-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1-5);
   border: 0;
   margin: 0;
   padding: 0;
@@ -43,6 +49,8 @@
 
 .team-member-fieldset legend {
   margin-bottom: var(--sp-2);
+  font: var(--type-label);
+  color: var(--ink-2);
 }
 
 .team-member-options {

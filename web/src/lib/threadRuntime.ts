@@ -128,6 +128,25 @@ export function threadRuntimeNodeId(
   return undefined;
 }
 
+/**
+ * Whether the computer a thread is pinned to is currently unreachable, so the
+ * thread list can badge the row. Threads with no resolvable computer (brand
+ * new, or predating node stamping with no agent placement) report false —
+ * there is nothing to point the indicator at. A pinned computer that has
+ * vanished from the fleet entirely counts as offline.
+ */
+export function threadNodeOffline(
+  session: ThreadRuntimeSession | undefined,
+  agents: readonly ThreadAgent[] = [],
+  nodes: readonly ThreadComputer[] = [],
+): boolean {
+  const nodeId = threadRuntimeNodeId(session, agents, nodes);
+  if (!nodeId) return false;
+  const node = nodes.find((item) => item.id === nodeId);
+  if (!node || node.retiredAt) return true;
+  return !node.online || node.stale;
+}
+
 export function threadNeedsRuntimeSelection(
   session: ThreadRuntimeSession | undefined,
   composingNew: boolean,

@@ -16,11 +16,9 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
-    MetaData,
     Table,
     Text,
     UniqueConstraint,
-    create_engine,
     delete,
     insert,
     inspect,
@@ -40,6 +38,11 @@ from .store_common import (
     _write_json,
     database_id_column,
     entity_uuid_type,
+    create_all_tables,
+    json_type,
+    shared_engine,
+    store_transaction,
+    metadata as shared_metadata,
     materialize_events,
     new_database_id,
     now_iso,
@@ -332,26 +335,29 @@ class LocalSessionStore:
 
 class DatabaseSessionStore:
     REQUIRED_SCHEMA_REVISION = "20260729_0043"
-    metadata = MetaData()
+    metadata = shared_metadata
 
     sessions = Table(
         "sessions",
         metadata,
         database_id_column(),
         Column("workspace_path", Text, nullable=False),
-        Column("owner_employee_id", Text, nullable=True),
+        Column("owner_employee_id", entity_uuid_type(), nullable=True),
         Column("title", Text, nullable=True),
         Column("task_goal", Text, nullable=False),
-        Column("participants", JSON, nullable=False),
+        Column("participants", json_type(), nullable=False),
         Column("status", Text, nullable=False),
         Column("phase", Text, nullable=False),
         Column("pending_decision", Text, nullable=True),
         Column("current_agent", Text, nullable=True),
-        Column("final_outcome", JSON, nullable=True),
-        Column("snapshot", JSON, nullable=False),
+        Column("final_outcome", json_type(), nullable=True),
+        Column("snapshot", json_type(), nullable=False),
         Column("version", BigInteger, nullable=False),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
+        Index("ix_sessions_updated_at", "updated_at"),
+        Index("ix_sessions_owner_employee_id", "owner_employee_id"),
+        Index("ix_sessions_status", "status"),
     )
     events = Table(
         "session_events",
@@ -366,10 +372,12 @@ class DatabaseSessionStore:
         Column("sequence", BigInteger, nullable=False),
         Column("type", Text, nullable=False),
         Column("timestamp", DateTime(timezone=True), nullable=False),
-        Column("payload", JSON, nullable=False),
+        Column("payload", json_type(), nullable=False),
         UniqueConstraint(
             "session_id", "sequence", name="uq_session_events_session_sequence"
         ),
+        Index("ix_session_events_session_id", "session_id"),
+        Index("ix_session_events_timestamp", "timestamp"),
     )
     artifacts = Table(
         "session_artifacts",
@@ -388,8 +396,9 @@ class DatabaseSessionStore:
         Column("content", Text, nullable=True),
         Column("content_type", Text, nullable=True),
         Column("byte_size", BigInteger, nullable=False),
-        Column("metadata", JSON, nullable=False),
+        Column("metadata", json_type(), nullable=False),
         Column("created_at", DateTime(timezone=True), nullable=False),
+        Index("ix_session_artifacts_session_id", "session_id"),
     )
     run_token_usage = Table(
         "session_run_token_usage",
@@ -399,7 +408,7 @@ class DatabaseSessionStore:
         # is permanently deleted so token-usage history survives.
         Column("session_id", entity_uuid_type(), nullable=False),
         Column("run_id", Text, nullable=False),
-        Column("owner_employee_id", Text, nullable=True),
+        Column("owner_employee_id", entity_uuid_type(), nullable=True),
         Column("task_goal", Text, nullable=True),
         Column("input_tokens", BigInteger, nullable=False),
         Column("output_tokens", BigInteger, nullable=False),
@@ -419,7 +428,7 @@ class DatabaseSessionStore:
         Column("session_id", entity_uuid_type(), nullable=False),
         Column("task_goal", Text, nullable=False),
         Column("title", Text, nullable=True),
-        Column("owner_employee_id", Text, nullable=True),
+        Column("owner_employee_id", entity_uuid_type(), nullable=True),
         Column("deleted_by", Text, nullable=True),
         Column("deleted_at", DateTime(timezone=True), nullable=False),
         UniqueConstraint("session_id", name="uq_session_tombstones_session"),
@@ -431,9 +440,9 @@ class DatabaseSessionStore:
         *,
         create_schema: bool = False,
     ):
-        self.engine = create_engine(database_url, future=True)
+        self.engine = shared_engine(database_url)
         if create_schema:
-            self.metadata.create_all(self.engine)
+            create_all_tables(self.engine)
 
     def verify_schema(self) -> None:
         """Fail startup before serving traffic when session migrations are absent."""
@@ -555,7 +564,7 @@ class DatabaseSessionStore:
                 )
             )
         session = materialize_events(events)
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             session_row = session_to_row(session, version=len(events))
             conn.execute(insert(self.sessions).values(**session_row))
             for sequence, event in enumerate(events):
@@ -578,7 +587,7 @@ class DatabaseSessionStore:
         """
         session = materialize_events(events)
         session_id = session["id"]
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             outcome = self._existing_import_outcome(conn, session_id, events)
             if outcome:
                 return outcome
@@ -663,7 +672,7 @@ class DatabaseSessionStore:
     def _append_event_once(
         self, session_id: str, event: dict[str, Any]
     ) -> dict[str, Any]:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(
@@ -710,7 +719,7 @@ class DatabaseSessionStore:
         return session
 
     def get_session(self, session_id: str) -> dict[str, Any]:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.sessions.c.snapshot).where(self.sessions.c.id == session_id)
@@ -723,7 +732,7 @@ class DatabaseSessionStore:
         return row["snapshot"]
 
     def delete_session(self, session_id: str, *, deleted_by: str | None = None) -> None:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.sessions.c.id, self.sessions.c.snapshot)
@@ -772,7 +781,7 @@ class DatabaseSessionStore:
     ) -> bool:
         if str(self.engine.url) != str(task_store.engine.url):
             raise RuntimeError("Session and task stores must use the same database.")
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             session_row = (
                 conn.execute(
                     select(self.sessions.c.id, self.sessions.c.snapshot)
@@ -826,7 +835,7 @@ class DatabaseSessionStore:
         return True
 
     def list_sessions(self) -> list[dict[str, Any]]:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             rows = (
                 conn.execute(
                     select(self.sessions.c.snapshot).order_by(
@@ -839,7 +848,7 @@ class DatabaseSessionStore:
         return [row["snapshot"] for row in rows]
 
     def list_token_usage(self) -> list[dict[str, Any]]:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             rows = (
                 conn.execute(
                     select(
@@ -899,7 +908,7 @@ class DatabaseSessionStore:
         if not self.get_session(session_id):
             raise KeyError(session_id)
         artifact, extension, body = self._new_artifact_record(session_id, payload)
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             session_pk = self._session_pk(conn, session_id)
             conn.execute(
                 insert(self.artifacts).values(
@@ -969,7 +978,7 @@ class DatabaseSessionStore:
         content: str | None,
     ) -> dict[str, Any]:
         event = relay_event("artifact.created", session_id, {"artifact": artifact})
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(
@@ -1015,7 +1024,7 @@ class DatabaseSessionStore:
 
     def read_artifact_content(self, session_id: str, artifact_id: str) -> bytes | None:
         """Return the stored snapshot bytes for an artifact, if one was kept."""
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             session_pk = self._session_pk(conn, session_id)
             row = (
                 conn.execute(
@@ -1036,7 +1045,7 @@ class DatabaseSessionStore:
         return str(row["content"]).encode("utf-8")
 
     def read_artifact(self, session_id: str, artifact_id: str) -> str:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             session_pk = self._session_pk(conn, session_id)
             row = (
                 conn.execute(

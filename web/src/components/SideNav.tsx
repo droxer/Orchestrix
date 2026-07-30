@@ -304,11 +304,14 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             <span
               className="sidenav-btn sidenav-overflow-item"
               data-nav="channels"
-              data-coming-soon="true"
+              role="button"
+              tabIndex={0}
               aria-disabled="true"
               aria-label={channelsHint}
               onMouseEnter={(e) => showNavTooltip(channelsHint, e.currentTarget)}
               onMouseLeave={hideNavTooltip}
+              onFocus={(e) => showNavTooltip(channelsHint, e.currentTarget)}
+              onBlur={hideNavTooltip}
             >
               <NavChannels size={18} />
               <span className="sidenav-label sr-only">{t("nav.channels")}</span>
@@ -402,7 +405,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
           aria-label={t("nav.more_label")}
           style={{ top: moreMenu.y, left: moreMenu.x }}
         >
-          <span className="sidenav-more-item" aria-disabled="true">
+          <span className="sidenav-more-item" role="menuitem" aria-disabled="true">
             <NavChannels size={16} />
             <span>{t("nav.channels")}</span>
             <span className="sidenav-badge" aria-hidden="true">{t("nav.coming_soon_short")}</span>

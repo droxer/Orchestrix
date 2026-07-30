@@ -12,6 +12,7 @@ from ..core.models import AGENT_NAMES
 from ..daemon_registry import public_sandbox_record
 from ..security.auth import require_admin_session
 from ..services.computer_names import normalize_computer_display_name, present_computer
+from ..services.employee_lifecycle import soft_delete_employee as soft_delete_employee_cascade
 from ..services.node_agents import (
     assert_node_agent_runs_drained,
     remove_node_agents,
@@ -69,7 +70,9 @@ def _managed_node_placeholder(node: dict[str, Any]) -> dict[str, Any]:
         "queuedCommandCount": 0,
         "activeRuns": [],
         "online": False,
-        "stale": True,
+        # Never seen a heartbeat, so staleness does not apply — the placeholder
+        # status (provisioning/stopped/failed) must survive visualStatus.
+        "stale": False,
         "provisioningPlaceholder": True,
         **({"lastError": last_error} if last_error else {}),
     }
@@ -159,41 +162,11 @@ async def soft_delete_employee(employee_id: str, request: Request, ctx: AppConte
     if not hasattr(ctx.auth_store, "soft_delete_employee"):
         raise HTTPException(400, "Employee soft-delete is not supported by this auth store.")
     try:
-        record = ctx.auth_store.soft_delete_employee(employee_id)
+        return soft_delete_employee_cascade(ctx, employee_id)
     except KeyError as error:
         raise HTTPException(404, "Employee not found.") from error
     except ValueError as error:
         raise HTTPException(409, str(error)) from error
-    affected_nodes = ctx.registry.unassign_employee_everywhere(employee_id)
-    removed_placements: list[str] = []
-    deleted_agents: list[str] = []
-    for agent in ctx.agent_store.list_agents(supervisor_employee_id=employee_id):
-        for placement in ctx.agent_placement_store.list_placements(agent_id=agent["id"]):
-            removed = ctx.agent_placement_store.update_placement(
-                placement["id"], {"desiredState": "removed"}
-            )
-            removed_placements.append(removed["id"])
-        deleted = ctx.agent_store.delete_agent(agent["id"])
-        remove_agent_from_teams(ctx.team_store, agent["id"], employee_id)
-        deleted_agents.append(deleted["id"])
-    deleted_managed_nodes: list[str] = []
-    for node in ctx.managed_node_store.list_nodes():
-        if node.get("employeeId") != employee_id:
-            continue
-        deleted = ctx.managed_node_store.update_node(
-            node["id"], {"desiredState": "deleted"}
-        )
-        daemon_node_id = deleted.get("activeDaemonNodeId")
-        if daemon_node_id and ctx.registry.get(daemon_node_id):
-            ctx.registry.fence_managed_node(daemon_node_id)
-        deleted_managed_nodes.append(deleted["id"])
-    return {
-        "employee": record,
-        "unassignedNodes": affected_nodes,
-        "deletedAgents": deleted_agents,
-        "removedPlacements": removed_placements,
-        "deletedManagedNodes": deleted_managed_nodes,
-    }
 
 
 @router.post("/admin/employees", status_code=201)

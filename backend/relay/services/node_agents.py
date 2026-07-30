@@ -42,10 +42,41 @@ def assert_node_agent_runs_drained(ctx: NodeAgentContext, node_id: str) -> None:
         )
 
 
+def employee_is_live(ctx: NodeAgentContext, employee_id: str) -> bool:
+    """Whether the employee exists and has not been soft-deleted.
+
+    `employees.deleted_at` only filters listings, so without this check a node
+    that keeps registering re-materializes compatibility agents for an employee
+    whose agents were just deleted.
+
+    `auth_store` is not part of NodeAgentContext, so it is read defensively —
+    test doubles and reduced contexts may not carry one.
+    """
+    auth_store = getattr(ctx, "auth_store", None)
+    if auth_store is None:
+        return True
+    if hasattr(auth_store, "list_employees"):
+        # list_employees already excludes soft-deleted rows.
+        return any(
+            employee.get("id") == employee_id
+            for employee in auth_store.list_employees()
+        )
+    if hasattr(auth_store, "deleted_employee_ids"):
+        return employee_id not in auth_store.deleted_employee_ids()
+    return True
+
+
 def sync_node_agents(ctx: NodeAgentContext, node: dict[str, Any]) -> None:
     """Materialize stable compatibility agents for legacy node capabilities."""
     employee_id = node.get("employeeId")
     if not employee_id:
+        return
+    if not employee_is_live(ctx, employee_id):
+        logger.info(
+            "Skipping agent sync for a deleted employee",
+            node_id=node.get("id"),
+            employee_id=employee_id,
+        )
         return
     supported = set(node.get("supportedAgents") or []) | set(node.get("agents") or {})
     disabled = set(node.get("disabledAgents") or [])
@@ -170,11 +201,41 @@ def _rebind_managed_node_placements(
             or agent.get("supervisorEmployeeId") != employee_id
         ):
             continue
+        if _belongs_to_other_computer(
+            agent, employee_id, managed_node_id, runtime_ids
+        ):
+            continue
         ctx.agent_placement_store.rebind_placement(
             placement["id"],
             node["id"],
             managed_node_id=managed_node_id,
         )
+
+
+def _belongs_to_other_computer(
+    agent: dict[str, Any],
+    employee_id: str,
+    managed_node_id: str,
+    runtime_ids: set[str],
+) -> bool:
+    """True when a compatibility agent stands in for a different Computer.
+
+    A compatibility agent represents one executor on one Computer, so a managed
+    Computer must never adopt one keyed to an employee device even if a
+    placement still carries a stale managedNodeId. Keys naming this Computer or
+    any of its own past runtimes are its own, and are still claimable — those
+    are what runtime replacement rebinds. Agents without a compatibility key
+    are not Computer-scoped and stay claimable too.
+    """
+    compatibility_key = agent.get("compatibilityKey")
+    executor_kind = agent.get("executorKind")
+    if not compatibility_key or not executor_kind:
+        return False
+    own_keys = {
+        _compatibility_key_for(employee_id, computer_id, executor_kind)
+        for computer_id in {managed_node_id, *runtime_ids}
+    }
+    return compatibility_key not in own_keys
 
 
 def _migrate_managed_compatibility_agent(

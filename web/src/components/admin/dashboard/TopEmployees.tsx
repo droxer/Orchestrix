@@ -2,6 +2,13 @@
 
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmployeeAvatar } from "../../EmployeeAvatar";
 import type { ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../../types";
 
@@ -36,12 +43,12 @@ export function TopEmployees({ employees, nodes, ranked, className }: TopEmploye
   }, [ranked, employees, nodes]);
 
   return (
-    <section className={`adm-dash-card${className ? ` ${className}` : ""}`}>
-      <header className="adm-dash-card-head">
-        <h2 className="adm-dash-card-title">{t("admin.v2.dash_top_title")}</h2>
-      </header>
+    <Card render={<section />} className={className}>
+      <CardHeader>
+        <CardTitle render={<h2 />}>{t("admin.v2.dash_top_title")}</CardTitle>
+      </CardHeader>
       {rows.length === 0 ? (
-        <p className="adm-dash-card-hint">{t("admin.v2.dash_top_empty")}</p>
+        <CardDescription>{t("admin.v2.dash_top_empty")}</CardDescription>
       ) : (
         <ol className="adm-dash-top-list">
           {rows.map((row, index) => (
@@ -64,6 +71,6 @@ export function TopEmployees({ employees, nodes, ranked, className }: TopEmploye
           ))}
         </ol>
       )}
-    </section>
+    </Card>
   );
 }

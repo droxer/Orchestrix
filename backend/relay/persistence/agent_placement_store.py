@@ -10,12 +10,13 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
-    MetaData,
+    Index,
     Table,
+    UniqueConstraint,
     Text,
-    create_engine,
     insert,
     select,
+    text,
     update,
 )
 
@@ -32,6 +33,11 @@ from .store_common import (
     _write_json,
     database_id_column,
     entity_uuid_type,
+    create_all_tables,
+    json_type,
+    shared_engine,
+    store_transaction,
+    metadata as shared_metadata,
     safe_name,
 )
 
@@ -102,10 +108,7 @@ class LocalAgentPlacementStore:
             if (
                 current.get("daemonNodeId") == daemon_node_id
                 and current.get("desiredState") == "active"
-                and (
-                    managed_node_id is None
-                    or current.get("managedNodeId") == managed_node_id
-                )
+                and current.get("managedNodeId") == managed_node_id
             ):
                 return current
             conflicts = [
@@ -118,17 +121,7 @@ class LocalAgentPlacementStore:
                 raise ValueError(
                     "Agent already has an active placement on this daemon node."
                 )
-            updated = {
-                **current,
-                "daemonNodeId": daemon_node_id,
-                "desiredState": "active",
-                **(
-                    {"managedNodeId": managed_node_id}
-                    if managed_node_id is not None
-                    else {}
-                ),
-                "updatedAt": now_iso(),
-            }
+            updated = _rebound_placement(current, daemon_node_id, managed_node_id)
             self._append(placement_id, "placement.rebound", updated)
             return updated
 
@@ -212,22 +205,65 @@ class LocalAgentPlacementStore:
 
 
 class DatabaseAgentPlacementStore:
-    metadata = MetaData()
+    # `supervisor_employee_id` and `executor_kind` are copied from the agent and
+    # have no refresh path, which is safe only because neither is patchable on
+    # an agent -- `update_agent` rejects both. `test_agent_placements` pins that,
+    # so making either mutable fails there rather than silently drifting every
+    # placement. `agent_version` does change and is synced by `sync_agent_version`.
+    metadata = shared_metadata
     placements = Table(
         "agent_placements",
         metadata,
         database_id_column(),
-        Column("agent_id", entity_uuid_type(), nullable=False, index=True),
-        Column("supervisor_employee_id", Text, nullable=False, index=True),
-        Column("daemon_node_id", entity_uuid_type(), nullable=False, index=True),
+        Column(
+            "agent_id",
+            entity_uuid_type(),
+            ForeignKey(
+                "agents.id", ondelete="CASCADE", name="fk_agent_placements_agent"
+            ),
+            nullable=False,
+            index=True,
+        ),
+        Column(
+            "supervisor_employee_id",
+            entity_uuid_type(),
+            ForeignKey(
+                "employees.id",
+                ondelete="RESTRICT",
+                name="fk_agent_placements_supervisor_employee",
+            ),
+            nullable=False,
+            index=True,
+        ),
+        Column(
+            "daemon_node_id",
+            entity_uuid_type(),
+            ForeignKey(
+                "daemon_nodes.id",
+                ondelete="CASCADE",
+                name="fk_agent_placements_node",
+            ),
+            nullable=False,
+            index=True,
+        ),
         Column("executor_kind", Text, nullable=False),
         Column("desired_state", Text, nullable=False),
         Column("priority", BigInteger, nullable=False),
         Column("agent_version", BigInteger, nullable=False),
-        Column("snapshot", JSON, nullable=False),
+        Column("snapshot", json_type(), nullable=False),
         Column("event_version", BigInteger, nullable=False),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
+        # An agent has at most one live placement per node. Previously held only
+        # by the advisory row lock taken in create_placement/rebind_placement.
+        Index(
+            "uq_agent_placements_live_agent_node",
+            "agent_id",
+            "daemon_node_id",
+            unique=True,
+            postgresql_where=text("desired_state <> 'removed'"),
+            sqlite_where=text("desired_state <> 'removed'"),
+        ),
     )
     events_table = Table(
         "agent_placement_events",
@@ -242,14 +278,17 @@ class DatabaseAgentPlacementStore:
         Column("sequence", BigInteger, nullable=False),
         Column("type", Text, nullable=False),
         Column("timestamp", DateTime(timezone=True), nullable=False),
-        Column("payload", JSON, nullable=False),
+        Column("payload", json_type(), nullable=False),
+        UniqueConstraint(
+            "placement_id", "sequence", name="uq_agent_placement_events_sequence"
+        ),
     )
 
     def __init__(self, database_url: str, *, create_schema: bool = False):
-        self.engine = create_engine(database_url, future=True)
+        self.engine = shared_engine(database_url)
         self._lock = RLock()
         if create_schema:
-            self.metadata.create_all(self.engine)
+            create_all_tables(self.engine)
 
     def create_placement(
         self,
@@ -258,7 +297,7 @@ class DatabaseAgentPlacementStore:
         payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         placement = _new_placement(agent, daemon_node_id, payload or {})
-        with self._lock, self.engine.begin() as conn:
+        with self._lock, store_transaction(self.engine) as conn:
             # Lock the durable agent row so concurrent placement moves for the
             # same agent serialize across backend replicas, including when the
             # agent currently has no placement rows to lock.
@@ -329,7 +368,7 @@ class DatabaseAgentPlacementStore:
         return placement
 
     def get_placement(self, placement_id: str) -> dict[str, Any] | None:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(
@@ -357,7 +396,7 @@ class DatabaseAgentPlacementStore:
     ) -> dict[str, Any]:
         daemon_node_id = _required_daemon_node_id(daemon_node_id)
         managed_node_id = _optional_managed_node_id(managed_node_id)
-        with self._lock, self.engine.begin() as conn:
+        with self._lock, store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(
@@ -380,10 +419,7 @@ class DatabaseAgentPlacementStore:
             if (
                 current.get("daemonNodeId") == daemon_node_id
                 and current.get("desiredState") == "active"
-                and (
-                    managed_node_id is None
-                    or current.get("managedNodeId") == managed_node_id
-                )
+                and current.get("managedNodeId") == managed_node_id
             ):
                 return current
             conflict = conn.execute(
@@ -398,17 +434,7 @@ class DatabaseAgentPlacementStore:
                 raise ValueError(
                     "Agent already has an active placement on this daemon node."
                 )
-            updated = {
-                **current,
-                "daemonNodeId": daemon_node_id,
-                "desiredState": "active",
-                **(
-                    {"managedNodeId": managed_node_id}
-                    if managed_node_id is not None
-                    else {}
-                ),
-                "updatedAt": now_iso(),
-            }
+            updated = _rebound_placement(current, daemon_node_id, managed_node_id)
             sequence = int(row["event_version"] or 0)
             event = _placement_event(placement_id, "placement.rebound", updated)
             conn.execute(
@@ -448,7 +474,7 @@ class DatabaseAgentPlacementStore:
             )
         if not include_removed:
             statement = statement.where(self.placements.c.desired_state != "removed")
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             rows = conn.execute(statement).mappings().all()
         return sorted(
             (
@@ -468,7 +494,7 @@ class DatabaseAgentPlacementStore:
             raise KeyError(placement_id)
         updated, event_type = _updated_placement(current, patch)
         event = _placement_event(placement_id, event_type, updated)
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.placements.c.id, self.placements.c.event_version)
@@ -498,7 +524,7 @@ class DatabaseAgentPlacementStore:
         return updated
 
     def events(self, placement_id: str) -> list[dict[str, Any]]:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             rows = (
                 conn.execute(
                     select(
@@ -534,7 +560,7 @@ class DatabaseAgentPlacementStore:
         self, placement_id: str, agent_version: int
     ) -> dict[str, Any]:
         """Advance the diagnostic realized version under the placement row lock."""
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(
@@ -703,6 +729,32 @@ def _optional_managed_node_id(value: Any) -> str | None:
     if not isinstance(value, str) or not value.strip():
         raise ValueError("managedNodeId must be a non-empty string.")
     return value.strip()
+
+
+def _rebound_placement(
+    current: dict[str, Any],
+    daemon_node_id: str,
+    managed_node_id: str | None,
+) -> dict[str, Any]:
+    """Bind a placement to a node, adopting that node's Computer identity.
+
+    ``managedNodeId`` records which Computer the placement's node belongs to,
+    so it is always rewritten from the target — including cleared when the
+    target is not managed. Leaving a stale value behind lets a managed node's
+    sync keep reclaiming a placement that now lives on an employee device,
+    which rebinds the placement back and forth between the two indefinitely.
+    """
+    updated = {
+        **current,
+        "daemonNodeId": daemon_node_id,
+        "desiredState": "active",
+        "updatedAt": now_iso(),
+    }
+    if managed_node_id is None:
+        updated.pop("managedNodeId", None)
+    else:
+        updated["managedNodeId"] = managed_node_id
+    return updated
 
 
 def create_node_placement(

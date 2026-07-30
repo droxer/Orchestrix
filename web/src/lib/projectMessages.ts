@@ -351,7 +351,7 @@ export function projectMessages(session: RelaySession | undefined, t: TFunction)
           timestamp: event.timestamp,
           tone: "info",
           label: t("message.decision", { kind: t(`decision.${event.decision.kind}`, { defaultValue: event.decision.kind }) }),
-          detail: event.decision.note,
+          detail: event.decision.kind === "cancel" ? t("message.cancelled") : event.decision.note,
         });
         break;
       }
