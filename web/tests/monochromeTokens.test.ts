@@ -72,8 +72,15 @@ describe("monochrome palette tokens", () => {
     // is working right now. Both registers clear WCAG AA for small text
     // (10.94:1 dark, 5.08:1 light) so an elapsed timer in --live is legible.
     assert.match(darkRegister, /--live:\s*#3ee08a;/);
-    assert.match(darkRegister, /--live-wash:\s*color-mix\(in srgb, var\(--live\) 7%, transparent\);/);
     assert.match(lightRegister, /--live:\s*#0b7a45;/);
+  });
+
+  it("offers no --live fill token", () => {
+    // The palette's own rule is "dot/border/text only, never fills". A
+    // --live-wash existed for exactly zero call sites and contradicted that
+    // rule by handing out a translucent fill; tint a ring (pulse-ring) or an
+    // ink instead. Guard the declaration so it cannot drift back in.
+    assert.doesNotMatch(palette, /--live-wash\s*:/, "--live is never a fill; do not reintroduce a wash token");
   });
 
   it("originates --live only in palette.css", () => {

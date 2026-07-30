@@ -937,7 +937,7 @@
 }
 
 /* ── Responsive ───────────────────────────────────────────────────── */
-@media (max-width: 1024px) {
+@media (max-width: 1040px) {
   .adm-content {
     grid-template-columns: minmax(0, 1fr);
   }

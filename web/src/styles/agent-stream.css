@@ -158,7 +158,7 @@
 /* In-message heading ladder stays under the 22px conversation title so a
    content heading never visually rivals the page title. Smooth steps down to
    the 14px body: 18 / 16 / 15 / 14. */
-.agent-prose h1 { font-size: 1.2857rem; } /* 18px */
+.agent-prose h1 { font-size: var(--fs-subhead); } /* 18px */
 .agent-prose h2 { font-size: var(--fs-heading); } /* 16px */
 .agent-prose h3 { font-size: var(--fs-4); } /* 15px */
 .agent-prose h4,

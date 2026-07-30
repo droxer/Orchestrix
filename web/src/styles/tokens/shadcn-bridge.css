@@ -53,6 +53,21 @@
   --radius-4xl: var(--r-4);
   --radius-full: var(--r-full);
 
+  /* Numeric step → p-4, gap-2, size-4, h-11, …
+     Tailwind builds these as calc(--spacing * N). Its stock 0.25rem assumes a
+     16px root; base.css pins the root to 87.5% (14px), which silently made
+     every numeric utility a 3.5px step — 12.5% under the --sp-* grid and on
+     fractional pixels (gap-2 → 7px, px-3 → 10.5px, gap-1.5 → 5.25px).
+     Pinning it to the --sp-1 step restores an exact 4px grid, so the numeric
+     scale and the named scale below become the same scale: N maps to --sp-N,
+     and the only legal half-steps are .5 → --sp-0-5 (2px) and 1.5 → --sp-1-5
+     (6px). 2.5 (10px) and 3.5 (14px) have no token — do not reintroduce them.
+     px, not rem, because the whole --sp-* scale is px: layout spacing holds
+     its rhythm while the *type* scale (--fs-*, all rem) does the scaling that
+     WCAG 1.4.4 asks for. Deriving this from 1rem instead lands the half-steps
+     on floats (1rem/3.5*1.5 = 5.99999px). */
+  --spacing: var(--sp-1);
+
   /* Spacing → p-md, gap-sm, … (named keys coexist with numeric p-4). */
   --spacing-xxs: var(--sp-1);
   --spacing-xs: var(--sp-2);

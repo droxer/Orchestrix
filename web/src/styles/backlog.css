@@ -245,7 +245,7 @@
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 60;
+  z-index: var(--z-float);
   max-width: 200px;
   overflow: hidden;
   border: 1px solid var(--line-1);
@@ -355,7 +355,7 @@
 }
 
 .backlog-task:hover {
-  border-color: color-mix(in srgb, var(--ink-1) 12%, var(--line-1));
+  border-color: var(--line-strong);
   background: var(--surface-1);
 }
 
@@ -364,7 +364,7 @@
 .backlog-task[data-dragging="true"] {
   content-visibility: visible;
   opacity: 0.45;
-  border-color: color-mix(in srgb, var(--ink-1) 30%, var(--line-1));
+  border-color: var(--line-drag);
   cursor: grabbing;
 }
 
@@ -566,13 +566,8 @@
   transform: translateY(-50%);
   border-radius: var(--r-full);
   border: 2px solid color-mix(in srgb, var(--status-accent) 8%, transparent);
-  animation: task-status-pulse var(--t-pulse) var(--ease) infinite;
+  animation: blink var(--t-pulse) var(--ease) infinite;
   pointer-events: none;
-}
-
-@keyframes task-status-pulse {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 1; }
 }
 
 /* The title is a Button, so it arrives with the primitive's `whitespace-nowrap`
@@ -693,7 +688,7 @@
 
 .backlog-task-actions button:not(.icon-button):hover:not(:disabled) {
   background: var(--surface-1);
-  border-color: color-mix(in srgb, var(--ink-1) 14%, var(--line-1));
+  border-color: var(--line-strong);
 }
 
 .backlog-task-actions button:disabled {
@@ -857,7 +852,7 @@
   border: 1px solid var(--line-1);
   border-radius: var(--r-3);
   background: var(--surface-1);
-  transition: border-color 160ms var(--ease), transform 160ms var(--ease);
+  transition: border-color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
 }
 
 .task-assignment-summary::before {
@@ -1413,7 +1408,7 @@
 }
 
 .backlog-row:hover {
-  background: color-mix(in srgb, var(--surface-1) 60%, transparent);
+  background: var(--row-hover);
 }
 
 .backlog-row[data-status="backlog"] { --row-accent: var(--ink-4); }
@@ -1450,13 +1445,8 @@
   inset: -5px;
   border-radius: var(--r-full);
   border: 2px solid color-mix(in srgb, var(--row-accent) 8%, transparent);
-  animation: task-status-pulse var(--t-pulse) var(--ease) infinite;
+  animation: blink var(--t-pulse) var(--ease) infinite;
   pointer-events: none;
-}
-
-@keyframes backlog-row-pulse {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 1; }
 }
 
 .backlog-row-title {
@@ -1601,7 +1591,7 @@
 
 .backlog-row-actions button:not(.icon-button):hover:not(:disabled) {
   background: var(--surface-1);
-  border-color: color-mix(in srgb, var(--ink-1) 14%, var(--line-1));
+  border-color: var(--line-strong);
 }
 
 .backlog-row-actions button:disabled {

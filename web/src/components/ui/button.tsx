@@ -33,12 +33,15 @@ const buttonVariants = cva(
       },
       size: {
         default:
-          "h-(--control-h) gap-1.5 px-3 has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5",
-        xs: "h-6 gap-1 rounded-md px-2 text-xs in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1 rounded-md px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
-        /* One step ABOVE `default`. It previously resolved to 36px against a
-           40px --control-h, so `lg` rendered smaller than the default size;
-           44px also clears --touch-target on fine pointers. */
+          "h-(--control-h) gap-1.5 px-3 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+        /* The text tier climbs with the size tier: xs 11px → sm 13px →
+           default 14px (the base `text-sm`). `sm` previously carried an
+           arbitrary text-[0.8rem] (11.2px), which put it BELOW xs's 13px and
+           inverted the ladder. */
+        xs: "h-6 gap-1 rounded-md px-2 text-micro in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
+        sm: "h-7 gap-1 rounded-md px-3 text-xs in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5",
+        /* One step ABOVE `default`: 44px against a 40px --control-h, which
+           also clears --touch-target on fine pointers. */
         lg: "h-11 gap-1.5 px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
         /* Drawer/footer call-to-action: full control height with stronger
            label typography. Replaces the old `.adm-form-actions` descendant

@@ -20,9 +20,13 @@
 
   /* Hairline under the pointer. Cards and rows that are themselves targets
      strengthen their edge on hover rather than washing their fill, so a hovered
-     card never reads as loud as a selected one. Was hand-mixed at four separate
-     card call sites before it became a role. */
+     card never reads as loud as a selected one. */
   --line-strong: color-mix(in srgb, var(--ink-1) 20%, var(--line-1));
+
+  /* The edge of a card being dragged — one step louder than --line-strong,
+     because a card under the pointer and a card in the user's hand must not
+     read the same. The only state allowed above the hover tier. */
+  --line-drag: color-mix(in srgb, var(--ink-1) 30%, var(--line-1));
 
   /* Interactive control boundary / unchecked track. Unlike structural
      hairlines, this role must remain at least 3:1 against every surface so an
