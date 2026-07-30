@@ -1,7 +1,7 @@
 # Backlog and Routine Task Deletion — Design
 
 **Date:** 2026-07-30
-**Status:** Proposed
+**Status:** Implemented
 **Scope:** Backlog tasks, assigned/routed tasks, and routine definitions in the
 web client and Python control plane
 

@@ -7,7 +7,11 @@ from tempfile import TemporaryDirectory
 import pytest
 from relay.persistence.session_store import DatabaseSessionStore
 from relay.persistence.store_common import relay_task_event
-from relay.persistence.task_store import DatabaseTaskStore, LocalTaskStore
+from relay.persistence.task_store import (
+    DatabaseTaskStore,
+    LocalTaskStore,
+    TaskExecutionActiveError,
+)
 from sqlalchemy import text
 
 
@@ -686,6 +690,13 @@ def assert_store_delete_hides_task_everywhere(store) -> None:
         {"title": "Dispatchable", "description": "", "priority": "high"}
     )
     assigned = store.assign_task(assigned["id"], "codex")
+    active = store.create_task(
+        {"title": "Claimed", "description": "", "priority": "normal"}
+    )
+    active = store.assign_task(active["id"], "codex")
+    assert store.claim_task_for_dispatch(active["id"], "codex") is not None
+    with pytest.raises(TaskExecutionActiveError, match="task_execution_active"):
+        store.delete_task(active["id"], reject_active_claim=True)
 
     deleted = store.delete_task(routine["id"], deleted_by="alice")
     assert deleted["deletedAt"]
@@ -703,6 +714,11 @@ def assert_store_delete_hides_task_everywhere(store) -> None:
 
     deleted_assigned = store.delete_task(assigned["id"], reject_active_claim=True)
     assert deleted_assigned["deletedAt"]
+
+    store.release_dispatch_claim(
+        active["id"], store.get_task(active["id"])["dispatchClaim"]["id"]
+    )
+    assert store.delete_task(active["id"], reject_active_claim=True)["deletedAt"]
 
     assert store.list_tasks() == []
     assert store.list_due_routines("2026-06-25") == []

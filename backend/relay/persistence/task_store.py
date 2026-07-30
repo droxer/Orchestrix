@@ -41,18 +41,24 @@ from .store_common import (
     _read_json,
     _read_jsonl,
     _write_json,
+    create_all_tables,
     database_id_column,
     entity_uuid_type,
-    create_all_tables,
     json_type,
-    shared_engine,
-    store_transaction,
-    metadata as shared_metadata,
     materialize_task_events,
     new_database_id,
     now_iso,
     relay_task_event,
+    shared_engine,
+    store_transaction,
 )
+from .store_common import (
+    metadata as shared_metadata,
+)
+
+
+class TaskExecutionActiveError(RuntimeError):
+    pass
 
 
 class _TaskWriteConflict(RuntimeError):
@@ -296,12 +302,28 @@ class LocalTaskStore:
         live = [task for task in tasks if not task.get("deletedAt")]
         return sorted(live, key=lambda item: item["updatedAt"], reverse=True)
 
-    def delete_task(self, task_id: str) -> dict[str, Any]:
-        task = self.get_task(task_id)
-        if task.get("deletedAt"):
-            return task
-        logger.info("Task deleted", task_id=task_id)
-        return self.append_event(task_id, relay_task_event("task.deleted", task_id, {}))
+    def delete_task(
+        self,
+        task_id: str,
+        *,
+        deleted_by: str | None = None,
+        reject_active_claim: bool = False,
+    ) -> dict[str, Any]:
+        with self._lock:
+            task = self.get_task(task_id)
+            if task.get("deletedAt"):
+                return task
+            if reject_active_claim and dispatch_claim_active(task):
+                raise TaskExecutionActiveError("task_execution_active")
+            logger.info("Task deleted", task_id=task_id, deleted_by=deleted_by)
+            return self.append_event(
+                task_id,
+                relay_task_event(
+                    "task.deleted",
+                    task_id,
+                    {"actorEmployeeId": deleted_by} if deleted_by else {},
+                ),
+            )
 
     def list_due_routines(self, today: str) -> list[dict[str, Any]]:
         tasks = [
@@ -738,6 +760,7 @@ class DatabaseTaskStore:
         events: list[dict[str, Any]],
         *,
         skip_linked_session_id: str | None = None,
+        reject_active_claim: bool = False,
     ) -> dict[str, Any]:
         for attempt in range(3):
             try:
@@ -745,6 +768,7 @@ class DatabaseTaskStore:
                     task_id,
                     events,
                     skip_linked_session_id=skip_linked_session_id,
+                    reject_active_claim=reject_active_claim,
                 )
             except (IntegrityError, _TaskWriteConflict):
                 if attempt == 2:
@@ -758,6 +782,7 @@ class DatabaseTaskStore:
         events: list[dict[str, Any]],
         *,
         skip_linked_session_id: str | None = None,
+        reject_active_claim: bool = False,
     ) -> dict[str, Any]:
         with store_transaction(self.engine) as conn:
             if skip_linked_session_id:
@@ -776,6 +801,11 @@ class DatabaseTaskStore:
             task_pk = row["id"]
             sequence = int(row["version"] or 0)
             current = row["snapshot"] or {}
+            deleting = any(event.get("type") == "task.deleted" for event in events)
+            if deleting and current.get("deletedAt"):
+                return current
+            if reject_active_claim and dispatch_claim_active(current):
+                raise TaskExecutionActiveError("task_execution_active")
             if skip_linked_session_id and skip_linked_session_id in current.get(
                 "linkedSessionIds", []
             ):
@@ -855,12 +885,28 @@ class DatabaseTaskStore:
             )
         return [row["snapshot"] for row in rows if not row["snapshot"].get("deletedAt")]
 
-    def delete_task(self, task_id: str) -> dict[str, Any]:
+    def delete_task(
+        self,
+        task_id: str,
+        *,
+        deleted_by: str | None = None,
+        reject_active_claim: bool = False,
+    ) -> dict[str, Any]:
         task = self.get_task(task_id)
         if task.get("deletedAt"):
             return task
-        logger.info("Database task deleted", task_id=task_id)
-        return self.append_event(task_id, relay_task_event("task.deleted", task_id, {}))
+        logger.info("Database task deleted", task_id=task_id, deleted_by=deleted_by)
+        return self.append_events(
+            task_id,
+            [
+                relay_task_event(
+                    "task.deleted",
+                    task_id,
+                    {"actorEmployeeId": deleted_by} if deleted_by else {},
+                )
+            ],
+            reject_active_claim=reject_active_claim,
+        )
 
     def list_due_routines(self, today: str) -> list[dict[str, Any]]:
         try:

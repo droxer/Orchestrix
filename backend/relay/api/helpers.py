@@ -335,6 +335,8 @@ def get_session_for_actor(store: Any, session_id: str, actor: dict[str, Any]) ->
 
 def get_task_for_actor(store: Any, task_id: str, actor: dict[str, Any]) -> dict[str, Any]:
     task = get_task_or_404(store, task_id)
+    if task.get("deletedAt"):
+        raise HTTPException(404, "Task not found.")
     if not actor_can_access_record(actor, task):
         raise HTTPException(403, "Task access denied.")
     return task

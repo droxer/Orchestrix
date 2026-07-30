@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Callable
-from datetime import datetime, timezone
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from threading import RLock, local
 from typing import Any
@@ -500,6 +500,8 @@ def _apply_task_status(task: dict[str, Any], event: dict[str, Any]) -> None:
 
 def _apply_task_deleted(task: dict[str, Any], event: dict[str, Any]) -> None:
     task["deletedAt"] = event["timestamp"]
+    if event.get("actorEmployeeId"):
+        task["deletedByEmployeeId"] = event["actorEmployeeId"]
 
 
 def _apply_task_session_linked(task: dict[str, Any], event: dict[str, Any]) -> None:

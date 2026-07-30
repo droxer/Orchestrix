@@ -39,6 +39,7 @@
     "admin_delete_employee": "無法刪除員工。請檢查連線後重試。",
     "copy_message": "無法複製訊息。請手動選取文字複製。",
     "delete_task": "無法刪除任務。請檢查連線後重試。",
+    "task_execution_active": "此任務仍有進行中的工作。請先取消或完成關聯話題，再刪除任務。",
     "save_team": "無法儲存團隊。請檢查成員後再試一次。",
     "delete_team": "無法刪除團隊。請檢查連線後重試。",
     "team_unavailable": "智能體團隊目前無法使用。",
@@ -253,7 +254,7 @@
     "delete_task": "刪除",
     "deleting": "正在刪除…",
     "delete_title": "刪除任務？",
-    "delete_body": "「{{title}}」將從待辦中移除，關聯的話題與執行歷史仍會保留。",
+    "delete_body": "「{{title}}」將從待辦中移除，關聯的話題、產物與執行歷史仍會保留。",
     "toast_deleted": "任務已刪除。"
   },
   "workspace": {
@@ -422,8 +423,10 @@
     "no_activity": "尚無執行紀錄。",
     "next_run_hint": "例行任務會在當天開始時執行，請選擇今天或之後的日期。",
     "enabled_hint": "關閉後排程將暫停，不會再派發執行。",
+    "delete_task": "刪除例行任務",
+    "deleting": "刪除中…",
     "delete_title": "刪除例行任務？",
-    "delete_body": "將刪除「{{title}}」及其排程，目前與過去的執行紀錄仍會保留在話題中。",
+    "delete_body": "將刪除「{{title}}」及其排程，且不會再次執行。既有執行紀錄與話題仍會保留。",
     "toast_deleted": "例行任務已刪除。"
   },
   "admin": {

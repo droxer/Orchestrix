@@ -42,6 +42,7 @@ import type {
   StartTaskResponse,
   UserRole,
   TaskArtifactsResponse,
+  TaskDeletionResponse,
   TaskMutationInput,
   TasksResponse,
   WorkspaceBriefResponse,
@@ -57,6 +58,7 @@ export class RelayApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    public readonly code?: string,
   ) {
     super(message);
   }
@@ -68,6 +70,14 @@ function apiErrorMessage(value: unknown): string | undefined {
   }
   if (value && typeof value === "object" && "message" in value && typeof value.message === "string") {
     return value.message;
+  }
+  return undefined;
+}
+
+function apiErrorCode(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && "code" in value && typeof value.code === "string") {
+    return value.code;
   }
   return undefined;
 }
@@ -115,7 +125,8 @@ export async function apiJson<T>(
     const message = apiErrorMessage(detail)
       ?? apiErrorMessage(error)
       ?? (text.trim() || response.statusText);
-    throw new RelayApiError(message, response.status);
+    const code = apiErrorCode(detail) ?? apiErrorCode(error);
+    throw new RelayApiError(message, response.status, code);
   }
   return parsed as T;
 }
@@ -530,8 +541,8 @@ export function updateTask(taskId: string, input: TaskMutationInput): Promise<Re
   });
 }
 
-export function deleteTask(taskId: string): Promise<RelayTask> {
-  return apiJson<RelayTask>(`/tasks/${encodeURIComponent(taskId)}`, {
+export function deleteTask(taskId: string): Promise<TaskDeletionResponse> {
+  return apiJson<TaskDeletionResponse>(`/tasks/${encodeURIComponent(taskId)}`, {
     method: "DELETE",
   });
 }

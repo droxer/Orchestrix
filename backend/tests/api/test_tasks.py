@@ -1126,8 +1126,12 @@ def test_assigned_task_rejects_run_assignment_override(monkeypatch) -> None:
             headers={"Authorization": "Bearer ui_token"},
         )
         assert registered.status_code == 200
-        assigned = _create_agent(client, "alice", executor_kind="codex", node_id="sbx_alice")
-        override = _create_agent(client, "alice", executor_kind="claude", node_id="sbx_alice")
+        assigned = _create_agent(
+            client, "alice", executor_kind="codex", node_id="sbx_alice"
+        )
+        override = _create_agent(
+            client, "alice", executor_kind="claude", node_id="sbx_alice"
+        )
         task = client.post(
             "/api/v1/tasks",
             json={
@@ -1370,19 +1374,14 @@ def test_task_delete_hides_task_from_list_and_get(monkeypatch) -> None:
         again = client.delete(f"/api/v1/tasks/{task_id}")
         assert again.status_code == 200
         assert again.json()["outcome"] == "already_deleted"
-        assert (
-            again.json()["task"]["deletedAt"]
-            == deleted.json()["task"]["deletedAt"]
-        )
+        assert again.json()["task"]["deletedAt"] == deleted.json()["task"]["deletedAt"]
 
         listed = client.get("/api/v1/tasks")
         assert listed.status_code == 200
         assert all(task["id"] != task_id for task in listed.json()["tasks"])
         assert client.get(f"/api/v1/tasks/{task_id}").status_code == 404
 
-        missing = client.delete(
-            "/api/v1/tasks/11111111-1111-4111-8111-111111111111"
-        )
+        missing = client.delete("/api/v1/tasks/11111111-1111-4111-8111-111111111111")
         assert missing.status_code == 404
 
 
@@ -1493,7 +1492,9 @@ def test_blocked_dispatch_reports_the_recorded_failure_not_progress(
     assert _unclaimable_dispatch(running, "claude")["code"] == "dispatch_in_progress"
 
     routine = {"status": "assigned", "isRoutine": True}
-    assert _unclaimable_dispatch(routine, "claude")["code"] == "routine_not_dispatchable"
+    assert (
+        _unclaimable_dispatch(routine, "claude")["code"] == "routine_not_dispatchable"
+    )
 
     mismatched = {"status": "assigned", "isRoutine": False, "assignedAgent": "codex"}
     assert _unclaimable_dispatch(mismatched, "claude")["code"] == "agent_mismatch"

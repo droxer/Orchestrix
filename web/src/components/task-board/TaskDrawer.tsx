@@ -533,7 +533,9 @@ export function TaskDrawer({
               disabled={busy}
               loading={deleting}
             >
-              {deleting ? t("backlog.deleting") : t("backlog.delete_task")}
+              {deleting
+                ? t(form.variant === "routine" ? "routine.deleting" : "backlog.deleting")
+                : t(form.variant === "routine" ? "routine.delete_task" : "backlog.delete_task")}
             </Button>
           ) : null}
           <Button type="button" variant="ghost" size="cta" onClick={onClose} disabled={busy}>

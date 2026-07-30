@@ -155,7 +155,7 @@ describe("apiJson", () => {
       () => apiJson("/api/v1/sandboxes"),
       (error) => error instanceof RelayApiError
         && error.status === 401
-        && (error as RelayApiError & { code?: string }).code === "Invalid token."
+        && error.code === "Invalid token."
         && error.message === "Invalid token.",
     );
   });
@@ -173,7 +173,7 @@ describe("apiJson", () => {
       () => deleteTask("task 1"),
       (error) => error instanceof RelayApiError
         && error.status === 409
-        && (error as RelayApiError & { code?: string }).code === "task_execution_active",
+        && error.code === "task_execution_active",
     );
   });
 
@@ -342,10 +342,7 @@ describe("apiJson", () => {
       });
     }) as typeof fetch;
 
-    const result = await deleteTask("task 1") as unknown as {
-      outcome: string;
-      task: { deletedAt?: string };
-    };
+    const result = await deleteTask("task 1");
 
     assert.equal(requestedUrl, "/api/v1/tasks/task%201");
     assert.equal(requestedMethod, "DELETE");

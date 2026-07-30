@@ -10,6 +10,7 @@ import {
   deleteSession,
   deleteTeam,
   deleteTask,
+  RelayApiError,
   recordDecision,
   renameSession,
   runSandbox,
@@ -133,7 +134,12 @@ export function useRelayMutations() {
   const deleteTaskMutation = useMutation({
     mutationFn: ({ taskId }: { taskId: string }) => deleteTask(taskId),
     onSuccess: () => void invalidateRelay(),
-    onError: onRelayError("Failed to delete task", "errors.delete_task"),
+    onError: (error: unknown) => {
+      const messageKey = error instanceof RelayApiError && error.code === "task_execution_active"
+        ? "errors.task_execution_active"
+        : "errors.delete_task";
+      onRelayError("Failed to delete task", messageKey)(error);
+    },
   });
 
   const assignTaskMutation = useMutation({

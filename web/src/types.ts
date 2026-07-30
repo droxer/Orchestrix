@@ -77,6 +77,11 @@ export interface TaskArtifactsResponse {
   artifacts: ArtifactIndexItem[];
 }
 
+export interface TaskDeletionResponse {
+  task: RelayTask;
+  outcome: "deleted" | "already_deleted";
+}
+
 export interface AgentArtifactsResponse {
   agentId: string;
   artifacts: ArtifactIndexItem[];
