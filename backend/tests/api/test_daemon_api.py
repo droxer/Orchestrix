@@ -108,6 +108,45 @@ def test_workspace_event_is_authorized_and_resolves_query_broker(monkeypatch) ->
         )
 
 
+def test_daemon_heartbeat_is_authenticated_and_returns_lease_policy(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        app.state.registry.register(
+            {
+                "sandboxId": "sbx_heartbeat",
+                "employeeId": "alice",
+                "token": "node_token",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+
+        response = client.post(
+            "/api/v1/daemon-nodes/sbx_heartbeat/heartbeat",
+            json={"activeCommandLeases": []},
+            headers={"Authorization": "Bearer node_token"},
+        )
+
+        assert response.status_code == 200
+        heartbeat = response.json()["heartbeat"]
+        assert heartbeat["intervalMs"] == 5_000
+        assert heartbeat["timeoutMs"] == 15_000
+        assert heartbeat["observedAt"]
+        assert (
+            client.post(
+                "/api/v1/daemon-nodes/sbx_heartbeat/heartbeat",
+                json={},
+                headers={"Authorization": "Bearer wrong"},
+            ).status_code
+            == 401
+        )
+
+
 def test_managed_node_provisioning_enrolls_runtime_with_single_use_grant(
     monkeypatch,
 ) -> None:
@@ -160,6 +199,7 @@ def test_managed_node_provisioning_enrolls_runtime_with_single_use_grant(
         assert enrollment.status_code == 201
         runtime = enrollment.json()
         assert runtime["sandboxMode"] == "boxlite"
+        assert runtime["heartbeat"] == {"intervalMs": 5_000, "timeoutMs": 15_000}
 
         duplicate = client.post(
             "/api/v1/daemon-node-enrollments",
@@ -182,6 +222,10 @@ def test_managed_node_provisioning_enrolls_runtime_with_single_use_grant(
         )
         assert registered.status_code == 200
         assert registered.json()["managedNodeId"] == managed_node["id"]
+        assert registered.json()["heartbeat"] == {
+            "intervalMs": 5_000,
+            "timeoutMs": 15_000,
+        }
 
         managed = client.get(f"/api/v1/admin/managed-nodes/{managed_node['id']}")
         assert managed.status_code == 200

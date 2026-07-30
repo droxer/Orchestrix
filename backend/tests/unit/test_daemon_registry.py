@@ -3455,6 +3455,131 @@ def test_daemon_poll_heartbeats_are_throttled_before_reaching_the_store() -> Non
         assert registry.sandboxes["sbx_alice"]["status"] == "ready"
 
 
+@pytest.mark.parametrize("node_location", ["employee-device", "managed"])
+def test_explicit_heartbeat_renews_local_and_managed_node_leases(
+    node_location: str,
+) -> None:
+    with TemporaryDirectory() as root:
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(
+            LocalSessionStore(root), daemon_store, liveness_timeout_ms=15_000
+        )
+        registry.register(
+            {
+                "sandboxId": f"node_{node_location}",
+                "employeeId": "alice",
+                "token": "node_token",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            },
+            authorized_node_location="employee-device",
+        )
+        node_id = f"node_{node_location}"
+        registry.sandboxes[node_id] = {
+            **registry.sandboxes[node_id],
+            "nodeLocation": node_location,
+            **({"managedNodeId": "computer_alice"} if node_location == "managed" else {}),
+            "status": "stopped",
+            "lastSeenAt": "2020-01-01T00:00:00.000Z",
+        }
+
+        heartbeat = registry.heartbeat(node_id, "node_token")
+
+        assert heartbeat["intervalMs"] == 5_000
+        assert heartbeat["timeoutMs"] == 15_000
+        assert heartbeat["observedAt"] != "2020-01-01T00:00:00.000Z"
+        assert registry.get(node_id)["status"] == "ready"
+        assert registry.get(node_id)["nodeLocation"] == node_location
+
+
+def test_retired_node_cannot_renew_explicit_heartbeat() -> None:
+    with TemporaryDirectory() as root:
+        registry = DaemonNodeRegistry(
+            LocalSessionStore(root), LocalDaemonStore(root)
+        )
+        registry.register(
+            {
+                "sandboxId": "node_retired",
+                "employeeId": "alice",
+                "token": "node_token",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        registry.sandboxes["node_retired"]["retiredAt"] = (
+            "2026-07-30T00:00:00.000Z"
+        )
+
+        with pytest.raises(PermissionError, match="Retired daemon node"):
+            registry.heartbeat("node_retired", "node_token")
+
+
+def test_durable_heartbeat_is_visible_to_another_registry_replica() -> None:
+    with TemporaryDirectory() as root:
+        daemon_store = LocalDaemonStore(root)
+        first = DaemonNodeRegistry(LocalSessionStore(root), daemon_store)
+        first.register(
+            {
+                "sandboxId": "node_shared",
+                "employeeId": "alice",
+                "token": "node_token",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        second = DaemonNodeRegistry(LocalSessionStore(root), daemon_store)
+        second.sandboxes["node_shared"] = {
+            **second.sandboxes["node_shared"],
+            "status": "stopped",
+            "lastSeenAt": "2020-01-01T00:00:00.000Z",
+        }
+
+        first.heartbeat("node_shared", "node_token")
+        [observed] = second.monitor_nodes()
+
+        assert observed["online"] is True
+        assert observed["stale"] is False
+        assert observed["status"] == "ready"
+
+
+def test_explicit_heartbeat_renews_active_command_leases() -> None:
+    class LeaseTrackingStore(LocalDaemonStore):
+        def __init__(self, root: str):
+            super().__init__(root)
+            self.renewals: list[tuple[str, list[tuple[str, str | None]], float]] = []
+
+        def renew_command_leases(self, node_id, leases, *, lease_seconds):
+            self.renewals.append((node_id, leases, lease_seconds))
+            return super().renew_command_leases(
+                node_id, leases, lease_seconds=lease_seconds
+            )
+
+    with TemporaryDirectory() as root:
+        daemon_store = LeaseTrackingStore(root)
+        registry = DaemonNodeRegistry(LocalSessionStore(root), daemon_store)
+        registry.register(
+            {
+                "sandboxId": "node_busy",
+                "employeeId": "alice",
+                "token": "node_token",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "busy",
+            }
+        )
+
+        registry.heartbeat(
+            "node_busy", "node_token", [("command_one", "lease_one")]
+        )
+
+        assert daemon_store.renewals == [
+            ("node_busy", [("command_one", "lease_one")], 60.0)
+        ]
+
+
 def test_node_monitoring_and_selection_use_grouped_store_queries() -> None:
     class CountingLocalDaemonStore(LocalDaemonStore):
         def __init__(self, root: str):

@@ -65,6 +65,16 @@ POST   /api/v1/admin/chat-integrations/{id}/webhook-secret-rotations
 DELETE /api/v1/admin/managed-nodes/{id}/record
 ```
 
+Daemon runtimes renew their backend-advertised liveness lease independently of
+command polling:
+
+```text
+POST /api/v1/daemon-nodes/{id}/heartbeat
+```
+
+The request is authenticated with the daemon node token and may include
+`activeCommandLeases` so liveness and delivery ownership renew together.
+
 Managed-node retry creates an attempt with `replaceActive: true`; draining
 patches `desiredState` to `stopped`. `tasks/claim-next` is retired and has no v1
 operation.

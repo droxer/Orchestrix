@@ -89,6 +89,29 @@ def active_command_leases(request: Request, lease_mode: str) -> list[tuple[str, 
     return leases
 
 
+def heartbeat_command_leases(body: dict[str, Any]) -> list[tuple[str, str | None]]:
+    leases: list[tuple[str, str | None]] = []
+    raw_leases = body.get("activeCommandLeases")
+    if not isinstance(raw_leases, list):
+        return leases
+    for raw in raw_leases:
+        if not isinstance(raw, dict):
+            continue
+        command_id = raw.get("commandId")
+        lease_id = raw.get("leaseId")
+        if not isinstance(command_id, str) or not command_id.strip():
+            continue
+        item = (
+            command_id.strip(),
+            lease_id.strip() if isinstance(lease_id, str) and lease_id.strip() else None,
+        )
+        if item not in leases:
+            leases.append(item)
+        if len(leases) >= MAX_ACTIVE_COMMAND_IDS:
+            break
+    return leases
+
+
 @router.get("/daemon-nodes")
 async def list_daemon_nodes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     token = bearer_token(request)
@@ -252,13 +275,38 @@ async def register_daemon_node(request: Request, ctx: AppContextDep) -> dict[str
             employee_id=sandbox.get("employeeId"),
             status=sandbox.get("status"),
         )
-        return sandbox
+        return {**sandbox, "heartbeat": ctx.registry.heartbeat_settings()}
     except PermissionError as error:
         logger.warning("Daemon node registration denied", sandbox_id=body.get("sandboxId"), error=str(error))
         raise HTTPException(401, str(error))
     except Exception as error:
         logger.warning("Daemon node registration failed", sandbox_id=body.get("sandboxId"), error=str(error))
         raise HTTPException(400, str(error))
+
+
+@router.post("/daemon-nodes/{sandbox_id}/heartbeat")
+async def daemon_heartbeat(
+    sandbox_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    """Renew a daemon lease independently of command and event traffic."""
+    body = await json_body(request)
+    try:
+        return {
+            "heartbeat": ctx.registry.heartbeat(
+                sandbox_id,
+                bearer_token(request),
+                heartbeat_command_leases(body),
+            )
+        }
+    except PermissionError as error:
+        logger.warning(
+            "Daemon node heartbeat unauthorized",
+            sandbox_id=sandbox_id,
+            error=str(error),
+        )
+        raise HTTPException(401, str(error))
+    except KeyError as error:
+        raise HTTPException(404, str(error))
 
 
 @router.get("/daemon-nodes/{sandbox_id}/commands")

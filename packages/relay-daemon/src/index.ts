@@ -7,7 +7,10 @@ import type {
   DaemonNodeCommand,
   DaemonNodeEvent,
   DaemonAgentHealth,
+  DaemonNodeHeartbeatResponse,
+  DaemonNodeHeartbeatSettings,
   DaemonNodeRegistration,
+  DaemonNodeRegistrationResponse,
   DaemonNodeRunCommand,
   DaemonNodeSandboxMode,
   AgentName,
@@ -58,6 +61,10 @@ export interface DaemonRuntimeOptions {
   pollIntervalMs?: number;
   commandPollWaitMs?: number;
   commandLeaseSeconds?: number;
+  /** How often the daemon renews its liveness lease. The backend-advertised
+   * cadence is used by default. */
+  livenessHeartbeatIntervalMs?: number;
+  /** How often capabilities and local agent inventory are re-registered. */
   heartbeatIntervalMs?: number;
   inventoryDiscoveryTimeoutMs?: number;
   fetchFn?: typeof fetch;
@@ -128,12 +135,14 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   const enrollmentToken = options.enrollmentToken ?? process.env.RELAY_ENROLLMENT_TOKEN;
   let enrolledToken: string | undefined;
   let enrolledSandboxMode: string | undefined;
+  let enrolledHeartbeatSettings: DaemonNodeHeartbeatSettings | undefined;
   if (!sandboxId && enrollmentToken) {
     const enrollment = await enrollManagedDaemon(fetchFn, backendUrl, enrollmentToken, workspacePath, options.signal);
     sandboxId = enrollment.sandboxId;
     enrolledToken = enrollment.token;
     configuredEmployeeId = configuredEmployeeId ?? enrollment.employeeId;
     enrolledSandboxMode = enrollment.sandboxMode;
+    enrolledHeartbeatSettings = validHeartbeatSettings(enrollment.heartbeat);
   }
   if (!sandboxId) throw new Error("RELAY_SANDBOX_ID or RELAY_ENROLLMENT_TOKEN is required for the relay daemon.");
   const effectiveEmployeeId = configuredEmployeeId ?? employeeId;
@@ -163,7 +172,9 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     sandboxId,
     logDir: options.logDir,
   });
-  const heartbeatIntervalMs = options.heartbeatIntervalMs ?? positiveIntEnv("RELAY_DAEMON_HEARTBEAT_MS") ?? positiveIntEnv("RELAY_DAEMON_NODE_HEARTBEAT_MS") ?? 5 * 60_000;
+  const registrationRefreshIntervalMs = options.heartbeatIntervalMs ?? positiveIntEnv("RELAY_DAEMON_HEARTBEAT_MS") ?? positiveIntEnv("RELAY_DAEMON_NODE_HEARTBEAT_MS") ?? 5 * 60_000;
+  const configuredLivenessHeartbeatIntervalMs = options.livenessHeartbeatIntervalMs
+    ?? positiveIntEnv("RELAY_DAEMON_LIVENESS_HEARTBEAT_MS");
   const inventoryDiscoveryTimeoutMs = options.inventoryDiscoveryTimeoutMs ?? positiveIntEnv("RELAY_DAEMON_INVENTORY_TIMEOUT_MS") ?? 10_000;
   const environment = options.environment ?? createExecutionEnvironment(sandboxMode, sandboxId, workspacePath, logger);
   let health: DaemonHealthState | undefined;
@@ -220,18 +231,23 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     runCapacityByMode,
     status: status ?? (activeRuns.size > 0 ? "busy" : "ready"),
   });
-  const register = async (): Promise<void> => {
+  const register = async (): Promise<DaemonNodeHeartbeatSettings | undefined> => {
     const url = relayApiUrl(backendUrl, "/daemon-node-registrations");
     try {
-      await postJson(fetchFn, url, buildRegistration(), undefined, runtimeSignal);
+      const response = await postJsonResponse<DaemonNodeRegistrationResponse>(
+        fetchFn, url, buildRegistration(), undefined, runtimeSignal,
+      );
+      return validHeartbeatSettings(response.heartbeat);
     } catch (error) {
       if (
         error instanceof DaemonHttpError &&
         error.status === 400 &&
         error.message.includes("employeeId is required for unprovisioned daemon node registration")
       ) {
-        await postJson(fetchFn, url, buildRegistration(true), undefined, runtimeSignal);
-        return;
+        const response = await postJsonResponse<DaemonNodeRegistrationResponse>(
+          fetchFn, url, buildRegistration(true), undefined, runtimeSignal,
+        );
+        return validHeartbeatSettings(response.heartbeat);
       }
       throw error;
     }
@@ -284,9 +300,16 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     }
     return;
   }
+  let heartbeatTask: Promise<void> | undefined;
   try {
     const reconnectControl = { signal: runtimeSignal, shouldStop: () => stopping };
-    await withBackendReconnect(register, logger, { sandboxId, what: "registration" }, reconnectControl);
+    const initialHeartbeatSettings = await withBackendReconnect(
+      register, logger, { sandboxId, what: "registration" }, reconnectControl,
+    );
+    let livenessHeartbeatIntervalMs = configuredLivenessHeartbeatIntervalMs
+      ?? initialHeartbeatSettings?.intervalMs
+      ?? enrolledHeartbeatSettings?.intervalMs
+      ?? DEFAULT_LIVENESS_HEARTBEAT_MS;
     let lastRegisteredAt = Date.now();
     logger.info("daemon registered", { sandboxId, employeeId: effectiveEmployeeId, workspacePath, backendUrl, logPath: logger.logPath });
     setHealth("registered");
@@ -298,21 +321,71 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     }
 
     setHealth("polling");
+    const updateHeartbeatSettings = (settings: DaemonNodeHeartbeatSettings | undefined): void => {
+      if (!settings) return;
+      if (configuredLivenessHeartbeatIntervalMs === undefined) {
+        livenessHeartbeatIntervalMs = settings.intervalMs;
+      }
+    };
+    const sendHeartbeat = async (): Promise<void> => {
+      const url = relayApiUrl(backendUrl, `/daemon-nodes/${encodeURIComponent(sandboxId)}/heartbeat`);
+      try {
+        const response = await postJsonResponse<DaemonNodeHeartbeatResponse>(
+          fetchFn,
+          url,
+          {
+            activeCommandLeases: [...activeRuns.values()].map(({ command }) => ({
+              commandId: command.id,
+              ...(command.leaseId ? { leaseId: command.leaseId } : {}),
+            })),
+          },
+          token,
+          runtimeSignal,
+        );
+        updateHeartbeatSettings(validHeartbeatSettings(response.heartbeat));
+      } catch (error) {
+        // Rolling upgrades may briefly put a new daemon behind an older
+        // backend. Registration remains the compatibility heartbeat.
+        if (error instanceof DaemonHttpError && error.status === 404) {
+          updateHeartbeatSettings(await register());
+          lastRegisteredAt = Date.now();
+          return;
+        }
+        throw error;
+      }
+    };
+    heartbeatTask = (async () => {
+      while (!stopping && !runtimeSignal.aborted) {
+        await delay(livenessHeartbeatIntervalMs, runtimeSignal);
+        if (stopping || runtimeSignal.aborted) return;
+        await withBackendReconnect(
+          sendHeartbeat,
+          logger,
+          { sandboxId, what: "liveness heartbeat" },
+          reconnectControl,
+        );
+      }
+    })().catch((error: unknown) => {
+      if (stopping || runtimeSignal.aborted || error instanceof DaemonStoppedError) return;
+      logger.error("liveness heartbeat stopped", {
+        sandboxId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
     const cancellationTerminalEventSignal = (): AbortSignal | undefined =>
       stopping ? AbortSignal.timeout(SHUTDOWN_TERMINAL_EVENT_TIMEOUT_MS) : undefined;
     while (!stopping) {
       let completedEmptyLongPoll = false;
       const body = await withBackendReconnect(async () => {
         if (stopping) return { commands: [] };
-        // Heartbeat re-registration keeps a restarted backend current on this
-        // node's agent roster and busy/ready status without waiting for a poll
-        // rejection.
-        if (Date.now() - lastRegisteredAt >= heartbeatIntervalMs) {
+        // Capability re-registration refreshes agent inventory independently
+        // of the lightweight liveness heartbeat.
+        if (Date.now() - lastRegisteredAt >= registrationRefreshIntervalMs) {
           if (sandboxMode === "none") {
             agentHealth = await discoverDaemonAgentHealth(environment, logger, sandboxId, runtimeSignal);
             agentInventory = await discoverAgentInventory(environment.execStream, runtimeSignal, inventoryDiscoveryTimeoutMs);
           }
-          await register();
+          updateHeartbeatSettings(await register());
           lastRegisteredAt = Date.now();
         }
         const commandPollStartedAt = performance.now();
@@ -463,6 +536,8 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     }
     throw error;
   } finally {
+    if (!shutdownController.signal.aborted) shutdownController.abort("Daemon loop ended.");
+    await heartbeatTask;
     cleanupShutdownListeners();
   }
 }
@@ -1220,6 +1295,7 @@ const SHUTDOWN_TERMINAL_EVENT_TIMEOUT_MS = 500;
 const SIGKILL_DELAY_MS = 5_000;
 const DEFAULT_COMMAND_POLL_WAIT_MS = 25_000;
 const MAX_COMMAND_POLL_WAIT_MS = 25_000;
+const DEFAULT_LIVENESS_HEARTBEAT_MS = 5_000;
 const MAX_COMMAND_LEASE_SECONDS = 60 * 60;
 const DEFAULT_COMMAND_LEASE_SECONDS = 90;
 
@@ -1247,6 +1323,7 @@ interface ManagedDaemonEnrollment {
   token: string;
   employeeId?: string;
   sandboxMode?: DaemonNodeSandboxMode;
+  heartbeat?: DaemonNodeHeartbeatSettings;
 }
 
 async function enrollManagedDaemon(
@@ -1323,6 +1400,27 @@ async function withBackendReconnect<T>(
 }
 
 async function postJson(fetchFn: typeof fetch, url: string, body: unknown, token?: string, signal?: AbortSignal): Promise<void> {
+  await postJsonRequest(fetchFn, url, body, token, signal);
+}
+
+async function postJsonResponse<T>(
+  fetchFn: typeof fetch,
+  url: string,
+  body: unknown,
+  token?: string,
+  signal?: AbortSignal,
+): Promise<T> {
+  const response = await postJsonRequest(fetchFn, url, body, token, signal);
+  return await response.json() as T;
+}
+
+async function postJsonRequest(
+  fetchFn: typeof fetch,
+  url: string,
+  body: unknown,
+  token?: string,
+  signal?: AbortSignal,
+): Promise<Response> {
   const response = await fetchFn(url, {
     method: "POST",
     headers: {
@@ -1335,6 +1433,15 @@ async function postJson(fetchFn: typeof fetch, url: string, body: unknown, token
   if (!response.ok) {
     throw new DaemonHttpError(`POST ${url} failed: ${response.status} ${await response.text()}`, response.status);
   }
+  return response;
+}
+
+function validHeartbeatSettings(
+  value: DaemonNodeHeartbeatSettings | undefined,
+): DaemonNodeHeartbeatSettings | undefined {
+  if (!value || !Number.isFinite(value.intervalMs) || value.intervalMs <= 0) return undefined;
+  if (!Number.isFinite(value.timeoutMs) || value.timeoutMs <= value.intervalMs) return undefined;
+  return value;
 }
 
 const EVENT_POST_RETRY_INITIAL_DELAY_MS = 200;
