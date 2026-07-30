@@ -449,8 +449,11 @@ Example response:
 ### Existing daemon-node API
 
 `GET /api/v1/admin/daemon-nodes` remains the observed fleet view and adds the nullable
-`managedNodeId`. Existing heartbeat, command polling, command leases, and run
-event endpoints remain unchanged after enrollment.
+`managedNodeId`. Both manual and managed runtimes renew the same explicit
+heartbeat lease through `POST /api/v1/daemon-nodes/{id}/heartbeat`; the managed
+reconciler alone decides whether expiry should replace infrastructure. Command
+polling remains a compatibility liveness signal and continues renewing command
+leases for older daemons.
 
 The current `POST /api/v1/admin/daemon-nodes` is retained for manual
 enrollment only. It should be renamed or replaced with an explicit manual-node

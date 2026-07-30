@@ -569,6 +569,7 @@ class DaemonNodeRegistry:
         return self.sandboxes.get(sandbox_id)
 
     def list_ready(self) -> list[dict[str, Any]]:
+        self._refresh_persisted_liveness()
         if not self.sandboxes:
             return []
         active_runs_by_node = self._active_runs_by_node()
@@ -600,6 +601,7 @@ class DaemonNodeRegistry:
         logger.debug("Daemon node status updated", sandbox_id=sandbox_id, status=status)
 
     def monitor_nodes(self) -> list[dict[str, Any]]:
+        self._refresh_persisted_liveness()
         self.reap_stale_runs(force=False)
         active_runs_by_node = self._active_runs_by_node()
         queued_counts = self.daemon_store.queued_command_counts()
@@ -956,6 +958,7 @@ class DaemonNodeRegistry:
     def find_by_employee(
         self, employee_id: str, workspace_path: str | None = None
     ) -> dict[str, Any] | None:
+        self._refresh_persisted_liveness()
         matches = [
             sandbox
             for sandbox in self.sandboxes.values()
@@ -1011,6 +1014,7 @@ class DaemonNodeRegistry:
         )
 
     def is_live(self, sandbox_id: str) -> bool:
+        self._refresh_persisted_liveness(sandbox_id)
         sandbox = self.sandboxes.get(sandbox_id)
         return bool(sandbox and self._liveness(sandbox)["online"])
 
@@ -1063,6 +1067,46 @@ class DaemonNodeRegistry:
                 lease_seconds=lease_seconds,
                 renew_known_active=renew_known_active,
             )
+
+    def heartbeat_settings(self) -> dict[str, int]:
+        """Return the server-owned lease policy advertised to every daemon."""
+        return {
+            "intervalMs": max(1, self.liveness_timeout_ms // 3),
+            "timeoutMs": self.liveness_timeout_ms,
+        }
+
+    def heartbeat(
+        self,
+        sandbox_id: str,
+        token: str | None,
+        command_leases: list[tuple[str, str | None]] | None = None,
+        *,
+        lease_seconds: float = DAEMON_COMMAND_LEASE_SECONDS,
+    ) -> dict[str, Any]:
+        """Renew node liveness and any run leases through one explicit seam.
+
+        Command polling and run events still count as observations for older
+        daemons, but new daemons no longer depend on either traffic pattern to
+        remain live. Both employee-device and managed nodes use this contract;
+        infrastructure recovery remains a managed-node policy concern.
+        """
+        with self.dispatch_lock:
+            self._assert_authorized(sandbox_id, token)
+            sandbox = self.sandboxes[sandbox_id]
+            if sandbox.get("retiredAt"):
+                raise PermissionError("Retired daemon node cannot renew its lease.")
+            self._mark_seen(sandbox_id)
+            if command_leases:
+                self._renew_command_leases(
+                    sandbox_id,
+                    command_leases,
+                    lease_seconds=lease_seconds,
+                )
+            observed = self.sandboxes[sandbox_id]
+            return {
+                "observedAt": observed["lastSeenAt"],
+                **self.heartbeat_settings(),
+            }
 
     def _take_commands_unlocked(
         self,
@@ -1126,6 +1170,17 @@ class DaemonNodeRegistry:
         self._mark_seen(sandbox_id)
         if not command_leases:
             return
+        self._renew_command_leases(
+            sandbox_id, command_leases, lease_seconds=lease_seconds
+        )
+
+    def _renew_command_leases(
+        self,
+        sandbox_id: str,
+        command_leases: list[tuple[str, str | None]],
+        *,
+        lease_seconds: float,
+    ) -> None:
         # The durable store, not this registry replica's memory, is the source
         # of truth for command ownership. A poll may land on a different
         # backend process from the one that dispatched the command.
@@ -2389,6 +2444,37 @@ class DaemonNodeRegistry:
             }
         for run in active_runs:
             self.active_commands[run["commandId"]] = {**run, "sandboxId": run["nodeId"]}
+
+    def _refresh_persisted_liveness(self, sandbox_id: str | None = None) -> None:
+        """Merge newer durable lease observations from another backend replica."""
+        with self.dispatch_lock:
+            persisted_nodes = (
+                [self.daemon_store.get_node(sandbox_id)]
+                if sandbox_id
+                else self.daemon_store.list_nodes()
+            )
+            for persisted in persisted_nodes:
+                if not persisted:
+                    continue
+                current = self.sandboxes.get(persisted["id"])
+                if not current:
+                    continue
+                persisted_seen = persisted.get("lastSeenAt") or ""
+                current_seen = current.get("lastSeenAt") or ""
+                if persisted_seen <= current_seen:
+                    continue
+                refreshed = {
+                    **current,
+                    "lastSeenAt": persisted_seen,
+                    "updatedAt": persisted.get("updatedAt")
+                    or current.get("updatedAt"),
+                    "status": persisted.get("status", current.get("status")),
+                }
+                if persisted.get("lastError"):
+                    refreshed["lastError"] = persisted["lastError"]
+                else:
+                    refreshed.pop("lastError", None)
+                self.sandboxes[persisted["id"]] = refreshed
 
     def _liveness(self, sandbox: dict[str, Any]) -> dict[str, Any]:
         if sandbox.get("status") == "stopped" or not sandbox.get("lastSeenAt"):

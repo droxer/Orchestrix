@@ -294,6 +294,7 @@ async def enroll_managed_daemon(request: Request, ctx: AppContextDep) -> dict[st
                 else {}
             ),
             "sandboxMode": daemon_node.get("sandboxMode") or "boxlite",
+            "heartbeat": ctx.registry.heartbeat_settings(),
         }
     except PermissionError as error:
         raise HTTPException(401, str(error)) from error

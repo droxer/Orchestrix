@@ -98,6 +98,27 @@ export interface DaemonNodeRegistration {
   status?: DaemonNodeStatus;
 }
 
+export interface DaemonNodeHeartbeatSettings {
+  /** Recommended renewal cadence chosen by the backend. */
+  intervalMs: number;
+  /** Time since the last accepted observation before the node is offline. */
+  timeoutMs: number;
+  /** Backend timestamp for the accepted renewal. */
+  observedAt?: string;
+}
+
+export interface DaemonNodeHeartbeat {
+  activeCommandLeases: Array<{ commandId: string; leaseId?: string }>;
+}
+
+export interface DaemonNodeRegistrationResponse {
+  heartbeat?: DaemonNodeHeartbeatSettings;
+}
+
+export interface DaemonNodeHeartbeatResponse {
+  heartbeat: DaemonNodeHeartbeatSettings;
+}
+
 export interface DaemonNodeRunCommand {
   id: string;
   type: "run.start";

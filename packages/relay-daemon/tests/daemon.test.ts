@@ -675,6 +675,56 @@ test("local node refreshes agent availability before heartbeat registration", as
   assert.equal(registrations[1].supportedAgents.includes("codex"), true);
 });
 
+test("daemon renews liveness while an idle command poll is in flight", async () => {
+  const stop = new AbortController();
+  let commandPolls = 0;
+  let heartbeats = 0;
+  await runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_explicit_heartbeat",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    commandPollWaitMs: 25_000,
+    livenessHeartbeatIntervalMs: 2,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: fakeEnvironment(),
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api/v1/daemon-node-registrations") {
+        return jsonResponse({ heartbeat: { intervalMs: 5_000, timeoutMs: 15_000 } });
+      }
+      if (path.endsWith("/heartbeat")) {
+        assert.equal(init?.method, "POST");
+        assert.equal(new Headers(init?.headers).get("Authorization"), "Bearer node_token");
+        const body = await jsonBody<{ activeCommandLeases: unknown[] }>(init);
+        assert.deepEqual(body.activeCommandLeases, []);
+        heartbeats += 1;
+        stop.abort();
+        return jsonResponse({
+          heartbeat: {
+            intervalMs: 5_000,
+            timeoutMs: 15_000,
+            observedAt: new Date().toISOString(),
+          },
+        });
+      }
+      if (path.endsWith("/commands")) {
+        commandPolls += 1;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return jsonResponse({ commands: [] });
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  assert.equal(commandPolls, 1);
+  assert.equal(heartbeats, 1);
+});
+
 test("relay daemon doctor reports per-agent preflight failures", async () => {
   const report = await runRelayDaemonDoctor({
     backendUrl: "http://relay.test",
