@@ -230,8 +230,7 @@
     padding: var(--sp-1) max(env(safe-area-inset-right), var(--sp-2)) max(env(safe-area-inset-bottom), var(--sp-1)) max(env(safe-area-inset-left), var(--sp-2));
     border-top: 1px solid var(--line-1);
     border-right: 0;
-    background: color-mix(in srgb, var(--surface-0) 94%, transparent);
-    backdrop-filter: blur(14px);
+    background: var(--surface-0);
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
