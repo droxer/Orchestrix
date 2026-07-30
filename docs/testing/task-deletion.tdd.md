@@ -101,3 +101,16 @@ The design's explicit high-contention database races are guarded by the same
 row-locked, optimistic event append used for task claims and session links.
 Tests verify the serialized preconditions in both adapters; they do not attempt
 a probabilistic thread race against SQLite.
+
+## Final verification
+
+- Production build: PASS (`npm test`, including `next build`).
+- TypeScript: 633 passed.
+- Python after the review fixes: 606 passed, 1 skipped, with two pre-existing
+  warnings.
+- CSS lint: PASS (`npm run lint:css -w web`).
+- Final standards review: no actionable findings.
+- Final spec review: no actionable findings after the two concurrency fixes.
+- `npm audit` was attempted but could not query the configured external
+  registry mirror because the execution security policy rejected sending the
+  dependency metadata. No audit result is claimed.

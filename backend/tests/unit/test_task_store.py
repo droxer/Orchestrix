@@ -717,8 +717,9 @@ def assert_store_delete_hides_task_everywhere(store, session_store) -> None:
     with pytest.raises(TaskExecutionActiveError, match="task_execution_active"):
         store.delete_task(
             linked["id"],
-            active_linked_session=lambda task: session["id"]
-            in task.get("linkedSessionIds", []),
+            active_linked_session=lambda task: (
+                session["id"] in task.get("linkedSessionIds", [])
+            ),
         )
     assert store.claim_task_for_dispatch(active["id"], "codex") is not None
     with pytest.raises(TaskExecutionActiveError, match="task_execution_active"):
@@ -745,9 +746,9 @@ def assert_store_delete_hides_task_everywhere(store, session_store) -> None:
         active["id"], store.get_task(active["id"])["dispatchClaim"]["id"]
     )
     assert store.delete_task(active["id"], reject_active_claim=True)["deletedAt"]
-    assert store.delete_task(
-        linked["id"], active_linked_session=lambda _task: False
-    )["deletedAt"]
+    assert store.delete_task(linked["id"], active_linked_session=lambda _task: False)[
+        "deletedAt"
+    ]
     relinked = store.link_session(linked["id"], late_session["id"])
     assert late_session["id"] not in relinked["linkedSessionIds"]
 
