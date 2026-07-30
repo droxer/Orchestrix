@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 from fastapi.testclient import TestClient
 from relay.api import task_routes
 from relay.app import create_app
+from relay.services.task_dispatch import active_routine_occurrence
 
 
 def _bootstrap_admin(client: TestClient) -> None:
@@ -1044,6 +1045,103 @@ def test_routine_start_dispatches_occurrence_not_definition(monkeypatch) -> None
         assert command["agent"] == "codex"
         assert command["sessionId"] == start.json()["session"]["id"]
         assert command["taskGoal"] == "Weekly report"
+
+
+def test_routine_start_reuses_an_open_overdue_occurrence(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        agent = _create_agent(client, "alice")
+        created = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Retry queued report",
+                "ownerEmployeeId": "alice",
+                "assigneeEmployeeId": "alice",
+                "assignedAgentId": agent["id"],
+                "isRoutine": True,
+                "routineCadence": "daily",
+                "routineNextRunDate": "2020-01-01",
+                "routineEnabled": True,
+            },
+        )
+        assert created.status_code == 201
+
+        promoted = asyncio.run(app.state.task_scheduler.tick())
+        assert promoted.promoted == 1
+        definition = client.get(f"/api/v1/tasks/{created.json()['id']}").json()
+        [occurrence_id] = definition["occurrenceIds"]
+        assert app.state.task_store.get_task(occurrence_id)["status"] == "assigned"
+
+        started = client.post(f"/api/v1/tasks/{definition['id']}/runs", json={})
+
+        assert started.status_code == 202
+        assert started.json()["task"]["id"] == occurrence_id
+        app.state.task_store.update_task(occurrence_id, {"status": "review"})
+        assert (
+            active_routine_occurrence(
+                app.state.task_store,
+                app.state.task_store.get_task(definition["id"]),
+            )["id"]
+            == occurrence_id
+        )
+
+        repeated = client.post(f"/api/v1/tasks/{definition['id']}/runs", json={})
+
+        assert repeated.status_code == 202
+        assert repeated.json()["task"]["id"] == occurrence_id
+        assert repeated.json()["dispatch"]["code"] == "already_active"
+        refreshed = client.get(f"/api/v1/tasks/{definition['id']}").json()
+        assert refreshed["occurrenceIds"] == [occurrence_id]
+
+
+def test_assigned_task_rejects_run_assignment_override(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        registered = client.post(
+            "/api/v1/daemon-node-registrations",
+            json={
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["claude", "codex"],
+                "status": "ready",
+            },
+            headers={"Authorization": "Bearer ui_token"},
+        )
+        assert registered.status_code == 200
+        assigned = _create_agent(client, "alice", executor_kind="codex", node_id="sbx_alice")
+        override = _create_agent(client, "alice", executor_kind="claude", node_id="sbx_alice")
+        task = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Use the assigned agent",
+                "ownerEmployeeId": "alice",
+                "assigneeEmployeeId": "alice",
+                "assignedAgentId": assigned["id"],
+                "status": "assigned",
+            },
+        ).json()
+
+        started = client.post(
+            f"/api/v1/tasks/{task['id']}/runs",
+            json={
+                "assignments": [
+                    {"agentId": override["id"], "agent": "claude", "mode": "action"}
+                ]
+            },
+        )
+
+        assert started.status_code == 409
+        assert started.json()["detail"] == "task_assignment_override"
 
 
 def test_task_rejects_invalid_due_date(monkeypatch) -> None:

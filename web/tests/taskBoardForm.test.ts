@@ -14,6 +14,7 @@ import {
   type RoutineTaskFormState,
 } from "../src/lib/taskBoardForm.js";
 import { parseAppPath, pathForAppState } from "../src/lib/appRoute.js";
+import { assignmentOptionVisible } from "../src/lib/taskAssignment.js";
 
 describe("taskBoardForm", () => {
   const user = { id: "user-alice", username: "alice", employeeId: "alice", role: "user" as const };
@@ -80,6 +81,13 @@ describe("taskBoardForm", () => {
       assignedAgentId: null,
       assignedTeamId: "team_ops",
     });
+  });
+
+  it("hides ownerless assignment options unless they are already selected", () => {
+    assert.equal(assignmentOptionVisible(undefined, "alice", false), false);
+    assert.equal(assignmentOptionVisible(undefined, "alice", true), true);
+    assert.equal(assignmentOptionVisible("alice", "alice", false), true);
+    assert.equal(assignmentOptionVisible("bob", "alice", false), false);
   });
 
   it("returns an unassigned assigned task to backlog", () => {

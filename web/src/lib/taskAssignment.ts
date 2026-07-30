@@ -1,5 +1,15 @@
 import type { AgentTeam, CurrentUser, LogicalAgentAvailability } from "../types.js";
 
+export function assignmentOptionVisible(
+  ownerEmployeeId: string | undefined,
+  assigneeEmployeeId: string,
+  selected: boolean,
+): boolean {
+  if (selected) return true;
+  if (!assigneeEmployeeId) return true;
+  return ownerEmployeeId === assigneeEmployeeId;
+}
+
 export function teamReady(team: Pick<AgentTeam, "enabled" | "members">): boolean {
   return teamAvailability(team) === "ready";
 }

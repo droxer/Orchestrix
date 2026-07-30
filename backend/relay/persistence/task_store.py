@@ -127,7 +127,7 @@ def task_creation_events(task_id: str, payload: dict[str, Any]) -> list[dict[str
         ):
             if payload.get(field):
                 assignment[event_field] = payload[field]
-        events.append(relay_task_event("task.assigned", task_id, assignment))
+        events.extend(task_assignment_events(task_id, assignment))
     if payload.get("status") and payload["status"] != "backlog":
         events.append(
             relay_task_event("task.status", task_id, {"status": payload["status"]})
@@ -135,7 +135,57 @@ def task_creation_events(task_id: str, payload: dict[str, Any]) -> list[dict[str
     return events
 
 
-def task_update_events(task_id: str, payload: dict[str, Any]) -> list[dict[str, Any]]:
+def task_assignment_events(
+    task_id: str, assignment: dict[str, Any]
+) -> list[dict[str, Any]]:
+    if assignment.get("teamId"):
+        assigned = relay_task_event(
+            "task.assigned", task_id, {"teamId": assignment["teamId"]}
+        )
+        message = f"Assigned to team {assignment['teamId']}."
+        activity_payload: dict[str, Any] = {}
+    elif assignment.get("agent"):
+        assigned_payload = {"agent": assignment["agent"]}
+        if assignment.get("agentId"):
+            assigned_payload["agentId"] = assignment["agentId"]
+        assigned = relay_task_event(
+            "task.assigned",
+            task_id,
+            assigned_payload,
+        )
+        message = (
+            f"Assigned to logical agent {assignment['agentId']}."
+            if assignment.get("agentId")
+            else f"Assigned to {assignment['agent']}."
+        )
+        activity_payload = {"agent": assignment["agent"]}
+    else:
+        assigned = relay_task_event("task.unassigned", task_id, {})
+        message = "Agent assignment cleared."
+        activity_payload = {}
+    return [
+        assigned,
+        relay_task_event(
+            "task.activity",
+            task_id,
+            {
+                "activity": {
+                    "id": new_relay_id("act"),
+                    "createdAt": now_iso(),
+                    "message": message,
+                    **activity_payload,
+                }
+            },
+        ),
+    ]
+
+
+def task_update_events(
+    task_id: str,
+    payload: dict[str, Any],
+    *,
+    assignment: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     updated = {
         field: payload.get(field)
         for field in (
@@ -152,52 +202,27 @@ def task_update_events(task_id: str, payload: dict[str, Any]) -> list[dict[str, 
         )
     }
     events = [relay_task_event("task.updated", task_id, updated)]
-    if payload.get("status"):
-        events.append(
-            relay_task_event("task.status", task_id, {"status": payload["status"]})
-        )
     assignment_supplied = "assignedAgentId" in payload or "assignedTeamId" in payload
-    if assignment_supplied:
+    resolved_assignment = assignment
+    if resolved_assignment is None and assignment_supplied:
         agent_id = payload.get("assignedAgentId")
         team_id = payload.get("assignedTeamId")
         if agent_id and team_id:
             raise ValueError("task_agent_and_team_conflict")
         if team_id:
-            events.append(
-                relay_task_event("task.assigned", task_id, {"teamId": team_id})
-            )
-            message = f"Assigned to team {team_id}."
-            activity_payload: dict[str, Any] = {}
+            resolved_assignment = {"teamId": team_id}
         elif agent_id:
             agent = payload.get("assignedAgent")
             if not agent:
                 raise ValueError("assignedAgent is required with assignedAgentId")
-            events.append(
-                relay_task_event(
-                    "task.assigned",
-                    task_id,
-                    {"agent": agent, "agentId": agent_id},
-                )
-            )
-            message = f"Assigned to logical agent {agent_id}."
-            activity_payload = {"agent": agent}
+            resolved_assignment = {"agent": agent, "agentId": agent_id}
         else:
-            events.append(relay_task_event("task.unassigned", task_id, {}))
-            message = "Agent assignment cleared."
-            activity_payload = {}
+            resolved_assignment = {}
+    if resolved_assignment is not None:
+        events.extend(task_assignment_events(task_id, resolved_assignment))
+    if payload.get("status"):
         events.append(
-            relay_task_event(
-                "task.activity",
-                task_id,
-                {
-                    "activity": {
-                        "id": new_relay_id("act"),
-                        "createdAt": now_iso(),
-                        "message": message,
-                        **activity_payload,
-                    }
-                },
-            )
+            relay_task_event("task.status", task_id, {"status": payload["status"]})
         )
     return events
 
@@ -295,8 +320,16 @@ class LocalTaskStore:
         ordered = sorted(tasks, key=task_claim_sort_key)
         return ordered[:limit] if limit is not None else ordered
 
-    def update_task(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        return self.append_events(task_id, task_update_events(task_id, payload))
+    def update_task(
+        self,
+        task_id: str,
+        payload: dict[str, Any],
+        *,
+        assignment: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return self.append_events(
+            task_id, task_update_events(task_id, payload, assignment=assignment)
+        )
 
     def claim_next_task_for_agent(
         self, agent: AgentName, assignee_employee_id: str | None = None
@@ -423,6 +456,46 @@ class LocalTaskStore:
                 occurrence_id=occurrence["id"],
                 agent=agent,
             )
+            return occurrence
+
+    def create_routine_occurrence(
+        self,
+        routine_id: str,
+        scheduled_for: str,
+        *,
+        agent_override: AgentName | None = None,
+    ) -> dict[str, Any]:
+        with self._lock:
+            routine = self.get_task(routine_id)
+            existing = _open_routine_occurrence(
+                routine,
+                self.get_task,
+                scheduled_for=scheduled_for,
+            )
+            if existing:
+                return existing
+            agent = routine.get("assignedAgent") or agent_override
+            occurrence_events = routine_occurrence_events(
+                routine, agent, scheduled_for=scheduled_for
+            )
+            occurrence = materialize_task_events(occurrence_events)
+            self._task_dir(occurrence["id"]).mkdir(parents=True, exist_ok=True)
+            self._events_path(occurrence["id"]).write_text(
+                "".join(
+                    json.dumps(item, separators=(",", ":")) + "\n"
+                    for item in occurrence_events
+                ),
+                encoding="utf-8",
+            )
+            _write_json(self._snapshot_path(occurrence["id"]), occurrence)
+            event = relay_task_event(
+                "task.occurrence_created",
+                routine_id,
+                {"occurrenceId": occurrence["id"], "scheduledFor": scheduled_for},
+            )
+            _append_jsonl(self._events_path(routine_id), event)
+            updated = materialize_task_events([*routine.get("events", []), event])
+            _write_json(self._snapshot_path(routine_id), updated)
             return occurrence
 
     def assign_task(
@@ -841,8 +914,16 @@ class DatabaseTaskStore:
         live = [row["snapshot"] for row in rows if not row["snapshot"].get("deletedAt")]
         return live[:limit] if limit is not None else live
 
-    def update_task(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        return self.append_events(task_id, task_update_events(task_id, payload))
+    def update_task(
+        self,
+        task_id: str,
+        payload: dict[str, Any],
+        *,
+        assignment: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return self.append_events(
+            task_id, task_update_events(task_id, payload, assignment=assignment)
+        )
 
     def claim_next_task_for_agent(
         self, agent: AgentName, assignee_employee_id: str | None = None
@@ -1037,6 +1118,91 @@ class DatabaseTaskStore:
             occurrence_id=occurrence["id"],
             agent=agent,
         )
+        return occurrence
+
+    def create_routine_occurrence(
+        self,
+        routine_id: str,
+        scheduled_for: str,
+        *,
+        agent_override: AgentName | None = None,
+    ) -> dict[str, Any]:
+        with store_transaction(self.engine) as conn:
+            row = (
+                conn.execute(
+                    select(self.tasks.c.id, self.tasks.c.snapshot, self.tasks.c.version)
+                    .where(self.tasks.c.id == routine_id)
+                    .with_for_update()
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                raise KeyError(routine_id)
+            routine = row["snapshot"] or {}
+
+            def load_occurrence(occurrence_id: str) -> dict[str, Any]:
+                occurrence_row = (
+                    conn.execute(
+                        select(self.tasks.c.snapshot).where(
+                            self.tasks.c.id == occurrence_id
+                        )
+                    )
+                    .mappings()
+                    .first()
+                )
+                if not occurrence_row:
+                    raise KeyError(occurrence_id)
+                return occurrence_row["snapshot"]
+
+            existing = _open_routine_occurrence(
+                routine,
+                load_occurrence,
+                scheduled_for=scheduled_for,
+            )
+            if existing:
+                return existing
+
+            agent = routine.get("assignedAgent") or agent_override
+            occurrence_events = routine_occurrence_events(
+                routine, agent, scheduled_for=scheduled_for
+            )
+            occurrence = materialize_task_events(occurrence_events)
+            occurrence_row = task_to_row(occurrence, version=len(occurrence_events))
+            conn.execute(insert(self.tasks).values(**occurrence_row))
+            for sequence, occurrence_event in enumerate(occurrence_events):
+                conn.execute(
+                    insert(self.events).values(
+                        **task_event_to_row(
+                            occurrence_row["id"], sequence, occurrence_event
+                        )
+                    )
+                )
+
+            event = relay_task_event(
+                "task.occurrence_created",
+                routine_id,
+                {"occurrenceId": occurrence["id"], "scheduledFor": scheduled_for},
+            )
+            task_pk = row["id"]
+            sequence = int(row["version"] or 0)
+            conn.execute(
+                insert(self.events).values(
+                    **task_event_to_row(task_pk, sequence, event)
+                )
+            )
+            updated = materialize_task_events([*routine.get("events", []), event])
+            conn.execute(
+                update(self.tasks)
+                .where(self.tasks.c.id == task_pk)
+                .values(
+                    **task_to_row(
+                        updated,
+                        version=sequence + 1,
+                        database_id=task_pk,
+                    )
+                )
+            )
         return occurrence
 
     def assign_task(
@@ -1310,8 +1476,12 @@ def routine_due_for_promotion(routine: dict[str, Any], today: str) -> bool:
 
 
 def routine_occurrence_events(
-    routine: dict[str, Any], agent: AgentName | None
+    routine: dict[str, Any],
+    agent: AgentName | None,
+    *,
+    scheduled_for: str | None = None,
 ) -> list[dict[str, Any]]:
+    occurrence_date = scheduled_for or routine["routineNextRunDate"]
     occurrence_id = new_database_id()
     events = [
         relay_task_event(
@@ -1321,9 +1491,9 @@ def routine_occurrence_events(
                 "title": routine["title"],
                 "description": routine.get("description", ""),
                 "priority": routine.get("priority", "normal"),
-                "dueDate": routine["routineNextRunDate"],
+                "dueDate": occurrence_date,
                 "sourceRoutineId": routine["id"],
-                "scheduledFor": routine["routineNextRunDate"],
+                "scheduledFor": occurrence_date,
                 **(
                     {"ownerEmployeeId": routine["ownerEmployeeId"]}
                     if routine.get("ownerEmployeeId")
@@ -1360,6 +1530,28 @@ def routine_occurrence_events(
         relay_task_event("task.status", occurrence_id, {"status": "assigned"})
     )
     return events
+
+
+def _open_routine_occurrence(
+    routine: dict[str, Any],
+    load_task: Any,
+    *,
+    scheduled_for: str | None = None,
+) -> dict[str, Any] | None:
+    for event in reversed(routine.get("events", [])):
+        if event.get("type") != "task.occurrence_created":
+            continue
+        if scheduled_for is not None and event.get("scheduledFor") != scheduled_for:
+            continue
+        occurrence_id = event.get("occurrenceId")
+        if not isinstance(occurrence_id, str) or not occurrence_id:
+            continue
+        try:
+            occurrence = load_task(occurrence_id)
+        except (KeyError, FileNotFoundError):
+            continue
+        return occurrence
+    return None
 
 
 def routine_promotion_events(

@@ -666,6 +666,23 @@ async def start_task(
     assignments = assignment_list(body.get("assignments"))
     if body.get("agent") is not None:
         raise HTTPException(400, "agent is read-only; start through assignedAgentId.")
+    if assignments and task.get("assignedTeamId"):
+        assignments = []
+    if assignments and task.get("assignedAgentId"):
+        if (
+            len(assignments) != 1
+            or assignments[0].get("agentId") != task.get("assignedAgentId")
+        ):
+            raise HTTPException(409, "task_assignment_override")
+        if not task.get("assignedAgent"):
+            raise HTTPException(409, "task_assignment_invalid")
+        assignments = [
+            {
+                "agentId": task["assignedAgentId"],
+                "agent": task["assignedAgent"],
+                "mode": assignments[0]["mode"],
+            }
+        ]
     if (
         not task.get("assignedTeamId")
         and assignments

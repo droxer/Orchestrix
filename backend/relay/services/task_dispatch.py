@@ -14,7 +14,7 @@ from ..persistence.protocols import (
     TaskStore,
     TeamStore,
 )
-from ..persistence.stores import relay_task_event, valid_agent
+from ..persistence.stores import valid_agent
 from ..tasks import (
     ensure_managed_capacity_for_task,
     next_routine_date,
@@ -505,7 +505,7 @@ async def start_routine_occurrence_on_ready_node(
     today = run_date or date.today()
     today_iso = today.isoformat()
     scheduled_run_date = routine_next_run_date(routine)
-    occurrence = active_routine_occurrence_for_date(ctx.task_store, routine, today_iso)
+    occurrence = active_routine_occurrence(ctx.task_store, routine)
     if not occurrence and scheduled_run_date and scheduled_run_date <= today:
         next_run = next_routine_date(
             scheduled_run_date, routine.get("routineCadence") or "weekly", today
@@ -527,10 +527,16 @@ async def start_routine_occurrence_on_ready_node(
                 return None
     elif not occurrence:
         occurrence = _create_manual_occurrence(ctx, routine, agent, today_iso)
-    if occurrence.get("status") == "running":
+    if occurrence.get("status") in {"running", "review"}:
         existing = _existing_occurrence_result(ctx, routine, occurrence)
         if existing:
             return existing
+        return _result(
+            occurrence,
+            "queued",
+            code="already_active",
+            message="The current routine occurrence is already active.",
+        )
     result = await start_task_on_ready_node(
         ctx, occurrence, actor, mode=mode, assignments=assignments
     )
@@ -545,38 +551,11 @@ def _create_manual_occurrence(
     agent: str | None,
     scheduled_for: str,
 ) -> dict[str, Any]:
-    occurrence = ctx.task_store.create_task(
-        {
-            "title": routine["title"],
-            "description": routine.get("description", ""),
-            "priority": routine.get("priority", "normal"),
-            "ownerEmployeeId": routine.get("ownerEmployeeId"),
-            "assigneeEmployeeId": routine.get("assigneeEmployeeId"),
-            "dueDate": scheduled_for,
-            "sourceRoutineId": routine["id"],
-            "scheduledFor": scheduled_for,
-            **(
-                {"assignedAgent": agent}
-                if not routine.get("assignedTeamId")
-                else {"assignedTeamId": routine["assignedTeamId"]}
-            ),
-            **(
-                {"assignedAgentId": routine["assignedAgentId"]}
-                if routine.get("assignedAgentId")
-                else {}
-            ),
-            "status": "assigned",
-        }
-    )
-    ctx.task_store.append_event(
+    return ctx.task_store.create_routine_occurrence(
         routine["id"],
-        relay_task_event(
-            "task.occurrence_created",
-            routine["id"],
-            {"occurrenceId": occurrence["id"], "scheduledFor": scheduled_for},
-        ),
+        scheduled_for,
+        agent_override=agent,
     )
-    return occurrence
 
 
 def _existing_occurrence_result(
@@ -613,7 +592,26 @@ def active_routine_occurrence_for_date(
             occurrence = task_store.get_task(occurrence_id)
         except (KeyError, FileNotFoundError):
             continue
-        if occurrence.get("status") in {"backlog", "assigned", "running"}:
+        if occurrence.get("status") in {"backlog", "assigned", "running", "review"}:
+            return occurrence
+    return None
+
+
+def active_routine_occurrence(
+    task_store: TaskStore,
+    routine: dict[str, Any],
+) -> dict[str, Any] | None:
+    for event in reversed(routine.get("events", [])):
+        if event.get("type") != "task.occurrence_created":
+            continue
+        occurrence_id = event.get("occurrenceId")
+        if not isinstance(occurrence_id, str) or not occurrence_id:
+            continue
+        try:
+            occurrence = task_store.get_task(occurrence_id)
+        except (KeyError, FileNotFoundError):
+            continue
+        if occurrence.get("status") in {"backlog", "assigned", "running", "review"}:
             return occurrence
     return None
 
