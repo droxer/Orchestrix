@@ -92,6 +92,12 @@ export function matchesNodeQuickFilter(
   if (filter === "unassigned") return !node.employeeId;
   const status = visualStatus(node);
   if (filter === "failed") return status === "failed" || status === "stale";
+  // "Running" describes the Computer process, not only an actively executing
+  // agent run. Healthy idle (ready) and busy Computers are running too.
+  if (filter === "running") {
+    return isNodeOnline(node)
+      && (node.status === "ready" || node.status === "busy" || node.status === "running");
+  }
   return status === filter;
 }
 
@@ -217,8 +223,10 @@ export function buildEmployeeSummaries(
   return [...ids].sort().map((id) => {
     const employee = employeeById.get(id);
     const employeeNodes = nodesByEmployee.get(id) ?? [];
-    const readyCount = employeeNodes.filter((node) => matchesNodeQuickFilter(node, "ready")).length;
-    const runningCount = employeeNodes.filter((node) => matchesNodeQuickFilter(node, "running")).length;
+    // Employee summaries are categorical: an idle ready Computer must not also
+    // make its employee look like they have an actively running agent.
+    const readyCount = employeeNodes.filter((node) => visualStatus(node) === "ready").length;
+    const runningCount = employeeNodes.filter((node) => visualStatus(node) === "running").length;
     const failedCount = employeeNodes.filter((node) => matchesNodeQuickFilter(node, "failed")).length;
     return {
       id,

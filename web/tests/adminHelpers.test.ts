@@ -158,6 +158,15 @@ describe("buildEmployeeSummaries", () => {
 });
 
 describe("admin quick filters", () => {
+  it("includes healthy idle computers in the running slice", () => {
+    const ready = node({ id: "ready", status: "ready", online: true, stale: false });
+    const busy = node({ id: "busy", status: "busy", online: true, stale: false });
+
+    assert.equal(matchesNodeQuickFilter(ready, "ready"), true);
+    assert.equal(matchesNodeQuickFilter(ready, "running"), true);
+    assert.equal(matchesNodeQuickFilter(busy, "running"), true);
+  });
+
   it("keeps a stale stopped record in the failed slice", () => {
     const staleStopped = node({ id: "stale-stopped", status: "stopped", online: false, stale: true });
 
