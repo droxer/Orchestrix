@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { AgentMark } from "./AgentMark";
+import { IdentityMonogram } from "./IdentityMonogram";
+import { ProfileImage } from "./ProfileImagePicker";
 import { RelayEmptyState } from "./RelayEmptyState";
 import type { AgentName } from "../types";
 
@@ -9,6 +10,7 @@ type TranscriptEmptyProps = {
   selectedEmployee: string;
   activeAgent: AgentName;
   activeAgentDisplayName: string;
+  activeAgentImageUrl?: string | null;
   agentDescriptors: Record<AgentName, AgentDescriptor>;
 };
 
@@ -16,6 +18,7 @@ export function TranscriptEmpty({
   selectedEmployee,
   activeAgent,
   activeAgentDisplayName,
+  activeAgentImageUrl,
   agentDescriptors,
 }: TranscriptEmptyProps) {
   const { t } = useTranslation();
@@ -32,7 +35,11 @@ export function TranscriptEmpty({
       body={descriptor.blurb}
       illustration={(
         <span className="relay-empty-avatar agent-avatar" data-agent={activeAgent} aria-hidden="true">
-          <AgentMark agent={activeAgent} size={28} />
+          <ProfileImage
+            src={activeAgentImageUrl}
+            alt=""
+            fallback={<IdentityMonogram name={activeAgentDisplayName} size={20} />}
+          />
         </span>
       )}
     />

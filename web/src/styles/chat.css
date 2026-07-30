@@ -112,10 +112,15 @@
   font: var(--type-label-strong);
 }
 
+/* The picker names one logical agent, so it carries that agent's profile
+   image (uploaded, else its monogram) rather than a shared executor glyph —
+   two agents on the same executor were otherwise indistinguishable here. */
 .chat-active-agent-mark,
 .chat-agent-option-mark {
   flex: 0 0 auto;
-  opacity: 0.8;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--r-1);
 }
 
 .chat-agent-option-availability {
@@ -380,12 +385,20 @@
   box-shadow: 0 0 0 2px var(--surface-0);
   z-index: 1;
   /* Agents are squares; the human is a rounded badge/avatar filled with the
-     action color. Agent identity is the glyph inside, never color. */
+     action color. Agent identity is the profile image inside. */
   border-radius: var(--r-1);
   animation: node-in var(--t-fast) var(--ease) both;
 }
 
 .rail-node-agent > svg { display: block; }
+
+/* The agent turn's speaker mark is that agent's profile image, filling the
+   node so the tile below only shows through a glyph fallback. */
+.rail-node-agent > .profile-image {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
 
 .rail-node-user {
   background: var(--action);
@@ -401,10 +414,11 @@
 
    You    → a round solid action-green avatar. Round reads as "a person"; the
             circle silhouette is the fast human-vs-machine tell.
-   Agent  → a square light product tile carrying the specific executor's
-            vendor glyph. The circle-vs-square contrast, not colour, separates
-            the two speakers. (The generic Relay product mark lives on the
-            agent-phase divider, not here.) */
+   Agent  → a square tile carrying that agent's profile image — its upload, or
+            the name monogram on its identity hue. The circle-vs-square
+            contrast, not colour, separates the two speakers; the monogram's
+            hue separates one agent from another across a handoff. (The
+            generic Relay product mark lives on the agent-phase divider.) */
 .msg-user .rail-node.rail-node-user {
   border-radius: var(--r-full);
   border-color: transparent;
@@ -456,7 +470,8 @@
   box-shadow: 0 0 0 2px var(--surface-0);
 }
 
-.msg-agent.grouped .rail-node-agent > svg {
+.msg-agent.grouped .rail-node-agent > svg,
+.msg-agent.grouped .rail-node-agent > .profile-image {
   opacity: 0.4;
 }
 

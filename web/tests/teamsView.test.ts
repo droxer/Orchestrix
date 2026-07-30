@@ -43,7 +43,9 @@ describe("Agent team management", () => {
     assert.match(teamMarkSource, /M12 1\.5 17 6\.5/);
     assert.match(teamsSource, /className="teams-list-mark"/);
     assert.match(teamWorkspaceSource, /<TeamMark/);
-    assert.match(pickerSource, /<TeamMark/);
+    // The assignment picker identifies a team by its profile image, whose
+    // default is the name monogram rather than the shared team glyph.
+    assert.match(pickerSource, /fallback=\{<IdentityMonogram name=\{team\.name\}/);
     assert.match(sideNavSource, /data-nav="teams"/);
     assert.match(sideNavSource, /handleRouteClick\(event, "teams"\)/);
     assert.match(drawerSource, /memberAgentIds/);

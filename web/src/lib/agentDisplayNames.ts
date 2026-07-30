@@ -92,3 +92,26 @@ export function labelForAgentRun(
   const named = run.agentId ? logicalAgentNames?.[run.agentId] : undefined;
   return named ?? labelForExecutor(run.agent, agentDisplayNames);
 }
+
+/** Uploaded profile image per logical agent id. Agents without one are absent
+ * from the map — their default profile image is the name monogram, which needs
+ * no lookup. */
+export function buildLogicalAgentImageMap(
+  logicalAgents: readonly EmployeeAgent[],
+): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const agent of logicalAgents) {
+    if (agent.profileImageUrl) map[agent.id] = agent.profileImageUrl;
+  }
+  return map;
+}
+
+/** Profile image for one run, keyed the same way as `labelForAgentRun`. A run
+ * with no logical agent id (legacy or workflow dispatch) has no identity to
+ * resolve an image against, so it falls through to the monogram. */
+export function imageForAgentRun(
+  run: { agentId?: string },
+  logicalAgentImages?: Record<string, string>,
+): string | undefined {
+  return run.agentId ? logicalAgentImages?.[run.agentId] : undefined;
+}

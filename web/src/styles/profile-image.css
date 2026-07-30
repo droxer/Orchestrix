@@ -15,6 +15,33 @@
   object-fit: cover;
 }
 
+/* Default profile image for an agent or a team: the name's abbreviation on a
+   background tinted by a hue derived from that same name. It fills the whole
+   profile-image box so the neutral surface above is only ever seen behind a
+   glyph fallback. Hue is identity (which agent), never status — the readiness
+   pip on the surrounding chip stays the only status color. */
+.identity-monogram {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  /* stylelint-disable-next-line function-disallowed-list -- procedurally generated
+     per-identity hue (--avatar-hue, set inline by IdentityMonogram.tsx from the
+     display name); there is no fixed primitive to reference since the hue itself
+     is the value. Matches .task-assignee-avatar in backlog.css. */
+  background: color-mix(in srgb, hsl(var(--avatar-hue, 0) 70% 55%) 22%, var(--surface-2));
+  /* stylelint-disable-next-line function-disallowed-list -- see above */
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, hsl(var(--avatar-hue, 0) 70% 55%) 34%, transparent);
+  color: var(--ink-1);
+  font-family: var(--font-display);
+  font-size: var(--monogram-size, 12px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: var(--track-display);
+  user-select: none;
+}
+
 .profile-image-picker {
   position: relative;
   display: inline-grid;

@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
-import type { AgentName, EmployeeAgent } from "../../types";
-import { AgentMark } from "../AgentMark";
+import type { EmployeeAgent } from "../../types";
+import { IdentityMonogram } from "../IdentityMonogram";
+import { ProfileImage } from "../ProfileImagePicker";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { isEmployeeAgentRoutable } from "../../lib/agentDisplayNames";
 
@@ -8,8 +9,7 @@ import { isEmployeeAgentRoutable } from "../../lib/agentDisplayNames";
 // the thread talks to. Non-routable agents stay listed (disabled) with
 // their availability spelled out so users can see why an agent cannot take
 // the thread.
-export function AgentSelect({ activeAgent, logicalAgents, activeLogicalAgentId, onLogicalAgentPicked }: {
-  activeAgent: AgentName;
+export function AgentSelect({ logicalAgents, activeLogicalAgentId, onLogicalAgentPicked }: {
   logicalAgents: EmployeeAgent[];
   activeLogicalAgentId: string | null;
   onLogicalAgentPicked: (agent: EmployeeAgent) => void;
@@ -33,9 +33,10 @@ export function AgentSelect({ activeAgent, logicalAgents, activeLogicalAgentId, 
       >
         {activeLogicalAgent ? (
           <>
-            <AgentMark
-              agent={activeLogicalAgent.executorKind ?? activeAgent}
-              size={16}
+            <ProfileImage
+              src={activeLogicalAgent.profileImageUrl}
+              alt=""
+              fallback={<IdentityMonogram name={activeLogicalAgent.displayName} size={8} />}
               className="chat-active-agent-mark"
             />
             <span className="chat-agent-select-name" translate="no">
@@ -74,7 +75,12 @@ export function AgentSelect({ activeAgent, logicalAgents, activeLogicalAgentId, 
               disabled={!isRoutable}
               data-availability={visualAvailability}
             >
-              <AgentMark agent={logicalAgent.executorKind} size={16} className="chat-agent-option-mark" />
+              <ProfileImage
+                src={logicalAgent.profileImageUrl}
+                alt=""
+                fallback={<IdentityMonogram name={logicalAgent.displayName} size={8} />}
+                className="chat-agent-option-mark"
+              />
               <span translate="no">{logicalAgent.displayName}</span>
               {availabilityLabel ? (
                 <span className="chat-agent-option-availability" data-availability={visualAvailability}>

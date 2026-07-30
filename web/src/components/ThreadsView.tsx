@@ -7,6 +7,7 @@ import { RelayMark } from "./RelayMark";
 import type { AgentName, AgentTaskMode, DaemonNodeMonitorRecord, EmployeeAgent, RelayArtifact, RelaySession } from "../types";
 import {
   buildExecutorDisplayNameMap,
+  buildLogicalAgentImageMap,
   buildLogicalAgentNameMap,
   displayNameForExecutor,
   labelForAgentRun,
@@ -135,10 +136,15 @@ export function ThreadsView({
   const { t } = useTranslation();
   const agentDisplayNames = useMemo(() => buildExecutorDisplayNameMap(logicalAgents), [logicalAgents]);
   const logicalAgentNames = useMemo(() => buildLogicalAgentNameMap(logicalAgents), [logicalAgents]);
-  const activeAgentDisplayName = useMemo(() => {
-    const logical = logicalAgents.find((agent) => agent.id === activeLogicalAgentId && !agent.deletedAt);
-    return logical?.displayName ?? displayNameForExecutor(activeAgent, logicalAgents);
-  }, [activeAgent, activeLogicalAgentId, logicalAgents]);
+  const logicalAgentImages = useMemo(() => buildLogicalAgentImageMap(logicalAgents), [logicalAgents]);
+  const activeLogicalAgent = useMemo(
+    () => logicalAgents.find((agent) => agent.id === activeLogicalAgentId && !agent.deletedAt),
+    [activeLogicalAgentId, logicalAgents],
+  );
+  const activeAgentDisplayName = useMemo(
+    () => activeLogicalAgent?.displayName ?? displayNameForExecutor(activeAgent, logicalAgents),
+    [activeAgent, activeLogicalAgent, logicalAgents],
+  );
   // Name the agent actually running this thread. The in-flight run carries the
   // logical agent id; without it the executor kind would name whichever agent
   // happens to share that kind.
@@ -223,6 +229,7 @@ export function ThreadsView({
                         grouped={isGroupedContinuation(displayMessages, i)}
                         agentDisplayNames={agentDisplayNames}
                         logicalAgentNames={logicalAgentNames}
+                        logicalAgentImages={logicalAgentImages}
                         onOpenArtifact={onOpenArtifacts}
                         onRetryAgent={onRetryAgent}
                         retryDisabled={running}
@@ -251,6 +258,7 @@ export function ThreadsView({
                 selectedEmployee={selectedEmployee}
                 activeAgent={activeAgent}
                 activeAgentDisplayName={activeAgentDisplayName}
+                activeAgentImageUrl={activeLogicalAgent?.profileImageUrl}
                 agentDescriptors={agentDescriptors}
               />
             )}
@@ -261,7 +269,6 @@ export function ThreadsView({
           ref={composerRef}
           composerMode={composerMode}
           setComposerMode={setComposerMode}
-          activeAgent={activeAgent}
           logicalAgents={selectableLogicalAgents}
           activeLogicalAgentId={activeLogicalAgentId}
           onLogicalAgentPicked={onLogicalAgentPicked}
