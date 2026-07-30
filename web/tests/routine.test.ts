@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { filterRoutineTasks, latestRoutineSession, routineDueTone, type RoutineFilters } from "../src/lib/routine.js";
+import { filterRoutineTasks, latestRoutineSession, routineDueTone, runningRoutineCount, type RoutineFilters } from "../src/lib/routine.js";
 import type { RelaySession, RelayTask } from "../src/types.js";
 
 const baseFilters: RoutineFilters = {
@@ -91,5 +91,21 @@ describe("routineDueTone", () => {
     assert.equal(routineDueTone(task({ id: "b", title: "B", isRoutine: true, routineEnabled: true, routineNextRunDate: "2026-06-24" }), "2026-06-24"), "warn");
     assert.equal(routineDueTone(task({ id: "c", title: "C", isRoutine: true, routineEnabled: false, routineNextRunDate: "2026-06-23" }), "2026-06-24"), "neutral");
     assert.equal(routineDueTone(task({ id: "d", title: "D", isRoutine: true, routineEnabled: true, routineNextRunDate: "2026-06-23", status: "done" }), "2026-06-24"), "bad");
+  });
+});
+
+describe("runningRoutineCount", () => {
+  it("derives running definitions from their active occurrence tasks", () => {
+    const routines = [
+      task({ id: "routine-a", title: "A", isRoutine: true }),
+      task({ id: "routine-b", title: "B", isRoutine: true }),
+    ];
+    const tasks = [
+      ...routines,
+      task({ id: "occ-a", title: "A run", sourceRoutineId: "routine-a", status: "running" }),
+      task({ id: "occ-b", title: "B run", sourceRoutineId: "routine-b", status: "done" }),
+    ];
+
+    assert.equal(runningRoutineCount(routines, tasks), 1);
   });
 });

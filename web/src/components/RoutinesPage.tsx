@@ -18,7 +18,7 @@ import { TaskAssignee, TaskExecutionBadge } from "./TaskAssignee";
 import { isTaskAssigneeCurrentUser, taskAssigneeDisplayName, teamReady } from "../lib/taskAssignment";
 import { useEmployeeNames } from "../hooks/useEmployeeNames";
 import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
-import { filterRoutineTasks, latestRoutineSession, routineDueTone, TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, type RoutineFilters } from "../lib/routine";
+import { filterRoutineTasks, latestRoutineSession, routineDueTone, runningRoutineCount, TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, type RoutineFilters } from "../lib/routine";
 import { emptyRoutineForm, taskAssignmentMutationFields, taskBoardFormsEqual, type RoutineTaskFormState } from "../lib/taskBoardForm";
 import { TaskDrawer } from "./task-board/TaskDrawer";
 import { PageHeader } from "./PageHeader";
@@ -68,14 +68,14 @@ function activeFilterCount(filters: RoutineFilters): number {
   return count;
 }
 
-function RoutineStats({ tasks }: { tasks: RelayTask[] }) {
+function RoutineStats({ routines, tasks }: { routines: RelayTask[]; tasks: RelayTask[] }) {
   const { t } = useTranslation();
   const stats = useMemo(() => {
-    const enabled = tasks.filter((task) => task.routineEnabled).length;
-    const due = tasks.filter((task) => routineDueTone(task) !== "neutral").length;
-    const running = tasks.filter((task) => task.status === "running" || task.status === "review").length;
-    return { total: tasks.length, enabled, due, running };
-  }, [tasks]);
+    const enabled = routines.filter((task) => task.routineEnabled).length;
+    const due = routines.filter((task) => routineDueTone(task) !== "neutral").length;
+    const running = runningRoutineCount(routines, tasks);
+    return { total: routines.length, enabled, due, running };
+  }, [routines, tasks]);
 
   return (
     <p className="backlog-stats" aria-label={t("routine.metrics")}>
@@ -539,7 +539,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
         }
       />
 
-      <RoutineStats tasks={routineTasks} />
+      <RoutineStats routines={routineTasks} tasks={tasks} />
       <RoutineFiltersBar filters={filters} agents={logicalAgents} onChange={setFilters} />
 
       {filteredTasks.length === 0 ? (

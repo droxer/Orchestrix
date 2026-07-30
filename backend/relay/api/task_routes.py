@@ -181,6 +181,18 @@ def routine_fields(
         today = date.today()
         calculated_next_run = next_routine_date(today, resolved_cadence, today)
         next_run = calculated_next_run.isoformat() if calculated_next_run else None
+    effective_next_run = (
+        next_run
+        if has_next_run_input or next_run is not None
+        else (current or {}).get("routineNextRunDate")
+    )
+    if (
+        next_is_routine
+        and next_enabled
+        and resolved_cadence == "custom"
+        and not effective_next_run
+    ):
+        raise HTTPException(400, "An enabled custom routine requires a next-run date.")
     return {
         "isRoutine": is_routine if is_routine is not None else next_is_routine,
         "routineType": routine_type or (current or {}).get("routineType") or "task",
@@ -309,13 +321,17 @@ async def create_task(request: Request, ctx: AppContextDep) -> dict[str, Any]:
             "assigneeEmployeeId": assignee,
             "dueDate": date_field(body, "dueDate"),
             "status": status,
+            **(
+                {"assignedAgent": agent, "assignedAgentId": assigned_agent_id}
+                if agent and assigned_agent_id
+                else {}
+            ),
             **({"assignedTeamId": assigned_team_id} if assigned_team_id else {}),
             **routine,
         }
     )
     logger.info("Task created", task_id=task["id"], title=title, owner=owner)
     if agent:
-        task = ctx.task_store.set_task_assignment(task["id"], agent, assigned_agent_id)
         logger.info(
             "Task assigned", task_id=task["id"], agent=agent, agent_id=assigned_agent_id
         )
@@ -491,6 +507,16 @@ async def update_task(
         raise HTTPException(400, "An enabled routine requires an agent or team.")
     if status == "assigned" and not (next_agent_id or next_team_id):
         raise HTTPException(400, "assigned status requires an agent or team.")
+    assignment_change: dict[str, Any] | None = None
+    if logical_agent and assigned_agent_id != current.get("assignedAgentId"):
+        assignment_change = {"agent": agent, "agentId": assigned_agent_id}
+    elif team and assigned_team_id != current.get("assignedTeamId"):
+        assignment_change = {"teamId": assigned_team_id}
+    elif (
+        ("assignedAgentId" in body and not assigned_agent_id)
+        or ("assignedTeamId" in body and not assigned_team_id)
+    ) and not (next_agent_id or next_team_id):
+        assignment_change = {}
     task = ctx.task_store.update_task(
         task_id,
         {
@@ -502,16 +528,8 @@ async def update_task(
             "assigneeEmployeeId": assignee,
             **routine,
         },
+        assignment=assignment_change,
     )
-    if logical_agent and assigned_agent_id != current.get("assignedAgentId"):
-        task = ctx.task_store.set_task_assignment(task_id, agent, assigned_agent_id)
-    elif team and assigned_team_id != current.get("assignedTeamId"):
-        task = ctx.task_store.set_task_team_assignment(task_id, assigned_team_id)
-    elif (
-        ("assignedAgentId" in body and not assigned_agent_id)
-        or ("assignedTeamId" in body and not assigned_team_id)
-    ) and not (next_agent_id or next_team_id):
-        task = ctx.task_store.unassign_task(task_id)
     if status == "done":
         complete_linked_task_sessions(ctx, task, "Task marked done.")
         task = ctx.task_store.get_task(task_id)
@@ -565,8 +583,11 @@ async def assign_task(
             )
         except TeamDispatchError as error:
             raise HTTPException(409, error.code) from error
-        ctx.task_store.set_task_team_assignment(task_id, assigned_team_id)
-        return ctx.task_store.update_task(task_id, {"status": "assigned"})
+        return ctx.task_store.update_task(
+            task_id,
+            {"status": "assigned"},
+            assignment={"teamId": assigned_team_id},
+        )
     logical_agent = logical_agent_for_assignment(
         ctx,
         actor,
@@ -577,11 +598,14 @@ async def assign_task(
     )
     if not logical_agent or not assigned_agent_id:
         raise HTTPException(400, "agentId is required for task assignment.")
-    task = ctx.task_store.set_task_assignment(
-        task_id, logical_agent["executorKind"], assigned_agent_id
+    return ctx.task_store.update_task(
+        task_id,
+        {"status": "assigned"},
+        assignment={
+            "agent": logical_agent["executorKind"],
+            "agentId": assigned_agent_id,
+        },
     )
-    task = ctx.task_store.update_task(task_id, {"status": "assigned"})
-    return task
 
 
 @router.post("/tasks/{task_id}/runs", status_code=202)
@@ -594,6 +618,23 @@ async def start_task(
     assignments = assignment_list(body.get("assignments"))
     if body.get("agent") is not None:
         raise HTTPException(400, "agent is read-only; start through assignedAgentId.")
+    if assignments and task.get("assignedTeamId"):
+        assignments = []
+    if assignments and task.get("assignedAgentId"):
+        if (
+            len(assignments) != 1
+            or assignments[0].get("agentId") != task.get("assignedAgentId")
+        ):
+            raise HTTPException(409, "task_assignment_override")
+        if not task.get("assignedAgent"):
+            raise HTTPException(409, "task_assignment_invalid")
+        assignments = [
+            {
+                "agentId": task["assignedAgentId"],
+                "agent": task["assignedAgent"],
+                "mode": assignments[0]["mode"],
+            }
+        ]
     if (
         not task.get("assignedTeamId")
         and assignments

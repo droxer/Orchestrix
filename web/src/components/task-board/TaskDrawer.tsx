@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { AgentTeam, EmployeeAgent, LogicalAgentAvailability, TaskPriority, TaskRoutineCadence, TaskRoutineType, TaskStatus } from "../../types";
 import { TASK_PRIORITIES, TASK_STATUSES } from "../../lib/backlog";
 import { TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, isoToday } from "../../lib/routine";
-import { teamAvailability } from "../../lib/taskAssignment";
+import { assignmentOptionVisible, teamAvailability } from "../../lib/taskAssignment";
 import {
   nextRoutineRunDate,
   parseTaskAssignmentValue,
@@ -330,22 +330,16 @@ export function TaskDrawer({
     onChange({ ...form, ...patch } as TaskBoardFormState);
   }
 
-  // Ownerless agents/teams (no employeeId/ownerEmployeeId) are globally
-  // assignable — mirrors the backend's "ownerless legacy work is allowed"
-  // invariant. Without this, an employee-scoped `assigneeEmployeeId` hides
-  // every unowned agent and team, leaving the picker empty.
-  const agentOptions = logicalAgents.filter((agent) =>
-    !form.assigneeEmployeeId
-    || !agent.employeeId
-    || agent.employeeId === form.assigneeEmployeeId
-    || agent.id === form.assignedAgentId
-  );
-  const teamOptions = teams.filter((team) =>
-    !form.assigneeEmployeeId
-    || !team.ownerEmployeeId
-    || team.ownerEmployeeId === form.assigneeEmployeeId
-    || team.id === form.assignedTeamId
-  );
+  const agentOptions = logicalAgents.filter((agent) => assignmentOptionVisible(
+    agent.employeeId,
+    form.assigneeEmployeeId,
+    agent.id === form.assignedAgentId,
+  ));
+  const teamOptions = teams.filter((team) => assignmentOptionVisible(
+    team.ownerEmployeeId,
+    form.assigneeEmployeeId,
+    team.id === form.assignedTeamId,
+  ));
   const selectedAgent = agentOptions.find((agent) => agent.id === form.assignedAgentId);
   const selectedTeam = teamOptions.find((team) => team.id === form.assignedTeamId);
 

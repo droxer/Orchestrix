@@ -263,6 +263,7 @@ def resolve_agent_assignments(
             {
                 **assignment,
                 "agentId": agent_id,
+                "agent": agent["executorKind"],
                 "agentDisplayName": agent["displayName"],
                 "executorKind": agent["executorKind"],
                 "agentVersion": agent["version"],

@@ -297,6 +297,73 @@ def test_task_store_promotes_due_routine_once() -> None:
         )
 
 
+def test_task_store_updates_routine_and_assignment_in_one_event_batch() -> None:
+    with TemporaryDirectory() as root:
+        store = LocalTaskStore(root)
+        task = store.create_task(
+            {
+                "title": "Atomic routine",
+                "isRoutine": True,
+                "routineEnabled": False,
+            }
+        )
+
+        updated = store.update_task(
+            task["id"],
+            {"routineEnabled": True, "routineNextRunDate": "2026-07-31"},
+            assignment={"agent": "codex", "agentId": "agent_builder"},
+        )
+
+        assert updated["routineEnabled"] is True
+        assert updated["assignedAgentId"] == "agent_builder"
+        assert [event["type"] for event in updated["events"][-3:]] == [
+            "task.updated",
+            "task.assigned",
+            "task.activity",
+        ]
+
+
+def assert_manual_routine_occurrence_is_idempotent(
+    store: LocalTaskStore | DatabaseTaskStore,
+) -> None:
+    routine = store.create_task(
+        {
+            "title": "Run once",
+            "isRoutine": True,
+            "routineEnabled": True,
+            "routineCadence": "custom",
+            "routineNextRunDate": "2026-07-31",
+            "assignedAgent": "codex",
+            "assignedAgentId": "agent_builder",
+        }
+    )
+
+    first = store.create_routine_occurrence(routine["id"], "2026-07-30")
+    second = store.create_routine_occurrence(routine["id"], "2026-07-30")
+
+    store.update_task(first["id"], {"status": "review"})
+    while_in_review = store.create_routine_occurrence(routine["id"], "2026-07-30")
+    store.update_task(first["id"], {"status": "done"})
+    after_completion = store.create_routine_occurrence(routine["id"], "2026-07-30")
+
+    assert second["id"] == first["id"]
+    assert while_in_review["id"] == first["id"]
+    assert after_completion["id"] == first["id"]
+    assert store.get_task(routine["id"])["occurrenceIds"] == [first["id"]]
+
+
+def test_local_manual_routine_occurrence_is_idempotent() -> None:
+    with TemporaryDirectory() as root:
+        assert_manual_routine_occurrence_is_idempotent(LocalTaskStore(root))
+
+
+def test_database_manual_routine_occurrence_is_idempotent() -> None:
+    with TemporaryDirectory() as root:
+        assert_manual_routine_occurrence_is_idempotent(
+            DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True)
+        )
+
+
 def test_database_task_claim_orders_by_priority_due_date_and_assignee() -> None:
     with TemporaryDirectory() as root:
         store = DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True)

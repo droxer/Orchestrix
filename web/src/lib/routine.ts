@@ -61,6 +61,22 @@ export function latestRoutineSession(
   return [...linkedIds].reverse().map((id) => sessionById.get(id)).find(Boolean);
 }
 
+export function runningRoutineCount(
+  routines: RelayTask[],
+  tasks: RelayTask[],
+): number {
+  const runningRoutineIds = new Set(
+    tasks
+      .filter((task) =>
+        !task.isRoutine
+        && Boolean(task.sourceRoutineId)
+        && (task.status === "running" || task.status === "review"),
+      )
+      .map((task) => task.sourceRoutineId),
+  );
+  return routines.filter((routine) => runningRoutineIds.has(routine.id)).length;
+}
+
 function compareRoutineTasks(left: RelayTask, right: RelayTask): number {
   return enabledRank(left) - enabledRank(right)
     || routineDate(left).localeCompare(routineDate(right))
