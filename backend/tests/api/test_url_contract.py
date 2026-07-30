@@ -57,7 +57,7 @@ def test_openapi_publishes_only_the_canonical_json_contract(
     assert set(paths["/api/v1/threads/{session_id}"]) == {"get", "patch", "delete"}
     assert "204" in paths["/api/v1/threads/{session_id}"]["delete"]["responses"]
     assert set(paths["/api/v1/tasks/{task_id}/assignment"]) == {"put"}
-    assert "201" in paths["/api/v1/tasks/{task_id}/pickups"]["post"]["responses"]
+    assert "202" in paths["/api/v1/tasks/{task_id}/pickups"]["post"]["responses"]
     assert set(paths["/api/v1/admin/daemon-nodes/{node_id}/assignment"]) == {
         "put",
         "delete",

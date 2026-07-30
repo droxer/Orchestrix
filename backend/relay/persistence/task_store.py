@@ -156,6 +156,49 @@ def task_update_events(task_id: str, payload: dict[str, Any]) -> list[dict[str, 
         events.append(
             relay_task_event("task.status", task_id, {"status": payload["status"]})
         )
+    assignment_supplied = "assignedAgentId" in payload or "assignedTeamId" in payload
+    if assignment_supplied:
+        agent_id = payload.get("assignedAgentId")
+        team_id = payload.get("assignedTeamId")
+        if agent_id and team_id:
+            raise ValueError("task_agent_and_team_conflict")
+        if team_id:
+            events.append(
+                relay_task_event("task.assigned", task_id, {"teamId": team_id})
+            )
+            message = f"Assigned to team {team_id}."
+            activity_payload: dict[str, Any] = {}
+        elif agent_id:
+            agent = payload.get("assignedAgent")
+            if not agent:
+                raise ValueError("assignedAgent is required with assignedAgentId")
+            events.append(
+                relay_task_event(
+                    "task.assigned",
+                    task_id,
+                    {"agent": agent, "agentId": agent_id},
+                )
+            )
+            message = f"Assigned to logical agent {agent_id}."
+            activity_payload = {"agent": agent}
+        else:
+            events.append(relay_task_event("task.unassigned", task_id, {}))
+            message = "Agent assignment cleared."
+            activity_payload = {}
+        events.append(
+            relay_task_event(
+                "task.activity",
+                task_id,
+                {
+                    "activity": {
+                        "id": new_relay_id("act"),
+                        "createdAt": now_iso(),
+                        "message": message,
+                        **activity_payload,
+                    }
+                },
+            )
+        )
     return events
 
 
@@ -253,9 +296,7 @@ class LocalTaskStore:
         return ordered[:limit] if limit is not None else ordered
 
     def update_task(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        for event in task_update_events(task_id, payload):
-            task = self.append_event(task_id, event)
-        return task
+        return self.append_events(task_id, task_update_events(task_id, payload))
 
     def claim_next_task_for_agent(
         self, agent: AgentName, assignee_employee_id: str | None = None
@@ -801,9 +842,7 @@ class DatabaseTaskStore:
         return live[:limit] if limit is not None else live
 
     def update_task(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        for event in task_update_events(task_id, payload):
-            task = self.append_event(task_id, event)
-        return task
+        return self.append_events(task_id, task_update_events(task_id, payload))
 
     def claim_next_task_for_agent(
         self, agent: AgentName, assignee_employee_id: str | None = None

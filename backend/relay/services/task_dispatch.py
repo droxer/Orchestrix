@@ -231,19 +231,28 @@ class TaskDispatcher:
                 agent_store=self.ctx.agent_store,
                 placement_store=self.ctx.agent_placement_store,
                 daemon_nodes=self.ctx.registry.monitor_nodes(),
+                mode=_task_mode(self.mode),
             )
             self.team_assignment_resolved = True
             return None
-        except TeamDispatchError:
+        except TeamDispatchError as error:
             if not self.record_pending:
                 raise
             self._mark_assigned_if_backlog()
+            if error.permanent:
+                self.task = self.ctx.task_store.update_task(
+                    self.task["id"], {"status": "blocked"}
+                )
             return _record_result(
                 self.ctx,
                 self.task["id"],
-                "queued",
-                code="team_unavailable",
-                message=TEAM_UNAVAILABLE_MESSAGE,
+                "rejected" if error.permanent else "queued",
+                code=error.code,
+                message=(
+                    f"The assigned team cannot execute this task ({error.code})."
+                    if error.permanent
+                    else TEAM_UNAVAILABLE_MESSAGE
+                ),
             )
         except AgentRoutingError as error:
             if not self.record_pending:
@@ -320,6 +329,10 @@ class TaskDispatcher:
         code = dispatch_reason_code(error.code)
         state = "rejected" if error.code in PERMANENT_DISPATCH_CODES else "queued"
         message = str(error)
+        if state == "rejected":
+            self.task = self.ctx.task_store.update_task(
+                self.task["id"], {"status": "blocked"}
+            )
         if state == "queued":
             capacity = ensure_managed_capacity_for_task(
                 self.task, self.ctx.registry, self.ctx.managed_node_store
