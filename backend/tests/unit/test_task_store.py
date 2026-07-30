@@ -687,8 +687,13 @@ def assert_store_delete_hides_task_everywhere(store) -> None:
     )
     assigned = store.assign_task(assigned["id"], "codex")
 
-    deleted = store.delete_task(routine["id"])
+    deleted = store.delete_task(routine["id"], deleted_by="alice")
     assert deleted["deletedAt"]
+    assert deleted["deletedByEmployeeId"] == "alice"
+    deleted_event = next(
+        event for event in deleted["events"] if event["type"] == "task.deleted"
+    )
+    assert deleted_event["actorEmployeeId"] == "alice"
     again = store.delete_task(routine["id"])
     assert again["deletedAt"] == deleted["deletedAt"]
     assert (
@@ -696,7 +701,7 @@ def assert_store_delete_hides_task_everywhere(store) -> None:
         == 1
     )
 
-    deleted_assigned = store.delete_task(assigned["id"])
+    deleted_assigned = store.delete_task(assigned["id"], reject_active_claim=True)
     assert deleted_assigned["deletedAt"]
 
     assert store.list_tasks() == []
