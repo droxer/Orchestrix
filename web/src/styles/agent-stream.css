@@ -105,6 +105,13 @@
   overflow-wrap: anywhere;
 }
 
+/* Parsing a growing Markdown document on every token is expensive. Keep the
+   unfinished tail as whitespace-preserving text; it is rendered as Markdown
+   once the run settles. */
+.agent-prose-live {
+  white-space: pre-wrap;
+}
+
 .agent-prose p {
   margin: 0 0 var(--sp-2);
 }

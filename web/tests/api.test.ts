@@ -12,6 +12,7 @@ import {
   listAgentWorkspaceFiles,
   listArtifacts,
   listEmployeeAgents,
+  listSessionSummaries,
   listTaskArtifacts,
   readAgentWorkspaceFile,
   RelayApiError,
@@ -220,6 +221,20 @@ describe("apiJson", () => {
 
     assert.deepEqual(await listEmployeeAgents(), { agents: [] });
     assert.equal(requestedUrl, "/api/v1/agents");
+  });
+
+  it("requests compact thread summaries for background polling", async () => {
+    let requestedUrl = "";
+    globalThis.fetch = (async (input) => {
+      requestedUrl = String(input);
+      return new Response(JSON.stringify({ sessions: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    assert.deepEqual(await listSessionSummaries(), { sessions: [] });
+    assert.equal(requestedUrl, "/api/v1/threads?view=summary");
   });
 
   it("updates employee-owned logical agent metadata", async () => {

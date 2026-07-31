@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { mergeSessionEventIntoSessions } from "../src/lib/sessionEventMerge.js";
+import { mergeSessionEventIntoSessions, mergeSessionEventsIntoSessions } from "../src/lib/sessionEventMerge.js";
 import { applySessionEvent } from "../src/lib/sessionEvents.js";
 import type { RelaySession } from "../src/types.js";
 
@@ -88,5 +88,74 @@ describe("mergeSessionEventIntoSessions", () => {
     assert.equal(result.consumed, true);
     assert.equal(result.sessions?.[0].status, "waiting_for_human");
     assert.equal(result.sessions?.[0].pendingDecision, "feedback");
+  });
+
+  it("merges an SSE batch with one sessions-array replacement", () => {
+    const existing = [session()];
+    const result = mergeSessionEventsIntoSessions(existing, "ses_1", [
+      {
+        id: "evt_started",
+        type: "agent.started",
+        sessionId: "ses_1",
+        timestamp: "2026-06-20T00:00:01.000Z",
+        runId: "run_1",
+        agent: "pi",
+        mode: "action",
+      },
+      {
+        id: "evt_output_1",
+        type: "agent.output",
+        sessionId: "ses_1",
+        timestamp: "2026-06-20T00:00:02.000Z",
+        runId: "run_1",
+        agent: "pi",
+        stream: "stdout",
+        text: "one",
+        sequence: 0,
+      },
+      {
+        id: "evt_output_2",
+        type: "agent.output",
+        sessionId: "ses_1",
+        timestamp: "2026-06-20T00:00:03.000Z",
+        runId: "run_1",
+        agent: "pi",
+        stream: "stdout",
+        text: "two",
+        sequence: 1,
+      },
+    ], applySessionEvent);
+
+    assert.notEqual(result.sessions, existing);
+    assert.equal(result.consumed, 3);
+    assert.deepEqual(result.sessions?.[0].events.map((event) => event.id), [
+      "evt_started",
+      "evt_output_1",
+      "evt_output_2",
+    ]);
+  });
+
+  it("deduplicates events within one streamed batch", () => {
+    const event = {
+      id: "evt_output",
+      type: "agent.output" as const,
+      sessionId: "ses_1",
+      timestamp: "2026-06-20T00:00:02.000Z",
+      runId: "run_1",
+      agent: "pi" as const,
+      stream: "stdout" as const,
+      text: "one",
+      sequence: 0,
+    };
+
+    const result = mergeSessionEventsIntoSessions(
+      [session()],
+      "ses_1",
+      [event, event],
+      applySessionEvent,
+    );
+
+    assert.equal(result.consumed, 1);
+    assert.equal(result.sessions?.[0].events.length, 1);
   });
 });

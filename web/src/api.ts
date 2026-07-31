@@ -37,6 +37,7 @@ import type {
   SandboxesResponse,
   SandboxRecord,
   SessionsResponse,
+  SessionSummariesResponse,
   StartTaskResponse,
   UserRole,
   TaskArtifactsResponse,
@@ -454,6 +455,14 @@ export function createUser(input: { username: string; password: string; role?: U
 
 export function listSessions(signal?: AbortSignal): Promise<SessionsResponse> {
   return apiJson<SessionsResponse>("/threads", { signal });
+}
+
+export function listSessionSummaries(signal?: AbortSignal): Promise<SessionSummariesResponse> {
+  return apiJson<SessionSummariesResponse>("/threads?view=summary", { signal });
+}
+
+export function getSession(sessionId: string, signal?: AbortSignal): Promise<RelaySession> {
+  return apiJson<RelaySession>(`/threads/${encodeURIComponent(sessionId)}`, { signal });
 }
 
 export function listArtifacts(

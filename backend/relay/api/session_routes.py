@@ -97,8 +97,10 @@ def session_brief_item(session: dict[str, Any]) -> dict[str, Any]:
         "teamId": session.get("teamId"),
         "currentAgent": session.get("currentAgent"),
         "pendingDecision": session.get("pendingDecision"),
+        "archived": session.get("archived", False),
         "artifactCount": len(workspace_artifacts(session)),
         "runCount": len(session.get("agentRuns", [])),
+        "eventCount": len(session.get("events", [])),
         "updatedAt": session.get("updatedAt"),
         "createdAt": session.get("createdAt"),
     }
@@ -218,7 +220,10 @@ async def list_sessions(request: Request, ctx: AppContextDep) -> dict[str, Any]:
         for session in ctx.session_store.list_sessions()
         if actor["isAdmin"] or session.get("ownerEmployeeId") == actor["employeeId"]
     ]
-    return {"sessions": ensure_sessions_managed_affinity(ctx, visible)}
+    sessions = ensure_sessions_managed_affinity(ctx, visible)
+    if request.query_params.get("view") == "summary":
+        return {"sessions": [session_brief_item(session) for session in sessions]}
+    return {"sessions": sessions}
 
 
 ARTIFACT_INDEX_DEFAULT_LIMIT = 200
@@ -707,10 +712,9 @@ async def handoff(
 # stream flushes the backlog and closes when it sees one of these.
 TERMINAL_SESSION_STATUSES = frozenset({"completed", "failed", "cancelled"})
 # Agent subprocesses emit output in small chunks, but this tail loop is the
-# final hop before the browser. A one-second interval collects those chunks
-# into visible bursts; 100 ms keeps the transcript perceptibly continuous
-# without turning an open SSE connection into a busy loop.
-_STREAM_POLL_SECONDS = 0.1
+# final hop before the browser. A 50 ms tail interval feels continuous while
+# still batching subprocess chunks into a single browser cache update.
+_STREAM_POLL_SECONDS = 0.05
 _STREAM_HEARTBEAT_SECONDS = 15.0
 _STREAM_MAX_SECONDS = 60 * 30
 
@@ -722,15 +726,6 @@ def _sse_frame(data: dict[str, Any], *, event: str | None = None) -> str:
     return f"{prefix}data: {json.dumps(data)}\n\n"
 
 
-def _event_start_index(events: list[Any], after_event_id: str | None) -> int:
-    if not after_event_id:
-        return 0
-    for index, event in enumerate(events):
-        if isinstance(event, dict) and event.get("id") == after_event_id:
-            return index + 1
-    return 0
-
-
 @router.get("/threads/{session_id}/events")
 async def session_events(
     session_id: str, request: Request, ctx: AppContextDep
@@ -740,12 +735,10 @@ async def session_events(
     get_session_for_actor(ctx.session_store, session_id, actor)
 
     async def event_stream() -> AsyncIterator[str]:
-        # Server-side tail-poll: re-read the materialized session each tick and
-        # emit only newly-appended events (by index). This moves the poll off N
-        # browser clients and onto one short loop per open stream, and lets the
-        # active conversation update at push latency instead of the list poll's
-        # cadence. The store rewrites the snapshot on every append, and
-        # get_session reads it fresh, so new events are visible here.
+        # Server-side tail-poll: read only newly appended rows from the event
+        # log each tick. The web client coalesces that tick's message frames
+        # into one render commit, while other SSE consumers keep the existing
+        # one-domain-event-per-frame contract.
         # EventSource keeps the original URL across automatic reconnects but
         # advances Last-Event-ID as frames arrive. Prefer that live cursor over
         # the URL's initial `after` value so a reconnect does not replay the
@@ -753,25 +746,27 @@ async def session_events(
         after_event_id = request.headers.get(
             "last-event-id"
         ) or request.query_params.get("after")
-        sent: int | None = None
+        next_sequence: int | None = None
         start = time.monotonic()
         last_heartbeat = start
         while True:
             if await request.is_disconnected():
                 return
             try:
-                session = get_session_for_actor(ctx.session_store, session_id, actor)
-            except HTTPException:
+                page = ctx.session_store.read_event_page(
+                    session_id,
+                    after_event_id=after_event_id if next_sequence is None else None,
+                    after_sequence=next_sequence,
+                )
+            except KeyError:
                 return
-            events = session.get("events", [])
-            if sent is None:
-                sent = _event_start_index(events, after_event_id)
-            if len(events) > sent:
-                for event in events[sent:]:
+            events = page["events"]
+            next_sequence = page["nextSequence"]
+            if events:
+                for event in events:
                     yield _sse_frame(event)
-                sent = len(events)
                 last_heartbeat = time.monotonic()
-            status = session.get("status")
+            status = page.get("status")
             if status in TERMINAL_SESSION_STATUSES:
                 yield _sse_frame({"status": status}, event="done")
                 return

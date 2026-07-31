@@ -58,6 +58,32 @@ export interface SessionsResponse {
   sessions: RelaySession[];
 }
 
+export interface SessionSummary {
+  id: string;
+  title?: string;
+  taskGoal: string;
+  status: RelaySession["status"];
+  phase: string;
+  daemonNodeId?: string;
+  managedNodeId?: string;
+  workspacePath: string;
+  ownerEmployeeId?: string;
+  ownerAgentId?: string;
+  teamId?: string;
+  currentAgent?: AgentName;
+  pendingDecision?: RelaySession["pendingDecision"];
+  archived?: boolean;
+  artifactCount: number;
+  runCount: number;
+  eventCount: number;
+  updatedAt: string;
+  createdAt: string;
+}
+
+export interface SessionSummariesResponse {
+  sessions: SessionSummary[];
+}
+
 export interface ArtifactIndexItem extends RelayArtifact {
   sessionId: string;
   sessionTitle?: string;

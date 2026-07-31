@@ -12,6 +12,7 @@ import { useRelayMutations } from "./hooks/useRelayMutations";
 import { useMutationError } from "./hooks/useMutationError";
 import { useAppRouter } from "./hooks/useAppRouter";
 import { useSessionEvents } from "./hooks/useSessionEvents";
+import { useSessionDetail } from "./hooks/useSessionDetail";
 import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeThreadRuntimeNodes, mergeVisibleDaemonNodes } from "./lib/daemonNodes";
 import { formatDispatchError } from "./lib/agentReadiness";
@@ -313,6 +314,7 @@ export function App() {
 
   // Live SSE tail of the open thread; merges new events into the
   // sessions cache so the active thread updates at push latency.
+  useSessionDetail(activeSession?.id, Boolean(user));
   useSessionEvents(activeSession?.id, Boolean(user) && shouldTailSessionEvents(activeSession?.status));
 
   const selectedToken = selectedSandbox ? (tokens[selectedSandbox.id] ?? tokens[selectedEmployee]) : tokens[selectedEmployee];
@@ -475,11 +477,19 @@ export function App() {
     const el = transcriptRef.current;
     const content = el?.firstElementChild;
     if (!el || !content || typeof ResizeObserver === "undefined") return;
+    let frame: number | undefined;
     const observer = new ResizeObserver(() => {
-      if (atBottomRef.current) el.scrollTop = el.scrollHeight;
+      if (!atBottomRef.current || frame !== undefined) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = undefined;
+        if (atBottomRef.current) el.scrollTop = el.scrollHeight;
+      });
     });
     observer.observe(content);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (frame !== undefined) window.cancelAnimationFrame(frame);
+    };
   }, [activeSession?.id]);
 
   useEffect(() => {

@@ -10,7 +10,6 @@ from typing import Any
 
 from loguru import logger
 from sqlalchemy import (
-    JSON,
     BigInteger,
     Column,
     DateTime,
@@ -36,18 +35,20 @@ from .store_common import (
     _read_json,
     _read_jsonl,
     _write_json,
+    create_all_tables,
     database_id_column,
     entity_uuid_type,
-    create_all_tables,
     json_type,
-    shared_engine,
-    store_transaction,
-    metadata as shared_metadata,
     materialize_events,
     new_database_id,
     now_iso,
     relay_event,
     safe_name,
+    shared_engine,
+    store_transaction,
+)
+from .store_common import (
+    metadata as shared_metadata,
 )
 
 
@@ -157,6 +158,37 @@ class LocalSessionStore:
             if self._snapshot_path(session_id).exists():
                 return _read_json(self._snapshot_path(session_id))
             return materialize_events(_read_jsonl(self._events_path(session_id)))
+
+    def read_event_page(
+        self,
+        session_id: str,
+        *,
+        after_event_id: str | None = None,
+        after_sequence: int | None = None,
+    ) -> dict[str, Any]:
+        """Read only the event tail needed by an SSE connection.
+
+        ``nextSequence`` is an index into the append-only event log, so callers
+        can continue without repeatedly materializing the full session.
+        """
+        with self._lock:
+            session = self.get_session(session_id)
+            events = session.get("events", [])
+            start = after_sequence if after_sequence is not None else 0
+            if after_sequence is None and after_event_id:
+                start = next(
+                    (
+                        index + 1
+                        for index, event in enumerate(events)
+                        if event.get("id") == after_event_id
+                    ),
+                    0,
+                )
+            return {
+                "events": events[start:],
+                "nextSequence": len(events),
+                "status": session.get("status"),
+            }
 
     def delete_session(self, session_id: str, *, deleted_by: str | None = None) -> None:
         with self._lock:
@@ -730,6 +762,60 @@ class DatabaseSessionStore:
             if not row:
                 raise KeyError(session_id)
         return row["snapshot"]
+
+    def read_event_page(
+        self,
+        session_id: str,
+        *,
+        after_event_id: str | None = None,
+        after_sequence: int | None = None,
+    ) -> dict[str, Any]:
+        """Read an event tail directly from the append-only event table."""
+        with store_transaction(self.engine) as conn:
+            session = (
+                conn.execute(
+                    select(
+                        self.sessions.c.id,
+                        self.sessions.c.status,
+                        self.sessions.c.version,
+                    ).where(self.sessions.c.id == session_id)
+                )
+                .mappings()
+                .first()
+            )
+            if not session:
+                raise KeyError(session_id)
+
+            start = after_sequence if after_sequence is not None else 0
+            if after_sequence is None and after_event_id:
+                cursor = conn.scalar(
+                    select(self.events.c.sequence).where(
+                        self.events.c.session_id == session["id"],
+                        self.events.c.payload["id"].as_string() == after_event_id,
+                    )
+                )
+                start = int(cursor) + 1 if cursor is not None else 0
+
+            rows = (
+                conn.execute(
+                    select(self.events.c.sequence, self.events.c.payload)
+                    .where(
+                        self.events.c.session_id == session["id"],
+                        self.events.c.sequence >= start,
+                    )
+                    .order_by(self.events.c.sequence)
+                )
+                .mappings()
+                .all()
+            )
+            next_sequence = int(session["version"] or 0)
+            if rows:
+                next_sequence = max(next_sequence, int(rows[-1]["sequence"]) + 1)
+            return {
+                "events": [row["payload"] for row in rows],
+                "nextSequence": next_sequence,
+                "status": session["status"],
+            }
 
     def delete_session(self, session_id: str, *, deleted_by: str | None = None) -> None:
         with store_transaction(self.engine) as conn:
