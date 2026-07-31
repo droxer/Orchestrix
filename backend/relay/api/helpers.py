@@ -12,6 +12,7 @@ from typing import Any
 from fastapi import HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from loguru import logger
+from starlette.requests import ClientDisconnect
 
 from ..core.models import AGENT_NAMES
 from ..daemon_registry import (
@@ -30,6 +31,10 @@ CHAT_SERVICE_EMPLOYEE_HEADER = "x-relay-employee-id"
 async def json_body(request: Request) -> dict[str, Any]:
     try:
         value = await request.json()
+    except ClientDisconnect as error:
+        raise HTTPException(
+            400, "Client disconnected while reading request body."
+        ) from error
     except json.JSONDecodeError:
         return {}
     return value if isinstance(value, dict) else {}

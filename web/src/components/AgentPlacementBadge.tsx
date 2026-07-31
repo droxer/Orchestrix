@@ -10,7 +10,7 @@ import {
 } from "../lib/agentPlacements";
 import { NodeLocal, NodeManaged, NodePending } from "./icons";
 
-const OWNERSHIP_ICON: Record<PlacementOwnership, typeof NodeManaged> = {
+export const OWNERSHIP_ICON: Record<PlacementOwnership, typeof NodeManaged> = {
   managed: NodeManaged,
   local: NodeLocal,
   pending: NodePending,

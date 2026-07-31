@@ -108,6 +108,8 @@ Node.js 22.19 or newer is required.
 - Backend task scheduler env: `RELAY_TASK_SCHEDULER_ENABLED` (default on),
   `RELAY_TASK_SCHEDULER_INTERVAL_SECONDS` (default `10`),
   `RELAY_TASK_SCHEDULER_MAX_DISPATCHES` (default `5`).
+- Completed-run agent log tail cap: `RELAY_AGENT_RESULT_LOG_LIMIT` (default
+  `262144` chars) — the fallback transcript keeps the head of long output.
 - Stop Relay and BoxLite processes: `make stop`.
 - Install pre-commit hooks: `make pre-commit-install`.
 - Run pre-commit hooks on all files: `make pre-commit-run`.

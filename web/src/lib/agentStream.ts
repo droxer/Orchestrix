@@ -40,6 +40,11 @@ export class AgentStreamAccumulator {
   private stableSegments: AgentSegment[] = [];
   private segments: AgentSegment[] = [];
   private seenCheckpointIds = new Set<string>();
+  // Text committed by the most recent Claude assistant checkpoint slice. The
+  // result frame is checkpointed separately, so its fallback copy of the reply
+  // must dedup against these — the slice-local check inside parseClaude cannot
+  // see segments committed by an earlier slice.
+  private turnTextSignatures = new Set<string>();
 
   constructor(private readonly agent: AgentName) {}
 
@@ -49,6 +54,7 @@ export class AgentStreamAccumulator {
       this.stableOffset = 0;
       this.stableSegments = [];
       this.seenCheckpointIds.clear();
+      this.turnTextSignatures.clear();
     }
     this.raw = raw;
 
@@ -56,7 +62,24 @@ export class AgentStreamAccumulator {
     for (const checkpoint of agentCheckpoints(this.agent, raw, this.stableOffset)) {
       const checkpointId = agentCheckpointId(this.agent, checkpoint.value);
       if (!checkpointId || !this.seenCheckpointIds.has(checkpointId)) {
-        this.stableSegments.push(...parseAgentStream(this.agent, raw.slice(sliceStart, checkpoint.end)));
+        let parsed = parseAgentStream(this.agent, raw.slice(sliceStart, checkpoint.end));
+        if (this.agent === "claude") {
+          if (checkpoint.value.type === "assistant") {
+            this.turnTextSignatures = new Set(
+              parsed
+                .filter((segment): segment is Extract<AgentSegment, { kind: "text" }> => segment.kind === "text")
+                .map((segment) => segment.text.trimEnd()),
+            );
+          } else if (checkpoint.value.type === "result") {
+            if (this.turnTextSignatures.size > 0) {
+              parsed = parsed.filter(
+                (segment) => segment.kind !== "text" || !this.turnTextSignatures.has(segment.text.trimEnd()),
+              );
+              this.turnTextSignatures.clear();
+            }
+          }
+        }
+        this.stableSegments.push(...parsed);
       }
       if (checkpointId) this.seenCheckpointIds.add(checkpointId);
       sliceStart = checkpoint.end;
@@ -541,6 +564,11 @@ function parseClaude(raw: string): AgentSegment[] {
         if (resultText && !alreadyRendered) out.push({ kind: "text", text: resultText });
         out.push(narration("agent_stream.claude_finished", undefined, "good"));
       }
+      // A result frame closes the turn even when no assistant event carried
+      // one (result-only builds). Reset replay suppression so the next turn's
+      // text blocks are never mistaken for replays of this one.
+      resetTurnState();
+      turnStartIndex = out.length;
       continue;
     }
     if (event.type === "system" && event.subtype === "api_retry") {
@@ -587,19 +615,19 @@ function parseCodex(raw: string): AgentSegment[] {
       continue;
     }
     if (event.type === "agent_message") {
-      const text = textFromContent(event).trim();
+      const text = textFromContent(event).trimEnd();
       if (text) out.push({ kind: "text", text });
       continue;
     }
     if (typeof event.type === "string" && event.type.startsWith("item.")) {
       const item = asRecord(event.item);
       if (item.type === "agent_message" && event.type === "item.completed") {
-        const text = textFromContent(item).trim();
+        const text = textFromContent(item).trimEnd();
         if (text) out.push({ kind: "text", text });
         continue;
       }
       if (item.type === "reasoning" && event.type === "item.completed") {
-        const text = textFromContent(item).trim();
+        const text = textFromContent(item).trimEnd();
         if (text) out.push({ kind: "thinking", text });
         continue;
       }
@@ -636,7 +664,7 @@ function parseCodex(raw: string): AgentSegment[] {
       continue;
     }
     if (event.type === "message" || event.type === "assistant_message") {
-      const text = textFromContent(event).trim();
+      const text = textFromContent(event).trimEnd();
       if (text) out.push({ kind: "text", text });
     }
   }
@@ -679,7 +707,7 @@ function parsePi(raw: string): AgentSegment[] {
       thinkingBuffer.push(thinkingDelta);
       continue;
     }
-    const endedText = piAssistantEndedContent(event, "text_end").trim();
+    const endedText = piAssistantEndedContent(event, "text_end").trimEnd();
     if (endedText) {
       thinkingBuffer.flush(out, "thinking");
       textBuffer.flush(out, "text");
@@ -687,7 +715,7 @@ function parsePi(raw: string): AgentSegment[] {
       sawAssistantTextInTurn = true;
       continue;
     }
-    const endedThinking = piAssistantEndedContent(event, "thinking_end").trim();
+    const endedThinking = piAssistantEndedContent(event, "thinking_end").trimEnd();
     if (endedThinking) {
       textBuffer.flush(out, "text");
       thinkingBuffer.flush(out, "thinking");
@@ -701,7 +729,7 @@ function parsePi(raw: string): AgentSegment[] {
       if (streamedText) sawAssistantTextInTurn = true;
       thinkingBuffer.flush(out, "thinking");
       if (!sawAssistantTextInTurn) {
-        const accumulatedText = piAssistantText(event).trim();
+        const accumulatedText = piAssistantText(event).trimEnd();
         if (accumulatedText) {
           out.push({ kind: "text", text: accumulatedText });
           sawAssistantTextInTurn = true;
@@ -715,7 +743,7 @@ function parsePi(raw: string): AgentSegment[] {
       upsertSegmentById(out, toolSegmentById, tool.id, segment);
       continue;
     }
-    const assistantText = piAssistantText(event).trim();
+    const assistantText = piAssistantText(event).trimEnd();
     if (assistantText) {
       textBuffer.flush(out, "text");
       thinkingBuffer.flush(out, "thinking");
@@ -760,7 +788,7 @@ function parseKimi(raw: string): AgentSegment[] {
     const role = message.role ?? event.role;
     if (role !== undefined && role !== "assistant") continue;
 
-    const text = textFromContent(message).trim();
+    const text = textFromContent(message).trimEnd();
     if (text) out.push({ kind: "text", text });
 
     const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
@@ -779,8 +807,8 @@ function parseKimi(raw: string): AgentSegment[] {
 }
 
 function parsePlain(raw: string): AgentSegment[] {
-  const text = stripAnsi(raw).trim();
-  return text ? [{ kind: "text", text }] : [];
+  const text = stripAnsi(raw).trimEnd();
+  return text.trim() ? [{ kind: "text", text }] : [];
 }
 
 function piAssistantText(event: Record<string, unknown>): string {

@@ -31,6 +31,8 @@ import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { AgentProfilePanel } from "./AgentProfilePanel";
 import { ProfileImage } from "./ProfileImagePicker";
 import { agentAvailabilityTone } from "../lib/adminHelpers";
+import { describeAgentPlacements } from "../lib/agentPlacements";
+import { AgentPlacementBadge } from "./AgentPlacementBadge";
 
 export type WorkspacePageTab = "profile" | "workspace" | "activities";
 
@@ -227,21 +229,24 @@ export function WorkspaceFilesBrowser({
             <SnapshotBanner onDismiss={() => setSnapshotBannerDismissed(true)} />
           ) : null}
           {!fixedScope ? (
-            <div className="workspace-scope-toggle" role="group" aria-label={t("workspace.scope_label")}>
-              {(["personal", "shared"] as const).map((scopeOption) => (
-                <Button
-                  key={scopeOption}
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="workspace-scope-chip"
-                  data-active={fileScope === scopeOption ? "true" : "false"}
-                  aria-pressed={fileScope === scopeOption}
-                  onClick={() => switchFileScope(scopeOption)}
-                >
-                  {scopeOption === "personal" ? t("workspace.scope_personal") : t("workspace.scope_shared")}
-                </Button>
-              ))}
+            <div className="workspace-scope-toggle">
+              <span className="workspace-scope-options" role="radiogroup" aria-label={t("workspace.scope_label")}>
+                {(["personal", "shared"] as const).map((scopeOption) => (
+                  <Button
+                    key={scopeOption}
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="workspace-scope-chip"
+                    role="radio"
+                    data-active={fileScope === scopeOption ? "true" : "false"}
+                    aria-checked={fileScope === scopeOption}
+                    onClick={() => switchFileScope(scopeOption)}
+                  >
+                    {scopeOption === "personal" ? t("workspace.scope_personal") : t("workspace.scope_shared")}
+                  </Button>
+                ))}
+              </span>
               <span className="workspace-scope-hint">
                 {fileScope === "shared" ? t("workspace.scope_shared_hint") : t("workspace.scope_personal_hint")}
               </span>
@@ -254,14 +259,16 @@ export function WorkspaceFilesBrowser({
           <div className="workspace-files-bar">
             <WorkspacePathBreadcrumb path={filePath} onNavigate={openDirectory} />
             {homeStatus.kind === "live" ? (
-              <span className="workspace-home-status workspace-home-status--live">
-                <span aria-hidden="true">●</span> {t("workspace.source_live")}
-                {homeStatus.nodeId ? <span className="workspace-home-node"> {homeStatus.nodeId}</span> : null}
+              <span className="workspace-home-status">
+                <span className="workspace-status-pip tone-good" aria-hidden="true" />
+                {t("workspace.source_live")}
+                {homeStatus.nodeId ? <span className="workspace-home-node code">{homeStatus.nodeId}</span> : null}
               </span>
             ) : null}
             {homeStatus.kind === "snapshot-chip" ? (
-              <span className="workspace-home-status workspace-home-status--snapshot">
-                <span aria-hidden="true">○</span> {t("workspace.source_snapshot")}
+              <span className="workspace-home-status">
+                <span className="workspace-status-pip tone-warn" aria-hidden="true" />
+                {t("workspace.source_snapshot")}
               </span>
             ) : null}
           </div>
@@ -366,7 +373,12 @@ export function AgentWorkspacePage({
 
   const headerSubtitle = pageTab === "profile"
     ? t("workspace.profile_sub", { agent: displayName })
-    : t("workspace.header_executor", { executor: agentLabel(agent.executorKind) });
+    : null;
+
+  const placementDescriptions = describeAgentPlacements(agent.placements);
+  const primaryPlacement = placementDescriptions.find(
+    ({ placement }) => placement.desiredState === "active",
+  ) ?? placementDescriptions[0];
 
   function pageTabCount(tab: WorkspacePageTab): number | undefined {
     if (tab === "activities" && brief) return brief.metrics.sessionCount || undefined;
@@ -377,7 +389,6 @@ export function AgentWorkspacePage({
     <section
       id="agent-workspace-panel"
       className="workspace-page"
-      data-executor={agent.executorKind}
       aria-label={t("workspace.title")}
       tabIndex={-1}
     >
@@ -425,16 +436,36 @@ export function AgentWorkspacePage({
           </div>
         )}
         actions={(
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label={t("nav.refresh")}
-            disabled={isRefreshing || (pageTab === "activities" && query.isFetching)}
-            onClick={() => void refreshWorkspace()}
-          >
-            <NavRefresh size={16} className={isRefreshing || (pageTab === "activities" && query.isFetching) ? "spin" : undefined} />
-          </Button>
+          <>
+            <div className="workspace-header-facts">
+              <span className="workspace-header-fact">
+                <span className="workspace-header-fact-label">{t("admin.v2.agent_runtime")}</span>
+                <span className="workspace-header-chip" translate="no">
+                  <AgentMark agent={agent.executorKind} size={13} />
+                  <span className="workspace-header-chip-name">{agentLabel(agent.executorKind)}</span>
+                </span>
+              </span>
+              <span className="workspace-header-fact">
+                {primaryPlacement ? (
+                  <AgentPlacementBadge description={primaryPlacement} showSandbox />
+                ) : (
+                  <span className="workspace-header-chip workspace-header-chip--empty">
+                    {t("admin.v2.no_runtime_placement")}
+                  </span>
+                )}
+              </span>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label={t("nav.refresh")}
+              disabled={isRefreshing || (pageTab === "activities" && query.isFetching)}
+              onClick={() => void refreshWorkspace()}
+            >
+              <NavRefresh size={16} className={isRefreshing || (pageTab === "activities" && query.isFetching) ? "spin" : undefined} />
+            </Button>
+          </>
         )}
       />
 

@@ -5,7 +5,6 @@
    ===================================================================== */
 
 .workspace-page {
-  --workspace-accent: var(--action);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -14,13 +13,9 @@
   background: var(--surface-0);
 }
 
-/* Per-executor hue accents are retired — the monochrome system carries
-   agent identity through the vendor glyph (AgentMark), never a vendor
-   color. --workspace-accent stays a single ink accent for every agent. */
-
-.workspace-page .page-header-kicker {
-  color: var(--workspace-accent);
-}
+/* Per-executor hue accents and the --workspace-accent ink accent are both
+   retired — agent identity reads through the vendor glyph (AgentMark), page
+   kickers stay ink-3 like every other route, and metrics stay grey. */
 
 /* Title + vendor mark — operational scale (Geist title-lg), not a hero plate. */
 .workspace-header-title {
@@ -40,6 +35,70 @@
   background: var(--surface-2);
   color: var(--ink-1);
   box-shadow: inset 0 0 0 1px var(--line-2);
+}
+
+/* Runtime + computer facts in the workspace header: a two-row stack of
+   labeled chips. The micro caps label echoes the page kicker; the chips
+   reuse the placement-badge visual language (hairline, surface-1, mono
+   name) so runtime and node read as one system. */
+.workspace-header-facts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.workspace-header-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.workspace-header-fact-label {
+  flex: none;
+  color: var(--ink-3);
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+.workspace-header-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  padding: var(--sp-0-5) var(--sp-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-1);
+  background: var(--surface-1);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2);
+  line-height: 1.35;
+}
+
+.workspace-header-chip > svg {
+  flex: none;
+  color: var(--ink-2);
+}
+
+.workspace-header-chip-name {
+  flex: 0 1 auto;
+  overflow: hidden;
+  color: var(--ink-1);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-header-chip--empty {
+  color: var(--ink-3);
+  font-style: italic;
 }
 
 /* Stacked workspace header stays compact in the agents detail pane. */
@@ -149,14 +208,17 @@
   border-right: 0;
 }
 
+/* KPI numeral — display tier (mono, 700, tracked), same language as the
+   admin dashboard tiles. atelier.css no longer patches this rule. */
 .workspace-metric-item strong {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
   color: var(--ink-1);
+  font-family: var(--font-display);
   font-size: var(--fs-6);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: var(--track-display);
   line-height: 1;
 }
 
@@ -170,10 +232,9 @@
   text-transform: uppercase;
 }
 
-.workspace-metric-item.is-emphasis strong {
-  color: var(--workspace-accent);
-}
-
+/* Metrics stay grey — the --live scope rule names the workspace metric
+   strip as a calm surface, so an active-run count is a grey dot on the
+   calm cadence, never the accent and never an action fill. */
 .workspace-metric-item.is-live strong::after {
   content: "";
   flex: none;
@@ -443,13 +504,13 @@
 }
 
 /* Readiness pip: a standalone toned dot that carries availability at a glance.
-   The status text moves to the element's title/aria-label so the hero stays
-   uncluttered. */
+    The status text moves to the element's title/aria-label so the hero stays
+    uncluttered. Same 7px as the spec's status-dot and the placement badge. */
 .workspace-status-pip {
   flex: none;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-full);
   background: currentColor;
 }
 
@@ -474,15 +535,26 @@
   flex-direction: column;
 }
 
+/* Snapshot notice — status rides on the dot and the copy, never a fill. */
 .workspace-snapshot-banner {
   display: flex;
   align-items: flex-start;
   gap: var(--sp-3);
-  border-bottom: 1px solid color-mix(in srgb, var(--warn) 28%, var(--line-1));
-  background: color-mix(in srgb, var(--warn) 8%, var(--surface-0));
+  border-bottom: 1px solid var(--line-2);
+  background: var(--surface-1);
   padding: var(--sp-3) var(--sp-4);
   color: var(--ink-2);
   font: var(--type-body-sm);
+}
+
+.workspace-snapshot-banner::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: var(--sp-1-5);
+  border-radius: var(--r-full);
+  background: var(--warn);
 }
 
 .workspace-snapshot-banner-text {
@@ -517,25 +589,48 @@
 .workspace-scope-toggle {
   display: flex;
   align-items: center;
-  gap: var(--sp-1);
+  gap: var(--sp-3);
   min-height: 34px;
-  padding: 0 var(--sp-4);
+  padding: var(--sp-1) var(--sp-4);
   border-bottom: 1px solid var(--line-2);
 }
 
+/* Scope options share the segmented-control grammar of the page tabs —
+   same track, radius, and active fill, so both chip filters read as one
+   control vocabulary. */
+.workspace-scope-options {
+  display: inline-flex;
+  align-items: stretch;
+  gap: var(--sp-0-5);
+  padding: var(--sp-0-5);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+}
+
 .workspace-scope-chip {
-  height: 24px;
-  padding: 0 var(--sp-2);
-  font: var(--type-label-strong);
+  min-height: 26px;
+  padding: 0 var(--sp-3);
+  border: 0;
+  border-radius: calc(var(--r-2) - 2px);
+  background: transparent;
   color: var(--ink-3);
-  border: 1px solid transparent;
-  border-radius: var(--r-1);
+  font: var(--type-label-strong);
+  white-space: nowrap;
+  transition:
+    background var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease),
+    box-shadow var(--t-fast) var(--ease);
+}
+
+.workspace-scope-chip:hover {
+  color: var(--ink-1);
 }
 
 .workspace-scope-chip[data-active="true"] {
+  background: var(--surface-3);
   color: var(--ink-1);
-  border-color: var(--line-2);
-  background: var(--surface-1);
+  box-shadow: inset 0 0 0 1px var(--line-1);
 }
 
 .workspace-scope-hint {
@@ -599,14 +694,15 @@
 }
 
 .workspace-home-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1-5);
   margin-left: auto;
   color: var(--ink-3);
   font-size: var(--fs-2);
   white-space: nowrap;
 }
 
-.workspace-home-status--live { color: var(--ink-1); }
-.workspace-home-status--snapshot,
 .workspace-home-node { color: var(--ink-3); }
 
 .workspace-file-error {
@@ -674,9 +770,8 @@
   color: var(--ink-3);
 }
 
-.workspace-file-pick[data-kind="directory"] .workspace-file-icon {
-  color: var(--workspace-accent);
-}
+/* Kind is carried by the glyph (folder vs file), never by a hue — both stay
+   ink-3 like artifact chips. */
 
 .workspace-file-up {
   width: 100%;
@@ -894,11 +989,8 @@
 .workspace-empty-state-title {
   margin: 0;
   color: var(--ink-1);
-  font-family: var(--font-display);
-  font-size: var(--fs-5);
-  font-weight: 550;
+  font: var(--type-title);
   letter-spacing: var(--track-display);
-  line-height: 1.2;
 }
 
 .workspace-empty-state-hint {
@@ -980,11 +1072,8 @@
   font-size: var(--fs-2);
 }
 
-.workspace-empty-state-mark.is-pulse {
-  background: color-mix(in srgb, var(--ok) 14%, var(--surface-2));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 24%, var(--line-2));
-}
-
+/* Idle-presence pulse: the tile stays the neutral mark plate; only the dot
+   carries the (grey) presence signal on the calm cadence. */
 .workspace-empty-state-mark.is-pulse::after {
   content: "";
   width: 8px;
@@ -1013,13 +1102,15 @@
   background: var(--line-2);
 }
 
+/* A fetch shimmer is chrome feedback, not agent work — calm grey, not the
+   action fill and never --live. */
 .workspace-loading-bar::after {
   content: "";
   display: block;
   width: 40%;
   height: 100%;
   border-radius: inherit;
-  background: var(--workspace-accent);
+  background: var(--ink-3);
   animation: workspace-loading-slide var(--t-draw) var(--ease) infinite;
 }
 
@@ -1030,10 +1121,6 @@
 
 /* ---- profile dossier (workspace variant) ---------------------------- */
 
-/* Executor hue accents retired (see .workspace-page above) — the dossier
-   defines the accent locally since it can render outside .workspace-page. */
-.workspace-profile-dossier { --workspace-accent: var(--action); }
-
 .workspace-profile-dossier {
   display: flex;
   flex-direction: column;
@@ -1041,45 +1128,30 @@
 }
 
 .workspace-dossier-hero {
-  display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
   gap: var(--sp-4);
   padding-bottom: var(--sp-5);
   border-bottom: 1px solid var(--line-2);
 }
 
-.workspace-dossier-mark {
-  display: inline-grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--r-2);
-  background: color-mix(in srgb, var(--workspace-accent) 12%, var(--surface-2));
-  color: var(--ink-1);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--workspace-accent) 22%, var(--line-1));
+.workspace-dossier-identity {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--sp-1-5);
 }
 
+/* Team-profile hero slots — the agent hero uses the identity stack above. */
 .workspace-dossier-blurb {
+  flex: 1;
+  min-width: 0;
   margin: 0;
   color: var(--ink-2);
   font: var(--type-body-sm);
   line-height: 1.55;
   text-wrap: pretty;
-}
-
-.workspace-dossier-intro {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: var(--sp-1);
-}
-
-.workspace-dossier-intro > span {
-  color: var(--action);
-  font: var(--type-micro);
-  font-weight: 600;
-  letter-spacing: var(--track-0);
 }
 
 .workspace-dossier-status {
@@ -1088,6 +1160,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--sp-3);
+  margin-left: auto;
 }
 
 .workspace-dossier-runtime {
@@ -1095,18 +1168,37 @@
   font: var(--type-label);
 }
 
-/* This slot carries a count phrase on a team and an executor-kind identifier
-   on an agent. Only the identifier takes the code face, and the `font`
-   shorthand above resets family, so it has to be re-asserted here. */
-.workspace-dossier-runtime.code {
-  font-family: var(--font-mono);
+.workspace-dossier-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.workspace-dossier-rename {
+  display: flex;
+  max-width: 320px;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.workspace-dossier-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+  color: var(--ink-3);
+  font: var(--type-label);
+}
+
+.workspace-dossier-availability {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1-5);
 }
 
 /* The profile's durable inner character. Its slightly editorial treatment
    keeps identity separate from runtime configuration. */
 .agent-personality-card {
-  --personality-label-width: 5.25rem;
-
   position: relative;
   display: flex;
   flex-direction: column;
@@ -1135,31 +1227,6 @@
   gap: var(--sp-4);
 }
 
-.agent-personality-heading {
-  display: flex;
-  min-width: 0;
-  align-items: flex-start;
-  gap: var(--sp-4);
-}
-
-.agent-personality-file {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--personality-label-width);
-  min-height: var(--sp-6);
-  padding: 0 var(--sp-2);
-  flex-shrink: 0;
-  border: 1px solid color-mix(in srgb, var(--action) 38%, var(--line-1));
-  border-radius: var(--r-1);
-  background: color-mix(in srgb, var(--action) 8%, var(--surface-2));
-  color: var(--action);
-  font-family: var(--font-mono);
-  font-size: var(--fs-1);
-  font-weight: 650;
-  letter-spacing: 0.04em;
-}
-
 .agent-personality-title-block {
   display: flex;
   min-width: 0;
@@ -1174,13 +1241,13 @@
   gap: var(--sp-3);
 }
 
+/* Section title — the display tier (mono title role), not an off-scale
+   sans with hand-picked weight/tracking. */
 .agent-personality-title-row h2 {
   margin: 0;
   color: var(--ink-1);
-  font-size: var(--fs-5);
-  font-weight: 650;
-  letter-spacing: -0.025em;
-  line-height: 1.1;
+  font: var(--type-title);
+  letter-spacing: var(--track-display);
 }
 
 .agent-personality-state {
@@ -1196,16 +1263,18 @@
 .agent-personality-state > span {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   background: var(--ink-4);
 }
 
+/* "Ready" is a status, not an action — the grey hierarchy's calm tier,
+   same as tone-good on the status pills. */
 .agent-personality-state.is-defined {
-  color: var(--action);
+  color: var(--ok);
 }
 
 .agent-personality-state.is-defined > span {
-  background: var(--action);
+  background: var(--ok);
 }
 
 .agent-personality-help {
@@ -1226,7 +1295,7 @@
 .agent-personality-document {
   position: relative;
   z-index: 1;
-  padding: var(--sp-5) 0 0 calc(var(--personality-label-width) + var(--sp-4));
+  padding: var(--sp-5) 0 0;
   border-top: 1px solid var(--line-2);
   color: var(--ink-2);
   font: var(--type-body-sm);
@@ -1242,26 +1311,28 @@
   margin-bottom: 0;
 }
 
+/* In-document headings — reading face, on-scale weights, subhead sizes so a
+   heading inside the prose never rivals the pane title. */
 .agent-personality-document h1,
 .agent-personality-document h2,
 .agent-personality-document h3 {
   margin: var(--sp-5) 0 var(--sp-2);
   color: var(--ink-1);
-  font-weight: 650;
-  letter-spacing: -0.015em;
+  font-weight: 600;
+  letter-spacing: var(--track-0);
   line-height: 1.25;
 }
 
 .agent-personality-document h1 {
-  font-size: var(--fs-5);
+  font-size: var(--fs-subhead);
 }
 
 .agent-personality-document h2 {
-  font-size: var(--fs-4);
+  font-size: var(--fs-heading);
 }
 
 .agent-personality-document h3 {
-  font-size: var(--fs-3);
+  font-size: var(--fs-4);
 }
 
 .agent-personality-document p,
@@ -1282,7 +1353,7 @@
 
 .agent-personality-document blockquote {
   padding-left: var(--sp-4);
-  border-left: 2px solid var(--action);
+  border-left: 2px solid var(--line-1);
   color: var(--ink-3);
 }
 
@@ -1308,8 +1379,8 @@
 .agent-personality-empty-lede {
   color: var(--ink-1);
   font-size: var(--fs-4);
-  font-weight: 550;
-  letter-spacing: -0.015em;
+  font-weight: 500;
+  letter-spacing: var(--track-0);
   line-height: 1.35;
   text-wrap: balance;
 }
@@ -1322,7 +1393,6 @@
   text-wrap: pretty;
 }
 
-.agent-personality-empty ol,
 .agent-personality-editor-guide ol {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1332,7 +1402,6 @@
   list-style: none;
 }
 
-.agent-personality-empty li,
 .agent-personality-editor-guide li {
   display: grid;
   grid-template-columns: 24px 1fr;
@@ -1342,21 +1411,20 @@
   border-bottom: 1px solid var(--line-2);
 }
 
-.agent-personality-empty li:nth-child(odd),
 .agent-personality-editor-guide li:nth-child(odd) {
   margin-right: var(--sp-3);
   border-right: 1px solid var(--line-2);
 }
 
-.agent-personality-empty li > span,
+/* Ordinal markers — technical text (mono, quiet ink), not the action
+   color; they are labels, not links. */
 .agent-personality-editor-guide li > span {
-  color: var(--action);
+  color: var(--ink-4);
   font-family: var(--font-mono);
   font-size: var(--fs-1);
   line-height: 1.7;
 }
 
-.agent-personality-empty li > strong,
 .agent-personality-editor-guide li strong {
   color: var(--ink-2);
   font: var(--type-label-strong);
@@ -1440,7 +1508,7 @@
   min-height: 320px;
   resize: vertical;
   border-color: var(--line-1);
-  border-radius: var(--r-1);
+  border-radius: var(--r-2);
   background: var(--surface-0);
   font-size: var(--fs-3);
   line-height: 1.7;
@@ -1471,15 +1539,6 @@
 }
 
 @media (max-width: 719px) {
-  .workspace-dossier-hero {
-    grid-template-columns: auto 1fr;
-  }
-
-  .workspace-dossier-status {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
-  }
-
   .agent-personality-card {
     padding: var(--sp-5);
   }
@@ -1490,19 +1549,16 @@
 
   .agent-personality-edit-action {
     align-self: flex-start;
-    margin-left: calc(var(--personality-label-width) + var(--sp-4));
   }
 
   .agent-personality-document {
     padding-left: 0;
   }
 
-  .agent-personality-empty ol,
   .agent-personality-editor-guide ol {
     grid-template-columns: 1fr;
   }
 
-  .agent-personality-empty li:nth-child(odd),
   .agent-personality-editor-guide li:nth-child(odd) {
     margin-right: 0;
     border-right: 0;
@@ -1571,39 +1627,16 @@
   gap: var(--sp-3);
 }
 
-.workspace-identity-record {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  padding: var(--sp-4) 0;
-}
-
-.workspace-identity-kicker {
-  display: block;
-  margin-bottom: 3px;
-  color: var(--ink-3);
-  font: var(--type-micro);
-  letter-spacing: var(--track-0);
-}
-
-.workspace-identity-value {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--sp-4);
-}
-
-.workspace-identity-value > span {
-  color: var(--ink-3);
-  font: var(--type-label);
-}
-
+/* The agent/team name is display-tier — mono, tracked, ink-1 — the same
+   register as conversation titles and KPI numerals. */
 .workspace-dossier-name-value {
   margin: 0;
   color: var(--ink-1);
-  font-size: var(--fs-4);
+  font-family: var(--font-display);
+  font-size: var(--fs-title);
   font-weight: 600;
-  letter-spacing: -0.015em;
+  letter-spacing: var(--track-display);
+  line-height: 1.2;
 }
 
 .workspace-dossier-details {
@@ -1698,12 +1731,12 @@
 
 .workspace-error-action {
   min-height: 34px;
-  border: 1px solid var(--line-1);
+  border: 1px solid var(--action);
   border-radius: var(--r-2);
-  background: var(--ink-1);
+  background: var(--action);
   padding: 0 var(--sp-4);
-  color: var(--surface-0);
-  font: var(--type-label);
+  color: var(--on-action);
+  font: var(--type-label-strong);
   cursor: pointer;
 }
 
@@ -1718,6 +1751,7 @@
   .workspace-pick,
   .workspace-file-up,
   .workspace-page .workspace-page-tab,
+  .workspace-scope-chip,
   .workspace-snapshot-banner-dismiss,
   .workspace-path-segment {
     min-height: 44px;

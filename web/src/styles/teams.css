@@ -151,14 +151,6 @@
   justify-content: flex-end;
 }
 
-.team-workspace-page {
-  --workspace-accent: var(--action);
-}
-
-.team-profile-dossier {
-  --workspace-accent: var(--action);
-}
-
 .team-profile-inline-form {
   display: flex;
   flex-direction: column;

@@ -56,22 +56,19 @@ export function AgentPersonalityEditor({
       aria-labelledby={titleId}
     >
       <div className="agent-personality-card-head">
-        <div className="agent-personality-heading">
-          <span className="agent-personality-file" aria-hidden="true">PERSONALITY</span>
-          <div className="agent-personality-title-block">
-            <div className="agent-personality-title-row">
-              <h2 id={titleId}>{t("agents_page.personality_title")}</h2>
-              <span className={`agent-personality-state${hasCustomPersonality ? " is-defined" : ""}`}>
-                <span aria-hidden="true" />
-                {hasCustomPersonality
-                  ? t("agents_page.personality_defined")
-                  : t("agents_page.personality_default")}
-              </span>
-            </div>
-            <span id={helpId} className="agent-personality-help">
-              {t("agents_page.personality_help")}
+        <div className="agent-personality-title-block">
+          <div className="agent-personality-title-row">
+            <h2 id={titleId}>{t("agents_page.personality_title")}</h2>
+            <span className={`agent-personality-state${hasCustomPersonality ? " is-defined" : ""}`}>
+              <span aria-hidden="true" />
+              {hasCustomPersonality
+                ? t("agents_page.personality_defined")
+                : t("agents_page.personality_default")}
             </span>
           </div>
+          <span id={helpId} className="agent-personality-help">
+            {t("agents_page.personality_help")}
+          </span>
         </div>
         {editable && !editing ? (
           <Button
@@ -191,24 +188,6 @@ export function AgentPersonalityEditor({
         <div className="agent-personality-empty">
           <p className="agent-personality-empty-lede">{t("agents_page.personality_empty")}</p>
           <span>{t("agents_page.personality_empty_help")}</span>
-          <ol aria-label={t("agents_page.personality_framework")}>
-            <li>
-              <span>01</span>
-              <strong>{t("agents_page.personality_purpose")}</strong>
-            </li>
-            <li>
-              <span>02</span>
-              <strong>{t("agents_page.personality_truths")}</strong>
-            </li>
-            <li>
-              <span>03</span>
-              <strong>{t("agents_page.personality_voice")}</strong>
-            </li>
-            <li>
-              <span>04</span>
-              <strong>{t("agents_page.personality_boundaries")}</strong>
-            </li>
-          </ol>
         </div>
       )}
     </section>

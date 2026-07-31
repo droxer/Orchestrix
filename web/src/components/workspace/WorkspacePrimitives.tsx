@@ -58,24 +58,22 @@ export function WorkspaceLoading({ label }: { label: string }) {
   );
 }
 
-/** One cell of the metric strip. `emphasis`/`live`/`zero` toggle the accent,
- *  live pulse, and dimmed-zero treatments respectively. */
+/** One cell of the metric strip. `live` adds the grey presence dot on the
+ *  calm cadence (the workspace metric strip stays grey per the --live scope
+ *  rule); `zero` dims an empty count. */
 export function MetricItem({
   label,
   value,
-  emphasis = false,
   live = false,
   zero = false,
 }: {
   label: string;
   value: number;
-  emphasis?: boolean;
   live?: boolean;
   zero?: boolean;
 }) {
   const classes = [
     "workspace-metric-item",
-    emphasis ? "is-emphasis" : "",
     live ? "is-live" : "",
     zero ? "is-zero" : "",
   ]
@@ -239,7 +237,6 @@ export function WorkspaceActivities({
         <MetricItem
           label={t("workspace.metric_runs")}
           value={metrics?.activeRunCount ?? 0}
-          emphasis={(metrics?.activeRunCount ?? 0) > 0}
           live={(metrics?.activeRunCount ?? 0) > 0}
         />
         <MetricItem label={t("workspace.metric_tasks")} value={metrics?.activeTaskCount ?? 0} zero={(metrics?.activeTaskCount ?? 0) === 0} />

@@ -806,6 +806,111 @@ describe("agent stream parsing", () => {
     assert.deepEqual(accumulator.update(`${turn}\n${turn}`), [{ kind: "text", text: "One answer." }]);
   });
 
+  it("does not duplicate Claude result text when the result frame checkpoints separately", () => {
+    const assistantFrame = JSON.stringify({
+      type: "assistant",
+      message: { id: "msg_1", role: "assistant", content: [{ type: "text", text: "The answer is 42." }] },
+    });
+    const resultFrame = JSON.stringify({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      result: "The answer is 42.",
+    });
+    const accumulator = new AgentStreamAccumulator("claude");
+
+    assert.deepEqual(accumulator.update(assistantFrame), [{ kind: "text", text: "The answer is 42." }]);
+    assert.deepEqual(accumulator.update(`${assistantFrame}\n${resultFrame}`), [
+      { kind: "text", text: "The answer is 42." },
+      { kind: "narration", key: "agent_stream.claude_finished", params: { tone: "good" } },
+    ]);
+  });
+
+  it("keeps a Claude result-only reply that differs from the streamed text", () => {
+    const turn = [
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Streamed prefix" } },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        message: { id: "msg_1", role: "assistant", content: [{ type: "text", text: "Streamed prefix" }] },
+      }),
+    ].join("\n");
+    const resultFrame = JSON.stringify({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      result: "Streamed prefix — with the cloud-only suffix.",
+    });
+    const accumulator = new AgentStreamAccumulator("claude");
+    accumulator.update(turn);
+
+    assert.deepEqual(accumulator.update(`${turn}\n${resultFrame}`), [
+      { kind: "text", text: "Streamed prefix" },
+      { kind: "text", text: "Streamed prefix — with the cloud-only suffix." },
+      { kind: "narration", key: "agent_stream.claude_finished", params: { tone: "good" } },
+    ]);
+  });
+
+  it("keeps identical text blocks in consecutive Claude result-only turns", () => {
+    const turn = [
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_start", index: 0, content_block: { type: "text" } },
+      }),
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Same answer." } },
+      }),
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_stop", index: 0 },
+      }),
+      JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "Same answer." }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("claude", `${turn}\n${turn}`), [
+      { kind: "text", text: "Same answer." },
+      { kind: "narration", key: "agent_stream.claude_finished", params: { tone: "good" } },
+      { kind: "text", text: "Same answer." },
+      { kind: "narration", key: "agent_stream.claude_finished", params: { tone: "good" } },
+    ]);
+  });
+
+  it("preserves leading whitespace in Codex agent messages", () => {
+    const raw = JSON.stringify({
+      type: "item.completed",
+      item: { type: "agent_message", text: "  indented first line\nsecond line" },
+    });
+
+    assert.deepEqual(parseAgentStream("codex", raw), [
+      { kind: "text", text: "  indented first line\nsecond line" },
+    ]);
+  });
+
+  it("preserves leading whitespace in Pi assistant messages", () => {
+    const raw = JSON.stringify({
+      type: "message",
+      message: { role: "assistant", content: [{ type: "text", text: "  indented first line" }] },
+    });
+
+    assert.deepEqual(parseAgentStream("pi", raw), [
+      { kind: "text", text: "  indented first line" },
+    ]);
+  });
+
+  it("preserves leading whitespace in Kimi assistant messages", () => {
+    const raw = JSON.stringify({
+      role: "assistant",
+      content: [{ type: "text", text: "  indented first line" }],
+    });
+
+    assert.deepEqual(parseAgentStream("kimi", raw), [
+      { kind: "text", text: "  indented first line" },
+    ]);
+  });
+
   it("ignores Pi JSON empty assistant lifecycle events", () => {
     const raw = JSON.stringify({
       type: "message_end",
