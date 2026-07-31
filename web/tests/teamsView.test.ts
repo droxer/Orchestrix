@@ -9,7 +9,7 @@ import {
   nodeScopedTeamIssue,
   teamMutationInput,
 } from "../src/lib/teamForm.js";
-import { selectedTeamForWorkspace } from "../src/lib/teamWorkspace.js";
+import { selectedTeamForWorkspace, teamWorkspaceAgentId } from "../src/lib/teamWorkspace.js";
 
 describe("Agent team management", () => {
   it("keeps teams in employee agent management instead of standalone admin navigation", async () => {
@@ -17,6 +17,7 @@ describe("Agent team management", () => {
     const appSource = await readFile(resolve("web/src/App.tsx"), "utf8");
     const agentsSource = await readFile(resolve("web/src/components/AgentsPage.tsx"), "utf8");
     const teamsSource = await readFile(resolve("web/src/components/TeamsPage.tsx"), "utf8");
+    const agentWorkspaceSource = await readFile(resolve("web/src/components/AgentWorkspacePage.tsx"), "utf8");
     const teamWorkspaceSource = await readFile(resolve("web/src/components/TeamWorkspacePage.tsx"), "utf8");
     const teamMarkSource = await readFile(resolve("web/src/components/TeamMark.tsx"), "utf8");
     const sideNavSource = await readFile(resolve("web/src/components/SideNav.tsx"), "utf8");
@@ -28,8 +29,12 @@ describe("Agent team management", () => {
     assert.match(appSource, /route === "teams" \? \(\s*<TeamsPage/s);
     assert.match(teamsSource, /className="teams-list"/);
     assert.match(teamsSource, /<TeamWorkspacePage/);
-    assert.match(teamWorkspaceSource, /"profile", "artifacts", "activities"/);
-    assert.match(teamWorkspaceSource, /getTeamArtifacts/);
+    assert.match(agentWorkspaceSource, /"profile", "workspace", "activities"/);
+    assert.doesNotMatch(agentWorkspaceSource, /getAgentArtifacts|type: "artifact"/);
+    assert.match(teamWorkspaceSource, /"profile", "workspace", "activities"/);
+    assert.match(teamWorkspaceSource, /WorkspaceFilesBrowser/);
+    assert.match(teamWorkspaceSource, /fixedScope="shared"/);
+    assert.doesNotMatch(teamWorkspaceSource, /getTeamArtifacts|TeamArtifacts/);
     assert.match(teamWorkspaceSource, /getWorkspaceBrief\(\{ teamId: team\.id \}/);
     assert.match(teamsSource, /actions=\{teamId \? null :/);
     assert.match(teamsSource, /open=\{!teamId && addTeam\}/);
@@ -178,5 +183,22 @@ describe("Agent team management", () => {
     assert.equal(selectedTeamForWorkspace(teams, null), null);
     assert.equal(selectedTeamForWorkspace(teams, "team-research")?.id, "team-research");
     assert.equal(selectedTeamForWorkspace(teams, "team-missing"), null);
+  });
+
+  it("uses an available team member when the lead cannot read the shared workspace", () => {
+    assert.equal(teamWorkspaceAgentId({
+      leadAgentId: "lead",
+      members: [
+        { id: "lead", displayName: "Lead", executorKind: "codex", enabled: true, availability: "offline" },
+        { id: "support", displayName: "Support", executorKind: "claude", enabled: true, availability: "busy" },
+      ],
+    }), "support");
+    assert.equal(teamWorkspaceAgentId({
+      leadAgentId: "lead",
+      members: [
+        { id: "lead", displayName: "Lead", executorKind: "codex", enabled: true, availability: "ready" },
+        { id: "support", displayName: "Support", executorKind: "claude", enabled: true, availability: "ready" },
+      ],
+    }), "lead");
   });
 });

@@ -37,9 +37,9 @@
   width: 24px;
   height: 24px;
   border-radius: var(--r-2);
-  background: color-mix(in srgb, var(--workspace-accent) 12%, var(--surface-2));
+  background: var(--surface-2);
   color: var(--ink-1);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--workspace-accent) 22%, var(--line-1));
+  box-shadow: inset 0 0 0 1px var(--line-2);
 }
 
 /* Stacked workspace header stays compact in the agents detail pane. */
@@ -108,9 +108,9 @@
 
 .workspace-page .workspace-page-tab[aria-selected="true"],
 .workspace-page .workspace-page-tab.is-active {
-  background: color-mix(in srgb, var(--workspace-accent) 14%, var(--surface-3));
+  background: var(--surface-3);
   color: var(--ink-1);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--workspace-accent) 30%, var(--line-1));
+  box-shadow: inset 0 0 0 1px var(--line-1);
 }
 
 .workspace-page .workspace-page-tab[aria-selected="true"] .workspace-page-tab-count,
@@ -136,11 +136,13 @@
 
 .workspace-metric-item {
   display: flex;
-  align-items: baseline;
-  gap: var(--sp-2);
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--sp-1);
   min-width: 0;
-  border-right: 1px solid var(--line-2);
-  padding: var(--sp-3) var(--sp-4);
+  border-right: 1px solid var(--line-1);
+  padding: var(--sp-4);
 }
 
 .workspace-metric-item:last-child {
@@ -152,14 +154,17 @@
   align-items: center;
   gap: var(--sp-2);
   color: var(--ink-1);
-  font-size: var(--fs-5);
+  font-size: var(--fs-6);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
+/* Eyebrow-above-numeral, mirroring the admin dashboard tiles. DOM order
+   stays value-then-label so screen readers announce "3 active runs". */
 .workspace-metric-item span {
-  color: var(--ink-3);
+  order: -1;
+  color: var(--ink-4);
   font: var(--type-micro);
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
@@ -167,7 +172,6 @@
 
 .workspace-metric-item.is-emphasis strong {
   color: var(--workspace-accent);
-  font-size: var(--fs-5);
 }
 
 .workspace-metric-item.is-live strong::after {
@@ -194,6 +198,16 @@
   grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.6fr);
 }
 
+/* The preview renders only for a selected file; without one the browser
+   spans the full width instead of framing an empty desk. */
+.workspace-panes.is-browse-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace-panes.is-browse-only .workspace-pane-browse {
+  border-right: 0;
+}
+
 .workspace-pane {
   display: flex;
   flex-direction: column;
@@ -205,17 +219,7 @@
 .workspace-pane-preview {
   position: relative;
   border-right: 0;
-  background: color-mix(in srgb, var(--workspace-accent) 2.5%, var(--surface-0));
-}
-
-.workspace-pane-preview::after {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  z-index: 2;
-  width: 3px;
-  background: var(--workspace-accent);
-  pointer-events: none;
+  background: var(--surface-0);
 }
 
 .workspace-pane-preview::before {
@@ -267,6 +271,16 @@
   text-transform: lowercase;
 }
 
+.workspace-preview-close {
+  width: 28px;
+  height: 28px;
+  color: var(--ink-3);
+}
+
+.workspace-preview-close:hover {
+  color: var(--ink-1);
+}
+
 .workspace-pane-body {
   flex: 1;
   min-height: 0;
@@ -316,10 +330,14 @@
   padding: 0 var(--sp-4);
 }
 
+/* Section heads read as group labels, not content titles — the same micro
+   caps register as the metric eyebrows and dossier section titles. */
 .workspace-activity-head h2 {
   margin: 0;
-  color: var(--ink-1);
-  font: var(--type-label-strong);
+  color: var(--ink-3);
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
 }
 
 .workspace-activity-head > span {
@@ -349,18 +367,15 @@
   padding: var(--sp-6) var(--sp-7);
 }
 
+/* Quiet hairline card — no left accent bar, no tonal plate. Identity reads
+   through the hero, not through container chrome. */
 .workspace-profile .workspace-profile-panel {
   max-width: 640px;
   margin: 0 auto;
   padding: var(--sp-7);
   border: 1px solid var(--line-1);
   border-radius: var(--r-3);
-  background: var(--surface-3);
-  box-shadow: inset 3px 0 0 var(--workspace-accent);
-}
-
-.workspace-profile .workspace-profile-dossier {
-  box-shadow: inset 3px 0 0 var(--workspace-accent);
+  background: var(--surface-1);
 }
 
 .workspace-profile .adm-cred-row {
@@ -407,9 +422,11 @@
 }
 
 .workspace-metric-item--status {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
   margin-left: auto;
   border-right: 0;
-  align-items: center;
   gap: var(--sp-3);
 }
 
@@ -619,14 +636,13 @@
   width: 100%;
   min-width: 0;
   border: 0;
-  border-left: 2px solid transparent;
   border-bottom: 1px solid var(--line-2);
   background: transparent;
   padding: var(--sp-3) var(--sp-4);
   color: var(--ink-1);
   cursor: pointer;
   text-align: left;
-  transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+  transition: background var(--t-fast) var(--ease);
 }
 
 .workspace-pick:hover {
@@ -635,7 +651,6 @@
 
 .workspace-pick.is-active {
   background: var(--action-soft);
-  border-left-color: var(--workspace-accent);
 }
 
 .workspace-pick-title {
@@ -871,7 +886,7 @@
   height: 44px;
   margin-bottom: var(--sp-2);
   border-radius: var(--r-2);
-  background: color-mix(in srgb, var(--workspace-accent) 10%, var(--surface-2));
+  background: var(--surface-2);
   color: var(--ink-3);
   box-shadow: inset 0 0 0 1px var(--line-2);
 }
@@ -1104,7 +1119,7 @@
   overflow: hidden;
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
-  background: var(--surface-1);
+  background: transparent;
   transition:
     border-color var(--t-fast) var(--ease),
     background-color var(--t-fast) var(--ease);
@@ -1606,6 +1621,11 @@
   cursor: pointer;
   font: var(--type-label-strong);
   list-style: none;
+  transition: color var(--t-fast) var(--ease);
+}
+
+.workspace-dossier-details summary:hover {
+  color: var(--ink-1);
 }
 
 .workspace-dossier-details summary::-webkit-details-marker {
@@ -1642,7 +1662,7 @@
 }
 
 .workspace-skeleton-metric {
-  height: 44px;
+  height: 60px;
   flex: 1;
   border-radius: 0;
 }
@@ -1761,6 +1781,7 @@
 
   .workspace-metric-item--status {
     flex: 1 0 100%;
+    justify-content: flex-start;
     margin-left: 0;
   }
 

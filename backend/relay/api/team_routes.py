@@ -9,12 +9,9 @@ from ..security.auth import require_admin_session
 from .agent_routes import _agent_with_placements, _employee_exists
 from .deps import AppContextDep
 from .helpers import (
-    artifact_index_item,
     json_body,
     request_actor,
     string_field,
-    workspace_artifact_key,
-    workspace_artifacts,
 )
 
 router = APIRouter()
@@ -72,33 +69,6 @@ async def list_teams(request: Request, ctx: AppContextDep) -> dict[str, Any]:
             _team_view(ctx, team)
             for team in ctx.team_store.list_teams(actor["employeeId"])
         ]
-    }
-
-
-@router.get("/teams/{team_id}/artifacts")
-async def team_artifacts(
-    team_id: str, request: Request, ctx: AppContextDep
-) -> dict[str, Any]:
-    actor = request_actor(request, ctx.auth_store)
-    team = _owned_team(ctx, team_id, actor["employeeId"])
-    newest: dict[str, dict[str, Any]] = {}
-    for session in ctx.session_store.list_sessions():
-        if session.get("teamId") != team["id"]:
-            continue
-        for artifact in workspace_artifacts(session):
-            key = workspace_artifact_key(session, artifact)
-            current = newest.get(key)
-            if current is None or (artifact.get("createdAt") or "") >= (
-                current.get("createdAt") or ""
-            ):
-                newest[key] = artifact_index_item(session, artifact)
-    return {
-        "teamId": team["id"],
-        "artifacts": sorted(
-            newest.values(),
-            key=lambda item: item.get("createdAt") or "",
-            reverse=True,
-        ),
     }
 
 

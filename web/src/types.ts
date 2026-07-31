@@ -82,11 +82,6 @@ export interface TaskDeletionResponse {
   outcome: "deleted" | "already_deleted";
 }
 
-export interface AgentArtifactsResponse {
-  agentId: string;
-  artifacts: ArtifactIndexItem[];
-}
-
 export interface WorkspaceBriefSession {
   id: string;
   title?: string;
@@ -401,11 +396,6 @@ export interface AgentTeam {
 
 export interface AgentTeamsResponse {
   teams: AgentTeam[];
-}
-
-export interface TeamArtifactsResponse {
-  teamId: string;
-  artifacts: ArtifactIndexItem[];
 }
 
 export interface TeamMutationInput {

@@ -462,9 +462,6 @@ export function AgentProfilePanel({
                 <AdminDelete size={14} aria-hidden="true" />
                 {t("admin.v2.delete_agent")}
               </Button>
-              {error ? (
-                <p className="adm-form-error" role="alert">{t("admin.v2.action_failed", { message: error })}</p>
-              ) : null}
             </div>
           </>
         ) : null}

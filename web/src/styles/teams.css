@@ -165,9 +165,10 @@
   gap: var(--sp-5);
 }
 
+/* Inset fields on the surface-1 profile panel — surface-0 reads as sunken. */
 .team-profile-inline-form [data-slot="input"],
 .team-profile-inline-form [data-slot="select-trigger"] {
-  background: var(--surface-1);
+  background: var(--surface-0);
 }
 
 .team-profile-section {

@@ -20,7 +20,6 @@ from .helpers import (
     agent_task_mode,
     get_session_for_actor,
     json_body,
-    newest_agent_workspace_artifacts,
     request_actor,
     role_name,
     string_field,
@@ -90,25 +89,6 @@ async def update_agent(
             409 if "already has" in str(error) else 400, str(error)
         ) from error
     return {"agent": _agent_with_placements(ctx, updated)}
-
-
-@router.get("/agents/{agent_id}/artifacts")
-async def agent_artifacts(
-    agent_id: str, request: Request, ctx: AppContextDep
-) -> dict[str, Any]:
-    actor = request_actor(request, ctx.auth_store)
-    agent = ctx.agent_store.get_agent(agent_id)
-    if not agent or agent.get("deletedAt"):
-        raise HTTPException(404, "Agent not found.")
-    if (
-        not actor["isAdmin"]
-        and agent.get("supervisorEmployeeId") != actor["employeeId"]
-    ):
-        raise HTTPException(403, "Cannot read another employee's agent artifacts.")
-    return {
-        "agentId": agent_id,
-        "artifacts": newest_agent_workspace_artifacts(ctx.session_store, agent_id),
-    }
 
 
 @router.get("/admin/agents")

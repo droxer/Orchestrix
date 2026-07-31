@@ -1,30 +1,30 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { getAgentArtifacts, getWorkspaceBrief, listAgentWorkspaceFiles, readAgentWorkspaceFile } from "../api";
+import { getWorkspaceBrief, listAgentWorkspaceFiles, readAgentWorkspaceFile } from "../api";
 import type {
-  ArtifactIndexItem,
   EmployeeAgent,
   AgentWorkspaceFileResponse,
   WorkspaceFileEntry,
   AgentWorkspaceFilesResponse,
-  WorkspaceBriefSession,
-  WorkspaceBriefTask,
-  WorkspaceBriefResponse,
 } from "../types";
 import { agentLabel } from "../lib/plan";
 import { isWorkspaceRetryableError, workspaceFilesEmptyState, workspaceHomeStatus } from "../lib/workspaceHome";
-import { NavRefresh, WorkspaceFile, WorkspaceFolder } from "./icons";
+import { NavRefresh, ActionRemove, WorkspaceFile, WorkspaceFolder } from "./icons";
 import { AgentMark } from "./AgentMark";
 import { IdentityMonogram } from "./IdentityMonogram";
-import { compactDate, compactDueDate } from "../lib/workspaceFormat";
-import { MetricItem, WorkspaceEmpty, WorkspaceLoading } from "./workspace/WorkspacePrimitives";
+import { compactDate } from "../lib/workspaceFormat";
+import {
+  ActivitiesSkeleton,
+  WorkspaceActivities,
+  WorkspaceEmpty,
+  WorkspaceError,
+  WorkspaceLoading,
+} from "./workspace/WorkspacePrimitives";
 import { PageHeader } from "./PageHeader";
 import { Button } from "./ui/button";
-import { ArtifactBody } from "./artifact/ArtifactBody";
-import { ArtifactsEmpty } from "./artifact/ArtifactsEmpty";
 import { CodeView, isHtmlFile, isMarkdownFile, isRenderableFile, languageForFile } from "./CodeView";
 import { Markdown } from "./Markdown";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
@@ -32,9 +32,9 @@ import { AgentProfilePanel } from "./AgentProfilePanel";
 import { ProfileImage } from "./ProfileImagePicker";
 import { agentAvailabilityTone } from "../lib/adminHelpers";
 
-export type WorkspacePageTab = "profile" | "workspace" | "artifacts" | "activities";
+export type WorkspacePageTab = "profile" | "workspace" | "activities";
 
-const PAGE_TABS: readonly WorkspacePageTab[] = ["profile", "workspace", "artifacts", "activities"];
+const PAGE_TABS: readonly WorkspacePageTab[] = ["profile", "workspace", "activities"];
 
 interface AgentWorkspacePageProps {
   agent: EmployeeAgent;
@@ -44,11 +44,7 @@ interface AgentWorkspacePageProps {
   canEditMeta?: boolean;
 }
 
-// One active selection drives the preview pane: an artifact (rendered with the
-// shared ArtifactBody) or a workspace file (rendered from its fetched content).
-type Selection =
-  | { type: "artifact"; artifact: ArtifactIndexItem }
-  | { type: "file"; path: string; name: string };
+type FileSelection = { path: string; name: string };
 
 const parsePageTab = (value: string | null): WorkspacePageTab => {
   if (value === "files") return "workspace";
@@ -157,6 +153,167 @@ function WorkspacePathBreadcrumb({
   );
 }
 
+export function WorkspaceFilesBrowser({
+  agentId,
+  fixedScope,
+  emptyMark,
+  refreshVersion = 0,
+}: {
+  agentId: string;
+  fixedScope?: WorkspaceFileScope;
+  emptyMark?: ReactNode;
+  refreshVersion?: number;
+}) {
+  const { t } = useTranslation();
+  const [filePath, setFilePath] = useUrlSearchState("path", "", parseString, (value) => value || null);
+  const [selectedKey, setSelectedKey] = useUrlSearchState("item", "", parseString, (value) => value || null);
+  const [selectableScope, setSelectableScope] = useUrlSearchState(
+    "scope",
+    "personal" as WorkspaceFileScope,
+    parseFileScope,
+    (value) => value === "personal" ? null : value,
+  );
+  const [snapshotBannerDismissed, setSnapshotBannerDismissed] = useState(false);
+  const fileScope = fixedScope ?? selectableScope;
+  const selectedPath = selectedKey.startsWith("file:") ? selectedKey.slice(5) : "";
+  const selected: FileSelection | null = selectedPath
+    ? { path: selectedPath, name: selectedPath.split("/").at(-1) || selectedPath }
+    : null;
+  const fileQuery = useQuery({
+    queryKey: ["agent-workspace", agentId, fileScope, filePath, refreshVersion],
+    queryFn: ({ signal }) => listAgentWorkspaceFiles({
+      agentId,
+      path: filePath,
+      scope: fileScope === "shared" ? "shared" : undefined,
+    }, signal),
+    enabled: Boolean(agentId),
+  });
+  const contentQuery = useQuery({
+    queryKey: ["agent-workspace-file", agentId, fileScope, selectedPath, refreshVersion],
+    enabled: Boolean(agentId && selectedPath),
+    queryFn: ({ signal }) => readAgentWorkspaceFile({
+      agentId,
+      path: selectedPath,
+      scope: fileScope === "shared" ? "shared" : undefined,
+    }, signal),
+  });
+  const homeStatus = workspaceHomeStatus(fileQuery.data, snapshotBannerDismissed);
+
+  useEffect(() => {
+    setSnapshotBannerDismissed(false);
+  }, [agentId, fileScope]);
+
+  function openDirectory(path: string): void {
+    setFilePath(path);
+    setSelectedKey("");
+  }
+
+  function switchFileScope(next: WorkspaceFileScope): void {
+    if (next === fileScope) return;
+    setSelectableScope(next);
+    setFilePath("");
+    setSelectedKey("");
+  }
+
+  if (!agentId) {
+    return <WorkspaceEmpty title={t("workspace.files_unavailable")} mark={emptyMark ?? <WorkspaceFile size={18} />} announce />;
+  }
+
+  return (
+    <div className={`workspace-panes${selected ? "" : " is-browse-only"}`}>
+      <section className="workspace-pane workspace-pane-browse" aria-label={t("workspace.tab_files")}>
+        <div className="workspace-tabpanel-files">
+          {!fixedScope && fileScope === "personal" && homeStatus.kind === "snapshot-banner" ? (
+            <SnapshotBanner onDismiss={() => setSnapshotBannerDismissed(true)} />
+          ) : null}
+          {!fixedScope ? (
+            <div className="workspace-scope-toggle" role="group" aria-label={t("workspace.scope_label")}>
+              {(["personal", "shared"] as const).map((scopeOption) => (
+                <Button
+                  key={scopeOption}
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="workspace-scope-chip"
+                  data-active={fileScope === scopeOption ? "true" : "false"}
+                  aria-pressed={fileScope === scopeOption}
+                  onClick={() => switchFileScope(scopeOption)}
+                >
+                  {scopeOption === "personal" ? t("workspace.scope_personal") : t("workspace.scope_shared")}
+                </Button>
+              ))}
+              <span className="workspace-scope-hint">
+                {fileScope === "shared" ? t("workspace.scope_shared_hint") : t("workspace.scope_personal_hint")}
+              </span>
+            </div>
+          ) : (
+            <div className="workspace-scope-toggle" aria-label={t("workspace.scope_label")}>
+              <span className="workspace-scope-hint">{t("workspace.scope_shared_hint")}</span>
+            </div>
+          )}
+          <div className="workspace-files-bar">
+            <WorkspacePathBreadcrumb path={filePath} onNavigate={openDirectory} />
+            {homeStatus.kind === "live" ? (
+              <span className="workspace-home-status workspace-home-status--live">
+                <span aria-hidden="true">●</span> {t("workspace.source_live")}
+                {homeStatus.nodeId ? <span className="workspace-home-node"> {homeStatus.nodeId}</span> : null}
+              </span>
+            ) : null}
+            {homeStatus.kind === "snapshot-chip" ? (
+              <span className="workspace-home-status workspace-home-status--snapshot">
+                <span aria-hidden="true">○</span> {t("workspace.source_snapshot")}
+              </span>
+            ) : null}
+          </div>
+          <FilesPane
+            data={fileQuery.data}
+            error={fileQuery.error}
+            isLoading={fileQuery.isLoading}
+            path={filePath}
+            scope={fileScope}
+            selectedPath={selectedPath}
+            onOpenDirectory={openDirectory}
+            onSelectFile={(entry) => setSelectedKey(`file:${entry.path}`)}
+            onRetry={() => void fileQuery.refetch()}
+          />
+        </div>
+      </section>
+
+      {selected ? (
+        <section className="workspace-pane workspace-pane-preview" aria-label={t("workspace.preview")}>
+          <PaneHeader
+            title={selected.name}
+            actions={(
+              <>
+                <span className="workspace-preview-file-type code">{languageForFile(selected.name)}</span>
+                <Button
+                  variant="ghost"
+                  type="button"
+                  size="icon"
+                  className="workspace-preview-close"
+                  aria-label={t("workspace.close_preview")}
+                  title={t("workspace.close_preview")}
+                  onClick={() => setSelectedKey("")}
+                >
+                  <ActionRemove size={14} aria-hidden="true" />
+                </Button>
+              </>
+            )}
+          />
+          <div className="workspace-pane-body workspace-preview-body">
+            <FilePreview
+              name={selected.name}
+              data={contentQuery.data}
+              isLoading={contentQuery.isLoading}
+              error={contentQuery.isError ? contentQuery.error : null}
+            />
+          </div>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
 export function AgentWorkspacePage({
   agent,
   isRefreshing,
@@ -164,13 +321,9 @@ export function AgentWorkspacePage({
   onOpenThread,
   canEditMeta = false,
 }: AgentWorkspacePageProps) {
-  const { t, i18n } = useTranslation();
-  const [selected, setSelected] = useState<Selection | null>(null);
-  const [filePath, setFilePath] = useUrlSearchState("path", "", parseString, (value) => value || null);
+  const { t } = useTranslation();
   const [pageTab, setPageTab] = useUrlSearchState("tab", "activities" as WorkspacePageTab, parsePageTab, (value) => value === "activities" ? null : value, "push");
-  const [selectedKey, setSelectedKey] = useUrlSearchState("item", "", parseString, (value) => value || null);
-  const [snapshotBannerDismissed, setSnapshotBannerDismissed] = useState(false);
-  const previousScopeId = useRef(agent.id);
+  const [workspaceRefreshVersion, setWorkspaceRefreshVersion] = useState(0);
 
   const query = useQuery({
     queryKey: ["agent-workspace-brief", agent.id],
@@ -178,102 +331,19 @@ export function AgentWorkspacePage({
     queryFn: ({ signal }) => getWorkspaceBrief({ agentId: agent.id }, signal),
     enabled: pageTab === "activities",
   });
-  const [fileScope, setFileScope] = useUrlSearchState("scope", "personal" as WorkspaceFileScope, parseFileScope, (value) => value === "personal" ? null : value);
-  const fileQuery = useQuery({
-    queryKey: ["agent-workspace", agent.id, fileScope, filePath],
-    queryFn: ({ signal }) => listAgentWorkspaceFiles({ agentId: agent.id, path: filePath, scope: fileScope === "shared" ? "shared" : undefined }, signal),
-    enabled: pageTab === "workspace",
-  });
-  const homeStatus = workspaceHomeStatus(fileQuery.data, snapshotBannerDismissed);
-  const agentArtifactsQuery = useQuery({
-    queryKey: ["agent-artifacts", agent.id],
-    queryFn: ({ signal }) => getAgentArtifacts(agent.id, signal),
-    enabled: pageTab === "artifacts",
-  });
-  const selectedFilePath = selected?.type === "file" ? selected.path : "";
-  const contentQuery = useQuery({
-    queryKey: ["agent-workspace-file", agent.id, fileScope, selectedFilePath],
-    enabled: selected?.type === "file",
-    queryFn: ({ signal }) => readAgentWorkspaceFile({ agentId: agent.id, path: selectedFilePath, scope: fileScope === "shared" ? "shared" : undefined }, signal),
-  });
-
   const brief = query.data;
-  const artifacts = agentArtifactsQuery.data?.artifacts ?? [];
   const activitiesLoading = pageTab === "activities" && query.isLoading && !brief;
   const activitiesError = pageTab === "activities" && !brief && query.error
     ? query.error instanceof Error ? query.error.message : String(query.error)
     : "";
   const displayName = agent.displayName;
-  const showBrowsePane = pageTab === "artifacts" || pageTab === "workspace";
-
-  useEffect(() => {
-    const scopeId = agent.id;
-    if (previousScopeId.current === scopeId) return;
-    previousScopeId.current = scopeId;
-    setFilePath("");
-    setSelected(null);
-    setSelectedKey("");
-    setPageTab("activities");
-    setFileScope("personal");
-    setSnapshotBannerDismissed(false);
-  }, [agent.id, setFilePath, setFileScope, setPageTab, setSelectedKey]);
-
-  useEffect(() => {
-    if (pageTab === "profile" || pageTab === "activities") {
-      setSelected(null);
-      setSelectedKey("");
-      return;
-    }
-    if (pageTab === "artifacts" && selected?.type === "file") {
-      setSelected(null);
-      setSelectedKey("");
-    }
-    if (pageTab === "workspace" && selected?.type === "artifact") {
-      setSelected(null);
-      setSelectedKey("");
-    }
-  }, [pageTab, selected?.type, setSelectedKey]);
-
-  useEffect(() => {
-    if (!selectedKey) {
-      setSelected(null);
-      return;
-    }
-    if (selectedKey.startsWith("artifact:")) {
-      const artifact = artifacts.find((item) => item.id === selectedKey.slice(9));
-      if (artifact) setSelected({ type: "artifact", artifact });
-      return;
-    }
-    if (selectedKey.startsWith("file:")) {
-      const path = selectedKey.slice(5);
-      setSelected({ type: "file", path, name: path.split("/").at(-1) || path });
-    }
-  }, [artifacts, selectedKey]);
 
   async function refreshWorkspace(): Promise<void> {
+    if (pageTab === "workspace") setWorkspaceRefreshVersion((current) => current + 1);
     await Promise.all([
       pageTab === "activities" ? query.refetch() : Promise.resolve(),
-      pageTab === "workspace" ? fileQuery.refetch() : Promise.resolve(),
-      pageTab === "artifacts" ? agentArtifactsQuery.refetch() : Promise.resolve(),
       onRefresh(),
     ]);
-  }
-
-  function openDirectory(path: string): void {
-    setFilePath(path);
-  }
-
-  function switchFileScope(next: WorkspaceFileScope): void {
-    if (next === fileScope) return;
-    setFileScope(next);
-    setFilePath("");
-    setSelected(null);
-    setSelectedKey("");
-  }
-
-  function selectWorkspaceItem(selection: Selection): void {
-    setSelected(selection);
-    setSelectedKey(selection.type === "artifact" ? `artifact:${selection.artifact.id}` : `file:${selection.path}`);
   }
 
   function movePageTab(event: KeyboardEvent<HTMLButtonElement>, next: WorkspacePageTab): void {
@@ -290,8 +360,7 @@ export function AgentWorkspacePage({
 
   function pageTabLabel(tab: WorkspacePageTab): string {
     if (tab === "profile") return t("workspace.tab_profile");
-    if (tab === "workspace") return t("workspace.tab_files");
-    if (tab === "artifacts") return t("workspace.artifacts");
+    if (tab === "workspace") return t("workspace.tab_workspace");
     return t("workspace.tab_activities");
   }
 
@@ -300,7 +369,6 @@ export function AgentWorkspacePage({
     : t("workspace.header_executor", { executor: agentLabel(agent.executorKind) });
 
   function pageTabCount(tab: WorkspacePageTab): number | undefined {
-    if (tab === "artifacts") return artifacts.length || undefined;
     if (tab === "activities" && brief) return brief.metrics.sessionCount || undefined;
     return undefined;
   }
@@ -362,10 +430,10 @@ export function AgentWorkspacePage({
             variant="outline"
             size="icon"
             aria-label={t("nav.refresh")}
-            disabled={isRefreshing || (pageTab === "activities" && query.isFetching) || (pageTab === "workspace" && fileQuery.isFetching) || (pageTab === "artifacts" && agentArtifactsQuery.isFetching)}
+            disabled={isRefreshing || (pageTab === "activities" && query.isFetching)}
             onClick={() => void refreshWorkspace()}
           >
-            <NavRefresh size={16} className={isRefreshing || (pageTab === "activities" && query.isFetching) || (pageTab === "workspace" && fileQuery.isFetching) || (pageTab === "artifacts" && agentArtifactsQuery.isFetching) ? "spin" : undefined} />
+            <NavRefresh size={16} className={isRefreshing || (pageTab === "activities" && query.isFetching) ? "spin" : undefined} />
           </Button>
         )}
       />
@@ -385,334 +453,44 @@ export function AgentWorkspacePage({
         </div>
       ) : pageTab === "activities" ? (
         activitiesLoading ? (
-          <ActivitiesLoading />
+          <ActivitiesSkeleton panelId="workspace-page-panel-activities" labelledBy="workspace-page-tab-activities" />
         ) : activitiesError ? (
-          <WorkspaceError message={activitiesError} onRetry={() => void query.refetch()} />
+          <WorkspaceError
+            message={activitiesError}
+            eyebrow={t("workspace.load_failed")}
+            onRetry={() => void query.refetch()}
+            panelId="workspace-page-panel-activities"
+            labelledBy="workspace-page-tab-activities"
+          />
         ) : (
-          <ActivitiesPane
-            agent={agent}
+          <WorkspaceActivities
             brief={brief}
+            panelId="workspace-page-panel-activities"
+            labelledBy="workspace-page-tab-activities"
+            statusPill={(
+              <span className={`workspace-status-pill tone-${agentAvailabilityTone(agent.availability)}`}>
+                {t(`admin.v2.placement_status.${agent.availability}`, { defaultValue: agent.availability })}
+              </span>
+            )}
+            emptyPulse
             onOpenThread={onOpenThread}
           />
         )
-      ) : (
+      ) : pageTab === "workspace" ? (
         <div
           className="workspace-inspect"
           role="tabpanel"
-          id={`workspace-page-panel-${pageTab}`}
-          aria-labelledby={`workspace-page-tab-${pageTab}`}
+          id="workspace-page-panel-workspace"
+          aria-labelledby="workspace-page-tab-workspace"
         >
-          {showBrowsePane && pageTab === "artifacts" && !artifacts.length ? (
-            /* No artifacts means nothing to preview — the empty state owns
-               the whole panel instead of sitting beside a dead preview pane. */
-            agentArtifactsQuery.isLoading ? (
-              <WorkspaceLoading label={t("workspace.loading")} />
-            ) : (
-              <ArtifactsEmpty
-                title={t("workspace.no_artifacts")}
-                hint={t("workspace.empty_artifacts_hint")}
-              />
-            )
-          ) : showBrowsePane ? (
-            <div className="workspace-panes">
-              <section className="workspace-pane workspace-pane-browse" aria-label={pageTab === "artifacts" ? t("workspace.artifacts") : t("workspace.tab_files")}>
-                {pageTab === "artifacts" ? (
-                  <div className="workspace-pane-body">
-                    <ul className="workspace-pick-list">
-                        {artifacts.map((artifact) => {
-                          const active = selected?.type === "artifact" && selected.artifact.id === artifact.id;
-                          return (
-                            <li key={artifact.id}>
-                              <button
-                                type="button"
-                                className={`workspace-pick${active ? " is-active" : ""}`}
-                                aria-pressed={active}
-                                onClick={() => selectWorkspaceItem({ type: "artifact", artifact })}
-                              >
-                                <span className={`artifact-kind-tag is-${artifact.kind}`}>
-                                  {t(`artifact.kind.${artifact.kind}`, { defaultValue: artifact.kind })}
-                                </span>
-                                <span className="workspace-pick-title">{artifact.title}</span>
-                                <span className="workspace-pick-meta tnum">{compactDate(artifact.createdAt, i18n.language)}</span>
-                              </button>
-                            </li>
-                          );
-                        })}
-                    </ul>
-                  </div>
-                ) : (
-                  <div className="workspace-tabpanel-files">
-                    {fileScope === "personal" && homeStatus.kind === "snapshot-banner" ? (
-                      <SnapshotBanner onDismiss={() => setSnapshotBannerDismissed(true)} />
-                    ) : null}
-                    <div className="workspace-scope-toggle" role="group" aria-label={t("workspace.scope_label")}>
-                      {(["personal", "shared"] as const).map((scopeOption) => (
-                        <Button
-                          key={scopeOption}
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="workspace-scope-chip"
-                          data-active={fileScope === scopeOption ? "true" : "false"}
-                          aria-pressed={fileScope === scopeOption}
-                          onClick={() => switchFileScope(scopeOption)}
-                        >
-                          {scopeOption === "personal" ? t("workspace.scope_personal") : t("workspace.scope_shared")}
-                        </Button>
-                      ))}
-                      <span className="workspace-scope-hint">
-                        {fileScope === "shared" ? t("workspace.scope_shared_hint") : t("workspace.scope_personal_hint")}
-                      </span>
-                    </div>
-                    <div className="workspace-files-bar">
-                      <WorkspacePathBreadcrumb path={filePath} onNavigate={openDirectory} />
-                      {homeStatus.kind === "live" ? <span className="workspace-home-status workspace-home-status--live">● {t("workspace.source_live")}{homeStatus.nodeId ? <span className="workspace-home-node"> {homeStatus.nodeId}</span> : null}</span> : null}
-                      {homeStatus.kind === "snapshot-chip" ? (
-                        <span className="workspace-home-status workspace-home-status--snapshot">○ {t("workspace.source_snapshot")}</span>
-                      ) : null}
-                    </div>
-                    <FilesPane
-                      data={fileQuery.data}
-                      error={fileQuery.error}
-                      isLoading={fileQuery.isLoading}
-                      path={filePath}
-                      scope={fileScope}
-                      selectedPath={selectedFilePath}
-                      onOpenDirectory={openDirectory}
-                      onSelectFile={(entry) => selectWorkspaceItem({ type: "file", path: entry.path, name: entry.name })}
-                      onRetry={() => void fileQuery.refetch()}
-                    />
-                  </div>
-                )}
-              </section>
-
-              <section className="workspace-pane workspace-pane-preview" aria-label={t("workspace.preview")}>
-                <PaneHeader
-                  title={selected ? (selected.type === "artifact" ? selected.artifact.title : selected.name) : t("workspace.preview")}
-                  actions={selected?.type === "artifact" ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onOpenThread(selected.artifact.sessionId)}
-                    >
-                      {t("workspace.open_thread")}
-                    </Button>
-                  ) : selected?.type === "file" ? (
-                    <span className="workspace-preview-file-type code">{languageForFile(selected.name)}</span>
-                  ) : null}
-                />
-                <div className="workspace-pane-body workspace-preview-body">
-                  {!selected ? (
-                    <WorkspaceEmpty
-                      title={t("workspace.select_to_preview")}
-                      hint={t("workspace.empty_preview_hint")}
-                      mark={<AgentMark agent={agent.executorKind} size={18} />}
-                    />
-                  ) : selected.type === "artifact" ? (
-                    <div className="workspace-preview-viewport workspace-preview-viewport--artifact">
-                      <div className="artifact-viewer-body">
-                        <ArtifactBody artifact={selected.artifact} sessionId={selected.artifact.sessionId} />
-                      </div>
-                    </div>
-                  ) : (
-                    <FilePreview
-                      name={selected.name}
-                      data={contentQuery.data}
-                      isLoading={contentQuery.isLoading}
-                      error={contentQuery.isError ? contentQuery.error : null}
-                    />
-                  )}
-                </div>
-              </section>
-            </div>
-          ) : null}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function sessionTitle(session: WorkspaceBriefSession): string {
-  return session.title?.trim() || session.taskGoal?.trim() || session.id;
-}
-
-function taskTitle(task: WorkspaceBriefTask): string {
-  return task.title?.trim() || task.id;
-}
-
-/** Sessions carry `SessionStatus`, not `TaskStatus` — `completed`, `failed`,
- *  and `cancelled` have no `backlog.statuses.*` key and used to fall through
- *  to the raw lowercase enum. Label them from the thread vocabulary. */
-function sessionStatusLabel(
-  status: WorkspaceBriefSession["status"] | undefined,
-  t: (key: string, options?: Record<string, unknown>) => string,
-): string {
-  if (!status) return "";
-  return t(`thread.statuses.${status}`, { defaultValue: status });
-}
-
-function ActivitiesPane({
-  agent,
-  brief,
-  onOpenThread,
-}: {
-  agent: EmployeeAgent;
-  brief?: WorkspaceBriefResponse;
-  onOpenThread: (sessionId: string) => void;
-}) {
-  const { t, i18n } = useTranslation();
-  const metrics = brief?.metrics;
-  const activeRuns = brief?.activeRuns ?? [];
-  const sessions = brief?.sessions ?? [];
-  const tasks = brief?.tasks ?? [];
-  const hasActivity = activeRuns.length > 0 || sessions.length > 0 || tasks.length > 0;
-
-  return (
-    <div
-      className="workspace-inspect workspace-activities"
-      role="tabpanel"
-      id="workspace-page-panel-activities"
-      aria-labelledby="workspace-page-tab-activities"
-    >
-      <div className="workspace-metric-strip" aria-label={t("workspace.metrics")}>
-        <MetricItem
-          label={t("workspace.metric_runs")}
-          value={metrics?.activeRunCount ?? 0}
-          emphasis={(metrics?.activeRunCount ?? 0) > 0}
-          live={(metrics?.activeRunCount ?? 0) > 0}
-        />
-        <MetricItem label={t("workspace.metric_tasks")} value={metrics?.activeTaskCount ?? 0} zero={(metrics?.activeTaskCount ?? 0) === 0} />
-        <MetricItem label={t("workspace.metric_sessions")} value={metrics?.sessionCount ?? 0} zero={(metrics?.sessionCount ?? 0) === 0} />
-        <MetricItem label={t("workspace.metric_artifacts")} value={metrics?.artifactCount ?? 0} zero={(metrics?.artifactCount ?? 0) === 0} />
-        <div className="workspace-metric-item workspace-metric-item--status">
-          <span className={`workspace-status-pill tone-${agentAvailabilityTone(agent.availability)}`}>
-            {t(`admin.v2.placement_status.${agent.availability}`, { defaultValue: agent.availability })}
-          </span>
-        </div>
-      </div>
-
-      <div className="workspace-activity-sections">
-        {activeRuns.length ? (
-          <ActivitySection title={t("workspace.activity_runs")} count={activeRuns.length} index={0}>
-            <ul className="workspace-pick-list">
-              {activeRuns.map((run) => (
-                <li key={run.runId}>
-                  <ActivityRow
-                    title={run.taskGoal}
-                    meta={[
-                      agentLabel(run.agent),
-                      t(`mode.${run.mode}`, { defaultValue: run.mode }),
-                      compactDate(run.startedAt, i18n.language),
-                    ].filter(Boolean).join(" · ")}
-                    onClick={() => onOpenThread(run.sessionId)}
-                  />
-                </li>
-              ))}
-            </ul>
-          </ActivitySection>
-        ) : null}
-
-        {sessions.length ? (
-          <ActivitySection title={t("workspace.activity_threads")} count={sessions.length} index={activeRuns.length ? 1 : 0}>
-            <ul className="workspace-pick-list">
-              {sessions.map((session) => (
-                <li key={session.id}>
-                  <ActivityRow
-                    title={sessionTitle(session)}
-                    meta={[
-                      sessionStatusLabel(session.status, t),
-                      session.runCount ? t("workspace.session_runs", { count: session.runCount }) : "",
-                      session.artifactCount ? t("workspace.session_artifacts", { count: session.artifactCount }) : "",
-                      compactDate(session.updatedAt, i18n.language),
-                    ].filter(Boolean).join(" · ")}
-                    onClick={() => onOpenThread(session.id)}
-                  />
-                </li>
-              ))}
-            </ul>
-          </ActivitySection>
-        ) : null}
-
-        {tasks.length ? (
-          <ActivitySection
-            title={t("workspace.activity_tasks")}
-            count={tasks.length}
-            index={(activeRuns.length ? 1 : 0) + (sessions.length ? 1 : 0)}
-          >
-            <ul className="workspace-pick-list">
-              {tasks.map((task) => {
-                const linkedSessionId = task.linkedSessionIds[0];
-                return (
-                  <li key={task.id}>
-                    <ActivityRow
-                      title={taskTitle(task)}
-                      meta={[
-                        task.status ? t(`backlog.statuses.${task.status}`, { defaultValue: task.status }) : "",
-                        task.dueDate ? t("workspace.task_due", { date: compactDueDate(task.dueDate, i18n.language) }) : "",
-                        compactDate(task.updatedAt, i18n.language),
-                      ].filter(Boolean).join(" · ")}
-                      onClick={linkedSessionId ? () => onOpenThread(linkedSessionId) : undefined}
-                    />
-                  </li>
-                );
-              })}
-            </ul>
-          </ActivitySection>
-        ) : null}
-
-        {!hasActivity ? (
-          <WorkspaceEmpty
-            title={t("workspace.no_activity")}
-            hint={t("workspace.empty_activity_hint")}
-            pulse
-            announce
+          <WorkspaceFilesBrowser
+            agentId={agent.id}
+            emptyMark={<AgentMark agent={agent.executorKind} size={18} />}
+            refreshVersion={workspaceRefreshVersion}
           />
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function ActivitySection({ title, count, index = 0, children }: { title: string; count: number; index?: number; children: ReactNode }) {
-  return (
-    <section
-      className="workspace-activity-section"
-      /* The delay itself belongs to the stylesheet (calc off --t-stagger);
-         only the section's position in the ladder is data. */
-      style={{ "--stagger-index": index } as CSSProperties}
-    >
-      <header className="workspace-activity-head">
-        <h2>{title}</h2>
-        <span className="tnum">{count}</span>
-      </header>
-      {children}
+        </div>
+      ) : null}
     </section>
-  );
-}
-
-function ActivityRow({
-  title,
-  meta,
-  onClick,
-}: {
-  title: string;
-  meta: string;
-  onClick?: () => void;
-}) {
-  if (!onClick) {
-    return (
-      <div className="workspace-pick workspace-activity-pick is-static">
-        <span className="workspace-pick-title">{title}</span>
-        <span className="workspace-pick-meta tnum">{meta}</span>
-      </div>
-    );
-  }
-  return (
-    <button type="button" className="workspace-pick workspace-activity-pick" onClick={onClick}>
-      <span className="workspace-pick-title">{title}</span>
-      <span className="workspace-pick-meta tnum">{meta}</span>
-    </button>
   );
 }
 
@@ -737,7 +515,7 @@ function FilesPane({
   onSelectFile: (entry: WorkspaceFileEntry) => void;
   onRetry: () => void;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const entries = data?.entries ?? [];
   const emptyState = workspaceFilesEmptyState(data?.source);
   const sharedUnavailable = scope === "shared" && isWorkspaceRetryableError(error);
@@ -768,7 +546,6 @@ function FilesPane({
             <li key={entry.path}>
               <WorkspaceFileRow
                 entry={entry}
-                locale={i18n.language}
                 selected={selectedPath === entry.path}
                 onOpenDirectory={onOpenDirectory}
                 onSelectFile={onSelectFile}
@@ -790,17 +567,16 @@ function FilesPane({
 
 function WorkspaceFileRow({
   entry,
-  locale,
   selected,
   onOpenDirectory,
   onSelectFile,
 }: {
   entry: WorkspaceFileEntry;
-  locale: string;
   selected: boolean;
   onOpenDirectory: (path: string) => void;
   onSelectFile: (entry: WorkspaceFileEntry) => void;
 }) {
+  const { t, i18n } = useTranslation();
   const isDirectory = entry.kind === "directory";
   return (
     <button
@@ -815,7 +591,11 @@ function WorkspaceFileRow({
       </span>
       <span className="workspace-pick-title">{entry.name}</span>
       <span className="workspace-pick-meta tnum">
-        {isDirectory ? entry.kind : formatBytes(entry.bytes, locale) || entry.kind} · {compactDate(entry.updatedAt, locale)}
+        {isDirectory
+          ? t("workspace.kind_directory")
+          : formatBytes(entry.bytes, i18n.language) || t("workspace.kind_file")}
+        {" · "}
+        {compactDate(entry.updatedAt, i18n.language)}
       </span>
     </button>
   );
@@ -905,53 +685,5 @@ function HtmlPreview({ html, title }: { html: string; title: string }) {
       sandbox=""
       srcDoc={html}
     />
-  );
-}
-
-function ActivitiesLoading() {
-  const { t } = useTranslation();
-  return (
-    <div
-      className="workspace-inspect workspace-activities"
-      role="tabpanel"
-      id="workspace-page-panel-activities"
-      aria-labelledby="workspace-page-tab-activities"
-      aria-busy="true"
-    >
-      <span className="sr-only" role="status">{t("workspace.loading")}</span>
-      <div className="workspace-metric-strip">
-        {Array.from({ length: 4 }, (_, index) => (
-          <div key={index} className="workspace-skeleton workspace-skeleton-metric" />
-        ))}
-      </div>
-      <div className="workspace-activity-sections">
-        {Array.from({ length: 2 }, (_, index) => (
-          <div key={index} className="workspace-activity-section workspace-skeleton-pane">
-            <div className="workspace-skeleton workspace-skeleton-line" />
-            <div className="workspace-skeleton workspace-skeleton-line short" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function WorkspaceError({ message, onRetry }: { message: string; onRetry: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <div
-      className="workspace-inspect"
-      role="tabpanel"
-      id="workspace-page-panel-activities"
-      aria-labelledby="workspace-page-tab-activities"
-    >
-      <div className="workspace-error" role="alert">
-        <span className="workspace-eyebrow">{t("workspace.load_failed")}</span>
-        <p>{message}</p>
-        <Button variant="ghost" type="button" className="workspace-error-action h-auto" onClick={onRetry}>
-          {t("workspace.retry")}
-        </Button>
-      </div>
-    </div>
   );
 }

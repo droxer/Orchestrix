@@ -220,14 +220,13 @@ def test_employee_team_routes_cannot_access_another_employee_team(monkeypatch) -
             == 403
         )
         assert client.delete(f"/api/v1/teams/{team['id']}").status_code == 403
-        assert client.get(f"/api/v1/teams/{team['id']}/artifacts").status_code == 403
         assert (
             client.get(f"/api/v1/workspace/brief?teamId={team['id']}").status_code
             == 403
         )
 
 
-def test_employee_reads_team_profile_artifacts_and_activity(monkeypatch) -> None:
+def test_employee_reads_team_profile_and_activity(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
@@ -308,7 +307,7 @@ def test_employee_reads_team_profile_artifacts_and_activity(monkeypatch) -> None
                 }
             ],
         )
-        artifact, _ = app.state.session_store.create_artifact(
+        app.state.session_store.create_artifact(
             session["id"],
             {
                 "kind": "workspace_file",
@@ -335,14 +334,7 @@ def test_employee_reads_team_profile_artifacts_and_activity(monkeypatch) -> None
         assert team_task["id"] in {item["id"] for item in payload["tasks"]}
         assert individual_task["id"] not in {item["id"] for item in payload["tasks"]}
         assert payload["metrics"]["artifactCount"] == 1
-
-        artifacts = client.get(f"/api/v1/teams/{team['id']}/artifacts")
-        assert artifacts.status_code == 200
-        artifact_payload = artifacts.json()
-        assert artifact_payload["teamId"] == team["id"]
-        assert len(artifact_payload["artifacts"]) == 1
-        assert artifact_payload["artifacts"][0]["id"] == artifact["id"]
-        assert artifact_payload["artifacts"][0]["sessionId"] == session["id"]
+        assert client.get(f"/api/v1/teams/{team['id']}/artifacts").status_code == 404
 
 
 def test_team_rejects_cross_supervisor_members_and_assignment_conflicts(

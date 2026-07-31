@@ -70,6 +70,12 @@ describe("app pathname routes", () => {
       canonicalBrowserUrl("/teams/team-1", "?tab=profile&artifact=art-1&dialog=create"),
       "/teams/team-1?tab=profile",
     );
+    assert.equal(
+      canonicalBrowserUrl("/teams/team-1", "?tab=workspace&scope=shared&path=src&item=file%3Aa.ts"),
+      "/teams/team-1?tab=workspace&path=src&item=file%3Aa.ts",
+    );
+    assert.equal(canonicalBrowserUrl("/agents/agent-1", "?tab=artifacts&item=artifact%3Aold"), "/agents/agent-1");
+    assert.equal(canonicalBrowserUrl("/teams/team-1", "?tab=artifacts&artifact=old"), "/teams/team-1");
     assert.equal(canonicalBrowserUrl("/teams", "?dialog=create&tab=artifacts"), "/teams?dialog=create");
     assert.equal(canonicalBrowserUrl("/backlog", "?q=stale"), "/backlog");
   });

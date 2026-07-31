@@ -8,7 +8,6 @@ import {
   assignTask,
   cancelRun,
   deleteTask,
-  getTeamArtifacts,
   getWorkspaceBrief,
   listAgentWorkspaceFiles,
   listArtifacts,
@@ -384,44 +383,38 @@ describe("apiJson", () => {
     assert.equal(requestedUrl, "/api/v1/workspace/brief?employeeId=alice");
   });
 
-  it("fetches team-scoped artifacts and activity", async () => {
+  it("fetches team-scoped activity", async () => {
     const requestedUrls: string[] = [];
     globalThis.fetch = (async (input) => {
       const url = String(input);
       requestedUrls.push(url);
-      const body = url.includes("/api/v1/teams/")
-        ? { teamId: "team delivery", artifacts: [] }
-        : {
-            employeeId: "alice",
-            teamId: "team delivery",
-            nodes: [],
-            activeRuns: [],
-            sessions: [],
-            tasks: [],
-            artifacts: [],
-            metrics: {
-              nodeCount: 0,
-              activeRunCount: 0,
-              sessionCount: 0,
-              activeSessionCount: 0,
-              taskCount: 0,
-              activeTaskCount: 0,
-              artifactCount: 0,
-            },
-            generatedAt: "2026-07-23T00:00:00Z",
-          };
+      const body = {
+        employeeId: "alice",
+        teamId: "team delivery",
+        nodes: [],
+        activeRuns: [],
+        sessions: [],
+        tasks: [],
+        artifacts: [],
+        metrics: {
+          nodeCount: 0,
+          activeRunCount: 0,
+          sessionCount: 0,
+          activeSessionCount: 0,
+          taskCount: 0,
+          activeTaskCount: 0,
+          artifactCount: 0,
+        },
+        generatedAt: "2026-07-23T00:00:00Z",
+      };
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
     }) as typeof fetch;
 
-    assert.deepEqual(await getTeamArtifacts("team delivery"), { teamId: "team delivery", artifacts: [] });
     assert.equal((await getWorkspaceBrief({ teamId: "team delivery" })).teamId, "team delivery");
-    assert.deepEqual(requestedUrls, [
-      "/api/v1/teams/team%20delivery/artifacts",
-      "/api/v1/workspace/brief?teamId=team+delivery",
-    ]);
+    assert.deepEqual(requestedUrls, ["/api/v1/workspace/brief?teamId=team+delivery"]);
   });
 
   it("lists agent workspace files", async () => {

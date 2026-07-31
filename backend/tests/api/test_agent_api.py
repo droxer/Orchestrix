@@ -68,6 +68,12 @@ def test_admin_manages_agents_and_employee_lists_own_agents(
             "Researcher",
             "Reviewer",
         }
+        assert (
+            client.get(
+                f"/api/v1/agents/{researcher.json()['agent']['id']}/artifacts"
+            ).status_code
+            == 404
+        )
 
 
 def test_employee_agent_admin_routes_require_admin(monkeypatch) -> None:

@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { deleteTeamProfileImage, getTeamArtifacts, getWorkspaceBrief, updateTeamProfileImage } from "../api";
+import { deleteTeamProfileImage, getWorkspaceBrief, updateTeamProfileImage } from "../api";
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { useRelayMutations } from "../hooks/useRelayMutations";
 import { TEAMS_QUERY_KEY } from "../hooks/useTeams";
@@ -16,75 +16,30 @@ import {
   nodeScopedTeamIssue,
   teamMutationInput,
 } from "../lib/teamForm";
-import { compactDate, compactDueDate } from "../lib/workspaceFormat";
-import type { AgentTeam, ArtifactIndexItem, WorkspaceBriefResponse, WorkspaceBriefSession, WorkspaceBriefTask } from "../types";
-import { ActionEdit, AdminDelete, NavRefresh, ViewBoard } from "./icons";
+import { teamWorkspaceAgentId } from "../lib/teamWorkspace";
+import type { AgentTeam } from "../types";
+import { ActionEdit, AdminDelete, NavRefresh } from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { PageHeader } from "./PageHeader";
 import { IdentityMonogram } from "./IdentityMonogram";
 import { TeamMark } from "./TeamMark";
 import { ProfileImage, ProfileImagePicker } from "./ProfileImagePicker";
-import { ArtifactBody } from "./artifact/ArtifactBody";
-import { ArtifactsEmpty } from "./artifact/ArtifactsEmpty";
-import { MetricItem, WorkspaceEmpty, WorkspaceLoading } from "./workspace/WorkspacePrimitives";
+import { ActivitiesSkeleton, WorkspaceActivities, WorkspaceEmpty, WorkspaceError } from "./workspace/WorkspacePrimitives";
+import { WorkspaceFilesBrowser } from "./AgentWorkspacePage";
 import { Badge } from "./ui/badge";
-import { Button, buttonVariants } from "./ui/button";
+import { Button } from "./ui/button";
 import { Field } from "@/components/ui/field";
 import { useDialogs } from "./ui/DialogProvider";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { hrefForRoute } from "../lib/appRoute";
 
-type TeamPageTab = "profile" | "artifacts" | "activities";
+type TeamPageTab = "profile" | "workspace" | "activities";
 
-const TEAM_PAGE_TABS: readonly TeamPageTab[] = ["profile", "artifacts", "activities"];
+const TEAM_PAGE_TABS: readonly TeamPageTab[] = ["profile", "workspace", "activities"];
 const TEAM_BRIEF_POLL_MS = 3000;
 
 function parseTeamTab(value: string | null): TeamPageTab {
   return TEAM_PAGE_TABS.includes(value as TeamPageTab) ? value as TeamPageTab : "activities";
-}
-
-function WorkspaceError({ message, onRetry }: { message: string; onRetry: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <div className="workspace-error" role="alert">
-      <p>{message}</p>
-      <Button type="button" variant="outline" size="sm" onClick={onRetry}>{t("workspace.retry")}</Button>
-    </div>
-  );
-}
-
-function sessionTitle(session: WorkspaceBriefSession): string {
-  return session.title?.trim() || session.taskGoal?.trim() || session.id;
-}
-
-function taskTitle(task: WorkspaceBriefTask): string {
-  return task.title?.trim() || task.id;
-}
-
-function ActivitySection({ title, count, children }: { title: string; count: number; children: ReactNode }) {
-  return (
-    <section className="workspace-activity-section">
-      <header className="workspace-activity-head">
-        <h2>{title}</h2>
-        <span className="tnum">{count}</span>
-      </header>
-      {children}
-    </section>
-  );
-}
-
-function ActivityRow({ title, meta, onClick }: { title: string; meta: string; onClick?: () => void }) {
-  const className = `workspace-pick workspace-activity-pick${onClick ? "" : " is-static"}`;
-  const content = (
-    <>
-      <span className="workspace-pick-title">{title}</span>
-      <span className="workspace-pick-meta tnum">{meta}</span>
-    </>
-  );
-  return onClick
-    ? <button type="button" className={className} onClick={onClick}>{content}</button>
-    : <div className={className}>{content}</div>;
 }
 
 function TeamProfile({
@@ -438,169 +393,6 @@ function TeamProfile({
   );
 }
 
-function TeamArtifacts({
-  artifacts,
-  selected,
-  isLoading,
-  onSelect,
-  onOpenThread,
-}: {
-  artifacts: ArtifactIndexItem[];
-  selected?: ArtifactIndexItem;
-  isLoading: boolean;
-  onSelect: (artifact: ArtifactIndexItem) => void;
-  onOpenThread: (sessionId: string) => void;
-}) {
-  const { t, i18n } = useTranslation();
-  return (
-    <div className="workspace-inspect" role="tabpanel" id="team-page-panel-artifacts" aria-labelledby="team-page-tab-artifacts">
-      {/* No artifacts means nothing to preview — the empty state owns the
-          whole panel instead of sitting beside a dead preview pane. */}
-      {artifacts.length === 0 ? (
-        isLoading ? (
-          <WorkspaceLoading label={t("workspace.loading")} />
-        ) : (
-          <ArtifactsEmpty title={t("workspace.no_artifacts")} hint={t("workspace.empty_artifacts_hint")} />
-        )
-      ) : (
-      <div className="workspace-panes">
-        <section className="workspace-pane workspace-pane-browse" aria-label={t("workspace.artifacts")}>
-          <div className="workspace-pane-body">
-            <ul className="workspace-pick-list">
-              {artifacts.map((artifact) => (
-                <li key={artifact.id}>
-                  <button
-                    type="button"
-                    className={`workspace-pick${selected?.id === artifact.id ? " is-active" : ""}`}
-                    aria-pressed={selected?.id === artifact.id}
-                    onClick={() => onSelect(artifact)}
-                  >
-                    <span className={`artifact-kind-tag is-${artifact.kind}`}>{t(`artifact.kind.${artifact.kind}`, { defaultValue: artifact.kind })}</span>
-                    <span className="workspace-pick-title">{artifact.title}</span>
-                    <span className="workspace-pick-meta tnum">{compactDate(artifact.createdAt, i18n.language)}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-        <section className="workspace-pane workspace-pane-preview" aria-label={t("workspace.preview")}>
-          <header className="workspace-pane-head">
-            <h2>{selected?.title ?? t("workspace.preview")}</h2>
-            {selected ? (
-              <div className="workspace-pane-head-actions">
-                <a
-                  data-slot="link-button"
-                  href={hrefForRoute("main", selected.sessionId)}
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                  onClick={(event) => {
-                    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
-                    event.preventDefault();
-                    onOpenThread(selected.sessionId);
-                  }}
-                >
-                  {t("workspace.open_thread")}
-                </a>
-              </div>
-            ) : null}
-          </header>
-          <div className="workspace-pane-body workspace-preview-body">
-            {selected ? (
-              <div className="workspace-preview-viewport workspace-preview-viewport--artifact">
-                <div className="artifact-viewer-body"><ArtifactBody artifact={selected} sessionId={selected.sessionId} /></div>
-              </div>
-            ) : (
-              <WorkspaceEmpty title={t("workspace.select_to_preview")} hint={t("workspace.empty_preview_hint")} mark={<ViewBoard size={18} />} />
-            )}
-          </div>
-        </section>
-      </div>
-      )}
-    </div>
-  );
-}
-
-function TeamActivities({ team, brief, onOpenThread }: { team: AgentTeam; brief: WorkspaceBriefResponse; onOpenThread: (sessionId: string) => void }) {
-  const { t, i18n } = useTranslation();
-  const hasActivity = brief.activeRuns.length > 0 || brief.sessions.length > 0 || brief.tasks.length > 0;
-  const available = teamReady(team);
-
-  return (
-    <div className="workspace-inspect workspace-activities" role="tabpanel" id="team-page-panel-activities" aria-labelledby="team-page-tab-activities">
-      <div className="workspace-metric-strip" aria-label={t("workspace.metrics")}>
-        <MetricItem label={t("workspace.metric_runs")} value={brief.metrics.activeRunCount} emphasis={brief.metrics.activeRunCount > 0} live={brief.metrics.activeRunCount > 0} />
-        <MetricItem label={t("workspace.metric_tasks")} value={brief.metrics.activeTaskCount} zero={brief.metrics.activeTaskCount === 0} />
-        <MetricItem label={t("workspace.metric_sessions")} value={brief.metrics.sessionCount} zero={brief.metrics.sessionCount === 0} />
-        <MetricItem label={t("workspace.metric_artifacts")} value={brief.metrics.artifactCount} zero={brief.metrics.artifactCount === 0} />
-        <div className="workspace-metric-item workspace-metric-item--status">
-          <span className={`workspace-status-pill tone-${available ? "good" : "neutral"}`}>{available ? t("teams.available") : t("teams.unavailable")}</span>
-        </div>
-      </div>
-      <div className="workspace-activity-sections">
-        {brief.activeRuns.length ? (
-          <ActivitySection title={t("workspace.activity_runs")} count={brief.activeRuns.length}>
-            <ul className="workspace-pick-list">
-              {brief.activeRuns.map((run) => (
-                <li key={run.runId}>
-                  <ActivityRow
-                    title={run.taskGoal}
-                    meta={[agentLabel(run.agent), t(`mode.${run.mode}`, { defaultValue: run.mode }), compactDate(run.startedAt, i18n.language)].filter(Boolean).join(" · ")}
-                    onClick={() => onOpenThread(run.sessionId)}
-                  />
-                </li>
-              ))}
-            </ul>
-          </ActivitySection>
-        ) : null}
-        {brief.sessions.length ? (
-          <ActivitySection title={t("workspace.activity_threads")} count={brief.sessions.length}>
-            <ul className="workspace-pick-list">
-              {brief.sessions.map((session) => (
-                <li key={session.id}>
-                  <ActivityRow
-                    title={sessionTitle(session)}
-                    meta={[
-                      // Sessions carry SessionStatus — see sessionStatusLabel in AgentWorkspacePage.
-                      session.status ? t(`thread.statuses.${session.status}`, { defaultValue: session.status }) : "",
-                      session.runCount ? t("workspace.session_runs", { count: session.runCount }) : "",
-                      session.artifactCount ? t("workspace.session_artifacts", { count: session.artifactCount }) : "",
-                      compactDate(session.updatedAt, i18n.language),
-                    ].filter(Boolean).join(" · ")}
-                    onClick={() => onOpenThread(session.id)}
-                  />
-                </li>
-              ))}
-            </ul>
-          </ActivitySection>
-        ) : null}
-        {brief.tasks.length ? (
-          <ActivitySection title={t("workspace.activity_tasks")} count={brief.tasks.length}>
-            <ul className="workspace-pick-list">
-              {brief.tasks.map((task) => {
-                const sessionId = task.linkedSessionIds[0];
-                return (
-                  <li key={task.id}>
-                    <ActivityRow
-                      title={taskTitle(task)}
-                      meta={[
-                        task.status ? t(`backlog.statuses.${task.status}`, { defaultValue: task.status }) : "",
-                        task.dueDate ? t("workspace.task_due", { date: compactDueDate(task.dueDate, i18n.language) }) : "",
-                        compactDate(task.updatedAt, i18n.language),
-                      ].filter(Boolean).join(" · ")}
-                      onClick={sessionId ? () => onOpenThread(sessionId) : undefined}
-                    />
-                  </li>
-                );
-              })}
-            </ul>
-          </ActivitySection>
-        ) : null}
-        {!hasActivity ? <WorkspaceEmpty title={t("workspace.no_activity")} hint={t("workspace.empty_activity_hint")} mark={<TeamMark size={18} />} announce /> : null}
-      </div>
-    </div>
-  );
-}
-
 export function TeamWorkspacePage({
   team,
   employeeId,
@@ -618,25 +410,19 @@ export function TeamWorkspacePage({
 }) {
   const { t } = useTranslation();
   const [pageTab, setPageTab] = useUrlSearchState("tab", "activities" as TeamPageTab, parseTeamTab, (value) => value === "activities" ? null : value, "push");
-  const [selectedArtifactId, setSelectedArtifactId] = useUrlSearchState("artifact", "", (value) => value ?? "", (value) => value || null);
+  const [workspaceRefreshVersion, setWorkspaceRefreshVersion] = useState(0);
   const briefQuery = useQuery({
     queryKey: ["team-workspace-brief", team.id],
     queryFn: ({ signal }) => getWorkspaceBrief({ teamId: team.id }, signal),
     enabled: pageTab === "activities",
     refetchInterval: pageTab === "activities" ? TEAM_BRIEF_POLL_MS : false,
   });
-  const artifactsQuery = useQuery({
-    queryKey: ["team-artifacts", team.id],
-    queryFn: ({ signal }) => getTeamArtifacts(team.id, signal),
-    enabled: pageTab === "artifacts",
-  });
-  const artifacts = artifactsQuery.data?.artifacts ?? [];
-  const selectedArtifact = artifacts.find((artifact) => artifact.id === selectedArtifactId);
+  const workspaceAgentId = teamWorkspaceAgentId(team);
 
   async function refreshTeam(): Promise<void> {
+    if (pageTab === "workspace") setWorkspaceRefreshVersion((current) => current + 1);
     await Promise.all([
       pageTab === "activities" ? briefQuery.refetch() : Promise.resolve(),
-      pageTab === "artifacts" ? artifactsQuery.refetch() : Promise.resolve(),
       onRefresh(),
     ]);
   }
@@ -684,29 +470,55 @@ export function TeamWorkspacePage({
                 onClick={() => setPageTab(tab)}
                 onKeyDown={(event) => movePageTab(event, TEAM_PAGE_TABS[index - 1] ?? TEAM_PAGE_TABS.at(-1)!, TEAM_PAGE_TABS[index + 1] ?? TEAM_PAGE_TABS[0])}
               >
-                {tab === "profile" ? t("workspace.tab_profile") : tab === "artifacts" ? t("workspace.artifacts") : t("workspace.tab_activities")}
-                {tab === "artifacts" && artifacts.length ? <span className="workspace-page-tab-count tnum">{artifacts.length}</span> : null}
+                {tab === "profile" ? t("workspace.tab_profile") : tab === "workspace" ? t("workspace.tab_workspace") : t("workspace.tab_activities")}
                 {tab === "activities" && briefQuery.data?.metrics.sessionCount ? <span className="workspace-page-tab-count tnum">{briefQuery.data.metrics.sessionCount}</span> : null}
               </button>
             ))}
           </div>
         )}
         actions={(
-          <Button type="button" variant="outline" size="icon" aria-label={t("nav.refresh")} disabled={isRefreshing || briefQuery.isFetching || artifactsQuery.isFetching} onClick={() => void refreshTeam()}>
-            <NavRefresh size={16} className={isRefreshing || briefQuery.isFetching || artifactsQuery.isFetching ? "spin" : undefined} />
+          <Button type="button" variant="outline" size="icon" aria-label={t("nav.refresh")} disabled={isRefreshing || (pageTab === "activities" && briefQuery.isFetching)} onClick={() => void refreshTeam()}>
+            <NavRefresh size={16} className={isRefreshing || (pageTab === "activities" && briefQuery.isFetching) ? "spin" : undefined} />
           </Button>
         )}
       />
       {pageTab === "profile" ? (
         <TeamProfile team={team} employeeId={employeeId} onDeleted={onDeleted} />
-      ) : pageTab === "artifacts" ? (
-        <TeamArtifacts artifacts={artifacts} selected={selectedArtifact} isLoading={artifactsQuery.isLoading} onSelect={(artifact) => setSelectedArtifactId(artifact.id)} onOpenThread={onOpenThread} />
+      ) : pageTab === "workspace" ? (
+        <div className="workspace-inspect" role="tabpanel" id="team-page-panel-workspace" aria-labelledby="team-page-tab-workspace">
+          {workspaceAgentId ? (
+            <WorkspaceFilesBrowser
+              agentId={workspaceAgentId}
+              fixedScope="shared"
+              emptyMark={<TeamMark size={18} />}
+              refreshVersion={workspaceRefreshVersion}
+            />
+          ) : (
+            <WorkspaceEmpty title={t("teams.no_workspace")} mark={<TeamMark size={18} />} announce />
+          )}
+        </div>
       ) : briefQuery.isLoading && !briefQuery.data ? (
-        <WorkspaceLoading label={t("workspace.loading")} />
+        <ActivitiesSkeleton panelId="team-page-panel-activities" labelledBy="team-page-tab-activities" />
       ) : error || !briefQuery.data ? (
-        <WorkspaceError message={error || t("workspace.load_failed")} onRetry={() => void briefQuery.refetch()} />
+        <WorkspaceError
+          message={error || t("workspace.load_failed")}
+          onRetry={() => void briefQuery.refetch()}
+          panelId="team-page-panel-activities"
+          labelledBy="team-page-tab-activities"
+        />
       ) : (
-        <TeamActivities team={team} brief={briefQuery.data} onOpenThread={onOpenThread} />
+        <WorkspaceActivities
+          brief={briefQuery.data}
+          panelId="team-page-panel-activities"
+          labelledBy="team-page-tab-activities"
+          statusPill={(
+            <span className={`workspace-status-pill tone-${teamReady(team) ? "good" : "neutral"}`}>
+              {teamReady(team) ? t("teams.available") : t("teams.unavailable")}
+            </span>
+          )}
+          emptyMark={<TeamMark size={18} />}
+          onOpenThread={onOpenThread}
+        />
       )}
     </section>
   );

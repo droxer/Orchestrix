@@ -89,8 +89,8 @@ export function hrefForRoute(route: AppRoute, sessionId?: string | null): string
   });
 }
 
-const AGENT_TABS = new Set(["profile", "activities", "artifacts", "workspace"]);
-const TEAM_TABS = new Set(["profile", "activities", "artifacts"]);
+const AGENT_TABS = new Set(["profile", "activities", "workspace"]);
+const TEAM_TABS = new Set(["profile", "activities", "workspace"]);
 const AGENT_AVAILABILITY = new Set(["ready", "busy", "pending", "offline"]);
 
 function copyParam(source: URLSearchParams, target: URLSearchParams, key: string): void {
@@ -121,8 +121,6 @@ export function canonicalSearchForPath(pathname: string, search = ""): string {
       if (source.get("scope") === "shared") target.set("scope", "shared");
       copyParam(source, target, "path");
       copyParam(source, target, "item");
-    } else if (tab === "artifacts") {
-      copyParam(source, target, "item");
     }
   } else if (head === "teams" && !entityId) {
     if (source.get("dialog") === "create") target.set("dialog", "create");
@@ -130,7 +128,10 @@ export function canonicalSearchForPath(pathname: string, search = ""): string {
     const requestedTab = source.get("tab");
     const tab = requestedTab && TEAM_TABS.has(requestedTab) ? requestedTab : "activities";
     if (tab !== "activities") target.set("tab", tab);
-    if (tab === "artifacts") copyParam(source, target, "artifact");
+    if (tab === "workspace") {
+      copyParam(source, target, "path");
+      copyParam(source, target, "item");
+    }
   }
 
   const encoded = target.toString();

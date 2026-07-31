@@ -1,6 +1,5 @@
 import { relayApiPath } from "relay-core/api-url";
 import type {
-  AgentArtifactsResponse,
   AgentName,
   AgentRole,
   AgentTaskMode,
@@ -29,7 +28,6 @@ import type {
   EmployeeAgent,
   AgentTeam,
   AgentTeamsResponse,
-  TeamArtifactsResponse,
   TeamMutationInput,
   AgentPlacement,
   AgentRunInput,
@@ -175,10 +173,6 @@ export function updateTeam(teamId: string, input: Partial<TeamMutationInput>): P
 
 export function deleteTeam(teamId: string): Promise<{ team: AgentTeam }> {
   return apiJson<{ team: AgentTeam }>(`/teams/${encodeURIComponent(teamId)}`, { method: "DELETE" });
-}
-
-export function getTeamArtifacts(teamId: string, signal?: AbortSignal): Promise<TeamArtifactsResponse> {
-  return apiJson<TeamArtifactsResponse>(`/teams/${encodeURIComponent(teamId)}/artifacts`, { signal });
 }
 
 export function getControlPanelAgent(agentId: string, signal?: AbortSignal): Promise<{ agent: EmployeeAgent }> {
@@ -566,10 +560,6 @@ export function startTask(taskId: string, input: { mode?: AgentTaskMode; assignm
     method: "POST",
     body: input,
   });
-}
-
-export function getAgentArtifacts(agentId: string, signal?: AbortSignal): Promise<AgentArtifactsResponse> {
-  return apiJson<AgentArtifactsResponse>(`/agents/${encodeURIComponent(agentId)}/artifacts`, { signal });
 }
 
 export function listTaskArtifacts(taskId: string, signal?: AbortSignal): Promise<TaskArtifactsResponse> {
