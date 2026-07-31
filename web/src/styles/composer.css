@@ -17,19 +17,6 @@
   background: transparent;
 }
 
-/* Scrim fade — the transcript dissolves into the composer card rather
-   than terminating at a hard edge. Decorative only. */
-.composer::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 100%;
-  height: var(--sp-7);
-  background: linear-gradient(to bottom, transparent, var(--surface-0));
-  pointer-events: none;
-}
-
 /* Runtime control: environment stays visible beside agent and mode. Keeping
    it in the footer removes a second floating card above the composer. */
 .thread-runtime-rail {

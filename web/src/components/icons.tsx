@@ -57,7 +57,6 @@ import {
   Square,
   Settings2,
   ShieldCheck,
-  Sparkles,
   SquarePen,
   Terminal,
   Trash2,
@@ -171,7 +170,6 @@ export const PrefLanguage = withStandardStroke(Languages, "PrefLanguage");
 
 // Stream markers form a deliberate geometric family: circle / triangle /
 // circle for check / warn / error so they read as a system at a glance.
-export const StreamThinking = withStandardStroke(Sparkles, "StreamThinking");
 export const StreamTool = withStandardStroke(Wrench, "StreamTool");
 export const StreamCommand = withStandardStroke(Terminal, "StreamCommand");
 export const StreamCheck = withStandardStroke(CircleCheck, "StreamCheck");

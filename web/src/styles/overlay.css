@@ -51,8 +51,6 @@
   inset: 0;
   display: flex;
   background: var(--scrim);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
   overscroll-behavior: contain;
   animation: overlay-backdrop-in var(--t-fast) var(--ease) both;
 }

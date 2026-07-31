@@ -28,6 +28,22 @@ import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
 import { Button } from "./ui/button";
 import { FiltersBar, FilterSelect } from "./FiltersBar";
 import { Input } from "./ui/input";
+import { StateMark, type StateShape } from "./StateMark";
+
+/**
+ * Lifecycle status in the shared shape vocabulary (see StateMark). The row
+ * rail and the status column read the same accent, so the 8px mark at the far
+ * left and the word 150px away are no longer two unrelated signals.
+ */
+const TASK_STATUS_SHAPE: Record<TaskStatus, StateShape> = {
+  backlog: "dashed",
+  assigned: "solid",
+  running: "live",
+  waiting_for_human: "solid",
+  review: "solid",
+  blocked: "ring",
+  done: "muted",
+};
 
 interface BacklogPageProps {
   tasks: RelayTask[];
@@ -377,7 +393,7 @@ function BacklogTaskRow({
   return (
     <article className="backlog-row group list-virtual" role="row" data-status={task.status} data-priority={task.priority}>
       <span className="backlog-row-dot-cell" aria-hidden="true">
-        <span className="backlog-row-dot" />
+        <StateMark shape={TASK_STATUS_SHAPE[task.status]} />
       </span>
       <div className="backlog-row-lead" role="cell">
         <Button variant="ghost" type="button" className="backlog-row-title" onClick={onEdit}>{task.title}</Button>

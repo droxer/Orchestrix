@@ -374,10 +374,9 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
           <span className="sidenav-label sr-only">{t("nav.preferences")}</span>
         </Button>
       </div>
-      {/* Portaled to <body>: the mobile bottom bar has a backdrop-filter,
-          which makes the panel the containing block for position:fixed —
-          rendering these viewport-coordinate overlays inside it would
-          mis-place them and scroll the tab row. */}
+      {/* Portaled to <body>: the mobile bottom bar is a horizontal scroll
+          container, so these viewport-coordinate overlays render against the
+          viewport instead of the panel. */}
       {preferencesMenu ? createPortal(
         <div
           ref={preferencesMenuRef}

@@ -517,6 +517,98 @@
   background: var(--prio-accent);
 }
 
+/* ── State mark — the shape half of the state vocabulary ────────────────
+   The palette is a grey brightness ramp with a single hue, and --err is
+   byte-identical to --ink-1/--action, so six states cannot be told apart by
+   colour alone. Brightness carries the step (loud → calm) and shape carries
+   the class:
+
+     solid   on track            dashed  nothing set (unscheduled, backlog)
+     live    working right now   muted   out of play (paused, done)
+     ring    a problem (blocked, overdue)
+
+   The accent is inherited from --mark-accent, which the host rule owns — a
+   mark never picks its own colour, so a row's rail and its label always
+   agree. Sized to the 8px dot cell the list rows already reserve. */
+.state-mark {
+  --mark-accent: var(--ink-4);
+  position: relative;
+  flex: none;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--mark-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mark-accent) 16%, transparent);
+}
+
+/* Hollow, not filled: the bad tier shares --action's brightness, so a solid
+   dot reads as "primary/selected" rather than "problem". Same ring shape the
+   node status dots and StatusPill use. */
+.state-mark[data-shape="ring"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--mark-accent);
+}
+
+.state-mark[data-shape="dashed"] {
+  background: transparent;
+  border: 1px dashed var(--mark-accent);
+  box-shadow: none;
+}
+
+.state-mark[data-shape="muted"] {
+  box-shadow: none;
+  opacity: 0.55;
+}
+
+/* Compositor-friendly pulse: the dot keeps a static ring; a faint outer
+   pseudo breathes via opacity instead of animating box-shadow. */
+.state-mark[data-shape="live"] {
+  --mark-accent: var(--live);
+}
+
+.state-mark[data-shape="live"]::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: var(--r-full);
+  border: 2px solid color-mix(in srgb, var(--mark-accent) 30%, transparent);
+  animation: blink var(--t-pulse) var(--ease) infinite;
+  pointer-events: none;
+}
+
+/* ── Routine state — schedule health, in the .task-status pill grammar ───
+   A routine never moves through the board, so it gets its own vocabulary:
+   running · overdue · due today · scheduled · unscheduled · paused. The two
+   "not really scheduled" states are separated by *which* thing is dashed —
+   unscheduled dashes the mark (the schedule is on, the date is missing),
+   paused dashes the pill border (the whole schedule is off). */
+.routine-state {
+  --state-accent: var(--ink-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 1px var(--sp-2);
+  border: 1px solid color-mix(in srgb, var(--state-accent) 35%, transparent);
+  border-radius: var(--r-2);
+  color: var(--ink-2);
+  font: var(--type-label);
+}
+
+.routine-state .state-mark { --mark-accent: var(--state-accent); }
+
+.routine-state[data-state="running"] { --state-accent: var(--live); color: var(--ink-1); }
+.routine-state[data-state="overdue"] { --state-accent: var(--err); color: var(--ink-1); }
+.routine-state[data-state="due"] { --state-accent: var(--warn); }
+.routine-state[data-state="scheduled"] { --state-accent: var(--ink-3); }
+.routine-state[data-state="unscheduled"] { --state-accent: var(--ink-4); color: var(--ink-3); }
+
+.routine-state[data-state="paused"] {
+  --state-accent: var(--ink-4);
+  border-style: dashed;
+  color: var(--ink-3);
+}
+
 /* ── Task status — bordered pill + dot, accent map shared with lanes/rows ──
    Used where status would otherwise be plain meta text (routine cards); the
    board uses lanes and the list its own column, so they don't need it.
@@ -1427,27 +1519,10 @@
   gap: var(--sp-3);
 }
 
-.backlog-row-dot {
-  flex: none;
-  position: relative;
-  width: 8px;
-  height: 8px;
-  border-radius: var(--r-full);
-  background: var(--row-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--row-accent) 18%, transparent);
-}
-
-/* Same compositor-friendly pulse as .task-status: the ring lives on a
-   pseudo-element and animates opacity only, never box-shadow. */
-.backlog-row[data-status="running"] .backlog-row-dot::after {
-  content: "";
-  position: absolute;
-  inset: -5px;
-  border-radius: var(--r-full);
-  border: 2px solid color-mix(in srgb, var(--row-accent) 8%, transparent);
-  animation: blink var(--t-pulse) var(--ease) infinite;
-  pointer-events: none;
-}
+/* The leading rail is a .state-mark; the row owns the accent so the mark and
+   the status column below cannot drift apart. `live` supplies its own --live
+   accent, which is why running is excluded here rather than mapped. */
+.backlog-row .state-mark:not([data-shape="live"]) { --mark-accent: var(--row-accent); }
 
 .backlog-row-title {
   min-width: 0;
@@ -1479,10 +1554,41 @@
   text-underline-offset: 2px;
 }
 
+/* The status label takes the row accent so it and the leading rail read as
+   one signal rather than two unrelated marks 150px apart. --err is as bright
+   as --ink-1, so the bad tier is separated by the rail's ring shape, not by
+   making the word louder than the title. */
 .backlog-row-status {
-  color: var(--ink-3);
+  color: var(--row-accent);
   font: var(--type-label);
   letter-spacing: var(--track-0);
+}
+
+/* Calm tiers would otherwise render the label dimmer than plain meta text. */
+.backlog-row[data-status="backlog"] .backlog-row-status,
+.backlog-row[data-status="done"] .backlog-row-status,
+.backlog-row[data-routine-state="scheduled"] .backlog-row-status,
+.backlog-row[data-routine-state="unscheduled"] .backlog-row-status,
+.backlog-row[data-routine-state="paused"] .backlog-row-status {
+  color: var(--ink-3);
+}
+
+/* ── Routine rows — schedule health, not board lifecycle ─────────────────
+   Routine definitions never advance through the board, so their rows key off
+   data-routine-state. Accents mirror the .routine-state pill. */
+.backlog-row[data-routine-state="running"] { --row-accent: var(--live); }
+.backlog-row[data-routine-state="overdue"] { --row-accent: var(--err); }
+.backlog-row[data-routine-state="due"] { --row-accent: var(--warn); }
+.backlog-row[data-routine-state="scheduled"] { --row-accent: var(--ink-3); }
+.backlog-row[data-routine-state="unscheduled"],
+.backlog-row[data-routine-state="paused"] { --row-accent: var(--ink-4); }
+
+/* Out of play: a paused routine and a finished task recede so a scan lands on
+   the rows that still need something. Titles only — the actions stay at full
+   contrast because they are how you bring the row back. */
+.backlog-row[data-routine-state="paused"] .backlog-row-title,
+.backlog-row[data-status="done"] .backlog-row-title {
+  color: var(--ink-2);
 }
 
 .backlog-row-assignee {
@@ -1726,7 +1832,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .backlog-row-actions,
-  .backlog-row-dot {
+  .state-mark {
     animation: none;
     transition: none;
   }
@@ -1734,7 +1840,7 @@
   /* Pulse rings live on pseudos now — hide them outright under reduced
      motion (animation: none alone would leave the ring at full opacity). */
   .task-status[data-status="running"]::after,
-  .backlog-row[data-status="running"] .backlog-row-dot::after {
+  .state-mark[data-shape="live"]::after {
     animation: none;
     opacity: 0;
   }
@@ -1761,6 +1867,44 @@
 
 .routine-card {
   min-width: 0;
+}
+
+/* Card-level state. The left edge is already spoken for by priority
+   (.backlog-task[data-priority] paints a 3px border-left), so state tints the
+   other three sides only — the shorthand `border-color` would repaint that
+   rail and silently delete the priority signal. Priority owns the left edge,
+   state owns the rest.
+
+   Running is the one place a routine card earns --live: an occurrence is
+   executing right now, which is exactly the --t-pulse condition. Idle boards
+   stay fully grey, so colour density across the grid reads as utilisation. */
+.routine-card[data-routine-state="running"] {
+  border-top-color: color-mix(in srgb, var(--live) 40%, var(--line-1));
+  border-right-color: color-mix(in srgb, var(--live) 40%, var(--line-1));
+  border-bottom-color: color-mix(in srgb, var(--live) 40%, var(--line-1));
+}
+
+.routine-card[data-routine-state="overdue"] {
+  border-top-color: color-mix(in srgb, var(--err) 28%, var(--line-1));
+  border-right-color: color-mix(in srgb, var(--err) 28%, var(--line-1));
+  border-bottom-color: color-mix(in srgb, var(--err) 28%, var(--line-1));
+}
+
+/* Paused routines dispatch nothing, so they recede: dimmer title and
+   description, hairline held at the soft step. The dashed pill border carries
+   the actual statement — this is only the supporting weight. */
+.routine-card[data-routine-state="paused"] {
+  border-top-color: var(--line-2);
+  border-right-color: var(--line-2);
+  border-bottom-color: var(--line-2);
+}
+
+.routine-card[data-routine-state="paused"] .backlog-task-title {
+  color: var(--ink-2);
+}
+
+.routine-card[data-routine-state="paused"] .backlog-description {
+  color: var(--ink-3);
 }
 
 /* The enabled switch is its own full-width row beneath the field grid — a

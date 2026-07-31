@@ -8,7 +8,6 @@ import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { useTeams } from "../hooks/useTeams";
 import { useDialogs } from "@/components/ui/DialogProvider";
-import { Badge } from "@/components/ui/badge";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
 import { type CurrentUser, type DaemonNodeMonitorRecord, type EmployeeAgent, type RelaySession, type RelayTask } from "../types";
@@ -18,7 +17,9 @@ import { TaskAssignee, TaskExecutionBadge } from "./TaskAssignee";
 import { isTaskAssigneeCurrentUser, taskAssigneeDisplayName, teamReady } from "../lib/taskAssignment";
 import { useEmployeeNames } from "../hooks/useEmployeeNames";
 import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
-import { filterRoutineTasks, latestRoutineSession, routineDueTone, runningRoutineCount, TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, type RoutineFilters } from "../lib/routine";
+import { filterRoutineTasks, latestRoutineSession, routineDueTone, routineState, runningRoutineCount, runningRoutineIds, TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, type RoutineFilters, type RoutineState } from "../lib/routine";
+import { ROUTINE_STATE_SHAPE, RoutineStateBadge } from "./RoutineStateBadge";
+import { StateMark } from "./StateMark";
 import { emptyRoutineForm, taskAssignmentMutationFields, taskBoardFormsEqual, type RoutineTaskFormState } from "../lib/taskBoardForm";
 import { TaskDrawer } from "./task-board/TaskDrawer";
 import { PageHeader } from "./PageHeader";
@@ -204,6 +205,7 @@ function RoutineStartButton({
 
 function RoutineCard({
   task,
+  state,
   session,
   ready,
   assigneeDisplayName,
@@ -213,6 +215,7 @@ function RoutineCard({
   onStart,
 }: {
   task: RelayTask;
+  state: RoutineState;
   session?: RelaySession;
   ready: boolean;
   assigneeDisplayName?: string;
@@ -225,10 +228,13 @@ function RoutineCard({
   const tone = routineDueTone(task);
   const startDisabled = (!task.assignedAgentId && !task.assignedTeamId) || !task.routineEnabled;
 
+  // `data-routine-state`, not `data-status`: a routine definition never moves
+  // through the board, so its `status` field is a constant and styling on it
+  // paints every card the same.
   return (
-    <article className="routine-card backlog-task list-virtual" data-priority={task.priority} data-status={task.status}>
+    <article className="routine-card backlog-task list-virtual" data-priority={task.priority} data-routine-state={state}>
       <div className="backlog-task-badges">
-        <Badge variant={task.routineEnabled ? "success" : "neutral"}>{task.routineEnabled ? t("routine.enabled") : t("routine.disabled")}</Badge>
+        <RoutineStateBadge state={state} />
         <PriorityBadge priority={task.priority} />
         <TaskExecutionBadge task={task} ready={ready} displayName={agentDisplayName} />
       </div>
@@ -295,6 +301,7 @@ function RoutineViewToggle({ view, onChange }: { view: RoutineView; onChange: (v
 
 function RoutineRow({
   task,
+  state,
   session,
   ready,
   assigneeDisplayName,
@@ -304,6 +311,7 @@ function RoutineRow({
   onStart,
 }: {
   task: RelayTask;
+  state: RoutineState;
   session?: RelaySession;
   ready: boolean;
   assigneeDisplayName?: string;
@@ -317,14 +325,14 @@ function RoutineRow({
   const startDisabled = (!task.assignedAgentId && !task.assignedTeamId) || !task.routineEnabled;
 
   return (
-    <article className="backlog-row group list-virtual" role="row" data-status={task.status} data-priority={task.priority}>
+    <article className="backlog-row group list-virtual" role="row" data-routine-state={state} data-priority={task.priority}>
       <span className="backlog-row-dot-cell" aria-hidden="true">
-        <span className="backlog-row-dot" />
+        <StateMark shape={ROUTINE_STATE_SHAPE[state]} />
       </span>
       <div className="backlog-row-lead" role="cell">
         <Button variant="ghost" type="button" className="backlog-row-title" onClick={onEdit}>{task.title}</Button>
       </div>
-      <span className="backlog-row-status" role="cell">{task.routineEnabled ? t("routine.enabled") : t("routine.disabled")}</span>
+      <span className="backlog-row-status" role="cell">{t(`routine.states.${state}`)}</span>
       <div className="backlog-row-tags" role="cell">
         <PriorityBadge priority={task.priority} />
       </div>
@@ -346,10 +354,12 @@ function RoutineRow({
 
 function RoutineDrawerMeta({
   task,
+  state,
   session,
   onOpenThread,
 }: {
   task: RelayTask;
+  state: RoutineState;
   session?: RelaySession;
   onOpenThread: (sessionId: string) => void;
 }) {
@@ -359,9 +369,7 @@ function RoutineDrawerMeta({
   return (
     <section className="task-drawer-meta" aria-label={t("routine.meta")}>
       <div className="task-drawer-meta-row">
-        <Badge variant={task.routineEnabled ? "success" : "neutral"}>
-          {task.routineEnabled ? t("routine.enabled") : t("routine.disabled")}
-        </Badge>
+        <RoutineStateBadge state={state} />
         {session ? (
           <a
             data-slot="link-button"
@@ -406,6 +414,9 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
   const confirmDiscardChanges = useUnsavedChangesGuard(formDirty && !saving && !deleting);
   const routineTasks = useMemo(() => tasks.filter((task) => task.isRoutine), [tasks]);
   const filteredTasks = useMemo(() => filterRoutineTasks(tasks, filters), [tasks, filters]);
+  // Derived once for the whole board: `routineState` then costs a Set lookup
+  // per card instead of a full task scan.
+  const runningIds = useMemo(() => runningRoutineIds(tasks), [tasks]);
   function changeView(next: RoutineView) {
     setView(next);
     writeViewPreference(ROUTINE_VIEW_STORAGE_KEY, next);
@@ -567,6 +578,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
               <RoutineRow
                 key={task.id}
                 task={task}
+                state={routineState(task, runningIds)}
                 session={session}
                 assigneeDisplayName={taskAssigneeDisplayName(task, currentUser, employeeNames)}
                 assigneeIsSelf={isTaskAssigneeCurrentUser(task, currentUser)}
@@ -586,6 +598,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
               <RoutineCard
                 key={task.id}
                 task={task}
+                state={routineState(task, runningIds)}
                 session={session}
                 assigneeDisplayName={taskAssigneeDisplayName(task, currentUser, employeeNames)}
                 assigneeIsSelf={isTaskAssigneeCurrentUser(task, currentUser)}
@@ -612,6 +625,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
           meta={editingTask ? (
             <RoutineDrawerMeta
               task={editingTask}
+              state={routineState(editingTask, runningIds)}
               session={editingSession}
               onOpenThread={onOpenThread}
             />

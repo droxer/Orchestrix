@@ -33,6 +33,40 @@ export function filterRoutineTasks(tasks: RelayTask[], filters: RoutineFilters, 
   }).sort(compareRoutineTasks);
 }
 
+/**
+ * Routine state is *schedule health*, not backlog lifecycle. A routine
+ * definition never moves through the board, so its own `status` field stays
+ * at whatever it was created with — surfaces that render it are showing
+ * noise. Every routine surface derives state from the three facts that
+ * actually vary: is an occurrence executing right now, is the schedule on,
+ * and where does the next run date sit relative to today.
+ */
+export type RoutineState =
+  | "running"
+  | "overdue"
+  | "due"
+  | "unscheduled"
+  | "scheduled"
+  | "paused";
+
+/**
+ * Routines whose latest occurrence is still in flight. `running` outranks
+ * `paused`: pausing a schedule stops future dispatches, it does not abort the
+ * run already underway, and a live run is the more urgent fact to show.
+ */
+export function routineState(
+  routine: RelayTask,
+  running: ReadonlySet<string>,
+  today = isoToday(),
+): RoutineState {
+  if (running.has(routine.id)) return "running";
+  if (!routine.routineEnabled) return "paused";
+  if (!routine.routineNextRunDate) return "unscheduled";
+  if (routine.routineNextRunDate < today) return "overdue";
+  if (routine.routineNextRunDate === today) return "due";
+  return "scheduled";
+}
+
 export function routineDueTone(task: RelayTask, today = isoToday()): "neutral" | "warn" | "bad" {
   if (!task.routineEnabled || !task.routineNextRunDate) return "neutral";
   if (task.routineNextRunDate < today) return "bad";
@@ -61,20 +95,28 @@ export function latestRoutineSession(
   return [...linkedIds].reverse().map((id) => sessionById.get(id)).find(Boolean);
 }
 
+/**
+ * Ids of routines with an occurrence in flight. Derived once per render and
+ * passed to `routineState` so a board of N routines stays O(tasks) rather
+ * than re-scanning the task list per card.
+ */
+export function runningRoutineIds(tasks: RelayTask[]): Set<string> {
+  const ids = new Set<string>();
+  for (const task of tasks) {
+    if (task.isRoutine) continue;
+    if (!task.sourceRoutineId) continue;
+    if (task.status !== "running" && task.status !== "review") continue;
+    ids.add(task.sourceRoutineId);
+  }
+  return ids;
+}
+
 export function runningRoutineCount(
   routines: RelayTask[],
   tasks: RelayTask[],
 ): number {
-  const runningRoutineIds = new Set(
-    tasks
-      .filter((task) =>
-        !task.isRoutine
-        && Boolean(task.sourceRoutineId)
-        && (task.status === "running" || task.status === "review"),
-      )
-      .map((task) => task.sourceRoutineId),
-  );
-  return routines.filter((routine) => runningRoutineIds.has(routine.id)).length;
+  const running = runningRoutineIds(tasks);
+  return routines.filter((routine) => running.has(routine.id)).length;
 }
 
 function compareRoutineTasks(left: RelayTask, right: RelayTask): number {

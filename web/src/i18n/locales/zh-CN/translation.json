@@ -419,6 +419,14 @@
       "monthly": "每月",
       "custom": "自定义"
     },
+    "states": {
+      "running": "运行中",
+      "overdue": "已逾期",
+      "due": "今日到期",
+      "scheduled": "已排期",
+      "unscheduled": "未排期",
+      "paused": "已暂停"
+    },
     "meta": "例行状态",
     "no_activity": "暂无运行记录。",
     "next_run_hint": "例行任务会在当天开始时运行，请选择今天或之后的日期。",
