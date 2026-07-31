@@ -80,6 +80,10 @@ describe("agent stream parsing", () => {
     ]);
   });
 
+  it("does not render a truncated stream-event envelope as an AI response", () => {
+    assert.deepEqual(parseAgentStream("claude", '"m_event","event": "'), []);
+  });
+
   it("renders Pi stdout as message text", () => {
     assert.deepEqual(parseAgentStream("pi", "\n\nHi from Pi.\n"), [
       { kind: "text", text: "Hi from Pi." },

@@ -203,7 +203,8 @@ function safeParse(line: string): Record<string, unknown> | null {
 }
 
 function isLikelyProtocolFragment(text: string): boolean {
-  return /"type"\s*:|"session_id"\s*:|stream_event|content_block_|parent_tool_use_id|uuid/.test(text);
+  return /"type"\s*:|"session_id"\s*:|stream_event|content_block_|parent_tool_use_id|uuid/.test(text)
+    || /(?:tream_event|ream_event|eam_event|am_event|m_event)"\s*,\s*"event"\s*:/.test(text);
 }
 
 type StreamRecord =
