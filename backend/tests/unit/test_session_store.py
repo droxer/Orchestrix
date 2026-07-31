@@ -1,19 +1,17 @@
 from __future__ import annotations
 
 import json
-
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from uuid import UUID
 
 import pytest
-from sqlalchemy import text
-
 from relay.persistence.session_store import DatabaseSessionStore, LocalSessionStore
 from relay.persistence.store_common import relay_event
 from relay.persistence.task_store import DatabaseTaskStore
 from relay.sessions.controller import SessionController, SessionRunInFlightError
+from sqlalchemy import text
 
 
 def test_session_stores_create_uuid_thread_ids() -> None:
@@ -82,6 +80,46 @@ def test_session_stores_preserve_managed_computer_affinity() -> None:
             persisted = store.get_session(created["id"])
             assert persisted["managedNodeId"] == "computer_alice"
             assert persisted["events"][0]["managedNodeId"] == "computer_alice"
+
+
+def test_session_stores_read_incremental_event_pages() -> None:
+    with TemporaryDirectory() as root:
+        stores = (
+            LocalSessionStore(Path(root) / "local"),
+            DatabaseSessionStore(f"sqlite:///{root}/relay.db", create_schema=True),
+        )
+        for store in stores:
+            created = store.create_session(
+                {
+                    "workspacePath": "/workspace/alice",
+                    "taskGoal": "stream smoothly",
+                    "participants": ["human", "pi"],
+                }
+            )
+            first_id = created["events"][0]["id"]
+            output = relay_event(
+                "agent.output",
+                created["id"],
+                {
+                    "runId": "run_1",
+                    "agent": "pi",
+                    "stream": "stdout",
+                    "text": "hello",
+                    "sequence": 0,
+                },
+            )
+            store.append_event(created["id"], output)
+
+            initial = store.read_event_page(created["id"], after_event_id=first_id)
+            assert [event["id"] for event in initial["events"]] == [output["id"]]
+            assert initial["nextSequence"] == 2
+            assert initial["status"] == "running"
+
+            tail = store.read_event_page(
+                created["id"], after_sequence=initial["nextSequence"]
+            )
+            assert tail["events"] == []
+            assert tail["nextSequence"] == 2
 
 
 def test_session_stores_delete_session() -> None:

@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RelaySession } from "../types";
-import { applySessionEvent } from "../lib/sessionEvents";
-import { mergeSessionEventIntoSessions } from "../lib/sessionEventMerge";
+import { applySessionEventUnchecked } from "../lib/sessionEvents";
+import { mergeSessionEventsIntoSessions } from "../lib/sessionEventMerge";
 import { isTerminalSessionStatus, lastSessionEventId, sessionEventsUrl } from "../lib/sessionEventStream";
 
 const SESSIONS_KEY = ["relay", "sessions"] as const;
@@ -30,25 +30,61 @@ export function useSessionEvents(sessionId: string | undefined, enabled: boolean
 
     // Track ids we've already merged so dedup is O(1) per frame rather than a
     // linear scan of the session's growing event list on every streamed delta.
-    const seen = new Set<string>();
+    const cached = queryClient.getQueryData<RelaySession[]>(SESSIONS_KEY)
+      ?.find((session) => session.id === sessionId);
+    const seen = new Set(cached?.events.map((event) => event.id) ?? []);
+    const queued = new Set<string>();
+    let pending: RelayEvent[] = [];
+    let frame: number | undefined;
 
-    const mergeEvent = (event: RelayEvent) => {
-      if (seen.has(event.id)) return;
+    const flush = () => {
+      frame = undefined;
+      const events = pending;
+      pending = [];
       queryClient.setQueryData<RelaySession[]>(SESSIONS_KEY, (sessions) => {
-        const result = mergeSessionEventIntoSessions(sessions, sessionId, event, applySessionEvent);
-        if (result.consumed) seen.add(event.id);
+        const result = mergeSessionEventsIntoSessions(
+          sessions,
+          sessionId,
+          events,
+          applySessionEventUnchecked,
+        );
+        if (sessions?.some((session) => session.id === sessionId)) {
+          for (const event of events) seen.add(event.id);
+        }
         return result.sessions;
       });
+      for (const event of events) queued.delete(event.id);
+    };
+
+    const enqueue = (events: RelayEvent[]) => {
+      for (const event of events) {
+        if (!event?.id || seen.has(event.id) || queued.has(event.id)) continue;
+        queued.add(event.id);
+        pending.push(event);
+      }
+      if (pending.length > 0 && frame === undefined) {
+        frame = window.requestAnimationFrame(flush);
+      }
     };
 
     source.onmessage = (message) => {
       if (!message.data) return;
       try {
-        mergeEvent(JSON.parse(message.data) as RelayEvent);
+        enqueue([JSON.parse(message.data) as RelayEvent]);
       } catch {
         // Ignore malformed frames; the list poll still reconciles state.
       }
     };
+
+    source.addEventListener("batch", (message) => {
+      if (!(message as MessageEvent<string>).data) return;
+      try {
+        const payload = JSON.parse((message as MessageEvent<string>).data) as { events?: RelayEvent[] };
+        if (Array.isArray(payload.events)) enqueue(payload.events);
+      } catch {
+        // Ignore malformed frames; the summary poll and detail fetch reconcile state.
+      }
+    });
 
     // The server emits `done` before closing terminal sessions and long-lived
     // timeout windows. Only terminal sessions should stop reconnecting; active
@@ -85,6 +121,9 @@ export function useSessionEvents(sessionId: string | undefined, enabled: boolean
       failures = 0;
     };
 
-    return () => source.close();
+    return () => {
+      source.close();
+      if (frame !== undefined) window.cancelAnimationFrame(frame);
+    };
   }, [sessionId, enabled, queryClient]);
 }

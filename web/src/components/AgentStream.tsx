@@ -100,18 +100,24 @@ export function AgentStream({ agent, stdout, stderr, streaming, collaborations }
   return (
     <div className={`agent-stream ${streaming ? "streaming" : ""}`}>
       <SubagentTree nodes={collaborationNodes} />
-      {keyedSegments(segments).map(({ key, segment }) => (
-        <SegmentView key={key} segment={segment} />
+      {keyedSegments(segments).map(({ key, segment }, index) => (
+        <SegmentView key={key} segment={segment} live={streaming && index === segments.length - 1} />
       ))}
       {showActivity ? <StreamActivity label={workingLabel} /> : null}
     </div>
   );
 }
 
-function SegmentView({ segment }: { segment: AgentSegment }) {
+function SegmentView({ segment, live = false }: { segment: AgentSegment; live?: boolean }) {
   const { t } = useTranslation();
   if (segment.kind === "text") {
-    return <div className="agent-text">{renderProse(segment.text)}</div>;
+    return (
+      <div className="agent-text">
+        {live
+          ? <div className="agent-prose agent-prose-live"><p>{segment.text}</p></div>
+          : renderProse(segment.text)}
+      </div>
+    );
   }
   if (segment.kind === "thinking") {
     return null;

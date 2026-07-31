@@ -31,14 +31,39 @@ def _parse_sse(body: str) -> list[tuple[str, str]]:
 
 
 def _message_payloads(body: str) -> list[dict[str, object]]:
-    return [json.loads(data) for event, data in _parse_sse(body) if event == "message"]
+    payloads: list[dict[str, object]] = []
+    for event, data in _parse_sse(body):
+        decoded = json.loads(data)
+        if event == "message":
+            payloads.append(decoded)
+        elif event == "batch":
+            payloads.extend(decoded["events"])
+    return payloads
 
 
 def test_session_event_tail_poll_has_interactive_streaming_latency() -> None:
     # A one-second tail poll batches many agent.output events into a visible
     # jump in the browser. Keep the worst-case server-side wait below the
     # threshold where streamed text stops feeling continuous.
-    assert _STREAM_POLL_SECONDS <= 0.1
+    assert _STREAM_POLL_SECONDS <= 0.05
+
+
+def test_session_list_summary_omits_event_history(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        created = client.post("/api/v1/threads", json={"taskGoal": "ship it"})
+        assert created.status_code == 201
+
+        response = client.get("/api/v1/threads?view=summary")
+
+        assert response.status_code == 200
+        summary = response.json()["sessions"][0]
+        assert summary["id"] == created.json()["id"]
+        assert summary["eventCount"] == len(created.json()["events"])
+        assert "events" not in summary
+        assert "agentRuns" not in summary
 
 
 def test_session_events_streams_backlog_then_closes_on_terminal(monkeypatch) -> None:
@@ -62,11 +87,11 @@ def test_session_events_streams_backlog_then_closes_on_terminal(monkeypatch) -> 
         assert response.headers["content-type"].startswith("text/event-stream")
 
         frames = _parse_sse(response.text)
-        # Domain events arrive as default `message` frames carrying the full
-        # event JSON (type lives in the payload); the stream ends with a `done`
-        # control frame once the session is terminal.
-        message_types = [json.loads(data)["type"] for event, data in frames if event == "message"]
+        # The wire contract remains one domain event per default SSE message;
+        # the browser coalesces all messages received in one animation frame.
+        message_types = [payload["type"] for payload in _message_payloads(response.text)]
         assert "session.created" in message_types
+        assert [event for event, _ in frames].count("message") == len(message_types)
         assert frames[-1][0] == "done"
 
 
@@ -136,6 +161,37 @@ def test_session_events_cursor_falls_back_to_backlog_for_unknown_event(monkeypat
         assert [payload["id"] for payload in _message_payloads(response.text)] == [
             event["id"] for event in done.json()["events"]
         ]
+
+
+def test_session_events_reads_incremental_pages_after_authorization(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        created = client.post("/api/v1/threads", json={"taskGoal": "ship it"})
+        session_id = created.json()["id"]
+        client.post(
+            f"/api/v1/threads/{session_id}/decisions", json={"kind": "mark_done"}
+        )
+
+        store = app.state.session_store
+        original_get_session = store.get_session
+        get_session_calls = 0
+
+        def counted_get_session(target: str):
+            nonlocal get_session_calls
+            get_session_calls += 1
+            return original_get_session(target)
+
+        monkeypatch.setattr(store, "get_session", counted_get_session)
+
+        response = client.get(f"/api/v1/threads/{session_id}/events")
+
+        assert response.status_code == 200
+        # One full read authorizes the request; the stream loop itself must use
+        # the event table/page API instead of rematerializing the whole thread.
+        assert get_session_calls == 1
 
 
 def test_session_events_unauthorized_is_forbidden_before_streaming(monkeypatch) -> None:

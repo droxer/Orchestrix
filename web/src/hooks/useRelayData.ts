@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
-import { listDaemonNodes, listSandboxes, listSessions, listTasks } from "../api";
+import { listDaemonNodes, listSandboxes, listSessionSummaries, listTasks } from "../api";
 import type { DaemonNodeMonitorRecord, RelaySession, RelayTask, SandboxRecord } from "../types";
 import { upsertThreadSession } from "../lib/threads";
+import { mergeSessionSummaries } from "../lib/sessionPollMerge";
 
 export const RELAY_QUERY_KEY = ["relay"] as const;
 const RELAY_KEY = RELAY_QUERY_KEY;
@@ -78,8 +79,13 @@ export function useRelayData(
         queryKey: SESSIONS_KEY,
         enabled,
         refetchInterval: POLL_INTERVAL_MS,
-        queryFn: async ({ signal }: { signal: AbortSignal }): Promise<RelaySession[]> =>
-          (await listSessions(signal)).sessions,
+        queryFn: async ({ signal }: { signal: AbortSignal }): Promise<RelaySession[]> => {
+          const summaries = (await listSessionSummaries(signal)).sessions;
+          return mergeSessionSummaries(
+            queryClient.getQueryData<RelaySession[]>(SESSIONS_KEY) ?? [],
+            summaries,
+          );
+        },
       },
       {
         queryKey: TASKS_KEY,

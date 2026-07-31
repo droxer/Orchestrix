@@ -16,6 +16,11 @@ function mergeRunTokenUsage(values: Array<TokenUsage | undefined>): TokenUsage |
 
 export function applySessionEvent(session: RelaySession, event: RelayEvent): RelaySession {
   if (session.events.some((existing) => existing.id === event.id)) return session;
+  return applySessionEventUnchecked(session, event);
+}
+
+/** Apply an event whose id was already checked by a batch-level Set. */
+export function applySessionEventUnchecked(session: RelaySession, event: RelayEvent): RelaySession {
   const next: RelaySession = {
     ...session,
     updatedAt: event.timestamp,

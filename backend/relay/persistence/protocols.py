@@ -10,6 +10,13 @@ class SessionStore(Protocol):
         self, session_id: str, event: dict[str, Any]
     ) -> dict[str, Any]: ...
     def get_session(self, session_id: str) -> dict[str, Any]: ...
+    def read_event_page(
+        self,
+        session_id: str,
+        *,
+        after_event_id: str | None = None,
+        after_sequence: int | None = None,
+    ) -> dict[str, Any]: ...
     def delete_session(
         self, session_id: str, *, deleted_by: str | None = None
     ) -> None: ...
