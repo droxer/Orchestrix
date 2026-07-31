@@ -1049,10 +1049,6 @@
   border-bottom: 1px solid var(--line-2);
 }
 
-.workspace-dossier-hero.is-embedded {
-  grid-template-columns: 64px minmax(0, 1fr) auto;
-}
-
 .workspace-dossier-mark {
   display: inline-grid;
   place-items: center;
@@ -1475,8 +1471,7 @@
 }
 
 @media (max-width: 719px) {
-  .workspace-dossier-hero,
-  .workspace-dossier-hero.is-embedded {
+  .workspace-dossier-hero {
     grid-template-columns: auto 1fr;
   }
 

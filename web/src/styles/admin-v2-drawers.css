@@ -100,39 +100,11 @@
   font-family: var(--font-mono);
 }
 
-.adm-drawer-title-row {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-3);
-  min-width: 0;
-}
-
 .adm-drawer-title-mark {
   flex: none;
   opacity: 0.9;
 }
 
-.adm-drawer-sub-role {
-  font-family: var(--font-sans);
-  font-size: var(--fs-3);
-  color: var(--ink-3);
-}
-
-.adm-drawer-body--agent-profile {
-  display: flex;
-  flex-direction: column;
-  padding: var(--sp-6) var(--sp-7);
-}
-
-.adm-drawer-body--agent-profile .workspace-profile-panel {
-  max-width: none;
-  margin: 0;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
 
 .adm-drawer-body {
   flex: 1;
