@@ -19,7 +19,6 @@ import type {
   EmployeeRecord,
   ManagedNodeRecord,
 } from "../types";
-import { AgentProfileDrawer } from "./admin/AgentProfileDrawer";
 import { AssignNodeDrawer } from "./admin/AssignNodeDrawer";
 import { AdminLoginScreen, FirstAdminSetupScreen } from "./admin/AdminAuthScreens";
 import { CredentialsDrawer } from "./admin/CredentialsDrawer";
@@ -82,7 +81,6 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
   const [assignTarget, setAssignTarget] = useState<{ employeeId?: string } | null>(null);
   const [credentialsNodeId, setCredentialsNodeId] = useState<string | null>(null);
   const [manageExecutorsNodeId, setManageExecutorsNodeId] = useState<string | null>(null);
-  const [agentProfileId, setAgentProfileId] = useState<string | null>(null);
   const [highlightedEmployeeId, setHighlightedEmployeeId] = useState<string | null>(null);
   const [storedTokens, setStoredTokens] = useState<StoredNodeTokenMap>(() => readStoredNodeTokens());
 
@@ -546,14 +544,6 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
         onClose={() => setManageExecutorsNodeId(null)}
         node={manageExecutorsNode}
         onUpdated={handleNodeUpdated}
-      />
-      <AgentProfileDrawer
-        open={agentProfileId !== null}
-        onClose={() => setAgentProfileId(null)}
-        agentId={agentProfileId}
-        employees={employees}
-        nodes={nodes}
-        onAgentDeleted={() => setAgentProfileId(null)}
       />
     </section>
   );

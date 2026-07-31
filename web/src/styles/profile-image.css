@@ -165,13 +165,6 @@
   border-radius: inherit;
 }
 
-.adm-drawer-title-profile-image {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--r-2);
-  box-shadow: inset 0 0 0 1px var(--line-2);
-}
-
 .teams-list-mark .profile-image {
   width: 28px;
   height: 28px;

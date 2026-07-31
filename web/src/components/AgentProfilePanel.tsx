@@ -40,8 +40,6 @@ export interface AgentProfilePanelProps {
   onAgentDeleted?: (agentId: string) => void;
   /** Shown in admin drawer when the caller can navigate to the workspace page. */
   onOpenWorkspace?: (agent: EmployeeAgent) => void;
-  /** When true, dossier omits hero chrome duplicated by the drawer header. */
-  embedInDrawer?: boolean;
 }
 
 function DossierIconButton({
@@ -70,7 +68,6 @@ export function AgentProfilePanel({
   onAgentUpdated,
   onAgentDeleted,
   onOpenWorkspace,
-  embedInDrawer = false,
 }: AgentProfilePanelProps) {
   const { t } = useTranslation();
   const { confirm } = useDialogs();
@@ -284,7 +281,7 @@ export function AgentProfilePanel({
         className="workspace-profile-panel workspace-profile-dossier"
         data-executor={agent.executorKind}
       >
-        <header className={`workspace-dossier-hero${embedInDrawer ? " is-embedded" : ""}`}>
+        <header className="workspace-dossier-hero">
           <ProfileImagePicker
             imageUrl={agent.profileImageUrl}
             name={agent.displayName}
@@ -323,7 +320,6 @@ export function AgentProfilePanel({
                   title={t("admin.v2.edit_agent")}
                 >
                   <ActionEdit size={14} aria-hidden="true" />
-                  {embedInDrawer ? <span>{t("admin.v2.edit_agent")}</span> : null}
                 </DossierIconButton>
               ) : null}
             </div>
