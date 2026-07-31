@@ -419,6 +419,14 @@
       "monthly": "Monthly",
       "custom": "Custom"
     },
+    "states": {
+      "running": "Running",
+      "overdue": "Overdue",
+      "due": "Due today",
+      "scheduled": "Scheduled",
+      "unscheduled": "Unscheduled",
+      "paused": "Paused"
+    },
     "meta": "Routine status",
     "no_activity": "No runs yet.",
     "next_run_hint": "Runs at the start of this day. Pick today or a later date.",

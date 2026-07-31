@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { filterRoutineTasks, latestRoutineSession, routineDueTone, runningRoutineCount, type RoutineFilters } from "../src/lib/routine.js";
+import { filterRoutineTasks, latestRoutineSession, routineDueTone, routineState, runningRoutineCount, runningRoutineIds, type RoutineFilters } from "../src/lib/routine.js";
 import type { RelaySession, RelayTask } from "../src/types.js";
 
 const baseFilters: RoutineFilters = {
@@ -91,6 +91,46 @@ describe("routineDueTone", () => {
     assert.equal(routineDueTone(task({ id: "b", title: "B", isRoutine: true, routineEnabled: true, routineNextRunDate: "2026-06-24" }), "2026-06-24"), "warn");
     assert.equal(routineDueTone(task({ id: "c", title: "C", isRoutine: true, routineEnabled: false, routineNextRunDate: "2026-06-23" }), "2026-06-24"), "neutral");
     assert.equal(routineDueTone(task({ id: "d", title: "D", isRoutine: true, routineEnabled: true, routineNextRunDate: "2026-06-23", status: "done" }), "2026-06-24"), "bad");
+  });
+});
+
+describe("routineState", () => {
+  const none = new Set<string>();
+
+  it("derives schedule health from the enabled flag and the next-run date", () => {
+    const routine = (id: string, extra: Partial<RelayTask>) =>
+      task({ id, title: id, isRoutine: true, routineEnabled: true, ...extra });
+
+    assert.equal(routineState(routine("a", { routineNextRunDate: "2026-06-23" }), none, "2026-06-24"), "overdue");
+    assert.equal(routineState(routine("b", { routineNextRunDate: "2026-06-24" }), none, "2026-06-24"), "due");
+    assert.equal(routineState(routine("c", { routineNextRunDate: "2026-06-25" }), none, "2026-06-24"), "scheduled");
+    assert.equal(routineState(routine("d", {}), none, "2026-06-24"), "unscheduled");
+    assert.equal(routineState(routine("e", { routineEnabled: false, routineNextRunDate: "2026-06-23" }), none, "2026-06-24"), "paused");
+  });
+
+  it("ignores the routine's own backlog status, which never advances", () => {
+    const routine = task({ id: "a", title: "A", isRoutine: true, routineEnabled: true, routineNextRunDate: "2026-06-25", status: "blocked" });
+    assert.equal(routineState(routine, none, "2026-06-24"), "scheduled");
+  });
+
+  it("reports a live occurrence ahead of every scheduling state, including paused", () => {
+    const running = new Set(["a", "b"]);
+    assert.equal(routineState(task({ id: "a", title: "A", isRoutine: true, routineEnabled: true, routineNextRunDate: "2026-06-23" }), running, "2026-06-24"), "running");
+    assert.equal(routineState(task({ id: "b", title: "B", isRoutine: true, routineEnabled: false }), running, "2026-06-24"), "running");
+  });
+});
+
+describe("runningRoutineIds", () => {
+  it("collects source routines of occurrences that are running or in review", () => {
+    const tasks = [
+      task({ id: "routine-a", title: "A", isRoutine: true }),
+      task({ id: "occ-a", title: "A run", sourceRoutineId: "routine-a", status: "running" }),
+      task({ id: "occ-b", title: "B run", sourceRoutineId: "routine-b", status: "review" }),
+      task({ id: "occ-c", title: "C run", sourceRoutineId: "routine-c", status: "done" }),
+      task({ id: "loose", title: "Loose", status: "running" }),
+    ];
+
+    assert.deepEqual([...runningRoutineIds(tasks)].sort(), ["routine-a", "routine-b"]);
   });
 });
 
