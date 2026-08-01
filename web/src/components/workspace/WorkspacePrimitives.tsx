@@ -88,7 +88,15 @@ export function MetricItem({
 }
 
 /** Tabpanel-aware skeleton for the activities tab while the brief loads. */
-export function ActivitiesSkeleton({ panelId, labelledBy }: { panelId: string; labelledBy: string }) {
+export function ActivitiesSkeleton({
+  panelId,
+  labelledBy,
+  metricCount = 4,
+}: {
+  panelId: string;
+  labelledBy: string;
+  metricCount?: number;
+}) {
   const { t } = useTranslation();
   return (
     <div
@@ -100,7 +108,7 @@ export function ActivitiesSkeleton({ panelId, labelledBy }: { panelId: string; l
     >
       <span className="sr-only" role="status">{t("workspace.loading")}</span>
       <div className="workspace-metric-strip">
-        {Array.from({ length: 4 }, (_, index) => (
+        {Array.from({ length: metricCount }, (_, index) => (
           <div key={index} className="workspace-skeleton workspace-skeleton-metric" />
         ))}
       </div>

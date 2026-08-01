@@ -40,7 +40,8 @@
 .workspace-header-strip {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-2);
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-2);
   min-width: 0;
   max-width: 100%;
 }

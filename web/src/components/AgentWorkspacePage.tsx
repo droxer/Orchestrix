@@ -436,10 +436,10 @@ export function AgentWorkspacePage({
               <span
                 className="workspace-header-chip"
                 translate="no"
-                aria-label={`${t("admin.v2.agent_runtime")}: ${agentLabel(agent.executorKind)}`}
               >
+                <span className="sr-only">{t("admin.v2.agent_runtime")}: </span>
                 <AgentMark agent={agent.executorKind} size={13} />
-                <span className="workspace-header-chip-name" aria-hidden="true">{agentLabel(agent.executorKind)}</span>
+                <span className="workspace-header-chip-name">{agentLabel(agent.executorKind)}</span>
               </span>
               {primaryPlacement ? (
                 <AgentPlacementBadge description={primaryPlacement} showSandbox />
@@ -481,7 +481,7 @@ export function AgentWorkspacePage({
         </div>
       ) : pageTab === "activities" ? (
         activitiesLoading ? (
-          <ActivitiesSkeleton panelId="workspace-page-panel-activities" labelledBy="workspace-page-tab-activities" />
+          <ActivitiesSkeleton panelId="workspace-page-panel-activities" labelledBy="workspace-page-tab-activities" metricCount={3} />
         ) : activitiesError ? (
           <WorkspaceError
             message={activitiesError}
