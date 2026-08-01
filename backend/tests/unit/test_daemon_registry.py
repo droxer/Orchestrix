@@ -63,6 +63,56 @@ def test_daemon_store_notifies_when_command_becomes_visible(
 
 
 @pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_daemon_store_persists_workspace_responses(
+    daemon_store_factory,
+) -> None:
+    with TemporaryDirectory() as root:
+        store = daemon_store_factory(root)
+        notified: list[str] = []
+        store.set_workspace_listener(notified.append)
+        store.register_node(store_node_payload())
+        response = {
+            "type": "workspace.listing",
+            "commandId": "cmd_workspace",
+            "path": "",
+            "exists": True,
+            "entries": [],
+        }
+
+        store.record_workspace_response("sbx_alice", response)
+
+        assert store.get_workspace_response("cmd_workspace") == response
+        assert notified == ["cmd_workspace"]
+
+
+def test_registry_hydrates_node_registered_after_replica_start() -> None:
+    with TemporaryDirectory() as root:
+        database_url = f"sqlite:///{root}/daemon.db"
+        first = DaemonNodeRegistry(
+            LocalSessionStore(root),
+            DatabaseDaemonStore(database_url, create_schema=True),
+        )
+        second = DaemonNodeRegistry(
+            LocalSessionStore(root), DatabaseDaemonStore(database_url)
+        )
+        first.register(
+            {
+                "sandboxId": "node_late",
+                "employeeId": "alice",
+                "token": "node_token",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+
+        heartbeat = second.heartbeat("node_late", "node_token")
+
+        assert heartbeat["timeoutMs"] > 0
+        assert second.get("node_late")["agents"]["codex"] == "ready"
+
+
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
 def test_provisioned_daemon_nodes_use_uuid_ids(daemon_store_factory) -> None:
     with TemporaryDirectory() as root:
         registry = DaemonNodeRegistry(
