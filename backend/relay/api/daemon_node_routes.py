@@ -158,6 +158,33 @@ async def update_daemon_node(
     return {"node": present_computer(ctx, monitor_node)}
 
 
+@router.patch("/daemon-nodes/{sandbox_id}/disabled-agents")
+async def update_daemon_node_disabled_agents(
+    sandbox_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    actor = request_actor(request, ctx.auth_store)
+    node = ctx.registry.get(sandbox_id)
+    if not node:
+        raise HTTPException(404, "Daemon node not found.")
+    if not actor_can_access_sandbox(actor, node):
+        raise HTTPException(403, "Daemon node access denied.")
+    body = await json_body(request)
+    raw = body.get("disabledAgents")
+    if not isinstance(raw, list) or not all(isinstance(name, str) for name in raw):
+        raise HTTPException(400, "disabledAgents must be an array of agent names.")
+    try:
+        updated = ctx.registry.set_disabled_agents(sandbox_id, raw)
+    except KeyError as error:
+        raise HTTPException(404, "Daemon node not found.") from error
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+    monitor_node = next(
+        (node for node in ctx.registry.monitor_nodes() if node["id"] == sandbox_id),
+        public_sandbox_record(updated),
+    )
+    return {"node": present_computer(ctx, monitor_node)}
+
+
 @router.post("/daemon-node-enrollments/local", status_code=201)
 async def create_local_device_enrollment(
     request: Request, ctx: AppContextDep
