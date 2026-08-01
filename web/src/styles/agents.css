@@ -236,6 +236,7 @@
   width: 7px;
   height: 7px;
   flex: none;
+  margin-right: var(--sp-1);
   border-radius: var(--r-full);
   background: var(--tone, var(--ink-4));
 }
