@@ -411,8 +411,6 @@
 /* Quiet hairline card — no left accent bar, no tonal plate. Identity reads
    through the hero, not through container chrome. */
 .workspace-profile .workspace-profile-panel {
-  max-width: 640px;
-  margin: 0 auto;
   padding: var(--sp-7);
   border: 1px solid var(--line-1);
   border-radius: var(--r-3);
