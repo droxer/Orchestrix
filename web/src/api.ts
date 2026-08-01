@@ -148,6 +148,16 @@ export function updateComputerDisplayName(
   );
 }
 
+export function updateDaemonNodeDisabledAgents(
+  nodeId: string,
+  disabledAgents: AgentName[],
+): Promise<{ node: DaemonNodeMonitorRecord }> {
+  return apiJson<{ node: DaemonNodeMonitorRecord }>(
+    `/daemon-nodes/${encodeURIComponent(nodeId)}/disabled-agents`,
+    { method: "PATCH", body: { disabledAgents } },
+  );
+}
+
 export function listEmployeeAgents(signal?: AbortSignal): Promise<EmployeeAgentsResponse> {
   return apiJson<EmployeeAgentsResponse>("/agents", { signal });
 }
