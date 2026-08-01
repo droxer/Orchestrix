@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { useMutationError } from "../hooks/useMutationError";
 import { Button } from "@/components/ui/button";
 import { ActionAddPerson, AdminNode, NavRefresh } from "./icons";
-import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, deleteManagedNode, getAuthStatus, getMe, listManagedNodes, permanentlyDeleteManagedNode, recoverManagedNode, unassignControlPanelDaemonNode, updateComputerDisplayName, updateManagedNodeDisplayName } from "../api";
+import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, deleteManagedNode, getAuthStatus, getMe, listManagedNodes, permanentlyDeleteManagedNode, recoverManagedNode, unassignControlPanelDaemonNode, updateComputerDisplayName, updateControlPanelDaemonNodeDisabledAgents, updateManagedNodeDisplayName } from "../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
   ControlPanelDaemonNodeRecord,
@@ -544,6 +544,7 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
         onClose={() => setManageExecutorsNodeId(null)}
         node={manageExecutorsNode}
         onUpdated={handleNodeUpdated}
+        onSave={updateControlPanelDaemonNodeDisabledAgents}
       />
     </section>
   );
