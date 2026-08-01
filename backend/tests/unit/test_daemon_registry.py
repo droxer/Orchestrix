@@ -48,6 +48,21 @@ def stored_daemon_event_types(store: object) -> list[str]:
 
 
 @pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_daemon_store_notifies_when_command_becomes_visible(
+    daemon_store_factory,
+) -> None:
+    with TemporaryDirectory() as root:
+        store = daemon_store_factory(root)
+        notified: list[str] = []
+        store.set_command_listener(notified.append)
+        store.register_node(store_node_payload())
+
+        store.enqueue_command("sbx_alice", run_start_command("cmd_one", "run_one"))
+
+        assert notified == ["sbx_alice"]
+
+
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
 def test_provisioned_daemon_nodes_use_uuid_ids(daemon_store_factory) -> None:
     with TemporaryDirectory() as root:
         registry = DaemonNodeRegistry(

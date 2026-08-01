@@ -122,6 +122,77 @@ def test_session_stores_read_incremental_event_pages() -> None:
             assert tail["nextSequence"] == 2
 
 
+def test_session_stores_bound_incremental_event_pages() -> None:
+    with TemporaryDirectory() as root:
+        stores = (
+            LocalSessionStore(Path(root) / "local"),
+            DatabaseSessionStore(f"sqlite:///{root}/relay.db", create_schema=True),
+        )
+        for store in stores:
+            created = store.create_session(
+                {
+                    "workspacePath": "/workspace/alice",
+                    "taskGoal": "stream in bounded pages",
+                    "participants": ["human"],
+                }
+            )
+            for sequence in range(3):
+                store.append_event(
+                    created["id"],
+                    relay_event(
+                        "agent.output",
+                        created["id"],
+                        {
+                            "runId": "run_1",
+                            "agent": "codex",
+                            "stream": "stdout",
+                            "text": str(sequence),
+                            "sequence": sequence,
+                        },
+                    ),
+                )
+
+            first = store.read_event_page(created["id"], limit=2)
+            second = store.read_event_page(
+                created["id"], after_sequence=first["nextSequence"], limit=2
+            )
+
+            assert len(first["events"]) == 2
+            assert first["nextSequence"] == 2
+            assert len(second["events"]) == 2
+            assert second["nextSequence"] == 4
+
+
+def test_session_stores_notify_after_committed_events() -> None:
+    with TemporaryDirectory() as root:
+        stores = (
+            LocalSessionStore(Path(root) / "local"),
+            DatabaseSessionStore(f"sqlite:///{root}/relay.db", create_schema=True),
+        )
+        for store in stores:
+            notified: list[str] = []
+            store.set_event_listener(notified.append)
+            created = store.create_session(
+                {
+                    "workspacePath": "/workspace/alice",
+                    "taskGoal": "wake subscribers",
+                    "participants": ["human"],
+                }
+            )
+            notified.clear()
+
+            store.append_event(
+                created["id"],
+                relay_event(
+                    "session.status",
+                    created["id"],
+                    {"status": "completed", "phase": "completed"},
+                ),
+            )
+
+            assert notified == [created["id"]]
+
+
 def test_session_stores_delete_session() -> None:
     with TemporaryDirectory() as root:
         stores = (

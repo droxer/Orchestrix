@@ -4,7 +4,7 @@ import json
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
-from relay.api.session_routes import _STREAM_POLL_SECONDS
+from relay.api.session_routes import _STREAM_FALLBACK_SECONDS
 from relay.app import create_app
 
 
@@ -41,11 +41,11 @@ def _message_payloads(body: str) -> list[dict[str, object]]:
     return payloads
 
 
-def test_session_event_tail_poll_has_interactive_streaming_latency() -> None:
-    # A one-second tail poll batches many agent.output events into a visible
-    # jump in the browser. Keep the worst-case server-side wait below the
-    # threshold where streamed text stops feeling continuous.
-    assert _STREAM_POLL_SECONDS <= 0.05
+def test_session_event_stream_uses_slow_recovery_polling() -> None:
+    # Committed events wake the stream through the notification broker. The
+    # fallback exists only to recover from a missed notification and therefore
+    # must not recreate the old 20-queries-per-second hot poll.
+    assert _STREAM_FALLBACK_SECONDS >= 1.0
 
 
 def test_session_list_summary_omits_event_history(monkeypatch) -> None:
