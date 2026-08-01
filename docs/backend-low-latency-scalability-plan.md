@@ -32,6 +32,8 @@ logical agents without sacrificing durable delivery or per-thread ordering.
 
 ### Stage 1: notification-driven wakeups
 
+Status: implemented.
+
 - Add one process-local keyed notifier with a PostgreSQL `LISTEN/NOTIFY`
   bridge for cross-replica wakeups.
 - Wake thread SSE readers after committed session events.
@@ -42,12 +44,20 @@ logical agents without sacrificing durable delivery or per-thread ordering.
 
 ### Stage 2: replica-safe coordination
 
+Status: implemented for daemon registration and workspace correlation. Managed
+node provisioning desired state remains local-only and must not be reconciled
+by more than one API replica yet.
+
 - Hydrate nodes registered after a replica starts.
 - Replace process-local workspace request futures with durable correlated
   responses plus notification fan-out.
 - Move managed-node desired state and provisioning attempts into PostgreSQL.
 
 ### Stage 3: keyed dispatch concurrency
+
+Status: implemented for API admission and hot node paths. PostgreSQL node-row
+locks provide cross-replica capacity fencing; per-node in-process locks keep
+unrelated nodes independent.
 
 - Replace the registry-wide dispatch lock with node/session-scoped database
   claims.
@@ -56,12 +66,20 @@ logical agents without sacrificing durable delivery or per-thread ordering.
 
 ### Stage 4: storage read/write amplification
 
+Status: implemented for session snapshots, streaming output writes, event
+pages, and thread summary projections. Task snapshots and output batching are
+follow-up work.
+
 - Remove full event history from mutable session/task snapshots.
 - Incrementally update compact projections.
 - Batch high-frequency agent output events.
 - Add cursor-paginated summary queries and owner/status filters.
 
 ### Stage 5: production controls
+
+Status: partially implemented. Database pool sizing and notification metrics
+are available; distributed admission limiting and full OpenTelemetry export
+remain deployment work.
 
 - Make database pool limits explicit and budget them across replicas.
 - Add request admission limits and bounded per-node queues.
@@ -75,3 +93,35 @@ logical agents without sacrificing durable delivery or per-thread ordering.
 Each stage keeps the old durable read path as a fallback. Notification delivery
 can therefore be enabled before polling intervals are relaxed, and each change
 can be rolled back independently without changing the daemon command schema.
+
+## Replica and connection budget
+
+Set these variables per API replica:
+
+- `RELAY_DB_POOL_SIZE` (default `10`)
+- `RELAY_DB_MAX_OVERFLOW` (default `20`)
+- `RELAY_DB_POOL_TIMEOUT_SECONDS` (default `5`)
+- `RELAY_DB_POOL_RECYCLE_SECONDS` (default `300`)
+- `RELAY_DB_POOL_PRE_PING` (default `true`)
+
+Budget worst-case application connections as:
+
+`replicas × (pool size + max overflow) + migration/admin connections`
+
+Keep that below the PostgreSQL or PgBouncer application budget with headroom
+for migrations and incident access. Prefer PgBouncer transaction pooling for a
+large replica count; the dedicated async `LISTEN` connection must bypass
+transaction pooling or use a session-pooled endpoint.
+
+The authenticated `GET /admin/control-plane/metrics` endpoint reports active
+notification waiters, publishes, wakeups, recovery timeouts, bridge connection
+state, reconnects, and received cross-replica notifications.
+
+## Current rollout boundary
+
+Multiple API replicas are safe for session streaming, daemon command delivery,
+workspace queries, node registration, and run admission when PostgreSQL is the
+configured store. Run exactly one managed-node reconciler until managed-node
+desired state, provisioning attempts, and enrollment grants move from the local
+filesystem into PostgreSQL. This restriction is explicit: it avoids pretending
+that filesystem state is a distributed control plane.

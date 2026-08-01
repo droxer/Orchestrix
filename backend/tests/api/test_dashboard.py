@@ -63,6 +63,27 @@ def test_dashboard_activity_returns_recent_items(monkeypatch) -> None:
         assert {"kind", "timestamp", "message"} <= set(first)
 
 
+def test_control_plane_metrics_reports_notification_health(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap(client)
+
+        response = client.get("/api/v1/admin/control-plane/metrics")
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "notifications": {
+                "published": 0,
+                "waits": 0,
+                "woken": 0,
+                "timedOut": 0,
+                "activeWaiters": 0,
+            },
+            "notificationBridge": {"enabled": False, "connected": False},
+        }
+
+
 def test_dashboard_tokens_returns_reported_usage(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

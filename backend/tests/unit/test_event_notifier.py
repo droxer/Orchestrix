@@ -48,3 +48,28 @@ def test_keyed_event_notifier_closes_waiters_without_leaking() -> None:
         assert notifier.waiter_count == 0
 
     asyncio.run(scenario())
+
+
+def test_keyed_event_notifier_handles_fanout_without_cross_key_wakeups() -> None:
+    async def scenario() -> None:
+        notifier = KeyedEventNotifier()
+        waiters = [
+            asyncio.create_task(
+                notifier.wait(
+                    f"session:{index % 16}",
+                    notifier.version(f"session:{index % 16}"),
+                    timeout=1,
+                )
+            )
+            for index in range(256)
+        ]
+        await asyncio.sleep(0)
+
+        for index in range(16):
+            notifier.publish(f"session:{index}")
+
+        assert all(await asyncio.gather(*waiters))
+        assert notifier.stats()["woken"] == 256
+        assert notifier.waiter_count == 0
+
+    asyncio.run(scenario())

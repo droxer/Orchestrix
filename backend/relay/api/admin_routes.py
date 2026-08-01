@@ -32,6 +32,22 @@ from .helpers import (
 router = APIRouter()
 
 
+@router.get("/admin/control-plane/metrics")
+async def control_plane_metrics(
+    request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    require_admin_session(request, ctx.auth_store)
+    bridge = getattr(request.app.state, "notification_bridge", None)
+    return {
+        "notifications": ctx.control_plane_notifier.stats(),
+        "notificationBridge": (
+            bridge.stats()
+            if bridge is not None
+            else {"enabled": False, "connected": False}
+        ),
+    }
+
+
 def _with_node_display_name(ctx: AppContextDep, node: dict[str, Any]) -> dict[str, Any]:
     return present_computer(ctx, node)
 

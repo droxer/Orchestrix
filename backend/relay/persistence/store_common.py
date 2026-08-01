@@ -11,6 +11,7 @@ from typing import Any
 
 from sqlalchemy import JSON, Column, MetaData, Text, Uuid, create_engine, text
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.engine import make_url
 
 from ..core.ids import new_database_id, now_iso
 from ..core.models import (
@@ -47,6 +48,38 @@ _ENGINES: dict[str, Any] = {}
 _ENGINE_LOCK = RLock()
 
 
+def _positive_env_number(name: str, default: str, cast: Any) -> Any:
+    raw = os.environ.get(name, default).strip()
+    try:
+        value = cast(raw)
+    except ValueError as error:
+        raise ValueError(f"{name} must be a positive number.") from error
+    if value <= 0:
+        raise ValueError(f"{name} must be a positive number.")
+    return value
+
+
+def database_engine_options(database_url: str) -> dict[str, Any]:
+    """Build bounded per-replica pool settings for server databases."""
+    if make_url(database_url).get_backend_name() == "sqlite":
+        return {}
+    pre_ping = os.environ.get("RELAY_DB_POOL_PRE_PING", "true").strip().lower()
+    if pre_ping not in {"1", "true", "yes", "on", "0", "false", "no", "off"}:
+        raise ValueError("RELAY_DB_POOL_PRE_PING must be a boolean.")
+    return {
+        "pool_size": _positive_env_number("RELAY_DB_POOL_SIZE", "10", int),
+        "max_overflow": _positive_env_number("RELAY_DB_MAX_OVERFLOW", "20", int),
+        "pool_timeout": _positive_env_number(
+            "RELAY_DB_POOL_TIMEOUT_SECONDS", "5", float
+        ),
+        "pool_recycle": _positive_env_number(
+            "RELAY_DB_POOL_RECYCLE_SECONDS", "300", int
+        ),
+        "pool_pre_ping": pre_ping in {"1", "true", "yes", "on"},
+        "pool_use_lifo": True,
+    }
+
+
 def shared_engine(database_url: str) -> Any:
     """One Engine per database URL, shared by every store.
 
@@ -58,7 +91,9 @@ def shared_engine(database_url: str) -> Any:
     with _ENGINE_LOCK:
         engine = _ENGINES.get(database_url)
         if engine is None:
-            engine = create_engine(database_url, future=True)
+            engine = create_engine(
+                database_url, future=True, **database_engine_options(database_url)
+            )
             _ENGINES[database_url] = engine
         return engine
 

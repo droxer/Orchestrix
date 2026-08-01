@@ -41,6 +41,10 @@ class KeyedEventNotifier:
             str, set[tuple[asyncio.AbstractEventLoop, asyncio.Future[int]]]
         ] = defaultdict(set)
         self._closed = False
+        self._published = 0
+        self._waits = 0
+        self._woken = 0
+        self._timed_out = 0
 
     @property
     def waiter_count(self) -> int:
@@ -51,10 +55,23 @@ class KeyedEventNotifier:
         with self._lock:
             return self._versions[key]
 
+    def stats(self) -> dict[str, int]:
+        with self._lock:
+            return {
+                "published": self._published,
+                "waits": self._waits,
+                "woken": self._woken,
+                "timedOut": self._timed_out,
+                "activeWaiters": sum(
+                    len(waiters) for waiters in self._waiters.values()
+                ),
+            }
+
     def publish(self, key: str) -> None:
         with self._lock:
             if self._closed:
                 return
+            self._published += 1
             self._versions[key] += 1
             version = self._versions[key]
             waiters = list(self._waiters.pop(key, ()))
@@ -73,15 +90,23 @@ class KeyedEventNotifier:
         future: asyncio.Future[int] = loop.create_future()
         waiter = (loop, future)
         with self._lock:
+            self._waits += 1
             if self._closed:
                 return False
             if self._versions[key] > after_version:
+                self._woken += 1
                 return True
             self._waiters[key].add(waiter)
         try:
             version = await asyncio.wait_for(future, timeout=timeout)
-            return version > after_version
+            woken = version > after_version
+            if woken:
+                with self._lock:
+                    self._woken += 1
+            return woken
         except TimeoutError:
+            with self._lock:
+                self._timed_out += 1
             return False
         finally:
             with self._lock:
@@ -127,6 +152,17 @@ class PostgresNotificationBridge:
         self.notifier = notifier
         self.channel = channel
         self._task: asyncio.Task[None] | None = None
+        self._connected = False
+        self._reconnects = 0
+        self._notifications = 0
+
+    def stats(self) -> dict[str, int | bool]:
+        return {
+            "enabled": True,
+            "connected": self._connected,
+            "reconnects": self._reconnects,
+            "notifications": self._notifications,
+        }
 
     def start(self) -> None:
         if self._task and not self._task.done():
@@ -153,16 +189,20 @@ class PostgresNotificationBridge:
                     self.database_url, autocommit=True
                 )
                 async with connection:
+                    self._connected = True
                     await connection.execute(
                         sql.SQL("LISTEN {}").format(sql.Identifier(self.channel))
                     )
                     retry_seconds = 0.25
                     while True:
                         async for notification in connection.notifies(timeout=30):
+                            self._notifications += 1
                             self.notifier.publish(notification.payload)
             except asyncio.CancelledError:
                 raise
             except (OSError, psycopg.Error) as error:
+                self._connected = False
+                self._reconnects += 1
                 logger.warning(
                     "PostgreSQL notification bridge disconnected",
                     error=str(error),
