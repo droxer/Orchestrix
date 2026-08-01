@@ -1100,7 +1100,7 @@
     "empty_filtered_body": "調整搜尋或篩選條件。",
     "personality_title": "個性",
     "personality_help": "在每項任務前套用的持久角色、原則與溝通方式。",
-    "personality_defined": "就緒",
+    "personality_defined": "自訂",
     "personality_default": "預設",
     "write_personality": "定義個性",
     "edit_personality": "編輯個性",

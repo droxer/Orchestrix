@@ -1102,7 +1102,7 @@
     "empty_filtered_body": "Adjust search or filters.",
     "personality_title": "Personality",
     "personality_help": "The durable role, principles, and communication style applied before every task.",
-    "personality_defined": "Ready",
+    "personality_defined": "Custom",
     "personality_default": "Default",
     "write_personality": "Define personality",
     "edit_personality": "Edit personality",

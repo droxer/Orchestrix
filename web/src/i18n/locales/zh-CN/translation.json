@@ -1101,7 +1101,7 @@
     "empty_filtered_body": "调整搜索或筛选条件。",
     "personality_title": "个性",
     "personality_help": "在每项任务前应用的持久角色、原则与沟通方式。",
-    "personality_defined": "就绪",
+    "personality_defined": "自定义",
     "personality_default": "默认",
     "write_personality": "定义个性",
     "edit_personality": "编辑个性",
