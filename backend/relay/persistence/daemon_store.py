@@ -86,6 +86,42 @@ TERMINAL_CLAIM_ID_STATE_KEY = "_relay_terminal_claim_id"
 TERMINAL_CLAIM_EXPIRES_STATE_KEY = "_relay_terminal_claim_expires_at"
 
 
+def _run_request_mode(request: dict[str, Any]) -> str:
+    assignments = request.get("assignments") or []
+    index = int(request.get("currentIndex") or 0)
+    if index >= len(assignments):
+        return "action"
+    return assignments[index].get("mode") or "action"
+
+
+def _assert_node_run_request_capacity(
+    node: dict[str, Any],
+    active_requests: list[dict[str, Any]],
+    request: dict[str, Any],
+) -> None:
+    requested_mode = _run_request_mode(request)
+    active_modes = [_run_request_mode(item) for item in active_requests]
+    if requested_mode != "ask":
+        available = not active_requests
+    elif any(mode != "ask" for mode in active_modes):
+        available = False
+    else:
+        raw_by_mode = node.get("runCapacityByMode")
+        by_mode = raw_by_mode if isinstance(raw_by_mode, dict) else {}
+        ask_limit = by_mode.get("ask")
+        if not isinstance(ask_limit, int) or ask_limit <= 0:
+            ask_limit = 1
+        max_concurrent = node.get("maxConcurrentRuns")
+        if not isinstance(max_concurrent, int) or max_concurrent <= 0:
+            max_concurrent = max(1, ask_limit)
+        available = (
+            len(active_requests) < max_concurrent
+            and sum(mode == "ask" for mode in active_modes) < ask_limit
+        )
+    if not available:
+        raise ValueError("Runtime node capacity is exhausted.")
+
+
 def _node_for_storage(node: dict[str, Any]) -> dict[str, Any]:
     stored = {**node, "token": None}
     stored.pop("nodeToken", None)
@@ -761,6 +797,13 @@ class LocalDaemonStore:
             if self.active_run_request_for_session_any_node(record["sessionId"]):
                 raise ValueError(
                     f"Session {record['sessionId']} already has an active daemon run."
+                )
+            node = self.get_node(record["nodeId"])
+            if node:
+                _assert_node_run_request_capacity(
+                    node,
+                    self.list_active_run_requests(record["nodeId"]),
+                    record,
                 )
             _write_json(
                 self.run_requests_dir / f"{safe_name(record['id'])}.json", record
@@ -2170,7 +2213,45 @@ class DatabaseDaemonStore:
         }
         try:
             with store_transaction(self.engine) as conn:
-                node_pk = self._node_pk(conn, record["nodeId"])
+                # The node row is the cross-replica capacity mutex. PostgreSQL
+                # serializes all reservations for one node while unrelated
+                # nodes remain independent.
+                node_row = (
+                    conn.execute(
+                        select(self.nodes)
+                        .where(self.nodes.c.id == record["nodeId"])
+                        .with_for_update()
+                    )
+                    .mappings()
+                    .first()
+                )
+                if not node_row:
+                    raise KeyError(record["nodeId"])
+                node_pk = node_row["id"]
+                active_rows = (
+                    conn.execute(
+                        select(self.run_requests)
+                        .where(self.run_requests.c.node_id == node_pk)
+                        .where(
+                            self.run_requests.c.status.in_(
+                                ACTIVE_RUN_REQUEST_STATUSES
+                            )
+                        )
+                    )
+                    .mappings()
+                    .all()
+                )
+                active_requests = [row_to_run_request(row) for row in active_rows]
+                if any(
+                    item["sessionId"] == record["sessionId"]
+                    for item in active_requests
+                ):
+                    raise ValueError(
+                        f"Session {record['sessionId']} already has an active daemon run."
+                    )
+                _assert_node_run_request_capacity(
+                    row_to_node(node_row), active_requests, record
+                )
                 conn.execute(
                     insert(self.run_requests).values(
                         **run_request_to_row(record, node_pk=node_pk)

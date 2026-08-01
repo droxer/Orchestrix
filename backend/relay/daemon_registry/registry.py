@@ -3,7 +3,8 @@ from __future__ import annotations
 import os
 import time
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import ExitStack, contextmanager
 from datetime import datetime
 from threading import RLock
 from typing import Any
@@ -298,6 +299,8 @@ class DaemonNodeRegistry:
         # which are delivered exactly once by the enrollment response.
         self.plain_node_tokens: dict[str, str] = {}
         self.dispatch_lock = RLock()
+        self._dispatch_locks_guard = RLock()
+        self._dispatch_locks: dict[str, RLock] = {}
         self.logical_assignment_validator: Callable[[dict[str, Any]], None] | None = (
             None
         )
@@ -306,6 +309,17 @@ class DaemonNodeRegistry:
         self._last_seen_persisted_at: dict[str, float] = {}
         self._load_persisted_state()
 
+    @contextmanager
+    def dispatch_scope(self, node_ids: list[str]) -> Iterator[None]:
+        """Serialize one node's mutations without blocking unrelated nodes."""
+        keys = sorted({node_id for node_id in node_ids if node_id})
+        with self._dispatch_locks_guard:
+            locks = [self._dispatch_locks.setdefault(key, RLock()) for key in keys]
+        with ExitStack() as stack:
+            for lock in locks:
+                stack.enter_context(lock)
+            yield
+
     def register(
         self,
         payload: dict[str, Any],
@@ -313,7 +327,7 @@ class DaemonNodeRegistry:
         *,
         authorized_node_location: str | None = None,
     ) -> dict[str, Any]:
-        with self.dispatch_lock:
+        with self.dispatch_scope([payload["sandboxId"]]):
             return self._register_unlocked(
                 payload,
                 ui_token,
@@ -1021,7 +1035,7 @@ class DaemonNodeRegistry:
         return bool(sandbox and self._liveness(sandbox)["online"])
 
     def enqueue(self, sandbox_id: str, command: dict[str, Any]) -> None:
-        with self.dispatch_lock:
+        with self.dispatch_scope([sandbox_id]):
             self._enqueue_unlocked(sandbox_id, command)
 
     def _enqueue_unlocked(self, sandbox_id: str, command: dict[str, Any]) -> None:
@@ -1061,7 +1075,7 @@ class DaemonNodeRegistry:
         lease_seconds: float = DAEMON_COMMAND_LEASE_SECONDS,
         renew_known_active: bool = True,
     ) -> list[dict[str, Any]]:
-        with self.dispatch_lock:
+        with self.dispatch_scope([sandbox_id]):
             return self._take_commands_unlocked(
                 sandbox_id,
                 token,
@@ -1092,7 +1106,7 @@ class DaemonNodeRegistry:
         remain live. Both employee-device and managed nodes use this contract;
         infrastructure recovery remains a managed-node policy concern.
         """
-        with self.dispatch_lock:
+        with self.dispatch_scope([sandbox_id]):
             self._assert_authorized(sandbox_id, token)
             sandbox = self.sandboxes[sandbox_id]
             if sandbox.get("retiredAt"):
@@ -1219,7 +1233,15 @@ class DaemonNodeRegistry:
         active_runs: list[dict[str, Any]] | None = None,
         request_id: str | None = None,
     ) -> dict[str, Any]:
-        with self.dispatch_lock:
+        node_ids = [
+            sandbox_id,
+            *(
+                assignment.get("daemonNodeId")
+                for assignment in assignments
+                if assignment.get("daemonNodeId")
+            ),
+        ]
+        with self.dispatch_scope(node_ids):
             return self._start_run_request_unlocked(
                 sandbox_id,
                 session_id,
@@ -1316,7 +1338,12 @@ class DaemonNodeRegistry:
     def handle_event(
         self, sandbox_id: str, event: dict[str, Any], token: str | None
     ) -> None:
-        with self.dispatch_lock:
+        lock = (
+            self.dispatch_scope([sandbox_id])
+            if event.get("type") in {"run.output", "run.collaboration"}
+            else self.dispatch_lock
+        )
+        with lock:
             self._handle_event_unlocked(sandbox_id, event, token)
 
     def _handle_event_unlocked(
@@ -1515,8 +1542,9 @@ class DaemonNodeRegistry:
 
     def assert_node_event_authorized(self, sandbox_id: str, token: str | None) -> None:
         """Authorize non-run events without attempting run-event bookkeeping."""
-        self._assert_authorized(sandbox_id, token)
-        self._mark_seen(sandbox_id)
+        with self.dispatch_scope([sandbox_id]):
+            self._assert_authorized(sandbox_id, token)
+            self._mark_seen(sandbox_id)
 
     def reap_stale_runs(self, *, force: bool = True) -> None:
         with self.dispatch_lock:
