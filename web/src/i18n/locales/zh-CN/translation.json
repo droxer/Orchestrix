@@ -372,6 +372,13 @@
     "empty_title": "暂无团队",
     "empty_body": "将智能体组成有负责人的命名团队，以便重复派发任务。"
   },
+  "computer": {
+    "title": "我的电脑",
+    "count_one": "{{count}} 台电脑",
+    "count_other": "{{count}} 台电脑",
+    "empty_title": "尚未分配电脑",
+    "empty_body": "请联系管理员为你分配一台电脑。"
+  },
   "routine": {
     "title": "例行任务",
     "sub_one": "{{count}} 个例行任务",
