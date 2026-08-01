@@ -204,6 +204,33 @@ def test_session_snapshots_do_not_duplicate_event_history() -> None:
             assert len(store.get_session(created["id"])["events"]) == 2
 
 
+def test_session_summary_pages_are_bounded_and_event_free() -> None:
+    with TemporaryDirectory() as root:
+        stores = (
+            LocalSessionStore(Path(root) / "local"),
+            DatabaseSessionStore(f"sqlite:///{root}/relay.db", create_schema=True),
+        )
+        for store in stores:
+            for index in range(3):
+                store.create_session(
+                    {
+                        "workspacePath": "/workspace/alice",
+                        "ownerEmployeeId": "alice" if index < 2 else "bob",
+                        "taskGoal": f"task {index}",
+                        "participants": ["human"],
+                    }
+                )
+
+            summaries = store.list_session_summaries(
+                owner_employee_id="alice", limit=1
+            )
+
+            assert len(summaries) == 1
+            assert summaries[0]["ownerEmployeeId"] == "alice"
+            assert summaries[0]["eventCount"] == 1
+            assert "events" not in summaries[0]
+
+
 def test_session_stores_notify_after_committed_events() -> None:
     with TemporaryDirectory() as root:
         stores = (

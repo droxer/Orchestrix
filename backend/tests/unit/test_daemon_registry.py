@@ -828,13 +828,15 @@ def test_daemon_output_retry_survives_event_log_write_failure(monkeypatch) -> No
             failed_once = False
 
             def append_with_one_failure(
-                session_id: str, event: dict[str, object]
+                session_id: str,
+                event: dict[str, object],
+                **kwargs: object,
             ) -> dict[str, object]:
                 nonlocal failed_once
                 if event.get("type") == "agent.output" and not failed_once:
                     failed_once = True
                     raise RuntimeError("disk unavailable")
-                return original_append(session_id, event)
+                return original_append(session_id, event, **kwargs)
 
             monkeypatch.setattr(session_store, "append_event", append_with_one_failure)
             with pytest.raises(RuntimeError, match="disk unavailable"):
