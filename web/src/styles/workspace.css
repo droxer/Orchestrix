@@ -37,32 +37,12 @@
   box-shadow: inset 0 0 0 1px var(--line-2);
 }
 
-/* Runtime + computer facts in the workspace header: a two-row stack of
-   labeled chips. The micro caps label echoes the page kicker; the chips
-   reuse the placement-badge visual language (hairline, surface-1, mono
-   name) so runtime and node read as one system. */
-.workspace-header-facts {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--sp-2);
-  min-width: 0;
-}
-
-.workspace-header-fact {
+.workspace-header-strip {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
   min-width: 0;
   max-width: 100%;
-}
-
-.workspace-header-fact-label {
-  flex: none;
-  color: var(--ink-3);
-  font: var(--type-micro);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
 }
 
 .workspace-header-chip {

@@ -432,22 +432,24 @@ export function AgentWorkspacePage({
         )}
         actions={(
           <>
-            <div className="workspace-header-facts">
-              <span className="workspace-header-fact">
-                <span className="workspace-header-fact-label">{t("admin.v2.agent_runtime")}</span>
-                <span className="workspace-header-chip" translate="no">
-                  <AgentMark agent={agent.executorKind} size={13} />
-                  <span className="workspace-header-chip-name">{agentLabel(agent.executorKind)}</span>
-                </span>
+            <div className="workspace-header-strip">
+              <span
+                className="workspace-header-chip"
+                translate="no"
+                aria-label={`${t("admin.v2.agent_runtime")}: ${agentLabel(agent.executorKind)}`}
+              >
+                <AgentMark agent={agent.executorKind} size={13} />
+                <span className="workspace-header-chip-name" aria-hidden="true">{agentLabel(agent.executorKind)}</span>
               </span>
-              <span className="workspace-header-fact">
-                {primaryPlacement ? (
-                  <AgentPlacementBadge description={primaryPlacement} showSandbox />
-                ) : (
-                  <span className="workspace-header-chip workspace-header-chip--empty">
-                    {t("admin.v2.no_runtime_placement")}
-                  </span>
-                )}
+              {primaryPlacement ? (
+                <AgentPlacementBadge description={primaryPlacement} showSandbox />
+              ) : (
+                <span className="workspace-header-chip workspace-header-chip--empty">
+                  {t("admin.v2.no_runtime_placement")}
+                </span>
+              )}
+              <span className={`workspace-status-pill tone-${agentAvailabilityTone(agent.availability)}`}>
+                {t(`admin.v2.placement_status.${agent.availability}`, { defaultValue: agent.availability })}
               </span>
             </div>
             <Button
