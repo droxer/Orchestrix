@@ -23,6 +23,13 @@ def test_keyed_event_notifier_wakes_only_matching_waiters() -> None:
 
         assert await session_waiter is True
         assert await other_waiter is False
+        assert notifier.stats() == {
+            "published": 1,
+            "waits": 2,
+            "woken": 1,
+            "timedOut": 1,
+            "activeWaiters": 0,
+        }
 
     asyncio.run(scenario())
 
