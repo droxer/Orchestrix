@@ -4,6 +4,7 @@ import base64
 import json
 import shutil
 import time
+from collections import defaultdict
 from collections.abc import Callable
 from pathlib import Path
 from threading import RLock
@@ -36,6 +37,7 @@ from .store_common import (
     _read_json,
     _read_jsonl,
     _write_json,
+    apply_session_event,
     create_all_tables,
     database_id_column,
     entity_uuid_type,
@@ -134,10 +136,18 @@ class LocalSessionStore:
                 ),
                 encoding="utf-8",
             )
-            _write_json(self._snapshot_path(session_id), session)
+            _write_json(
+                self._snapshot_path(session_id), compact_session_snapshot(session)
+            )
             return session
 
-    def append_event(self, session_id: str, event: dict[str, Any]) -> dict[str, Any]:
+    def append_event(
+        self,
+        session_id: str,
+        event: dict[str, Any],
+        *,
+        hydrate_events: bool = True,
+    ) -> dict[str, Any]:
         with self._lock:
             if self._tombstone_path(session_id).exists():
                 raise KeyError(session_id)
@@ -149,14 +159,21 @@ class LocalSessionStore:
                 event_type=event.get("type"),
             )
             if self._snapshot_path(session_id).exists():
-                events = [
-                    *_read_json(self._snapshot_path(session_id)).get("events", []),
-                    event,
-                ]
+                session = compact_session_snapshot(
+                    _read_json(self._snapshot_path(session_id))
+                )
+                apply_session_event(session, event, retain_event=False)
+                session["eventCount"] = int(session.get("eventCount") or 0) + 1
             else:
-                events = _read_jsonl(self._events_path(session_id))
-            session = materialize_events(events)
+                session = compact_session_snapshot(
+                    materialize_events(_read_jsonl(self._events_path(session_id)))
+                )
             _write_json(self._snapshot_path(session_id), session)
+            if hydrate_events:
+                session = {
+                    **session,
+                    "events": _read_jsonl(self._events_path(session_id)),
+                }
         self._notify_event(session_id)
         return session
 
@@ -173,7 +190,10 @@ class LocalSessionStore:
             if self._tombstone_path(session_id).exists():
                 raise KeyError(session_id)
             if self._snapshot_path(session_id).exists():
-                return _read_json(self._snapshot_path(session_id))
+                return {
+                    **_read_json(self._snapshot_path(session_id)),
+                    "events": _read_jsonl(self._events_path(session_id)),
+                }
             return materialize_events(_read_jsonl(self._events_path(session_id)))
 
     def read_event_page(
@@ -241,6 +261,26 @@ class LocalSessionStore:
             if path.is_dir()
         ]
         return sorted(sessions, key=lambda item: item["updatedAt"], reverse=True)
+
+    def list_session_summaries(
+        self, *, owner_employee_id: str | None = None, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        if not self.sessions_dir.exists():
+            return []
+        summaries = [
+            _read_json(self._snapshot_path(path.name))
+            for path in self.sessions_dir.iterdir()
+            if path.is_dir() and self._snapshot_path(path.name).exists()
+        ]
+        if owner_employee_id is not None:
+            summaries = [
+                item
+                for item in summaries
+                if item.get("ownerEmployeeId") == owner_employee_id
+            ]
+        return sorted(
+            summaries, key=lambda item: item["updatedAt"], reverse=True
+        )[: max(1, limit)]
 
     def list_token_usage(self) -> list[dict[str, Any]]:
         rows = [
@@ -718,12 +758,18 @@ class DatabaseSessionStore:
                     conn, session_row["id"], session, str(run["id"])
                 )
 
-    def append_event(self, session_id: str, event: dict[str, Any]) -> dict[str, Any]:
+    def append_event(
+        self,
+        session_id: str,
+        event: dict[str, Any],
+        *,
+        hydrate_events: bool = True,
+    ) -> dict[str, Any]:
         for attempt in range(3):
             try:
                 session = self._append_event_once(session_id, event)
                 self._notify_event(session_id)
-                return session
+                return self.get_session(session_id) if hydrate_events else session
             except IntegrityError:
                 if attempt == 2:
                     raise
@@ -756,8 +802,12 @@ class DatabaseSessionStore:
                     **session_event_to_row(session_pk, sequence, event)
                 )
             )
-            session = materialize_events(
-                [*(row["snapshot"] or {}).get("events", []), event]
+            session = apply_session_event(
+                compact_session_snapshot(
+                    row["snapshot"] or {}, event_count=sequence + 1
+                ),
+                event,
+                retain_event=False,
             )
             conn.execute(
                 update(self.sessions)
@@ -797,7 +847,7 @@ class DatabaseSessionStore:
         with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
-                    select(self.sessions.c.snapshot).where(
+                    select(self.sessions.c.id, self.sessions.c.snapshot).where(
                         self.sessions.c.id == session_id
                     )
                 )
@@ -806,7 +856,8 @@ class DatabaseSessionStore:
             )
             if not row:
                 raise KeyError(session_id)
-        return row["snapshot"]
+            events = self._events_for_session(conn, row["id"])
+        return {**(row["snapshot"] or {}), "events": events}
 
     def read_event_page(
         self,
@@ -967,14 +1018,57 @@ class DatabaseSessionStore:
         with store_transaction(self.engine) as conn:
             rows = (
                 conn.execute(
-                    select(self.sessions.c.snapshot).order_by(
+                    select(self.sessions.c.id, self.sessions.c.snapshot).order_by(
                         self.sessions.c.updated_at.desc()
                     )
                 )
                 .mappings()
                 .all()
             )
-        return [row["snapshot"] for row in rows]
+            session_ids = [row["id"] for row in rows]
+            events_by_session: dict[Any, list[dict[str, Any]]] = defaultdict(list)
+            if session_ids:
+                event_rows = (
+                    conn.execute(
+                        select(self.events.c.session_id, self.events.c.payload)
+                        .where(self.events.c.session_id.in_(session_ids))
+                        .order_by(self.events.c.session_id, self.events.c.sequence)
+                    )
+                    .mappings()
+                    .all()
+                )
+                for event_row in event_rows:
+                    events_by_session[event_row["session_id"]].append(
+                        event_row["payload"]
+                    )
+        return [
+            {
+                **(row["snapshot"] or {}),
+                "events": events_by_session[row["id"]],
+            }
+            for row in rows
+        ]
+
+    def list_session_summaries(
+        self, *, owner_employee_id: str | None = None, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        statement = select(
+            self.sessions.c.snapshot, self.sessions.c.version
+        ).order_by(self.sessions.c.updated_at.desc())
+        if owner_employee_id is not None:
+            statement = statement.where(
+                self.sessions.c.owner_employee_id == owner_employee_id
+            )
+        statement = statement.limit(max(1, limit))
+        with store_transaction(self.engine) as conn:
+            rows = conn.execute(statement).mappings().all()
+        return [
+            {
+                **(row["snapshot"] or {}),
+                "eventCount": int(row["version"] or 0),
+            }
+            for row in rows
+        ]
 
     def list_token_usage(self) -> list[dict[str, Any]]:
         with store_transaction(self.engine) as conn:
@@ -1137,8 +1231,12 @@ class DatabaseSessionStore:
                     **session_event_to_row(session_pk, sequence, event)
                 )
             )
-            session = materialize_events(
-                [*(row["snapshot"] or {}).get("events", []), event]
+            session = apply_session_event(
+                compact_session_snapshot(
+                    row["snapshot"] or {}, event_count=sequence + 1
+                ),
+                event,
+                retain_event=False,
             )
             conn.execute(
                 update(self.sessions)
@@ -1149,7 +1247,7 @@ class DatabaseSessionStore:
                     )
                 )
             )
-        return session
+        return self.get_session(session_id)
 
     def read_artifact_content(self, session_id: str, artifact_id: str) -> bytes | None:
         """Return the stored snapshot bytes for an artifact, if one was kept."""
@@ -1251,11 +1349,23 @@ def session_to_row(
         "pending_decision": session.get("pendingDecision"),
         "current_agent": session.get("currentAgent"),
         "final_outcome": session.get("finalOutcome"),
-        "snapshot": session,
+        "snapshot": compact_session_snapshot(session, event_count=version),
         "version": version,
         "created_at": _parse_iso(session["createdAt"]),
         "updated_at": _parse_iso(session["updatedAt"]),
     }
+
+
+def compact_session_snapshot(
+    session: dict[str, Any], *, event_count: int | None = None
+) -> dict[str, Any]:
+    snapshot = dict(session)
+    if event_count is None and "events" in snapshot:
+        event_count = len(snapshot["events"])
+    snapshot.pop("events", None)
+    if event_count is not None:
+        snapshot["eventCount"] = event_count
+    return snapshot
 
 
 def session_event_to_row(

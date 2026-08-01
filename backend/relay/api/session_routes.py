@@ -102,7 +102,7 @@ def session_brief_item(session: dict[str, Any]) -> dict[str, Any]:
         "archived": session.get("archived", False),
         "artifactCount": len(workspace_artifacts(session)),
         "runCount": len(session.get("agentRuns", [])),
-        "eventCount": len(session.get("events", [])),
+        "eventCount": session.get("eventCount", len(session.get("events", []))),
         "updatedAt": session.get("updatedAt"),
         "createdAt": session.get("createdAt"),
     }
@@ -217,14 +217,24 @@ def ensure_session_managed_affinity(
 @router.get("/threads")
 async def list_sessions(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
+    if request.query_params.get("view") == "summary":
+        try:
+            requested_limit = int(request.query_params.get("limit") or "100")
+        except ValueError as error:
+            raise HTTPException(400, "limit must be an integer.") from error
+        summaries = await run_in_threadpool(
+            ctx.session_store.list_session_summaries,
+            owner_employee_id=None if actor["isAdmin"] else actor["employeeId"],
+            limit=min(max(1, requested_limit), 200),
+        )
+        sessions = ensure_sessions_managed_affinity(ctx, summaries)
+        return {"sessions": [session_brief_item(session) for session in sessions]}
     visible = [
         session
         for session in ctx.session_store.list_sessions()
         if actor["isAdmin"] or session.get("ownerEmployeeId") == actor["employeeId"]
     ]
     sessions = ensure_sessions_managed_affinity(ctx, visible)
-    if request.query_params.get("view") == "summary":
-        return {"sessions": [session_brief_item(session) for session in sessions]}
     return {"sessions": sessions}
 
 

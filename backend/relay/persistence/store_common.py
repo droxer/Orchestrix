@@ -277,11 +277,20 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
     if created.get("managedNodeId"):
         session["managedNodeId"] = created["managedNodeId"]
     for event in events:
-        session["events"].append(event)
-        session["updatedAt"] = event["timestamp"]
-        handler = SESSION_EVENT_HANDLERS.get(event.get("type"))
-        if handler:
-            handler(session, event)
+        apply_session_event(session, event)
+    return session
+
+
+def apply_session_event(
+    session: dict[str, Any], event: dict[str, Any], *, retain_event: bool = True
+) -> dict[str, Any]:
+    """Incrementally update a derived session projection with one event."""
+    if retain_event:
+        session.setdefault("events", []).append(event)
+    session["updatedAt"] = event["timestamp"]
+    handler = SESSION_EVENT_HANDLERS.get(event.get("type"))
+    if handler:
+        handler(session, event)
     return session
 
 

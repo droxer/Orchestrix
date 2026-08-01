@@ -1471,6 +1471,7 @@ class DaemonNodeRegistry:
                         "sequence": event["sequence"],
                     },
                 ),
+                hydrate_events=False,
             )
             seen[event["stream"]] = event["sequence"]
             self._append_run_output(event["runId"], event["text"])
@@ -1492,6 +1493,7 @@ class DaemonNodeRegistry:
                         "collaboration": event["collaboration"],
                     },
                 ),
+                hydrate_events=False,
             )
             seen["collaboration"] = event["sequence"]
             return
