@@ -260,7 +260,6 @@
   "workspace": {
     "title": "Workspace",
     "sub": "Files",
-    "profile_sub": "Profile",
     "profile_details": "Details",
     "sections": "Workspace sections",
     "tab_profile": "Profile",

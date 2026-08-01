@@ -371,10 +371,6 @@ export function AgentWorkspacePage({
     return t("workspace.tab_activities");
   }
 
-  const headerSubtitle = pageTab === "profile"
-    ? t("workspace.profile_sub", { agent: displayName })
-    : null;
-
   const placementDescriptions = describeAgentPlacements(agent.placements);
   const primaryPlacement = placementDescriptions.find(
     ({ placement }) => placement.desiredState === "active",
@@ -406,7 +402,6 @@ export function AgentWorkspacePage({
             {displayName}
           </span>
         )}
-        subtitle={headerSubtitle}
         titleVariant="display"
         layout="stacked"
         toolbar={(

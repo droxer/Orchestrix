@@ -260,7 +260,6 @@
   "workspace": {
     "title": "工作區",
     "sub": "檔案",
-    "profile_sub": "設定",
     "profile_details": "詳細資訊",
     "sections": "工作區分區",
     "tab_profile": "設定",
