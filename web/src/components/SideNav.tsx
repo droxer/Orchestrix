@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type Dispatch, type MouseEvent, type SetSt
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
-  NavAdmin, NavAgents, NavBacklog, NavChannels, NavLogout, NavMore, NavPreferences, NavThreads,
+  NavAdmin, NavAgents, NavBacklog, NavChannels, NavComputer, NavLogout, NavMore, NavPreferences, NavThreads,
   NavTeams,
   NavRoutine, NavSidebarCollapse, NavSidebarExpand,
 } from "./icons";
@@ -230,6 +230,21 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
           >
             <NavThreads size={18} />
             <span className="sidenav-label sr-only">{t("nav.threads")}</span>
+          </a>
+          <a
+            className={`sidenav-btn ${route === "computer" ? "active" : ""}`}
+            data-nav="computer"
+            href={hrefForRoute("computer")}
+            aria-label={t("nav.computer")}
+            aria-current={route === "computer" ? "page" : undefined}
+            onClick={(event) => handleRouteClick(event, "computer")}
+            onMouseEnter={(e) => showNavTooltip(t("nav.computer"), e.currentTarget)}
+            onMouseLeave={hideNavTooltip}
+            onFocus={(e) => showNavTooltip(t("nav.computer"), e.currentTarget)}
+            onBlur={hideNavTooltip}
+          >
+            <NavComputer size={18} aria-hidden="true" />
+            <span className="sidenav-label sr-only">{t("nav.computer")}</span>
           </a>
         </div>
         <div className="sidenav-group sidenav-group--separated" role="group" aria-label={t("nav.workspace")}>

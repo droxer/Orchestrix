@@ -114,6 +114,7 @@ export const NavSidebarCollapse = withStandardStroke(PanelLeftClose, "NavSidebar
 export const NavSidebarExpand = withStandardStroke(PanelLeftOpen, "NavSidebarExpand");
 export const NavMore = withStandardStroke(MoreHorizontal, "NavMore");
 export const NavNewThread = withStandardStroke(Plus, "NavNewThread");
+export const NavComputer = withStandardStroke(Server, "NavComputer");
 // Compose a new thread (pencil-in-square), the messaging-app convention.
 export const ActionCompose = withStandardStroke(SquarePen, "ActionCompose");
 
