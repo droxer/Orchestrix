@@ -7,7 +7,7 @@ import { ActionEdit, ActionKey, AdminDelete, AdminManageExecutors } from "../ico
 
 interface NodeActionsProps {
   node: ControlPanelDaemonNodeRecord;
-  onReveal: (node: ControlPanelDaemonNodeRecord) => void;
+  onReveal?: (node: ControlPanelDaemonNodeRecord) => void;
   onRename: (node: ControlPanelDaemonNodeRecord) => void;
   onManageExecutors: (node: ControlPanelDaemonNodeRecord) => void;
   onDelete?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
@@ -30,7 +30,7 @@ export function NodeActions({ node, onReveal, onRename, onManageExecutors, onDel
       >
         <ActionEdit size={14} aria-hidden="true" />
       </Button>
-      {node.managedNodeId ? null : (
+      {node.managedNodeId || !onReveal ? null : (
         <Button
           variant="ghost"
           type="button"

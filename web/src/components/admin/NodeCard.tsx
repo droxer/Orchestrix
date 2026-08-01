@@ -42,7 +42,7 @@ interface NodeCardProps {
   node: ControlPanelDaemonNodeRecord;
   storedTokens?: StoredNodeTokenMap;
   colocated?: boolean;
-  onReveal: (node: ControlPanelDaemonNodeRecord) => void;
+  onReveal?: (node: ControlPanelDaemonNodeRecord) => void;
   onRename: (node: ControlPanelDaemonNodeRecord) => void;
   onManageExecutors: (node: ControlPanelDaemonNodeRecord) => void;
   onDelete?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
