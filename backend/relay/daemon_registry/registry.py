@@ -566,6 +566,8 @@ class DaemonNodeRegistry:
         return str(display_name) if display_name else None
 
     def get(self, sandbox_id: str) -> dict[str, Any] | None:
+        if sandbox_id not in self.sandboxes:
+            self._refresh_persisted_liveness(sandbox_id)
         return self.sandboxes.get(sandbox_id)
 
     def list_ready(self) -> list[dict[str, Any]]:
@@ -2350,6 +2352,9 @@ class DaemonNodeRegistry:
     def _assert_authorized(self, sandbox_id: str, token: str | None) -> None:
         sandbox = self.sandboxes.get(sandbox_id)
         if not sandbox:
+            self._refresh_persisted_liveness(sandbox_id)
+            sandbox = self.sandboxes.get(sandbox_id)
+        if not sandbox:
             logger.warning(
                 "Daemon node request for unknown sandbox", sandbox_id=sandbox_id
             )
@@ -2458,6 +2463,19 @@ class DaemonNodeRegistry:
                     continue
                 current = self.sandboxes.get(persisted["id"])
                 if not current:
+                    node_location = infer_node_location(persisted)
+                    self.sandboxes[persisted["id"]] = {
+                        **persisted,
+                        **(
+                            {"nodeLocation": node_location} if node_location else {}
+                        ),
+                        "agents": {
+                            agent: (persisted.get("agents") or {}).get(
+                                agent, "unknown"
+                            )
+                            for agent in AGENT_NAMES
+                        },
+                    }
                     continue
                 persisted_seen = persisted.get("lastSeenAt") or ""
                 current_seen = current.get("lastSeenAt") or ""

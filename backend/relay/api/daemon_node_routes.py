@@ -455,6 +455,9 @@ async def daemon_events(
         event = daemon_node_event(await json_body(request))
         if event.get("type") in WORKSPACE_EVENT_TYPES:
             ctx.registry.assert_node_event_authorized(sandbox_id, bearer_token(request))
+            await run_in_threadpool(
+                ctx.daemon_store.record_workspace_response, sandbox_id, event
+            )
             ctx.workspace_query_broker.resolve(event["commandId"], sandbox_id, event)
             return {"ok": True}
         ctx.registry.handle_event(sandbox_id, event, bearer_token(request))

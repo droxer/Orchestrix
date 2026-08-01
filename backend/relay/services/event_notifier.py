@@ -23,6 +23,10 @@ def daemon_command_key(node_id: str) -> str:
     return f"node:{node_id}"
 
 
+def workspace_response_key(command_id: str) -> str:
+    return f"workspace:{command_id}"
+
+
 class KeyedEventNotifier:
     """Wake async waiters for one domain key without cross-key contention.
 

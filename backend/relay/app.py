@@ -67,6 +67,7 @@ from .services.event_notifier import (
     daemon_command_key,
     database_notification_bridge,
     session_event_key,
+    workspace_response_key,
 )
 from .services.managed_nodes import LocalManagedNodeStore
 from .services.node_agents import sync_node_agents
@@ -107,6 +108,13 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     if hasattr(daemon_store, "set_command_listener"):
         daemon_store.set_command_listener(
             lambda node_id: control_plane_notifier.publish(daemon_command_key(node_id)),
+            database_channel=CONTROL_PLANE_NOTIFICATION_CHANNEL,
+        )
+    if hasattr(daemon_store, "set_workspace_listener"):
+        daemon_store.set_workspace_listener(
+            lambda command_id: control_plane_notifier.publish(
+                workspace_response_key(command_id)
+            ),
             database_channel=CONTROL_PLANE_NOTIFICATION_CHANNEL,
         )
     # Older runtimes could retire an agent without updating Teams. Repair those

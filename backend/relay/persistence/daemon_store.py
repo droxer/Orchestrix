@@ -63,7 +63,7 @@ TERMINAL_DAEMON_STATUSES = frozenset({"completed", "failed", "cancelled"})
 # events are otherwise kept indefinitely: `delete_node` hard-deletes the node
 # row, which makes the event log the only surviving record of a node incarnation
 # (see `historical_managed_runtime_ids`).
-PRUNABLE_DAEMON_EVENT_PREFIX = "daemon.command."
+PRUNABLE_DAEMON_EVENT_PREFIXES = ("daemon.command.", "daemon.workspace.")
 # `daemon.node.seen` is the exception. It was appended per heartbeat by a path
 # that has since stopped emitting it, nothing has ever read it, and it carries no
 # node payload -- so unlike `daemon.node.registered` it records nothing about an
@@ -73,7 +73,7 @@ PRUNABLE_DAEMON_EVENT_TYPES = frozenset({"daemon.node.seen"})
 
 def daemon_event_is_prunable(event_type: str) -> bool:
     return (
-        event_type.startswith(PRUNABLE_DAEMON_EVENT_PREFIX)
+        any(event_type.startswith(prefix) for prefix in PRUNABLE_DAEMON_EVENT_PREFIXES)
         or event_type in PRUNABLE_DAEMON_EVENT_TYPES
     )
 
@@ -258,6 +258,7 @@ class LocalDaemonStore:
         root = Path(root_dir)
         self._lock = RLock()
         self._command_listener: Callable[[str], None] | None = None
+        self._workspace_listener: Callable[[str], None] | None = None
         self._nonterminal_command_ids_by_node: dict[str, set[str]] = {}
         self.nodes_dir = root / "daemon" / "nodes"
         self.commands_dir = root / "daemon" / "commands"
@@ -287,6 +288,19 @@ class LocalDaemonStore:
             self._command_listener(node_id)
         except Exception:  # noqa: BLE001 - notification hints must not fail writes
             logger.exception("Daemon command listener failed", node_id=node_id)
+
+    def set_workspace_listener(
+        self, listener: Callable[[str], None], *, database_channel: str | None = None
+    ) -> None:
+        self._workspace_listener = listener
+
+    def _notify_workspace(self, command_id: str) -> None:
+        if not self._workspace_listener:
+            return
+        try:
+            self._workspace_listener(command_id)
+        except Exception:  # noqa: BLE001 - notification hints must not fail writes
+            logger.exception("Workspace response listener failed", command_id=command_id)
 
     def register_node(self, sandbox: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
@@ -551,6 +565,49 @@ class LocalDaemonStore:
             )
         self._notify_command(record["nodeId"])
         return updated
+
+    def record_workspace_response(
+        self, node_id: str, response: dict[str, Any]
+    ) -> None:
+        command_id = str(response["commandId"])
+        with self._lock:
+            record = self._get_command(command_id)
+            if record and record.get("status") not in TERMINAL_DAEMON_STATUSES:
+                completed = {
+                    **record,
+                    "status": "completed",
+                    "updatedAt": now_iso(),
+                    "completedAt": now_iso(),
+                }
+                _write_json(
+                    self.commands_dir / f"{safe_name(command_id)}.json", completed
+                )
+                self._remove_command_from_index(node_id, command_id)
+            self.append_daemon_event(
+                daemon_event(
+                    "daemon.workspace.response",
+                    {
+                        "nodeId": node_id,
+                        "commandId": command_id,
+                        "response": response,
+                    },
+                )
+            )
+        self._notify_workspace(command_id)
+
+    def get_workspace_response(self, command_id: str) -> dict[str, Any] | None:
+        events_path = self.events_dir / "events.jsonl"
+        if not events_path.exists():
+            return None
+        with self._lock:
+            for event in reversed(_read_jsonl(events_path)):
+                if (
+                    event.get("type") == "daemon.workspace.response"
+                    and event.get("commandId") == command_id
+                ):
+                    response = event.get("response")
+                    return response if isinstance(response, dict) else None
+        return None
 
     def discard_staged_command(self, command_id: str) -> None:
         with self._lock:
@@ -1347,6 +1404,7 @@ class DatabaseDaemonStore:
         Column("timestamp", DateTime(timezone=True), nullable=False),
         Column("payload", json_type(), nullable=False),
         Index("ix_daemon_events_node_id", "node_id"),
+        Index("ix_daemon_events_command_id", "command_id"),
         Index("ix_daemon_events_timestamp", "timestamp"),
     )
 
@@ -1354,6 +1412,8 @@ class DatabaseDaemonStore:
         self.engine = shared_engine(database_url)
         self._command_listener: Callable[[str], None] | None = None
         self._command_notification_channel: str | None = None
+        self._workspace_listener: Callable[[str], None] | None = None
+        self._workspace_notification_channel: str | None = None
         if create_schema:
             create_all_tables(self.engine)
 
@@ -1370,6 +1430,20 @@ class DatabaseDaemonStore:
             self._command_listener(node_id)
         except Exception:  # noqa: BLE001 - notification hints must not fail writes
             logger.exception("Daemon command listener failed", node_id=node_id)
+
+    def set_workspace_listener(
+        self, listener: Callable[[str], None], *, database_channel: str | None = None
+    ) -> None:
+        self._workspace_listener = listener
+        self._workspace_notification_channel = database_channel
+
+    def _notify_workspace(self, command_id: str) -> None:
+        if not self._workspace_listener:
+            return
+        try:
+            self._workspace_listener(command_id)
+        except Exception:  # noqa: BLE001 - notification hints must not fail writes
+            logger.exception("Workspace response listener failed", command_id=command_id)
 
     def _write_node_agents(self, conn: Any, node_pk: str, node: dict[str, Any]) -> None:
         """Replace a node's daemon_node_agents rows, but only if they changed.
@@ -1821,6 +1895,62 @@ class DatabaseDaemonStore:
             )
         self._notify_command(record["nodeId"])
         return updated
+
+    def record_workspace_response(
+        self, node_id: str, response: dict[str, Any]
+    ) -> None:
+        command_id = str(response["commandId"])
+        with store_transaction(self.engine) as conn:
+            command = (
+                conn.execute(
+                    select(self.commands.c.id)
+                    .where(self.commands.c.id == command_id)
+                    .where(~self.commands.c.status.in_(TERMINAL_DAEMON_STATUSES))
+                )
+                .mappings()
+                .first()
+            )
+            if command:
+                now = _parse_iso(now_iso())
+                conn.execute(
+                    update(self.commands)
+                    .where(self.commands.c.id == command["id"])
+                    .values(status="completed", updated_at=now, completed_at=now)
+                )
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    "daemon.workspace.response",
+                    {
+                        "nodeId": node_id,
+                        "commandId": command_id,
+                        "response": response,
+                    },
+                ),
+            )
+            publish_database_notification(
+                conn,
+                self.engine,
+                self._workspace_notification_channel,
+                f"workspace:{command_id}",
+            )
+        self._notify_workspace(command_id)
+
+    def get_workspace_response(self, command_id: str) -> dict[str, Any] | None:
+        with store_transaction(self.engine) as conn:
+            row = (
+                conn.execute(
+                    select(self.events.c.payload)
+                    .where(self.events.c.command_id == command_id)
+                    .where(self.events.c.type == "daemon.workspace.response")
+                    .order_by(self.events.c.timestamp.desc())
+                    .limit(1)
+                )
+                .mappings()
+                .first()
+            )
+        response = (row or {}).get("payload", {}).get("response")
+        return response if isinstance(response, dict) else None
 
     def discard_staged_command(self, command_id: str) -> None:
         with store_transaction(self.engine) as conn:
@@ -2462,7 +2592,10 @@ class DatabaseDaemonStore:
                 conn.execute(
                     delete(self.events).where(
                         or_(
-                            self.events.c.type.startswith(PRUNABLE_DAEMON_EVENT_PREFIX),
+                            *(
+                                self.events.c.type.startswith(prefix)
+                                for prefix in PRUNABLE_DAEMON_EVENT_PREFIXES
+                            ),
                             self.events.c.type.in_(PRUNABLE_DAEMON_EVENT_TYPES),
                         ),
                         self.events.c.timestamp <= _parse_iso(cutoff),
