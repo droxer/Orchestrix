@@ -277,10 +277,7 @@ export function AgentProfilePanel({
 
   if (isWorkspace) {
     return (
-      <div
-        className="workspace-profile-panel workspace-profile-dossier"
-        data-executor={agent.executorKind}
-      >
+      <div className="workspace-profile-panel workspace-profile-dossier">
         <header className="workspace-dossier-hero">
           <ProfileImagePicker
             imageUrl={agent.profileImageUrl}
@@ -291,40 +288,9 @@ export function AgentProfilePanel({
             onUpload={handleImageUpload}
             onRemove={handleImageRemove}
           />
-          <div className="workspace-dossier-intro">
-            <span>{t("agents_page.profile_kicker")}</span>
-            <p className="workspace-dossier-blurb">{t("agents_page.profile_intro")}</p>
-          </div>
-          <div className="workspace-dossier-status">
-            <span
-              className={`workspace-status-pip tone-${agentAvailabilityTone(agent.availability)}`}
-              role="img"
-              aria-label={t(`admin.v2.placement_status.${agent.availability}`, { defaultValue: agent.availability })}
-              title={t(`admin.v2.placement_status.${agent.availability}`, { defaultValue: agent.availability })}
-            />
-            <span className="workspace-dossier-runtime code" translate="no">{agentLabel(agent.executorKind)}</span>
-          </div>
-        </header>
-
-        {canEditProfile ? (
-          <section className="workspace-identity-record" aria-labelledby="workspace-dossier-name-title">
-            <div className="workspace-dossier-instructions-head">
-              <div>
-                <span className="workspace-identity-kicker">{t("agents_page.identity_title")}</span>
-                <h2 id="workspace-dossier-name-title">{t("admin.v2.agent_name")}</h2>
-              </div>
-              {!renaming ? (
-                <DossierIconButton
-                  onClick={startRename}
-                  aria-label={t("admin.v2.edit_agent")}
-                  title={t("admin.v2.edit_agent")}
-                >
-                  <ActionEdit size={14} aria-hidden="true" />
-                </DossierIconButton>
-              ) : null}
-            </div>
+          <div className="workspace-dossier-identity">
             {renaming ? (
-              <>
+              <div className="workspace-dossier-rename">
                 <Input
                   name="agent-display-name"
                   type="text"
@@ -358,15 +324,26 @@ export function AgentProfilePanel({
                     {t("admin.v2.save")}
                   </Button>
                 </div>
-              </>
+              </div>
             ) : (
-              <div className="workspace-identity-value">
-                <p className="workspace-dossier-name-value" translate="no">{agent.displayName}</p>
-                <span translate="no">@{agent.employeeId}</span>
+              <div className="workspace-dossier-name-row">
+                <h2 className="workspace-dossier-name-value" translate="no">{agent.displayName}</h2>
+                {canEditProfile ? (
+                  <DossierIconButton
+                    onClick={startRename}
+                    aria-label={t("admin.v2.edit_agent")}
+                    title={t("admin.v2.edit_agent")}
+                  >
+                    <ActionEdit size={14} aria-hidden="true" />
+                  </DossierIconButton>
+                ) : null}
               </div>
             )}
-          </section>
-        ) : null}
+            <div className="workspace-dossier-meta">
+              <span translate="no">@{agent.employeeId}</span>
+            </div>
+          </div>
+        </header>
 
         <AgentPersonalityEditor
           value={agent.instructions ?? ""}

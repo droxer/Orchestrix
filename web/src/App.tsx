@@ -287,6 +287,10 @@ export function App() {
     onSetComposingNewFromPath: setComposingNewFromPath,
     onClearPendingMessage: clearPendingMessage,
   });
+  const workspaceAgent = useMemo(
+    () => logicalAgents.find((agent) => agent.id === agentWorkspaceId) ?? null,
+    [agentWorkspaceId, logicalAgents],
+  );
 
   useEffect(() => {
     if (!mounted || !authChecked || typeof window === "undefined") return;
@@ -1015,7 +1019,7 @@ export function App() {
             currentUser={user}
             isRefreshing={isRefreshing}
             onRefresh={() => refresh()}
-            workspaceAgent={activeLogicalAgent?.id === agentWorkspaceId ? activeLogicalAgent ?? null : null}
+            workspaceAgent={workspaceAgent}
             isDetailRoute={agentWorkspaceId !== null}
             onOpenWorkspace={openAgentWorkspace}
             onOpenThread={openThread}

@@ -13,7 +13,11 @@ import {
 import { extractTokenUsageFromJsonl } from "./token-usage.js";
 import { CodexCollaborationStream } from "./codex-collaboration.js";
 
-const AGENT_RESULT_LOG_LIMIT = 12_000;
+// The completed-run agent log is the fallback transcript for runs whose live
+// output events are incomplete. A small tail cap drops the head of the stream,
+// which renders as the reply's first characters going missing, so keep the
+// budget generous; override with RELAY_AGENT_RESULT_LOG_LIMIT when needed.
+const AGENT_RESULT_LOG_LIMIT = Number(process.env.RELAY_AGENT_RESULT_LOG_LIMIT) || 262_144;
 
 /**
  * Run one agent assignment. Command construction, rendering, and failure

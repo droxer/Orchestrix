@@ -221,8 +221,7 @@ html[data-theme="dark"] .rail-node { background: var(--surface-3); }
   box-shadow: none;
 }
 
-.backlog-stat-value,
-.workspace-metric-item strong {
+.backlog-stat-value {
   font-family: var(--font-display);
   font-weight: 550;
   letter-spacing: var(--track-display);

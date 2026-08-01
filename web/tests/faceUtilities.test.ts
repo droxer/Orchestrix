@@ -101,7 +101,6 @@ describe("type-face utilities", () => {
       ["styles/admin-v2-views.css", "adm-node-card-name"],
       ["styles/admin-v2-views.css", "adm-node-history-identity span"],
       ["styles/admin-v2-drawers.css", "adm-assign-node-id"],
-      ["styles/workspace.css", "workspace-dossier-runtime"],
     ];
 
     for (const [file, selector] of pairs) {

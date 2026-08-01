@@ -14,6 +14,7 @@ import { RelayEmptyState } from "./RelayEmptyState";
 import { Badge } from "./ui/badge";
 import { FilterSelect } from "./FiltersBar";
 import { describeAgentPlacements } from "../lib/agentPlacements";
+import { OWNERSHIP_ICON } from "./AgentPlacementBadge";
 
 interface AgentsPageProps {
   currentUser: CurrentUser;
@@ -115,6 +116,8 @@ function RosterRow({
   // One agent lives on exactly one computer.
   const computer = placementDescriptions[0] ?? null;
   const ready = agent.enabled && agent.availability === "ready";
+  const ComputerIcon = computer ? OWNERSHIP_ICON[computer.ownership] : null;
+  const computerKindLabel = computer ? t(`admin.v2.node_ownership_${computer.ownership}`) : "";
 
   return (
     <li className="list-virtual">
@@ -143,16 +146,24 @@ function RosterRow({
               <span className="agents-roster-row-name">{agent.displayName}</span>
               {!agent.enabled ? <Badge variant="neutral">{t("agents_page.disabled")}</Badge> : null}
             </span>
-            {/* No computer line here: the selected agent's Profile tab names
-                its computer in the Placements section, and this pane sits
-                beside that one — the roster was printing the same fact twice
-                on one screen. An agent with nowhere to run still says so,
-                because that is a defect rather than a repeat. */}
-            {computer ? null : (
-              <span className="agents-roster-row-meta">
+            {/* Name + computer travel together: the roster is the one place
+                every agent's home machine can be scanned side by side. An
+                agent with nowhere to run still says so — that is a defect,
+                not a fact to quiet. */}
+            <span
+              className="agents-roster-row-meta"
+              title={computer ? `${computerKindLabel} · ${computer.nodeName}` : undefined}
+            >
+              {computer && ComputerIcon ? (
+                <>
+                  <ComputerIcon size={12} aria-hidden="true" />
+                  <span className="agents-roster-row-computer" translate="no">{computer.nodeName}</span>
+                  <span className="agents-roster-row-kind">{computerKindLabel}</span>
+                </>
+              ) : (
                 <span>{t("agents_page.no_placements")}</span>
-              </span>
-            )}
+              )}
+            </span>
           </span>
           {/* Explicit live status only when it adds information — "ready" is
               the default healthy state, already carried by the row accent and

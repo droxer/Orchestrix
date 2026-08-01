@@ -287,6 +287,15 @@ describe("prompts", () => {
 
     assert.deepEqual(cwds, [workspace]);
   });
+  it("keeps the head of long agent output in the completed agent log", async () => {
+    const head = "HEAD-OF-REPLY-MARKER";
+    const stdout = `${head}\n${"x".repeat(20_000)}`;
+    const patch = await runAgentNode("claude", "action", state({ task_goal: "Long output" }), {
+      execStream: async () => ({ exit_code: 0, stdout, stderr: "" }),
+    });
+
+    assert.ok(patch.agent_logs?.[0]?.includes(head));
+  });
   it("Claude action prompt carries the task goal", () => {
     const prompt = claudeTaskPrompt(state({ task_goal: "Fix auth" }));
 

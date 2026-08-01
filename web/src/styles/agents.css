@@ -172,13 +172,33 @@
 
 .agents-roster-row-meta {
   display: flex;
+  align-items: center;
   min-width: 0;
   overflow: hidden;
-  gap: var(--sp-1);
+  gap: var(--sp-1-5);
   color: var(--ink-3);
   font: var(--type-label);
+  white-space: nowrap;
+}
+
+/* Ownership glyph — the local/cloud badge. Kind is carried by the icon plus
+   a quiet kind word, never a hue, same rule as the placement badge. */
+.agents-roster-row-meta > svg {
+  flex: none;
+  color: var(--ink-3);
+}
+
+.agents-roster-row-computer {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.agents-roster-row-kind {
+  flex: none;
+  color: var(--ink-4);
+  font-size: var(--fs-2);
 }
 
 .agent-placement-badge {
@@ -216,6 +236,7 @@
   width: 7px;
   height: 7px;
   flex: none;
+  margin-right: var(--sp-1);
   border-radius: var(--r-full);
   background: var(--tone, var(--ink-4));
 }
