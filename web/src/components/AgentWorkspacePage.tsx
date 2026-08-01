@@ -495,11 +495,6 @@ export function AgentWorkspacePage({
             brief={brief}
             panelId="workspace-page-panel-activities"
             labelledBy="workspace-page-tab-activities"
-            statusPill={(
-              <span className={`workspace-status-pill tone-${agentAvailabilityTone(agent.availability)}`}>
-                {t(`admin.v2.placement_status.${agent.availability}`, { defaultValue: agent.availability })}
-              </span>
-            )}
             emptyPulse
             onOpenThread={onOpenThread}
           />

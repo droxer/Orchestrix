@@ -211,8 +211,10 @@ export function WorkspaceActivities({
   emptyPulse = false,
 }: {
   brief?: WorkspaceBriefResponse;
-  /** Status chip rendered as the last metric cell (agent availability or team readiness). */
-  statusPill: ReactNode;
+  /** Optional status chip rendered as a trailing metric cell (e.g. team
+   *  readiness). Omit when the caller already shows status elsewhere
+   *  (the agent page's header strip covers this for agents). */
+  statusPill?: ReactNode;
   onOpenThread: (sessionId: string) => void;
   panelId: string;
   labelledBy: string;
@@ -241,7 +243,9 @@ export function WorkspaceActivities({
         />
         <MetricItem label={t("workspace.metric_tasks")} value={metrics?.activeTaskCount ?? 0} zero={(metrics?.activeTaskCount ?? 0) === 0} />
         <MetricItem label={t("workspace.metric_sessions")} value={metrics?.sessionCount ?? 0} zero={(metrics?.sessionCount ?? 0) === 0} />
-        <div className="workspace-metric-item workspace-metric-item--status">{statusPill}</div>
+        {statusPill ? (
+          <div className="workspace-metric-item workspace-metric-item--status">{statusPill}</div>
+        ) : null}
       </div>
 
       <div className="workspace-activity-sections">
