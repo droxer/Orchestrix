@@ -2415,6 +2415,41 @@ def test_active_session_run_request_claim_is_atomic_across_store_instances(
         assert "already has an active daemon run" in str(failure)
 
 
+@pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
+def test_run_request_creation_reserves_node_capacity_atomically(store_factory) -> None:
+    with TemporaryDirectory() as root:
+        store = store_factory(root)
+        store.register_node(
+            {
+                **store_node_payload(),
+                "maxConcurrentRuns": 2,
+                "runCapacityByMode": {"action": 1, "review": 1, "ask": 2},
+            }
+        )
+
+        for index in range(2):
+            store.create_run_request(
+                {
+                    "nodeId": "sbx_alice",
+                    "sessionId": f"ses_capacity_{index}",
+                    "taskGoal": "answer independently",
+                    "assignments": [{"agent": "codex", "mode": "ask"}],
+                    "state": {},
+                }
+            )
+
+        with pytest.raises(ValueError, match="capacity is exhausted"):
+            store.create_run_request(
+                {
+                    "nodeId": "sbx_alice",
+                    "sessionId": "ses_capacity_overflow",
+                    "taskGoal": "one request too many",
+                    "assignments": [{"agent": "codex", "mode": "ask"}],
+                    "state": {},
+                }
+            )
+
+
 def test_daemon_output_retry_after_registry_restart_is_deduplicated() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
