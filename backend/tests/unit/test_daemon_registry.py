@@ -63,6 +63,35 @@ def test_daemon_store_notifies_when_command_becomes_visible(
 
 
 @pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_daemon_store_bounds_each_node_command_queue(
+    daemon_store_factory, monkeypatch
+) -> None:
+    monkeypatch.setenv("RELAY_DAEMON_MAX_QUEUED_COMMANDS_PER_NODE", "2")
+    with TemporaryDirectory() as root:
+        store = daemon_store_factory(root)
+        store.register_node(store_node_payload())
+        for index in range(2):
+            store.enqueue_command(
+                "sbx_alice",
+                {
+                    "id": f"cmd_workspace_{index}",
+                    "type": "workspace.list",
+                    "path": "",
+                },
+            )
+
+        with pytest.raises(ValueError, match="command queue is full"):
+            store.enqueue_command(
+                "sbx_alice",
+                {
+                    "id": "cmd_workspace_overflow",
+                    "type": "workspace.list",
+                    "path": "",
+                },
+            )
+
+
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
 def test_daemon_store_persists_workspace_responses(
     daemon_store_factory,
 ) -> None:
