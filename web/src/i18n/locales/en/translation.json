@@ -50,6 +50,7 @@
   "skip_to_content": "Skip to content",
   "nav": {
     "threads": "Threads",
+    "computer": "My Computer",
     "workspace": "Workspace",
     "workspace_label": "Workspace",
     "manage": "Manage",
@@ -370,6 +371,13 @@
     "select_body": "Choose a team to inspect its profile, workspace, and activity.",
     "empty_title": "No teams yet",
     "empty_body": "Group agents under a named lead for repeatable task dispatch."
+  },
+  "computer": {
+    "title": "My Computer",
+    "count_one": "{{count}} computer",
+    "count_other": "{{count}} computers",
+    "empty_title": "No computer assigned yet",
+    "empty_body": "Ask an admin to assign a computer to you."
   },
   "routine": {
     "title": "Routines",

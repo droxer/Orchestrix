@@ -2042,6 +2042,158 @@ def test_employee_can_create_own_device_enrollment(monkeypatch) -> None:
         assert body["nodeToken"] not in body["daemonCommand"]
 
 
+def test_employee_can_manage_own_computer_executors(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _login_admin(client)
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={"employeeId": "alice", "username": "alice", "password": "userpass"},
+            ).status_code
+            == 201
+        )
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
+            ).status_code
+            == 200
+        )
+        enrolled = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "boxlite"},
+        )
+        assert enrolled.status_code == 201
+        node_id = enrolled.json()["node"]["id"]
+
+        response = client.patch(
+            f"/api/v1/daemon-nodes/{node_id}/disabled-agents",
+            json={"disabledAgents": ["codex"]},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["node"]["disabledAgents"] == ["codex"]
+
+
+def test_employee_cannot_manage_another_employees_computer_executors(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _login_admin(client)
+        for employee_id in ("alice", "bob"):
+            assert (
+                client.post(
+                    "/api/v1/admin/employees",
+                    json={"employeeId": employee_id, "username": employee_id, "password": "userpass"},
+                ).status_code
+                == 201
+            )
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
+            ).status_code
+            == 200
+        )
+        enrolled = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "boxlite"},
+        )
+        assert enrolled.status_code == 201
+        node_id = enrolled.json()["node"]["id"]
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login", json={"username": "bob", "password": "userpass"}
+            ).status_code
+            == 200
+        )
+
+        response = client.patch(
+            f"/api/v1/daemon-nodes/{node_id}/disabled-agents",
+            json={"disabledAgents": ["codex"]},
+        )
+
+        assert response.status_code == 403
+
+
+def test_admin_can_manage_any_computers_executors(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _login_admin(client)
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={"employeeId": "alice", "username": "alice", "password": "userpass"},
+            ).status_code
+            == 201
+        )
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
+            ).status_code
+            == 200
+        )
+        enrolled = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "boxlite"},
+        )
+        assert enrolled.status_code == 201
+        node_id = enrolled.json()["node"]["id"]
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        _login_admin(client)
+
+        response = client.patch(
+            f"/api/v1/daemon-nodes/{node_id}/disabled-agents",
+            json={"disabledAgents": ["pi"]},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["node"]["disabledAgents"] == ["pi"]
+
+
+def test_disabled_agents_endpoint_rejects_invalid_payload(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _login_admin(client)
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={"employeeId": "alice", "username": "alice", "password": "userpass"},
+            ).status_code
+            == 201
+        )
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
+            ).status_code
+            == 200
+        )
+        enrolled = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "boxlite"},
+        )
+        assert enrolled.status_code == 201
+        node_id = enrolled.json()["node"]["id"]
+
+        response = client.patch(
+            f"/api/v1/daemon-nodes/{node_id}/disabled-agents",
+            json={"disabledAgents": "codex"},
+        )
+
+        assert response.status_code == 400
+
+
 def test_control_panel_creates_unassigned_pending_daemon_node(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

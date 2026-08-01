@@ -63,6 +63,7 @@ const ChannelsPage = lazy(() => import("./components/ChannelsPage").then((m) => 
 const RoutinesPage = lazy(() => import("./components/RoutinesPage").then((m) => ({ default: m.RoutinesPage })));
 const AgentsPage = lazy(() => import("./components/AgentsPage").then((m) => ({ default: m.AgentsPage })));
 const TeamsPage = lazy(() => import("./components/TeamsPage").then((m) => ({ default: m.TeamsPage })));
+const ComputerPage = lazy(() => import("./components/ComputerPage").then((m) => ({ default: m.ComputerPage })));
 
 const WORK_ROUTE_SKIP_IDS: Record<Exclude<AppRoute, "main">, string> = {
   backlog: "backlog-panel",
@@ -71,6 +72,7 @@ const WORK_ROUTE_SKIP_IDS: Record<Exclude<AppRoute, "main">, string> = {
   teams: "teams-panel",
   channels: "channels-panel",
   admin: "admin-panel",
+  computer: "computer-panel",
 };
 
 function useStableEvent<TArgs extends unknown[], TResult>(handler: (...args: TArgs) => TResult): (...args: TArgs) => TResult {
@@ -1023,6 +1025,11 @@ export function App() {
             isDetailRoute={agentWorkspaceId !== null}
             onOpenWorkspace={openAgentWorkspace}
             onOpenThread={openThread}
+          />
+        ) : route === "computer" ? (
+          <ComputerPage
+            nodes={runtimeNodes}
+            currentUser={user}
           />
         ) : (
           <ThreadsView

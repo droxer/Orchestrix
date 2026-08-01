@@ -7,6 +7,7 @@ const WORK_PATHS: Record<Exclude<AppRoute, "main">, string> = {
   teams: "/teams",
   channels: "/channels",
   admin: "/admin",
+  computer: "/computer",
 };
 
 const WORK_ROUTES = new Map(Object.entries(WORK_PATHS).map(([route, path]) => [path, route as AppRoute]));

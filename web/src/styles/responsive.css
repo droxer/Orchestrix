@@ -324,8 +324,9 @@
   .messenger-shell .sidenav-nav .sidenav-btn:nth-child(6) { animation-delay: calc(var(--t-fast) * 1.5); }
   .messenger-shell .sidenav-nav .sidenav-btn:nth-child(7) { animation-delay: calc(var(--t-fast) * 1.75); }
 
-  /* Admin Channels/Admin collapse into a More overflow so five primary tabs
-     fit a 390pt phone without horizontal scroll. */
+  /* Admin Channels/Admin collapse into a More overflow so the primary tabs
+     (Threads, My Computer, Backlog, Routines, Agents, Teams) fit a 390pt
+     phone without horizontal scroll. */
   .sidenav-overflow-item {
     display: none !important;
   }

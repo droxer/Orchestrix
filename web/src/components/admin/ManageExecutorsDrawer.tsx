@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { updateControlPanelDaemonNodeDisabledAgents } from "../../api";
 import {
   disabledSetsEqual,
   newlyDisabledReadyAgents,
@@ -24,9 +23,10 @@ interface ManageExecutorsDrawerProps {
   onClose: () => void;
   node: ControlPanelDaemonNodeRecord | null;
   onUpdated: (node: ControlPanelDaemonNodeRecord) => void;
+  onSave: (nodeId: string, disabledAgents: AgentName[]) => Promise<{ node: ControlPanelDaemonNodeRecord }>;
 }
 
-export function ManageExecutorsDrawer({ open, onClose, node, onUpdated }: ManageExecutorsDrawerProps) {
+export function ManageExecutorsDrawer({ open, onClose, node, onUpdated, onSave }: ManageExecutorsDrawerProps) {
   const { t } = useTranslation();
   const { confirm } = useDialogs();
   const [initialDisabled, setInitialDisabled] = useState<Set<AgentName>>(() => new Set());
@@ -93,7 +93,7 @@ export function ManageExecutorsDrawer({ open, onClose, node, onUpdated }: Manage
     try {
       let updatedNode = node;
       if (!disabledSetsEqual(disabled, initialDisabled)) {
-        const result = await updateControlPanelDaemonNodeDisabledAgents(
+        const result = await onSave(
           node.id,
           normalizeDisabledAgentsPayload(disabled),
         );

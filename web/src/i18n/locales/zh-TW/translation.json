@@ -50,6 +50,7 @@
   "skip_to_content": "跳至內容",
   "nav": {
     "threads": "對話",
+    "computer": "我的電腦",
     "workspace": "工作區",
     "workspace_label": "工作區",
     "manage": "管理",
@@ -370,6 +371,13 @@
     "select_body": "選擇團隊以查看其檔案、工作區和活動。",
     "empty_title": "尚無團隊",
     "empty_body": "將智能體組成有負責人的命名團隊，以便重複派發任務。"
+  },
+  "computer": {
+    "title": "我的電腦",
+    "count_one": "{{count}} 台電腦",
+    "count_other": "{{count}} 台電腦",
+    "empty_title": "尚未分配電腦",
+    "empty_body": "請聯繫管理員為你分配一台電腦。"
   },
   "routine": {
     "title": "例行任務",
