@@ -97,6 +97,15 @@
   margin-top: var(--sp-2);
 }
 
+/* The base page-header-actions utility is shrink-0 — fine for a lone
+   refresh button, but the header strip added here is wide enough that at
+   narrow viewports the actions block must be allowed to shrink (and thus
+   let its own flex-wrap take effect) instead of overflowing the row. */
+.workspace-page .page-header-actions {
+  flex-shrink: 1;
+  min-width: 0;
+}
+
 .workspace-page-tab-count {
   color: var(--ink-3);
   font-size: var(--fs-2);
