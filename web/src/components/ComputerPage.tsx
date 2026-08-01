@@ -28,9 +28,10 @@ export function ComputerPage({
 
   const myNodes = useMemo<ControlPanelDaemonNodeRecord[]>(
     () =>
-      nodesAssignedToEmployee(nodes, currentUser.employeeId).map(
-        (node): ControlPanelDaemonNodeRecord => overrides[node.id] ?? node,
-      ),
+      nodesAssignedToEmployee(nodes, currentUser.employeeId).map((node): ControlPanelDaemonNodeRecord => {
+        const override = overrides[node.id];
+        return override && override.updatedAt >= node.updatedAt ? override : node;
+      }),
     [nodes, currentUser.employeeId, overrides],
   );
   const manageExecutorsNode = myNodes.find((node) => node.id === manageExecutorsNodeId) ?? null;

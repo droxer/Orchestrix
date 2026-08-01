@@ -1028,7 +1028,7 @@ export function App() {
           />
         ) : route === "computer" ? (
           <ComputerPage
-            nodes={visibleNodes}
+            nodes={runtimeNodes}
             currentUser={user}
           />
         ) : (
