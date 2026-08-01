@@ -4,6 +4,7 @@ import base64
 import json
 import shutil
 import time
+from collections.abc import Callable
 from pathlib import Path
 from threading import RLock
 from typing import Any
@@ -42,6 +43,7 @@ from .store_common import (
     materialize_events,
     new_database_id,
     now_iso,
+    publish_database_notification,
     relay_event,
     safe_name,
     shared_engine,
@@ -57,7 +59,13 @@ class LocalSessionStore:
         self.root_dir = Path(root_dir)
         self.sessions_dir = self.root_dir / "sessions"
         self._lock = RLock()
+        self._event_listener: Callable[[str], None] | None = None
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
+
+    def set_event_listener(
+        self, listener: Callable[[str], None], *, database_channel: str | None = None
+    ) -> None:
+        self._event_listener = listener
 
     def create_session(self, payload: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
@@ -149,7 +157,16 @@ class LocalSessionStore:
                 events = _read_jsonl(self._events_path(session_id))
             session = materialize_events(events)
             _write_json(self._snapshot_path(session_id), session)
-            return session
+        self._notify_event(session_id)
+        return session
+
+    def _notify_event(self, session_id: str) -> None:
+        if not self._event_listener:
+            return
+        try:
+            self._event_listener(session_id)
+        except Exception:  # noqa: BLE001 - notification hints must not fail writes
+            logger.exception("Session event listener failed", session_id=session_id)
 
     def get_session(self, session_id: str) -> dict[str, Any]:
         with self._lock:
@@ -165,6 +182,7 @@ class LocalSessionStore:
         *,
         after_event_id: str | None = None,
         after_sequence: int | None = None,
+        limit: int = 256,
     ) -> dict[str, Any]:
         """Read only the event tail needed by an SSE connection.
 
@@ -184,9 +202,10 @@ class LocalSessionStore:
                     ),
                     0,
                 )
+            page = events[start : start + max(1, limit)]
             return {
-                "events": events[start:],
-                "nextSequence": len(events),
+                "events": page,
+                "nextSequence": start + len(page),
                 "status": session.get("status"),
             }
 
@@ -473,8 +492,16 @@ class DatabaseSessionStore:
         create_schema: bool = False,
     ):
         self.engine = shared_engine(database_url)
+        self._event_listener: Callable[[str], None] | None = None
+        self._event_notification_channel: str | None = None
         if create_schema:
             create_all_tables(self.engine)
+
+    def set_event_listener(
+        self, listener: Callable[[str], None], *, database_channel: str | None = None
+    ) -> None:
+        self._event_listener = listener
+        self._event_notification_channel = database_channel
 
     def verify_schema(self) -> None:
         """Fail startup before serving traffic when session migrations are absent."""
@@ -694,7 +721,9 @@ class DatabaseSessionStore:
     def append_event(self, session_id: str, event: dict[str, Any]) -> dict[str, Any]:
         for attempt in range(3):
             try:
-                return self._append_event_once(session_id, event)
+                session = self._append_event_once(session_id, event)
+                self._notify_event(session_id)
+                return session
             except IntegrityError:
                 if attempt == 2:
                     raise
@@ -743,6 +772,12 @@ class DatabaseSessionStore:
                 self._sync_run_token_usage(
                     conn, session_pk, session, str(event.get("runId") or "")
                 )
+            publish_database_notification(
+                conn,
+                self.engine,
+                self._event_notification_channel,
+                f"session:{session_id}",
+            )
         logger.debug(
             "Database session event appended",
             session_id=session_id,
@@ -750,11 +785,21 @@ class DatabaseSessionStore:
         )
         return session
 
+    def _notify_event(self, session_id: str) -> None:
+        if not self._event_listener:
+            return
+        try:
+            self._event_listener(session_id)
+        except Exception:  # noqa: BLE001 - notification hints must not fail writes
+            logger.exception("Session event listener failed", session_id=session_id)
+
     def get_session(self, session_id: str) -> dict[str, Any]:
         with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
-                    select(self.sessions.c.snapshot).where(self.sessions.c.id == session_id)
+                    select(self.sessions.c.snapshot).where(
+                        self.sessions.c.id == session_id
+                    )
                 )
                 .mappings()
                 .first()
@@ -769,6 +814,7 @@ class DatabaseSessionStore:
         *,
         after_event_id: str | None = None,
         after_sequence: int | None = None,
+        limit: int = 256,
     ) -> dict[str, Any]:
         """Read an event tail directly from the append-only event table."""
         with store_transaction(self.engine) as conn:
@@ -804,13 +850,12 @@ class DatabaseSessionStore:
                         self.events.c.sequence >= start,
                     )
                     .order_by(self.events.c.sequence)
+                    .limit(max(1, limit))
                 )
                 .mappings()
                 .all()
             )
-            next_sequence = int(session["version"] or 0)
-            if rows:
-                next_sequence = max(next_sequence, int(rows[-1]["sequence"]) + 1)
+            next_sequence = int(rows[-1]["sequence"]) + 1 if rows else start
             return {
                 "events": [row["payload"] for row in rows],
                 "nextSequence": next_sequence,
@@ -881,8 +926,7 @@ class DatabaseSessionStore:
                 raise KeyError(session_id)
             snapshot = session_row["snapshot"] or {}
             if snapshot.get("status") != "cancelled" and any(
-                run.get("status") == "running"
-                for run in snapshot.get("agentRuns", [])
+                run.get("status") == "running" for run in snapshot.get("agentRuns", [])
             ):
                 return False
             session_pk = session_row["id"]
@@ -895,13 +939,10 @@ class DatabaseSessionStore:
                     .select_from(
                         task_store.tasks.join(
                             task_store.task_sessions,
-                            task_store.task_sessions.c.task_id
-                            == task_store.tasks.c.id,
+                            task_store.task_sessions.c.task_id == task_store.tasks.c.id,
                         )
                     )
-                    .where(
-                        task_store.task_sessions.c.session_id == session_id
-                    )
+                    .where(task_store.task_sessions.c.session_id == session_id)
                     .with_for_update(of=task_store.tasks)
                 )
                 .mappings()
@@ -916,7 +957,9 @@ class DatabaseSessionStore:
             conn.execute(
                 delete(self.artifacts).where(self.artifacts.c.session_id == session_pk)
             )
-            conn.execute(delete(self.events).where(self.events.c.session_id == session_pk))
+            conn.execute(
+                delete(self.events).where(self.events.c.session_id == session_pk)
+            )
             conn.execute(delete(self.sessions).where(self.sessions.c.id == session_pk))
         return True
 

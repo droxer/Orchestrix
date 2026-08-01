@@ -9,7 +9,7 @@ from pathlib import Path
 from threading import RLock, local
 from typing import Any
 
-from sqlalchemy import JSON, Column, MetaData, Text, Uuid, create_engine
+from sqlalchemy import JSON, Column, MetaData, Text, Uuid, create_engine, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from ..core.ids import new_database_id, now_iso
@@ -63,6 +63,17 @@ def shared_engine(database_url: str) -> Any:
         return engine
 
 
+def publish_database_notification(
+    conn: Any, engine: Any, channel: str | None, payload: str
+) -> None:
+    """Publish a transactional PostgreSQL wakeup when notifications are enabled."""
+    if channel and engine.dialect.name == "postgresql":
+        conn.execute(
+            text("SELECT pg_notify(:channel, :payload)"),
+            {"channel": channel, "payload": payload},
+        )
+
+
 def create_all_tables(engine: Any) -> None:
     """Create every Relay table on `engine`.
 
@@ -72,7 +83,7 @@ def create_all_tables(engine: Any) -> None:
     here because `relay.persistence.schema` imports the stores that import this
     module.
     """
-    from . import schema  # noqa: PLC0415 - deferred to break the import cycle
+    from . import schema
 
     schema.metadata.create_all(engine)
 

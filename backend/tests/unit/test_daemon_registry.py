@@ -3550,7 +3550,11 @@ def test_explicit_heartbeat_renews_local_and_managed_node_leases(
         registry.sandboxes[node_id] = {
             **registry.sandboxes[node_id],
             "nodeLocation": node_location,
-            **({"managedNodeId": "computer_alice"} if node_location == "managed" else {}),
+            **(
+                {"managedNodeId": "computer_alice"}
+                if node_location == "managed"
+                else {}
+            ),
             "status": "stopped",
             "lastSeenAt": "2020-01-01T00:00:00.000Z",
         }
@@ -3566,9 +3570,7 @@ def test_explicit_heartbeat_renews_local_and_managed_node_leases(
 
 def test_retired_node_cannot_renew_explicit_heartbeat() -> None:
     with TemporaryDirectory() as root:
-        registry = DaemonNodeRegistry(
-            LocalSessionStore(root), LocalDaemonStore(root)
-        )
+        registry = DaemonNodeRegistry(LocalSessionStore(root), LocalDaemonStore(root))
         registry.register(
             {
                 "sandboxId": "node_retired",
@@ -3579,9 +3581,7 @@ def test_retired_node_cannot_renew_explicit_heartbeat() -> None:
                 "status": "ready",
             }
         )
-        registry.sandboxes["node_retired"]["retiredAt"] = (
-            "2026-07-30T00:00:00.000Z"
-        )
+        registry.sandboxes["node_retired"]["retiredAt"] = "2026-07-30T00:00:00.000Z"
 
         with pytest.raises(PermissionError, match="Retired daemon node"):
             registry.heartbeat("node_retired", "node_token")
@@ -3642,9 +3642,7 @@ def test_explicit_heartbeat_renews_active_command_leases() -> None:
             }
         )
 
-        registry.heartbeat(
-            "node_busy", "node_token", [("command_one", "lease_one")]
-        )
+        registry.heartbeat("node_busy", "node_token", [("command_one", "lease_one")])
 
         assert daemon_store.renewals == [
             ("node_busy", [("command_one", "lease_one")], 60.0)
@@ -4592,7 +4590,9 @@ def test_a_materially_changed_registration_is_still_recorded() -> None:
             "updatedAt": "2026-07-30T00:00:00.000Z",
         }
         store.register_node(dict(payload))
-        store.register_node({**payload, "agents": {"claude": "ready", "codex": "ready"}})
+        store.register_node(
+            {**payload, "agents": {"claude": "ready", "codex": "ready"}}
+        )
         store.register_node({**payload, "employeeId": "alice"})
 
         events = stored_daemon_event_types(store)

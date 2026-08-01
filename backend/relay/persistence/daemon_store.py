@@ -3,15 +3,15 @@ from __future__ import annotations
 import fcntl
 import json
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from threading import RLock
 from typing import Any
 
+from loguru import logger
 from sqlalchemy import (
-    JSON,
     Boolean,
     Column,
     DateTime,
@@ -41,17 +41,20 @@ from .store_common import (
     _read_jsonl,
     _write_json,
     _write_jsonl,
+    create_all_tables,
     daemon_event,
     database_id_column,
     entity_uuid_type,
-    create_all_tables,
     json_type,
-    shared_engine,
-    store_transaction,
-    metadata as shared_metadata,
     new_database_id,
     now_iso,
+    publish_database_notification,
     safe_name,
+    shared_engine,
+    store_transaction,
+)
+from .store_common import (
+    metadata as shared_metadata,
 )
 
 TERMINAL_DAEMON_STATUSES = frozenset({"completed", "failed", "cancelled"})
@@ -73,6 +76,8 @@ def daemon_event_is_prunable(event_type: str) -> bool:
         event_type.startswith(PRUNABLE_DAEMON_EVENT_PREFIX)
         or event_type in PRUNABLE_DAEMON_EVENT_TYPES
     )
+
+
 ACTIVE_RUN_REQUEST_STATUSES = frozenset({"running", "dispatching", "finalizing"})
 DISPATCH_CLAIM_ID_STATE_KEY = "_relay_dispatch_claim_id"
 DISPATCH_CLAIM_EXPIRES_STATE_KEY = "_relay_dispatch_claim_expires_at"
@@ -120,9 +125,7 @@ def node_registration_changed(
         key: value
         for key, value in previous.items()
         if key not in _NODE_LIVENESS_FIELDS
-    } != {
-        key: value for key, value in node.items() if key not in _NODE_LIVENESS_FIELDS
-    }
+    } != {key: value for key, value in node.items() if key not in _NODE_LIVENESS_FIELDS}
 
 
 def infer_node_location(node: dict[str, Any]) -> str | None:
@@ -254,6 +257,7 @@ class LocalDaemonStore:
     def __init__(self, root_dir: str | Path = DEFAULT_RELAY_DATA_DIR):
         root = Path(root_dir)
         self._lock = RLock()
+        self._command_listener: Callable[[str], None] | None = None
         self._nonterminal_command_ids_by_node: dict[str, set[str]] = {}
         self.nodes_dir = root / "daemon" / "nodes"
         self.commands_dir = root / "daemon" / "commands"
@@ -270,6 +274,19 @@ class LocalDaemonStore:
         ):
             path.mkdir(parents=True, exist_ok=True)
         self._rebuild_command_index()
+
+    def set_command_listener(
+        self, listener: Callable[[str], None], *, database_channel: str | None = None
+    ) -> None:
+        self._command_listener = listener
+
+    def _notify_command(self, node_id: str) -> None:
+        if not self._command_listener:
+            return
+        try:
+            self._command_listener(node_id)
+        except Exception:  # noqa: BLE001 - notification hints must not fail writes
+            logger.exception("Daemon command listener failed", node_id=node_id)
 
     def register_node(self, sandbox: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
@@ -532,7 +549,8 @@ class LocalDaemonStore:
                     {"nodeId": record["nodeId"], "commandId": command_id},
                 )
             )
-            return updated
+        self._notify_command(record["nodeId"])
+        return updated
 
     def discard_staged_command(self, command_id: str) -> None:
         with self._lock:
@@ -1194,9 +1212,7 @@ class DatabaseDaemonStore:
             "uq_daemon_nodes_managed_runtime",
             "managed_node_id",
             unique=True,
-            postgresql_where=text(
-                "managed_node_id IS NOT NULL AND retired_at IS NULL"
-            ),
+            postgresql_where=text("managed_node_id IS NOT NULL AND retired_at IS NULL"),
             sqlite_where=text("managed_node_id IS NOT NULL AND retired_at IS NULL"),
         ),
     )
@@ -1336,8 +1352,24 @@ class DatabaseDaemonStore:
 
     def __init__(self, database_url: str, *, create_schema: bool = False):
         self.engine = shared_engine(database_url)
+        self._command_listener: Callable[[str], None] | None = None
+        self._command_notification_channel: str | None = None
         if create_schema:
             create_all_tables(self.engine)
+
+    def set_command_listener(
+        self, listener: Callable[[str], None], *, database_channel: str | None = None
+    ) -> None:
+        self._command_listener = listener
+        self._command_notification_channel = database_channel
+
+    def _notify_command(self, node_id: str) -> None:
+        if not self._command_listener:
+            return
+        try:
+            self._command_listener(node_id)
+        except Exception:  # noqa: BLE001 - notification hints must not fail writes
+            logger.exception("Daemon command listener failed", node_id=node_id)
 
     def _write_node_agents(self, conn: Any, node_pk: str, node: dict[str, Any]) -> None:
         """Replace a node's daemon_node_agents rows, but only if they changed.
@@ -1781,6 +1813,13 @@ class DatabaseDaemonStore:
                     {"nodeId": record["nodeId"], "commandId": command_id},
                 ),
             )
+            publish_database_notification(
+                conn,
+                self.engine,
+                self._command_notification_channel,
+                f"node:{record['nodeId']}",
+            )
+        self._notify_command(record["nodeId"])
         return updated
 
     def discard_staged_command(self, command_id: str) -> None:
@@ -1892,9 +1931,9 @@ class DatabaseDaemonStore:
         now_dt = _parse_iso(now)
         with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, node_id)
-            return len(
-                conn.execute(
-                    select(self.commands.c.id)
+            return int(
+                conn.scalar(
+                    select(func.count(self.commands.c.id))
                     .where(self.commands.c.node_id == node_pk)
                     .where(
                         (self.commands.c.status == "queued")
@@ -1903,7 +1942,8 @@ class DatabaseDaemonStore:
                             & (self.commands.c.lease_expires_at <= now_dt)
                         )
                     )
-                ).all()
+                )
+                or 0
             )
 
     def queued_command_counts(self) -> dict[str, int]:
@@ -2422,9 +2462,7 @@ class DatabaseDaemonStore:
                 conn.execute(
                     delete(self.events).where(
                         or_(
-                            self.events.c.type.startswith(
-                                PRUNABLE_DAEMON_EVENT_PREFIX
-                            ),
+                            self.events.c.type.startswith(PRUNABLE_DAEMON_EVENT_PREFIX),
                             self.events.c.type.in_(PRUNABLE_DAEMON_EVENT_TYPES),
                         ),
                         self.events.c.timestamp <= _parse_iso(cutoff),

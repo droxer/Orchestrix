@@ -16,6 +16,7 @@ class SessionStore(Protocol):
         *,
         after_event_id: str | None = None,
         after_sequence: int | None = None,
+        limit: int = 256,
     ) -> dict[str, Any]: ...
     def delete_session(
         self, session_id: str, *, deleted_by: str | None = None

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import asyncio
 import base64
 import json
+import os
 import time
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
@@ -12,9 +12,11 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from loguru import logger
+from starlette.concurrency import run_in_threadpool
 
 from ..core.models import AGENT_NAMES
 from ..persistence.stores import valid_agent
+from ..services.event_notifier import session_event_key
 from ..services.team_dispatch import (
     TeamDispatchError,
     task_thread_assignments,
@@ -714,7 +716,12 @@ TERMINAL_SESSION_STATUSES = frozenset({"completed", "failed", "cancelled"})
 # Agent subprocesses emit output in small chunks, but this tail loop is the
 # final hop before the browser. A 50 ms tail interval feels continuous while
 # still batching subprocess chunks into a single browser cache update.
-_STREAM_POLL_SECONDS = 0.05
+_STREAM_FALLBACK_SECONDS = max(
+    1.0, float(os.environ.get("RELAY_STREAM_FALLBACK_SECONDS", "5"))
+)
+_STREAM_EVENT_PAGE_LIMIT = max(
+    1, min(1000, int(os.environ.get("RELAY_STREAM_EVENT_PAGE_LIMIT", "256")))
+)
 _STREAM_HEARTBEAT_SECONDS = 15.0
 _STREAM_MAX_SECONDS = 60 * 30
 
@@ -732,7 +739,7 @@ async def session_events(
 ) -> StreamingResponse:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     # Authorize before the stream opens so 403/404 surface as normal responses.
-    get_session_for_actor(ctx.session_store, session_id, actor)
+    await run_in_threadpool(get_session_for_actor, ctx.session_store, session_id, actor)
 
     async def event_stream() -> AsyncIterator[str]:
         # Server-side tail-poll: read only newly appended rows from the event
@@ -749,14 +756,18 @@ async def session_events(
         next_sequence: int | None = None
         start = time.monotonic()
         last_heartbeat = start
+        notification_key = session_event_key(session_id)
         while True:
             if await request.is_disconnected():
                 return
             try:
-                page = ctx.session_store.read_event_page(
+                observed_version = ctx.control_plane_notifier.version(notification_key)
+                page = await run_in_threadpool(
+                    ctx.session_store.read_event_page,
                     session_id,
-                    after_event_id=after_event_id if next_sequence is None else None,
+                    after_event_id=(after_event_id if next_sequence is None else None),
                     after_sequence=next_sequence,
+                    limit=_STREAM_EVENT_PAGE_LIMIT,
                 )
             except KeyError:
                 return
@@ -784,7 +795,18 @@ async def session_events(
             if now - start >= _STREAM_MAX_SECONDS:
                 yield _sse_frame({"status": status, "reason": "timeout"}, event="done")
                 return
-            await asyncio.sleep(_STREAM_POLL_SECONDS)
+            if events:
+                continue
+            wait_seconds = min(
+                _STREAM_FALLBACK_SECONDS,
+                _STREAM_HEARTBEAT_SECONDS - (now - last_heartbeat),
+                _STREAM_MAX_SECONDS - (now - start),
+            )
+            await ctx.control_plane_notifier.wait(
+                notification_key,
+                observed_version,
+                timeout=max(0.001, wait_seconds),
+            )
 
     return StreamingResponse(
         event_stream(),
