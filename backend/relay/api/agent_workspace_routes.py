@@ -65,25 +65,29 @@ async def _dispatch(
     ctx: AppContext, node: dict[str, Any], command: dict[str, Any]
 ) -> dict[str, Any]:
     key = workspace_response_key(command["id"])
-    observed_version = ctx.control_plane_notifier.version(key)
     deadline = asyncio.get_running_loop().time() + WORKSPACE_COMMAND_TIMEOUT_SECONDS
-    try:
-        await run_in_threadpool(ctx.registry.enqueue, node["id"], command)
-    except ValueError as error:
-        raise HTTPException(
-            503, {"reason": "placement-overloaded", "detail": str(error)}
-        ) from error
+    enqueued = False
     while True:
-        response = await run_in_threadpool(
-            ctx.daemon_store.get_workspace_response, command["id"]
-        )
-        if response is not None:
-            return response
-        remaining = deadline - asyncio.get_running_loop().time()
-        if remaining <= 0:
-            raise HTTPException(503, {"reason": "placement-unavailable"})
-        await ctx.control_plane_notifier.wait(key, observed_version, timeout=remaining)
-        observed_version = ctx.control_plane_notifier.version(key)
+        with ctx.control_plane_notifier.observe(key) as observed_version:
+            if not enqueued:
+                try:
+                    await run_in_threadpool(ctx.registry.enqueue, node["id"], command)
+                except ValueError as error:
+                    raise HTTPException(
+                        503, {"reason": "placement-overloaded", "detail": str(error)}
+                    ) from error
+                enqueued = True
+            response = await run_in_threadpool(
+                ctx.daemon_store.get_workspace_response, command["id"]
+            )
+            if response is not None:
+                return response
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                raise HTTPException(503, {"reason": "placement-unavailable"})
+            await ctx.control_plane_notifier.wait(
+                key, observed_version, timeout=remaining
+            )
 
 
 def _workspace_error(event: dict[str, Any]) -> None:

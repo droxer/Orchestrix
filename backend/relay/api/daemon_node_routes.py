@@ -400,37 +400,32 @@ async def daemon_commands(
             lease_seconds=lease_seconds,
         )
         notification_key = daemon_command_key(sandbox_id)
-        observed_version = ctx.control_plane_notifier.version(notification_key)
-        commands = await run_in_threadpool(
-            ctx.registry.take_commands,
-            sandbox_id,
-            token,
-            limit=limit,
-            lease_seconds=lease_seconds,
-            renew_known_active=lease_mode == "legacy",
-        )
-        while not commands and time.monotonic() < deadline:
-            remaining = deadline - time.monotonic()
-            await ctx.control_plane_notifier.wait(
-                notification_key,
-                observed_version,
-                timeout=min(COMMAND_NOTIFICATION_RECOVERY_SECONDS, remaining),
-            )
-            observed_version = ctx.control_plane_notifier.version(notification_key)
+        while True:
+            with ctx.control_plane_notifier.observe(
+                notification_key
+            ) as observed_version:
+                commands = await run_in_threadpool(
+                    ctx.registry.take_commands,
+                    sandbox_id,
+                    token,
+                    limit=limit,
+                    lease_seconds=lease_seconds,
+                    renew_known_active=lease_mode == "legacy",
+                )
+                remaining = deadline - time.monotonic()
+                if commands or remaining <= 0:
+                    break
+                await ctx.control_plane_notifier.wait(
+                    notification_key,
+                    observed_version,
+                    timeout=min(COMMAND_NOTIFICATION_RECOVERY_SECONDS, remaining),
+                )
             await run_in_threadpool(
                 ctx.registry.renew_active_command_leases,
                 sandbox_id,
                 token,
                 active_leases,
                 lease_seconds=lease_seconds,
-            )
-            commands = await run_in_threadpool(
-                ctx.registry.take_commands,
-                sandbox_id,
-                token,
-                limit=limit,
-                lease_seconds=lease_seconds,
-                renew_known_active=lease_mode == "legacy",
             )
         logger.debug(
             "Daemon node commands polled",

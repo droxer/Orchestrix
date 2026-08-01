@@ -89,6 +89,15 @@ def test_workspace_event_is_authorized_and_resolves_query_broker(monkeypatch) ->
             "exists": True,
             "entries": [],
         }
+        app.state.daemon_store.enqueue_command(
+            "sbx_workspace",
+            {
+                "id": event["commandId"],
+                "type": "workspace.list",
+                "path": "",
+            },
+        )
+        app.state.daemon_store.take_queued_commands("sbx_workspace")
         response = client.post(
             "/api/v1/daemon-nodes/sbx_workspace/events",
             json=event,
@@ -362,8 +371,8 @@ def test_recovered_managed_node_can_register_replacement_agents(monkeypatch) -> 
         recovered = client.post(f"/api/v1/admin/managed-nodes/{managed['id']}/recover")
         assert recovered.status_code == 202, recovered.text
 
-        replacement_attempt, _credential = (
-            app.state.managed_node_store.create_attempt(managed["id"])
+        replacement_attempt, _credential = app.state.managed_node_store.create_attempt(
+            managed["id"]
         )
         replacement, replacement_token = app.state.registry.enroll_managed_node(
             app.state.managed_node_store.get_node(managed["id"]),

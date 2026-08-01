@@ -630,17 +630,32 @@ class LocalDaemonStore:
         command_id = str(response["commandId"])
         with self._lock:
             record = self._get_command(command_id)
-            if record and record.get("status") not in TERMINAL_DAEMON_STATUSES:
-                completed = {
-                    **record,
-                    "status": "completed",
-                    "updatedAt": now_iso(),
-                    "completedAt": now_iso(),
-                }
-                _write_json(
-                    self.commands_dir / f"{safe_name(command_id)}.json", completed
+            if not record:
+                raise KeyError(command_id)
+            if record.get("nodeId") != node_id:
+                raise PermissionError(
+                    "Workspace command belongs to a different daemon node."
                 )
-                self._remove_command_from_index(node_id, command_id)
+            if not str((record.get("command") or {}).get("type") or "").startswith(
+                "workspace."
+            ):
+                raise ValueError("Command is not a workspace query.")
+            if record.get("status") == "completed":
+                if self.get_workspace_response(command_id) == response:
+                    return
+                raise ValueError("Workspace command already has a different response.")
+            if record.get("status") != "dispatched":
+                raise ValueError("Workspace command is not actively dispatched.")
+            completed = {
+                **record,
+                "status": "completed",
+                "updatedAt": now_iso(),
+                "completedAt": now_iso(),
+            }
+            _write_json(
+                self.commands_dir / f"{safe_name(command_id)}.json", completed
+            )
+            self._remove_command_from_index(node_id, command_id)
             self.append_daemon_event(
                 daemon_event(
                     "daemon.workspace.response",
@@ -1982,22 +1997,36 @@ class DatabaseDaemonStore:
     ) -> None:
         command_id = str(response["commandId"])
         with store_transaction(self.engine) as conn:
-            command = (
+            row = (
                 conn.execute(
-                    select(self.commands.c.id)
+                    select(self.commands)
                     .where(self.commands.c.id == command_id)
-                    .where(~self.commands.c.status.in_(TERMINAL_DAEMON_STATUSES))
+                    .with_for_update()
                 )
                 .mappings()
                 .first()
             )
-            if command:
-                now = _parse_iso(now_iso())
-                conn.execute(
-                    update(self.commands)
-                    .where(self.commands.c.id == command["id"])
-                    .values(status="completed", updated_at=now, completed_at=now)
+            if not row:
+                raise KeyError(command_id)
+            command = row_to_command(row)
+            if command.get("nodeId") != node_id:
+                raise PermissionError(
+                    "Workspace command belongs to a different daemon node."
                 )
+            if not str(command["command"].get("type") or "").startswith("workspace."):
+                raise ValueError("Command is not a workspace query.")
+            if command.get("status") == "completed":
+                if self.get_workspace_response(command_id) == response:
+                    return
+                raise ValueError("Workspace command already has a different response.")
+            if command.get("status") != "dispatched":
+                raise ValueError("Workspace command is not actively dispatched.")
+            now = _parse_iso(now_iso())
+            conn.execute(
+                update(self.commands)
+                .where(self.commands.c.id == row["id"])
+                .values(status="completed", updated_at=now, completed_at=now)
+            )
             self._append_daemon_event(
                 conn,
                 daemon_event(

@@ -226,6 +226,7 @@ class LocalSessionStore:
             return {
                 "events": page,
                 "nextSequence": start + len(page),
+                "version": len(events),
                 "status": session.get("status"),
             }
 
@@ -910,6 +911,7 @@ class DatabaseSessionStore:
             return {
                 "events": [row["payload"] for row in rows],
                 "nextSequence": next_sequence,
+                "version": int(session["version"] or 0),
                 "status": session["status"],
             }
 

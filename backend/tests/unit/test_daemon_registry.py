@@ -2574,6 +2574,63 @@ def test_dispatch_scopes_do_not_serialize_unrelated_nodes() -> None:
         assert registry._dispatch_locks == {}
 
 
+def test_global_reaping_precedes_command_poll_node_scope(monkeypatch) -> None:
+    with TemporaryDirectory() as root:
+        registry = DaemonNodeRegistry(LocalSessionStore(root), LocalDaemonStore(root))
+        registry.register(
+            {
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        calls = []
+
+        def assert_no_node_lock(*, force: bool = True) -> None:
+            assert force is False
+            assert registry._dispatch_locks == {}
+            calls.append("reap")
+
+        monkeypatch.setattr(registry, "reap_stale_runs", assert_no_node_lock)
+
+        assert registry.take_commands("sbx_alice", "node_token") == []
+        assert calls == ["reap"]
+
+
+def test_cross_replica_node_hydration_precedes_node_scope(monkeypatch) -> None:
+    with TemporaryDirectory() as root:
+        database_url = f"sqlite:///{root}/daemon.db"
+        first = DaemonNodeRegistry(
+            LocalSessionStore(root),
+            DatabaseDaemonStore(database_url, create_schema=True),
+        )
+        second = DaemonNodeRegistry(
+            LocalSessionStore(root), DatabaseDaemonStore(database_url)
+        )
+        second.register(
+            {
+                "sandboxId": "sbx_remote",
+                "employeeId": "remote",
+                "token": "node_token",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        original_refresh = first._refresh_persisted_liveness
+
+        def assert_no_node_lock(sandbox_id: str | None = None) -> None:
+            assert first._dispatch_locks == {}
+            original_refresh(sandbox_id)
+
+        monkeypatch.setattr(first, "_refresh_persisted_liveness", assert_no_node_lock)
+
+        assert first.take_commands("sbx_remote", "node_token") == []
+
+
 def test_daemon_output_retry_after_registry_restart_is_deduplicated() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:

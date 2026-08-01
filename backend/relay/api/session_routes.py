@@ -770,53 +770,60 @@ async def session_events(
         while True:
             if await request.is_disconnected():
                 return
-            try:
-                observed_version = ctx.control_plane_notifier.version(notification_key)
-                page = await run_in_threadpool(
-                    ctx.session_store.read_event_page,
-                    session_id,
-                    after_event_id=(after_event_id if next_sequence is None else None),
-                    after_sequence=next_sequence,
-                    limit=_STREAM_EVENT_PAGE_LIMIT,
+            with ctx.control_plane_notifier.observe(
+                notification_key
+            ) as observed_version:
+                try:
+                    page = await run_in_threadpool(
+                        ctx.session_store.read_event_page,
+                        session_id,
+                        after_event_id=(
+                            after_event_id if next_sequence is None else None
+                        ),
+                        after_sequence=next_sequence,
+                        limit=_STREAM_EVENT_PAGE_LIMIT,
+                    )
+                except KeyError:
+                    return
+                events = page["events"]
+                next_sequence = page["nextSequence"]
+                if events:
+                    for event in events:
+                        yield _sse_frame(event)
+                    last_heartbeat = time.monotonic()
+                status = page.get("status")
+                history_drained = next_sequence >= int(page.get("version") or 0)
+                if status in TERMINAL_SESSION_STATUSES and history_drained:
+                    yield _sse_frame({"status": status}, event="done")
+                    return
+                now = time.monotonic()
+                if now - last_heartbeat >= _STREAM_HEARTBEAT_SECONDS:
+                    yield _sse_frame(
+                        {
+                            "timestamp": datetime.now(timezone.utc)
+                            .isoformat()
+                            .replace("+00:00", "Z")
+                        },
+                        event="heartbeat",
+                    )
+                    last_heartbeat = now
+                if now - start >= _STREAM_MAX_SECONDS:
+                    yield _sse_frame(
+                        {"status": status, "reason": "timeout"}, event="done"
+                    )
+                    return
+                if events:
+                    continue
+                wait_seconds = min(
+                    _STREAM_FALLBACK_SECONDS,
+                    _STREAM_HEARTBEAT_SECONDS - (now - last_heartbeat),
+                    _STREAM_MAX_SECONDS - (now - start),
                 )
-            except KeyError:
-                return
-            events = page["events"]
-            next_sequence = page["nextSequence"]
-            if events:
-                for event in events:
-                    yield _sse_frame(event)
-                last_heartbeat = time.monotonic()
-            status = page.get("status")
-            if status in TERMINAL_SESSION_STATUSES:
-                yield _sse_frame({"status": status}, event="done")
-                return
-            now = time.monotonic()
-            if now - last_heartbeat >= _STREAM_HEARTBEAT_SECONDS:
-                yield _sse_frame(
-                    {
-                        "timestamp": datetime.now(timezone.utc)
-                        .isoformat()
-                        .replace("+00:00", "Z")
-                    },
-                    event="heartbeat",
+                await ctx.control_plane_notifier.wait(
+                    notification_key,
+                    observed_version,
+                    timeout=max(0.001, wait_seconds),
                 )
-                last_heartbeat = now
-            if now - start >= _STREAM_MAX_SECONDS:
-                yield _sse_frame({"status": status, "reason": "timeout"}, event="done")
-                return
-            if events:
-                continue
-            wait_seconds = min(
-                _STREAM_FALLBACK_SECONDS,
-                _STREAM_HEARTBEAT_SECONDS - (now - last_heartbeat),
-                _STREAM_MAX_SECONDS - (now - start),
-            )
-            await ctx.control_plane_notifier.wait(
-                notification_key,
-                observed_version,
-                timeout=max(0.001, wait_seconds),
-            )
 
     return StreamingResponse(
         event_stream(),

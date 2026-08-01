@@ -77,9 +77,10 @@ def test_control_plane_metrics_reports_notification_health(monkeypatch) -> None:
                 "published": 0,
                 "waits": 0,
                 "woken": 0,
-                "timedOut": 0,
-                "activeWaiters": 0,
-            },
+                    "timedOut": 0,
+                    "activeWaiters": 0,
+                    "activeKeys": 0,
+                },
             "notificationBridge": {"enabled": False, "connected": False},
         }
 

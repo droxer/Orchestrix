@@ -208,13 +208,15 @@ class ServerDaemonNodeBackend:
                 if assignment.get("daemonNodeId")
             ),
         ]
+        # Global recovery runs before node scopes so run admission follows the
+        # same global -> node order as terminal-event finalization.
+        self.registry.reap_stale_runs(force=False)
         with self.registry.dispatch_scope(node_ids):
             run_request_id = self._run_request_id(request)
             idempotent_session = self._idempotent_session(request, run_request_id)
             if idempotent_session:
                 return idempotent_session
 
-            self.registry.reap_stale_runs()
             active_runs_by_node = self._active_runs_by_node()
             sandbox = self._validate_run_target(sandbox_id, request)
             existing_session = self._existing_session(request)

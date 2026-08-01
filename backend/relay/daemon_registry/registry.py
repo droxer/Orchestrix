@@ -4,7 +4,8 @@ import os
 import time
 from collections import defaultdict
 from collections.abc import Callable, Iterator
-from contextlib import ExitStack, contextmanager
+from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime
 from threading import RLock
 from typing import Any
@@ -87,6 +88,14 @@ DAEMON_COMMAND_RETENTION_SECONDS = float(
 DAEMON_TERMINAL_RECORD_LIMIT = int(
     os.environ.get("RELAY_DAEMON_TERMINAL_RECORD_LIMIT", "500")
 )
+
+
+@dataclass
+class _DispatchLockEntry:
+    lock: Any
+    users: int = 0
+
+
 DAEMON_RECORD_PRUNE_INTERVAL_SECONDS = float(
     os.environ.get("RELAY_DAEMON_RECORD_PRUNE_INTERVAL_SECONDS", "60")
 )
@@ -300,7 +309,7 @@ class DaemonNodeRegistry:
         self.plain_node_tokens: dict[str, str] = {}
         self.dispatch_lock = RLock()
         self._dispatch_locks_guard = RLock()
-        self._dispatch_locks: dict[str, RLock] = {}
+        self._dispatch_locks: dict[str, _DispatchLockEntry] = {}
         self.logical_assignment_validator: Callable[[dict[str, Any]], None] | None = (
             None
         )
@@ -314,11 +323,25 @@ class DaemonNodeRegistry:
         """Serialize one node's mutations without blocking unrelated nodes."""
         keys = sorted({node_id for node_id in node_ids if node_id})
         with self._dispatch_locks_guard:
-            locks = [self._dispatch_locks.setdefault(key, RLock()) for key in keys]
-        with ExitStack() as stack:
-            for lock in locks:
-                stack.enter_context(lock)
+            entries = []
+            for key in keys:
+                entry = self._dispatch_locks.setdefault(
+                    key, _DispatchLockEntry(RLock())
+                )
+                entry.users += 1
+                entries.append((key, entry))
+        for _, entry in entries:
+            entry.lock.acquire()
+        try:
             yield
+        finally:
+            for _, entry in reversed(entries):
+                entry.lock.release()
+            with self._dispatch_locks_guard:
+                for key, entry in entries:
+                    entry.users -= 1
+                    if entry.users == 0 and self._dispatch_locks.get(key) is entry:
+                        self._dispatch_locks.pop(key, None)
 
     def register(
         self,
@@ -1075,6 +1098,10 @@ class DaemonNodeRegistry:
         lease_seconds: float = DAEMON_COMMAND_LEASE_SECONDS,
         renew_known_active: bool = True,
     ) -> list[dict[str, Any]]:
+        # Global recovery runs before the node scope so command polling never
+        # inverts the terminal-event lock order (global -> node).
+        self.reap_stale_runs(force=False)
+        self._hydrate_node(sandbox_id)
         with self.dispatch_scope([sandbox_id]):
             return self._take_commands_unlocked(
                 sandbox_id,
@@ -1106,6 +1133,7 @@ class DaemonNodeRegistry:
         remain live. Both employee-device and managed nodes use this contract;
         infrastructure recovery remains a managed-node policy concern.
         """
+        self._hydrate_node(sandbox_id)
         with self.dispatch_scope([sandbox_id]):
             self._assert_authorized(sandbox_id, token)
             sandbox = self.sandboxes[sandbox_id]
@@ -1135,7 +1163,6 @@ class DaemonNodeRegistry:
     ) -> list[dict[str, Any]]:
         self._assert_authorized(sandbox_id, token)
         self._mark_seen(sandbox_id)
-        self.reap_stale_runs()
         if renew_known_active:
             self._renew_known_active_command_leases(
                 sandbox_id, lease_seconds=lease_seconds
@@ -1170,6 +1197,7 @@ class DaemonNodeRegistry:
         return [daemon_command_payload(record) for record in records]
 
     def available_command_count(self, sandbox_id: str, token: str | None) -> int:
+        self._hydrate_node(sandbox_id)
         self._assert_authorized(sandbox_id, token)
         self._mark_seen(sandbox_id)
         return self.daemon_store.queued_command_count(sandbox_id)
@@ -1182,6 +1210,7 @@ class DaemonNodeRegistry:
         *,
         lease_seconds: float = DAEMON_COMMAND_LEASE_SECONDS,
     ) -> None:
+        self._hydrate_node(sandbox_id)
         self._assert_authorized(sandbox_id, token)
         self._mark_seen(sandbox_id)
         if not command_leases:
@@ -1338,6 +1367,7 @@ class DaemonNodeRegistry:
     def handle_event(
         self, sandbox_id: str, event: dict[str, Any], token: str | None
     ) -> None:
+        self._hydrate_node(sandbox_id)
         lock = (
             self.dispatch_scope([sandbox_id])
             if event.get("type") in {"run.output", "run.collaboration"}
@@ -1544,11 +1574,16 @@ class DaemonNodeRegistry:
 
     def assert_node_event_authorized(self, sandbox_id: str, token: str | None) -> None:
         """Authorize non-run events without attempting run-event bookkeeping."""
+        self._hydrate_node(sandbox_id)
         with self.dispatch_scope([sandbox_id]):
             self._assert_authorized(sandbox_id, token)
             self._mark_seen(sandbox_id)
 
     def reap_stale_runs(self, *, force: bool = True) -> None:
+        if not force and time.monotonic() - self._last_reap_at < max(
+            0.001, self.liveness_timeout_ms / 1000
+        ):
+            return
         with self.dispatch_lock:
             self._reap_stale_runs_unlocked(force=force)
 
@@ -2379,11 +2414,13 @@ class DaemonNodeRegistry:
             seen[stream] = max(seen.get(stream, -1), event["sequence"])
         return seen
 
+    def _hydrate_node(self, sandbox_id: str) -> None:
+        """Load cross-replica state before entering an authenticated node scope."""
+        if sandbox_id not in self.sandboxes:
+            self._refresh_persisted_liveness(sandbox_id)
+
     def _assert_authorized(self, sandbox_id: str, token: str | None) -> None:
         sandbox = self.sandboxes.get(sandbox_id)
-        if not sandbox:
-            self._refresh_persisted_liveness(sandbox_id)
-            sandbox = self.sandboxes.get(sandbox_id)
         if not sandbox:
             logger.warning(
                 "Daemon node request for unknown sandbox", sandbox_id=sandbox_id
@@ -2394,7 +2431,7 @@ class DaemonNodeRegistry:
             raise PermissionError("Unauthorized daemon node request.")
 
     def _should_persist_seen(self, sandbox_id: str) -> bool:
-        """Rate-limit durable heartbeat writes. Caller must hold dispatch_lock."""
+        """Rate-limit durable heartbeat writes under the node dispatch scope."""
         monotonic_now = time.monotonic()
         last = self._last_seen_persisted_at.get(sandbox_id)
         if (
@@ -2406,7 +2443,7 @@ class DaemonNodeRegistry:
         return True
 
     def _mark_seen(self, sandbox_id: str) -> None:
-        with self.dispatch_lock:
+        with self.dispatch_scope([sandbox_id]):
             sandbox = self.sandboxes.get(sandbox_id)
             if not sandbox:
                 return
@@ -2496,13 +2533,9 @@ class DaemonNodeRegistry:
                     node_location = infer_node_location(persisted)
                     self.sandboxes[persisted["id"]] = {
                         **persisted,
-                        **(
-                            {"nodeLocation": node_location} if node_location else {}
-                        ),
+                        **({"nodeLocation": node_location} if node_location else {}),
                         "agents": {
-                            agent: (persisted.get("agents") or {}).get(
-                                agent, "unknown"
-                            )
+                            agent: (persisted.get("agents") or {}).get(agent, "unknown")
                             for agent in AGENT_NAMES
                         },
                     }
@@ -2514,8 +2547,7 @@ class DaemonNodeRegistry:
                 refreshed = {
                     **current,
                     "lastSeenAt": persisted_seen,
-                    "updatedAt": persisted.get("updatedAt")
-                    or current.get("updatedAt"),
+                    "updatedAt": persisted.get("updatedAt") or current.get("updatedAt"),
                     "status": persisted.get("status", current.get("status")),
                 }
                 if persisted.get("lastError"):

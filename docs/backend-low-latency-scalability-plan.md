@@ -21,8 +21,9 @@ logical agents without sacrificing durable delivery or per-thread ordering.
    leases, and run state.
 2. Notifications are hints. Losing one may increase latency but must not lose
    work; bounded database recovery reads remain in place.
-3. Work is serialized by domain key (`session_id`, `task_id`, `node_id`, or
-   `agent_id`), never by a process-wide lock.
+3. The target steady state serializes work by domain key (`session_id`,
+   `task_id`, `node_id`, or `agent_id`). Terminal run finalization and bounded
+   stale-run recovery still use a process-wide lock and remain follow-up work.
 4. Delivery is at least once. Idempotency keys, leases, sequence numbers, and
    fencing prevent duplicate effects.
 5. Agents sharing a mutable workspace retain node affinity unless the
@@ -44,49 +45,51 @@ Status: implemented.
 
 ### Stage 2: replica-safe coordination
 
-Status: implemented for daemon registration and workspace correlation. Managed
-node provisioning desired state remains local-only and must not be reconciled
-by more than one API replica yet.
+Status: partially implemented.
 
-- Hydrate nodes registered after a replica starts.
-- Replace process-local workspace request futures with durable correlated
+- [x] Hydrate nodes registered after a replica starts.
+- [x] Replace process-local workspace request futures with durable correlated
   responses plus notification fan-out.
-- Move managed-node desired state and provisioning attempts into PostgreSQL.
+- [ ] Move managed-node desired state and provisioning attempts into
+  PostgreSQL. Until then, run exactly one managed-node reconciler.
 
 ### Stage 3: keyed dispatch concurrency
 
-Status: implemented for API admission and hot node paths. PostgreSQL node-row
-locks provide cross-replica capacity fencing; per-node in-process locks keep
-unrelated nodes independent.
+Status: partially implemented. PostgreSQL node-row locks provide cross-replica
+capacity fencing; per-node in-process locks keep unrelated nodes independent.
 
-- Replace the registry-wide dispatch lock with node/session-scoped database
-  claims.
-- Reserve node capacity atomically before command creation.
-- Run scheduler workers independently with bounded `SKIP LOCKED` claims.
+- [x] Replace the registry-wide hot-path lock with node-scoped locks and
+  database claims.
+- [x] Reserve node capacity atomically before command creation.
+- [ ] Run scheduler workers independently with bounded `SKIP LOCKED` claims.
+- [ ] Replace the process-wide terminal-finalization/recovery lock with
+  bounded durable claims keyed by run request.
 
 ### Stage 4: storage read/write amplification
 
-Status: implemented for session snapshots, streaming output writes, event
-pages, and thread summary projections. Task snapshots and output batching are
-follow-up work.
+Status: partially implemented.
 
-- Remove full event history from mutable session/task snapshots.
-- Incrementally update compact projections.
-- Batch high-frequency agent output events.
-- Add cursor-paginated summary queries and owner/status filters.
+- [x] Remove full event history from mutable session snapshots.
+- [x] Incrementally update compact session projections.
+- [x] Bound event pages and thread summary result counts.
+- [ ] Compact task snapshots.
+- [ ] Batch high-frequency agent output events.
+- [ ] Add cursor-paginated summary queries and status filters. Owner filtering
+  is already enforced by the API.
 
 ### Stage 5: production controls
 
-Status: partially implemented. Database pool sizing and notification metrics
-are available; distributed admission limiting and full OpenTelemetry export
-remain deployment work.
+Status: partially implemented.
 
-- Make database pool limits explicit and budget them across replicas.
-- Add request admission limits and bounded per-node queues.
-- Export latency, event-loop lag, connection-pool, queue-depth, lease, and
-  notification-recovery metrics.
-- Add repeatable load scenarios for SSE fan-out, daemon fleets, dispatch bursts,
-  reconnect storms, and output-heavy runs.
+- [x] Make database pool limits explicit and budget them across replicas.
+- [x] Add bounded per-node command queues.
+- [x] Export notification waiter, wakeup, timeout, bridge, and reconnect
+  metrics through the authenticated control-plane endpoint.
+- [ ] Add distributed request admission limits.
+- [ ] Export latency, event-loop lag, connection-pool, queue-depth, and lease
+  metrics through OpenTelemetry.
+- [ ] Add repeatable load scenarios for SSE fan-out, daemon fleets, dispatch
+  bursts, reconnect storms, and output-heavy runs.
 
 ## Rollout
 
@@ -115,8 +118,8 @@ large replica count; the dedicated async `LISTEN` connection must bypass
 transaction pooling or use a session-pooled endpoint.
 
 The authenticated `GET /admin/control-plane/metrics` endpoint reports active
-notification waiters, publishes, wakeups, recovery timeouts, bridge connection
-state, reconnects, and received cross-replica notifications.
+notification waiters and keys, publishes, wakeups, recovery timeouts, bridge
+connection state, reconnects, and received cross-replica notifications.
 
 ## Current rollout boundary
 

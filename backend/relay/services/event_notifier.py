@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
+from collections.abc import Iterator
+from contextlib import contextmanager
 from threading import Lock
 from typing import Any
 
@@ -40,6 +42,7 @@ class KeyedEventNotifier:
         self._waiters: dict[
             str, set[tuple[asyncio.AbstractEventLoop, asyncio.Future[int]]]
         ] = defaultdict(set)
+        self._observers: dict[str, int] = defaultdict(int)
         self._closed = False
         self._published = 0
         self._waits = 0
@@ -53,7 +56,25 @@ class KeyedEventNotifier:
 
     def version(self, key: str) -> int:
         with self._lock:
-            return self._versions[key]
+            return self._versions.get(key, 0)
+
+    @contextmanager
+    def observe(self, key: str) -> Iterator[int]:
+        """Keep one key alive across the durable-read-before-wait window."""
+        with self._lock:
+            self._observers[key] += 1
+            version = self._versions.get(key, 0)
+        try:
+            yield version
+        finally:
+            with self._lock:
+                remaining = self._observers.get(key, 0) - 1
+                if remaining > 0:
+                    self._observers[key] = remaining
+                else:
+                    self._observers.pop(key, None)
+                    if not self._waiters.get(key):
+                        self._versions.pop(key, None)
 
     def stats(self) -> dict[str, int]:
         with self._lock:
@@ -65,6 +86,7 @@ class KeyedEventNotifier:
                 "activeWaiters": sum(
                     len(waiters) for waiters in self._waiters.values()
                 ),
+                "activeKeys": len(set(self._observers) | set(self._waiters)),
             }
 
     def publish(self, key: str) -> None:
@@ -72,9 +94,10 @@ class KeyedEventNotifier:
             if self._closed:
                 return
             self._published += 1
-            self._versions[key] += 1
-            version = self._versions[key]
+            version = self._versions.get(key, 0) + 1
             waiters = list(self._waiters.pop(key, ()))
+            if self._observers.get(key) or waiters:
+                self._versions[key] = version
         for loop, future in waiters:
             try:
                 loop.call_soon_threadsafe(self._resolve, future, version)
@@ -115,6 +138,8 @@ class KeyedEventNotifier:
                     waiters.discard(waiter)
                     if not waiters:
                         self._waiters.pop(key, None)
+                        if not self._observers.get(key):
+                            self._versions.pop(key, None)
 
     def close(self) -> None:
         with self._lock:
@@ -123,6 +148,8 @@ class KeyedEventNotifier:
             self._closed = True
             waiters = [waiter for values in self._waiters.values() for waiter in values]
             self._waiters.clear()
+            self._observers.clear()
+            self._versions.clear()
         for loop, future in waiters:
             try:
                 loop.call_soon_threadsafe(self._resolve, future, 0)
