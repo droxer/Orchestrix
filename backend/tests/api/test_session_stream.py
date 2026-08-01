@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 from fastapi.testclient import TestClient
 from relay.api.session_routes import _STREAM_FALLBACK_SECONDS
 from relay.app import create_app
+from relay.persistence.stores import relay_event
 
 
 def _bootstrap_admin(client: TestClient, token: str = "admin_token") -> None:
@@ -103,6 +104,44 @@ def test_session_events_streams_backlog_then_closes_on_terminal(monkeypatch) -> 
         assert "session.created" in message_types
         assert [event for event, _ in frames].count("message") == len(message_types)
         assert frames[-1][0] == "done"
+
+
+def test_terminal_session_stream_drains_every_bounded_page(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        created = client.post("/api/v1/threads", json={"taskGoal": "stream all"})
+        session_id = created.json()["id"]
+        for sequence in range(300):
+            app.state.session_store.append_event(
+                session_id,
+                relay_event(
+                    "agent.output",
+                    session_id,
+                    {
+                        "runId": "run_long",
+                        "agent": "codex",
+                        "stream": "stdout",
+                        "text": str(sequence),
+                        "sequence": sequence,
+                    },
+                ),
+                hydrate_events=False,
+            )
+        app.state.session_store.append_event(
+            session_id,
+            relay_event("session.completed", session_id, {"outcome": "done"}),
+            hydrate_events=False,
+        )
+
+        response = client.get(f"/api/v1/threads/{session_id}/events")
+
+        assert response.status_code == 200
+        # session.created + 300 output events + session.completed
+        assert len(_message_payloads(response.text)) == 303
+        assert _parse_sse(response.text)[-1][0] == "done"
 
 
 def test_session_events_cursor_skips_already_cached_history(monkeypatch) -> None:

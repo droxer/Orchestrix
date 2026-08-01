@@ -107,11 +107,54 @@ def test_daemon_store_persists_workspace_responses(
             "exists": True,
             "entries": [],
         }
+        store.enqueue_command(
+            "sbx_alice",
+            {"id": "cmd_workspace", "type": "workspace.list", "path": ""},
+        )
+        store.take_queued_commands("sbx_alice")
 
         store.record_workspace_response("sbx_alice", response)
 
         assert store.get_workspace_response("cmd_workspace") == response
         assert notified == ["cmd_workspace"]
+
+
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_daemon_store_rejects_uncorrelated_workspace_responses(
+    daemon_store_factory,
+) -> None:
+    with TemporaryDirectory() as root:
+        store = daemon_store_factory(root)
+        store.register_node(store_node_payload())
+        store.register_node(
+            {
+                **store_node_payload(),
+                "id": "sbx_bob",
+                "employeeId": "bob",
+                "workspaceId": "repo:other",
+            }
+        )
+        store.enqueue_command(
+            "sbx_alice",
+            {"id": "cmd_workspace", "type": "workspace.list", "path": ""},
+        )
+        store.take_queued_commands("sbx_alice")
+        response = {
+            "type": "workspace.listing",
+            "commandId": "cmd_workspace",
+            "path": "",
+            "exists": True,
+            "entries": [],
+        }
+
+        with pytest.raises(PermissionError, match="different daemon node"):
+            store.record_workspace_response("sbx_bob", response)
+        with pytest.raises(KeyError):
+            store.record_workspace_response(
+                "sbx_alice", {**response, "commandId": "cmd_missing"}
+            )
+
+        assert store.get_workspace_response("cmd_workspace") is None
 
 
 def test_registry_hydrates_node_registered_after_replica_start() -> None:
@@ -2528,6 +2571,7 @@ def test_dispatch_scopes_do_not_serialize_unrelated_nodes() -> None:
                 pass
             release_first.set()
             future.result(timeout=1)
+        assert registry._dispatch_locks == {}
 
 
 def test_daemon_output_retry_after_registry_restart_is_deduplicated() -> None:
