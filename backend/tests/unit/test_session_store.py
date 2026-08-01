@@ -11,7 +11,7 @@ from relay.persistence.session_store import DatabaseSessionStore, LocalSessionSt
 from relay.persistence.store_common import relay_event
 from relay.persistence.task_store import DatabaseTaskStore
 from relay.sessions.controller import SessionController, SessionRunInFlightError
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 
 def test_session_stores_create_uuid_thread_ids() -> None:
@@ -157,6 +157,51 @@ def test_session_stores_bound_incremental_event_pages() -> None:
             assert first["nextSequence"] == 2
             assert len(second["events"]) == 2
             assert second["nextSequence"] == 4
+
+
+def test_session_snapshots_do_not_duplicate_event_history() -> None:
+    with TemporaryDirectory() as root:
+        stores = (
+            LocalSessionStore(Path(root) / "local"),
+            DatabaseSessionStore(f"sqlite:///{root}/relay.db", create_schema=True),
+        )
+        for store in stores:
+            created = store.create_session(
+                {
+                    "workspacePath": "/workspace/alice",
+                    "taskGoal": "stream a long result",
+                    "participants": ["human", "codex"],
+                }
+            )
+            store.append_event(
+                created["id"],
+                relay_event(
+                    "agent.output",
+                    created["id"],
+                    {
+                        "runId": "run_one",
+                        "agent": "codex",
+                        "stream": "stdout",
+                        "text": "chunk",
+                        "sequence": 0,
+                    },
+                ),
+            )
+
+            if isinstance(store, LocalSessionStore):
+                raw_snapshot = json.loads(
+                    store._snapshot_path(created["id"]).read_text(encoding="utf-8")
+                )
+            else:
+                with store.engine.begin() as conn:
+                    raw_snapshot = conn.scalar(
+                        select(store.sessions.c.snapshot).where(
+                            store.sessions.c.id == created["id"]
+                        )
+                    )
+
+            assert "events" not in raw_snapshot
+            assert len(store.get_session(created["id"])["events"]) == 2
 
 
 def test_session_stores_notify_after_committed_events() -> None:
