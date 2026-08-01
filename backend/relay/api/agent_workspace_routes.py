@@ -13,8 +13,8 @@ from starlette.concurrency import run_in_threadpool
 from ..core.ids import new_database_id
 from ..services.agent_routing import select_workspace_node
 from ..services.agent_workspace_snapshot import snapshot_file, snapshot_listing
-from ..services.workspace_query import WORKSPACE_COMMAND_TIMEOUT_SECONDS
 from ..services.event_notifier import workspace_response_key
+from ..services.workspace_query import WORKSPACE_COMMAND_TIMEOUT_SECONDS
 from .deps import AppContext, AppContextDep
 from .helpers import newest_agent_workspace_artifacts, request_actor
 from .session_routes import agent_supervisor_employee_id
@@ -67,7 +67,12 @@ async def _dispatch(
     key = workspace_response_key(command["id"])
     observed_version = ctx.control_plane_notifier.version(key)
     deadline = asyncio.get_running_loop().time() + WORKSPACE_COMMAND_TIMEOUT_SECONDS
-    await run_in_threadpool(ctx.registry.enqueue, node["id"], command)
+    try:
+        await run_in_threadpool(ctx.registry.enqueue, node["id"], command)
+    except ValueError as error:
+        raise HTTPException(
+            503, {"reason": "placement-overloaded", "detail": str(error)}
+        ) from error
     while True:
         response = await run_in_threadpool(
             ctx.daemon_store.get_workspace_response, command["id"]

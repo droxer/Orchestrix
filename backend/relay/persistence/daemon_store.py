@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import fcntl
 import json
+import os
 from collections import defaultdict
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -84,6 +85,21 @@ DISPATCH_CLAIM_EXPIRES_STATE_KEY = "_relay_dispatch_claim_expires_at"
 TERMINAL_EVENT_STATE_KEY = "_relay_terminal_event"
 TERMINAL_CLAIM_ID_STATE_KEY = "_relay_terminal_claim_id"
 TERMINAL_CLAIM_EXPIRES_STATE_KEY = "_relay_terminal_claim_expires_at"
+
+
+def daemon_command_queue_limit() -> int:
+    raw = os.environ.get("RELAY_DAEMON_MAX_QUEUED_COMMANDS_PER_NODE", "1000")
+    try:
+        limit = int(raw)
+    except ValueError as error:
+        raise ValueError(
+            "RELAY_DAEMON_MAX_QUEUED_COMMANDS_PER_NODE must be a positive integer."
+        ) from error
+    if limit <= 0:
+        raise ValueError(
+            "RELAY_DAEMON_MAX_QUEUED_COMMANDS_PER_NODE must be a positive integer."
+        )
+    return limit
 
 
 def _run_request_mode(request: dict[str, Any]) -> str:
@@ -512,8 +528,14 @@ class LocalDaemonStore:
             return self._get_command(command_id)
 
     def enqueue_command(self, node_id: str, command: dict[str, Any]) -> dict[str, Any]:
-        self.stage_command(node_id, command)
-        return self.publish_command(command["id"])
+        with self._lock:
+            if (
+                len(self._nonterminal_command_ids_by_node.get(node_id, set()))
+                >= daemon_command_queue_limit()
+            ):
+                raise ValueError(f"Daemon node {node_id} command queue is full.")
+            self.stage_command(node_id, command)
+            return self.publish_command(command["id"])
 
     def stage_command(
         self,
@@ -1809,7 +1831,23 @@ class DatabaseDaemonStore:
         return row_to_command(row) if row else None
 
     def enqueue_command(self, node_id: str, command: dict[str, Any]) -> dict[str, Any]:
-        self.stage_command(node_id, command)
+        with store_transaction(self.engine) as conn:
+            node_pk = conn.scalar(
+                select(self.nodes.c.id)
+                .where(self.nodes.c.id == node_id)
+                .with_for_update()
+            )
+            if not node_pk:
+                raise KeyError(node_id)
+            queued = conn.scalar(
+                select(func.count())
+                .select_from(self.commands)
+                .where(self.commands.c.node_id == node_pk)
+                .where(~self.commands.c.status.in_(TERMINAL_DAEMON_STATUSES))
+            )
+            if int(queued or 0) >= daemon_command_queue_limit():
+                raise ValueError(f"Daemon node {node_id} command queue is full.")
+            self.stage_command(node_id, command)
         return self.publish_command(command["id"])
 
     def stage_command(

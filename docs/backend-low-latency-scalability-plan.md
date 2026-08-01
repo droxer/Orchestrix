@@ -103,6 +103,7 @@ Set these variables per API replica:
 - `RELAY_DB_POOL_TIMEOUT_SECONDS` (default `5`)
 - `RELAY_DB_POOL_RECYCLE_SECONDS` (default `300`)
 - `RELAY_DB_POOL_PRE_PING` (default `true`)
+- `RELAY_DAEMON_MAX_QUEUED_COMMANDS_PER_NODE` (default `1000`)
 
 Budget worst-case application connections as:
 
