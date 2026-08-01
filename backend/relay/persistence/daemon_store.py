@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import fcntl
 import json
+import os
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from threading import RLock
 from typing import Any
 
+from loguru import logger
 from sqlalchemy import (
-    JSON,
     Boolean,
     Column,
     DateTime,
@@ -41,17 +42,20 @@ from .store_common import (
     _read_jsonl,
     _write_json,
     _write_jsonl,
+    create_all_tables,
     daemon_event,
     database_id_column,
     entity_uuid_type,
-    create_all_tables,
     json_type,
-    shared_engine,
-    store_transaction,
-    metadata as shared_metadata,
     new_database_id,
     now_iso,
+    publish_database_notification,
     safe_name,
+    shared_engine,
+    store_transaction,
+)
+from .store_common import (
+    metadata as shared_metadata,
 )
 
 TERMINAL_DAEMON_STATUSES = frozenset({"completed", "failed", "cancelled"})
@@ -60,7 +64,7 @@ TERMINAL_DAEMON_STATUSES = frozenset({"completed", "failed", "cancelled"})
 # events are otherwise kept indefinitely: `delete_node` hard-deletes the node
 # row, which makes the event log the only surviving record of a node incarnation
 # (see `historical_managed_runtime_ids`).
-PRUNABLE_DAEMON_EVENT_PREFIX = "daemon.command."
+PRUNABLE_DAEMON_EVENT_PREFIXES = ("daemon.command.", "daemon.workspace.")
 # `daemon.node.seen` is the exception. It was appended per heartbeat by a path
 # that has since stopped emitting it, nothing has ever read it, and it carries no
 # node payload -- so unlike `daemon.node.registered` it records nothing about an
@@ -70,15 +74,68 @@ PRUNABLE_DAEMON_EVENT_TYPES = frozenset({"daemon.node.seen"})
 
 def daemon_event_is_prunable(event_type: str) -> bool:
     return (
-        event_type.startswith(PRUNABLE_DAEMON_EVENT_PREFIX)
+        any(event_type.startswith(prefix) for prefix in PRUNABLE_DAEMON_EVENT_PREFIXES)
         or event_type in PRUNABLE_DAEMON_EVENT_TYPES
     )
+
+
 ACTIVE_RUN_REQUEST_STATUSES = frozenset({"running", "dispatching", "finalizing"})
 DISPATCH_CLAIM_ID_STATE_KEY = "_relay_dispatch_claim_id"
 DISPATCH_CLAIM_EXPIRES_STATE_KEY = "_relay_dispatch_claim_expires_at"
 TERMINAL_EVENT_STATE_KEY = "_relay_terminal_event"
 TERMINAL_CLAIM_ID_STATE_KEY = "_relay_terminal_claim_id"
 TERMINAL_CLAIM_EXPIRES_STATE_KEY = "_relay_terminal_claim_expires_at"
+
+
+def daemon_command_queue_limit() -> int:
+    raw = os.environ.get("RELAY_DAEMON_MAX_QUEUED_COMMANDS_PER_NODE", "1000")
+    try:
+        limit = int(raw)
+    except ValueError as error:
+        raise ValueError(
+            "RELAY_DAEMON_MAX_QUEUED_COMMANDS_PER_NODE must be a positive integer."
+        ) from error
+    if limit <= 0:
+        raise ValueError(
+            "RELAY_DAEMON_MAX_QUEUED_COMMANDS_PER_NODE must be a positive integer."
+        )
+    return limit
+
+
+def _run_request_mode(request: dict[str, Any]) -> str:
+    assignments = request.get("assignments") or []
+    index = int(request.get("currentIndex") or 0)
+    if index >= len(assignments):
+        return "action"
+    return assignments[index].get("mode") or "action"
+
+
+def _assert_node_run_request_capacity(
+    node: dict[str, Any],
+    active_requests: list[dict[str, Any]],
+    request: dict[str, Any],
+) -> None:
+    requested_mode = _run_request_mode(request)
+    active_modes = [_run_request_mode(item) for item in active_requests]
+    if requested_mode != "ask":
+        available = not active_requests
+    elif any(mode != "ask" for mode in active_modes):
+        available = False
+    else:
+        raw_by_mode = node.get("runCapacityByMode")
+        by_mode = raw_by_mode if isinstance(raw_by_mode, dict) else {}
+        ask_limit = by_mode.get("ask")
+        if not isinstance(ask_limit, int) or ask_limit <= 0:
+            ask_limit = 1
+        max_concurrent = node.get("maxConcurrentRuns")
+        if not isinstance(max_concurrent, int) or max_concurrent <= 0:
+            max_concurrent = max(1, ask_limit)
+        available = (
+            len(active_requests) < max_concurrent
+            and sum(mode == "ask" for mode in active_modes) < ask_limit
+        )
+    if not available:
+        raise ValueError("Runtime node capacity is exhausted.")
 
 
 def _node_for_storage(node: dict[str, Any]) -> dict[str, Any]:
@@ -120,9 +177,7 @@ def node_registration_changed(
         key: value
         for key, value in previous.items()
         if key not in _NODE_LIVENESS_FIELDS
-    } != {
-        key: value for key, value in node.items() if key not in _NODE_LIVENESS_FIELDS
-    }
+    } != {key: value for key, value in node.items() if key not in _NODE_LIVENESS_FIELDS}
 
 
 def infer_node_location(node: dict[str, Any]) -> str | None:
@@ -254,6 +309,8 @@ class LocalDaemonStore:
     def __init__(self, root_dir: str | Path = DEFAULT_RELAY_DATA_DIR):
         root = Path(root_dir)
         self._lock = RLock()
+        self._command_listener: Callable[[str], None] | None = None
+        self._workspace_listener: Callable[[str], None] | None = None
         self._nonterminal_command_ids_by_node: dict[str, set[str]] = {}
         self.nodes_dir = root / "daemon" / "nodes"
         self.commands_dir = root / "daemon" / "commands"
@@ -270,6 +327,32 @@ class LocalDaemonStore:
         ):
             path.mkdir(parents=True, exist_ok=True)
         self._rebuild_command_index()
+
+    def set_command_listener(
+        self, listener: Callable[[str], None], *, database_channel: str | None = None
+    ) -> None:
+        self._command_listener = listener
+
+    def _notify_command(self, node_id: str) -> None:
+        if not self._command_listener:
+            return
+        try:
+            self._command_listener(node_id)
+        except Exception:  # noqa: BLE001 - notification hints must not fail writes
+            logger.exception("Daemon command listener failed", node_id=node_id)
+
+    def set_workspace_listener(
+        self, listener: Callable[[str], None], *, database_channel: str | None = None
+    ) -> None:
+        self._workspace_listener = listener
+
+    def _notify_workspace(self, command_id: str) -> None:
+        if not self._workspace_listener:
+            return
+        try:
+            self._workspace_listener(command_id)
+        except Exception:  # noqa: BLE001 - notification hints must not fail writes
+            logger.exception("Workspace response listener failed", command_id=command_id)
 
     def register_node(self, sandbox: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
@@ -445,8 +528,14 @@ class LocalDaemonStore:
             return self._get_command(command_id)
 
     def enqueue_command(self, node_id: str, command: dict[str, Any]) -> dict[str, Any]:
-        self.stage_command(node_id, command)
-        return self.publish_command(command["id"])
+        with self._lock:
+            if (
+                len(self._nonterminal_command_ids_by_node.get(node_id, set()))
+                >= daemon_command_queue_limit()
+            ):
+                raise ValueError(f"Daemon node {node_id} command queue is full.")
+            self.stage_command(node_id, command)
+            return self.publish_command(command["id"])
 
     def stage_command(
         self,
@@ -532,7 +621,66 @@ class LocalDaemonStore:
                     {"nodeId": record["nodeId"], "commandId": command_id},
                 )
             )
-            return updated
+        self._notify_command(record["nodeId"])
+        return updated
+
+    def record_workspace_response(
+        self, node_id: str, response: dict[str, Any]
+    ) -> None:
+        command_id = str(response["commandId"])
+        with self._lock:
+            record = self._get_command(command_id)
+            if not record:
+                raise KeyError(command_id)
+            if record.get("nodeId") != node_id:
+                raise PermissionError(
+                    "Workspace command belongs to a different daemon node."
+                )
+            if not str((record.get("command") or {}).get("type") or "").startswith(
+                "workspace."
+            ):
+                raise ValueError("Command is not a workspace query.")
+            if record.get("status") == "completed":
+                if self.get_workspace_response(command_id) == response:
+                    return
+                raise ValueError("Workspace command already has a different response.")
+            if record.get("status") != "dispatched":
+                raise ValueError("Workspace command is not actively dispatched.")
+            completed = {
+                **record,
+                "status": "completed",
+                "updatedAt": now_iso(),
+                "completedAt": now_iso(),
+            }
+            _write_json(
+                self.commands_dir / f"{safe_name(command_id)}.json", completed
+            )
+            self._remove_command_from_index(node_id, command_id)
+            self.append_daemon_event(
+                daemon_event(
+                    "daemon.workspace.response",
+                    {
+                        "nodeId": node_id,
+                        "commandId": command_id,
+                        "response": response,
+                    },
+                )
+            )
+        self._notify_workspace(command_id)
+
+    def get_workspace_response(self, command_id: str) -> dict[str, Any] | None:
+        events_path = self.events_dir / "events.jsonl"
+        if not events_path.exists():
+            return None
+        with self._lock:
+            for event in reversed(_read_jsonl(events_path)):
+                if (
+                    event.get("type") == "daemon.workspace.response"
+                    and event.get("commandId") == command_id
+                ):
+                    response = event.get("response")
+                    return response if isinstance(response, dict) else None
+        return None
 
     def discard_staged_command(self, command_id: str) -> None:
         with self._lock:
@@ -686,6 +834,13 @@ class LocalDaemonStore:
             if self.active_run_request_for_session_any_node(record["sessionId"]):
                 raise ValueError(
                     f"Session {record['sessionId']} already has an active daemon run."
+                )
+            node = self.get_node(record["nodeId"])
+            if node:
+                _assert_node_run_request_capacity(
+                    node,
+                    self.list_active_run_requests(record["nodeId"]),
+                    record,
                 )
             _write_json(
                 self.run_requests_dir / f"{safe_name(record['id'])}.json", record
@@ -1194,9 +1349,7 @@ class DatabaseDaemonStore:
             "uq_daemon_nodes_managed_runtime",
             "managed_node_id",
             unique=True,
-            postgresql_where=text(
-                "managed_node_id IS NOT NULL AND retired_at IS NULL"
-            ),
+            postgresql_where=text("managed_node_id IS NOT NULL AND retired_at IS NULL"),
             sqlite_where=text("managed_node_id IS NOT NULL AND retired_at IS NULL"),
         ),
     )
@@ -1331,13 +1484,46 @@ class DatabaseDaemonStore:
         Column("timestamp", DateTime(timezone=True), nullable=False),
         Column("payload", json_type(), nullable=False),
         Index("ix_daemon_events_node_id", "node_id"),
+        Index("ix_daemon_events_command_id", "command_id"),
         Index("ix_daemon_events_timestamp", "timestamp"),
     )
 
     def __init__(self, database_url: str, *, create_schema: bool = False):
         self.engine = shared_engine(database_url)
+        self._command_listener: Callable[[str], None] | None = None
+        self._command_notification_channel: str | None = None
+        self._workspace_listener: Callable[[str], None] | None = None
+        self._workspace_notification_channel: str | None = None
         if create_schema:
             create_all_tables(self.engine)
+
+    def set_command_listener(
+        self, listener: Callable[[str], None], *, database_channel: str | None = None
+    ) -> None:
+        self._command_listener = listener
+        self._command_notification_channel = database_channel
+
+    def _notify_command(self, node_id: str) -> None:
+        if not self._command_listener:
+            return
+        try:
+            self._command_listener(node_id)
+        except Exception:  # noqa: BLE001 - notification hints must not fail writes
+            logger.exception("Daemon command listener failed", node_id=node_id)
+
+    def set_workspace_listener(
+        self, listener: Callable[[str], None], *, database_channel: str | None = None
+    ) -> None:
+        self._workspace_listener = listener
+        self._workspace_notification_channel = database_channel
+
+    def _notify_workspace(self, command_id: str) -> None:
+        if not self._workspace_listener:
+            return
+        try:
+            self._workspace_listener(command_id)
+        except Exception:  # noqa: BLE001 - notification hints must not fail writes
+            logger.exception("Workspace response listener failed", command_id=command_id)
 
     def _write_node_agents(self, conn: Any, node_pk: str, node: dict[str, Any]) -> None:
         """Replace a node's daemon_node_agents rows, but only if they changed.
@@ -1660,7 +1846,23 @@ class DatabaseDaemonStore:
         return row_to_command(row) if row else None
 
     def enqueue_command(self, node_id: str, command: dict[str, Any]) -> dict[str, Any]:
-        self.stage_command(node_id, command)
+        with store_transaction(self.engine) as conn:
+            node_pk = conn.scalar(
+                select(self.nodes.c.id)
+                .where(self.nodes.c.id == node_id)
+                .with_for_update()
+            )
+            if not node_pk:
+                raise KeyError(node_id)
+            queued = conn.scalar(
+                select(func.count())
+                .select_from(self.commands)
+                .where(self.commands.c.node_id == node_pk)
+                .where(~self.commands.c.status.in_(TERMINAL_DAEMON_STATUSES))
+            )
+            if int(queued or 0) >= daemon_command_queue_limit():
+                raise ValueError(f"Daemon node {node_id} command queue is full.")
+            self.stage_command(node_id, command)
         return self.publish_command(command["id"])
 
     def stage_command(
@@ -1781,7 +1983,84 @@ class DatabaseDaemonStore:
                     {"nodeId": record["nodeId"], "commandId": command_id},
                 ),
             )
+            publish_database_notification(
+                conn,
+                self.engine,
+                self._command_notification_channel,
+                f"node:{record['nodeId']}",
+            )
+        self._notify_command(record["nodeId"])
         return updated
+
+    def record_workspace_response(
+        self, node_id: str, response: dict[str, Any]
+    ) -> None:
+        command_id = str(response["commandId"])
+        with store_transaction(self.engine) as conn:
+            row = (
+                conn.execute(
+                    select(self.commands)
+                    .where(self.commands.c.id == command_id)
+                    .with_for_update()
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                raise KeyError(command_id)
+            command = row_to_command(row)
+            if command.get("nodeId") != node_id:
+                raise PermissionError(
+                    "Workspace command belongs to a different daemon node."
+                )
+            if not str(command["command"].get("type") or "").startswith("workspace."):
+                raise ValueError("Command is not a workspace query.")
+            if command.get("status") == "completed":
+                if self.get_workspace_response(command_id) == response:
+                    return
+                raise ValueError("Workspace command already has a different response.")
+            if command.get("status") != "dispatched":
+                raise ValueError("Workspace command is not actively dispatched.")
+            now = _parse_iso(now_iso())
+            conn.execute(
+                update(self.commands)
+                .where(self.commands.c.id == row["id"])
+                .values(status="completed", updated_at=now, completed_at=now)
+            )
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    "daemon.workspace.response",
+                    {
+                        "nodeId": node_id,
+                        "commandId": command_id,
+                        "response": response,
+                    },
+                ),
+            )
+            publish_database_notification(
+                conn,
+                self.engine,
+                self._workspace_notification_channel,
+                f"workspace:{command_id}",
+            )
+        self._notify_workspace(command_id)
+
+    def get_workspace_response(self, command_id: str) -> dict[str, Any] | None:
+        with store_transaction(self.engine) as conn:
+            row = (
+                conn.execute(
+                    select(self.events.c.payload)
+                    .where(self.events.c.command_id == command_id)
+                    .where(self.events.c.type == "daemon.workspace.response")
+                    .order_by(self.events.c.timestamp.desc())
+                    .limit(1)
+                )
+                .mappings()
+                .first()
+            )
+        response = (row or {}).get("payload", {}).get("response")
+        return response if isinstance(response, dict) else None
 
     def discard_staged_command(self, command_id: str) -> None:
         with store_transaction(self.engine) as conn:
@@ -1892,9 +2171,9 @@ class DatabaseDaemonStore:
         now_dt = _parse_iso(now)
         with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, node_id)
-            return len(
-                conn.execute(
-                    select(self.commands.c.id)
+            return int(
+                conn.scalar(
+                    select(func.count(self.commands.c.id))
                     .where(self.commands.c.node_id == node_pk)
                     .where(
                         (self.commands.c.status == "queued")
@@ -1903,7 +2182,8 @@ class DatabaseDaemonStore:
                             & (self.commands.c.lease_expires_at <= now_dt)
                         )
                     )
-                ).all()
+                )
+                or 0
             )
 
     def queued_command_counts(self) -> dict[str, int]:
@@ -2000,7 +2280,45 @@ class DatabaseDaemonStore:
         }
         try:
             with store_transaction(self.engine) as conn:
-                node_pk = self._node_pk(conn, record["nodeId"])
+                # The node row is the cross-replica capacity mutex. PostgreSQL
+                # serializes all reservations for one node while unrelated
+                # nodes remain independent.
+                node_row = (
+                    conn.execute(
+                        select(self.nodes)
+                        .where(self.nodes.c.id == record["nodeId"])
+                        .with_for_update()
+                    )
+                    .mappings()
+                    .first()
+                )
+                if not node_row:
+                    raise KeyError(record["nodeId"])
+                node_pk = node_row["id"]
+                active_rows = (
+                    conn.execute(
+                        select(self.run_requests)
+                        .where(self.run_requests.c.node_id == node_pk)
+                        .where(
+                            self.run_requests.c.status.in_(
+                                ACTIVE_RUN_REQUEST_STATUSES
+                            )
+                        )
+                    )
+                    .mappings()
+                    .all()
+                )
+                active_requests = [row_to_run_request(row) for row in active_rows]
+                if any(
+                    item["sessionId"] == record["sessionId"]
+                    for item in active_requests
+                ):
+                    raise ValueError(
+                        f"Session {record['sessionId']} already has an active daemon run."
+                    )
+                _assert_node_run_request_capacity(
+                    row_to_node(node_row), active_requests, record
+                )
                 conn.execute(
                     insert(self.run_requests).values(
                         **run_request_to_row(record, node_pk=node_pk)
@@ -2422,8 +2740,9 @@ class DatabaseDaemonStore:
                 conn.execute(
                     delete(self.events).where(
                         or_(
-                            self.events.c.type.startswith(
-                                PRUNABLE_DAEMON_EVENT_PREFIX
+                            *(
+                                self.events.c.type.startswith(prefix)
+                                for prefix in PRUNABLE_DAEMON_EVENT_PREFIXES
                             ),
                             self.events.c.type.in_(PRUNABLE_DAEMON_EVENT_TYPES),
                         ),

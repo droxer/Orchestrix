@@ -61,6 +61,14 @@ from .persistence.stores import (
 )
 from .persistence.team_store import DatabaseTeamStore, LocalTeamStore
 from .security.auth import auth_store_from_env
+from .services.event_notifier import (
+    CONTROL_PLANE_NOTIFICATION_CHANNEL,
+    KeyedEventNotifier,
+    daemon_command_key,
+    database_notification_bridge,
+    session_event_key,
+    workspace_response_key,
+)
 from .services.managed_nodes import LocalManagedNodeStore
 from .services.node_agents import sync_node_agents
 from .services.team_membership import reconcile_team_memberships
@@ -87,6 +95,28 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     team_store = team_store_from_env(root_dir)
     agent_placement_store = agent_placement_store_from_env(root_dir)
     profile_image_store = LocalProfileImageStore(root_dir)
+    control_plane_notifier = KeyedEventNotifier()
+    notification_bridge = database_notification_bridge(
+        session_store, control_plane_notifier
+    )
+    session_store.set_event_listener(
+        lambda session_id: control_plane_notifier.publish(
+            session_event_key(session_id)
+        ),
+        database_channel=CONTROL_PLANE_NOTIFICATION_CHANNEL,
+    )
+    if hasattr(daemon_store, "set_command_listener"):
+        daemon_store.set_command_listener(
+            lambda node_id: control_plane_notifier.publish(daemon_command_key(node_id)),
+            database_channel=CONTROL_PLANE_NOTIFICATION_CHANNEL,
+        )
+    if hasattr(daemon_store, "set_workspace_listener"):
+        daemon_store.set_workspace_listener(
+            lambda command_id: control_plane_notifier.publish(
+                workspace_response_key(command_id)
+            ),
+            database_channel=CONTROL_PLANE_NOTIFICATION_CHANNEL,
+        )
     # Older runtimes could retire an agent without updating Teams. Repair those
     # dangling member references through Team events before serving requests.
     reconcile_team_memberships(team_store, agent_store)
@@ -110,6 +140,8 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        if notification_bridge:
+            notification_bridge.start()
         if scheduler:
             scheduler.start()
         try:
@@ -117,6 +149,9 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
         finally:
             if scheduler:
                 await scheduler.stop()
+            if notification_bridge:
+                await notification_bridge.stop()
+            control_plane_notifier.close()
 
     app = FastAPI(
         title="Relay backend",
@@ -145,6 +180,8 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.state.agent_placement_store = agent_placement_store
     app.state.profile_image_store = profile_image_store
     app.state.workspace_query_broker = WorkspaceQueryBroker()
+    app.state.control_plane_notifier = control_plane_notifier
+    app.state.notification_bridge = notification_bridge
     app.state.task_scheduler = scheduler
     app.state.control_panel_version = CONTROL_PANEL_VERSION
 

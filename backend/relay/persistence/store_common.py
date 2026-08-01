@@ -9,8 +9,9 @@ from pathlib import Path
 from threading import RLock, local
 from typing import Any
 
-from sqlalchemy import JSON, Column, MetaData, Text, Uuid, create_engine
+from sqlalchemy import JSON, Column, MetaData, Text, Uuid, create_engine, text
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.engine import make_url
 
 from ..core.ids import new_database_id, now_iso
 from ..core.models import (
@@ -47,6 +48,38 @@ _ENGINES: dict[str, Any] = {}
 _ENGINE_LOCK = RLock()
 
 
+def _positive_env_number(name: str, default: str, cast: Any) -> Any:
+    raw = os.environ.get(name, default).strip()
+    try:
+        value = cast(raw)
+    except ValueError as error:
+        raise ValueError(f"{name} must be a positive number.") from error
+    if value <= 0:
+        raise ValueError(f"{name} must be a positive number.")
+    return value
+
+
+def database_engine_options(database_url: str) -> dict[str, Any]:
+    """Build bounded per-replica pool settings for server databases."""
+    if make_url(database_url).get_backend_name() == "sqlite":
+        return {}
+    pre_ping = os.environ.get("RELAY_DB_POOL_PRE_PING", "true").strip().lower()
+    if pre_ping not in {"1", "true", "yes", "on", "0", "false", "no", "off"}:
+        raise ValueError("RELAY_DB_POOL_PRE_PING must be a boolean.")
+    return {
+        "pool_size": _positive_env_number("RELAY_DB_POOL_SIZE", "10", int),
+        "max_overflow": _positive_env_number("RELAY_DB_MAX_OVERFLOW", "20", int),
+        "pool_timeout": _positive_env_number(
+            "RELAY_DB_POOL_TIMEOUT_SECONDS", "5", float
+        ),
+        "pool_recycle": _positive_env_number(
+            "RELAY_DB_POOL_RECYCLE_SECONDS", "300", int
+        ),
+        "pool_pre_ping": pre_ping in {"1", "true", "yes", "on"},
+        "pool_use_lifo": True,
+    }
+
+
 def shared_engine(database_url: str) -> Any:
     """One Engine per database URL, shared by every store.
 
@@ -58,9 +91,22 @@ def shared_engine(database_url: str) -> Any:
     with _ENGINE_LOCK:
         engine = _ENGINES.get(database_url)
         if engine is None:
-            engine = create_engine(database_url, future=True)
+            engine = create_engine(
+                database_url, future=True, **database_engine_options(database_url)
+            )
             _ENGINES[database_url] = engine
         return engine
+
+
+def publish_database_notification(
+    conn: Any, engine: Any, channel: str | None, payload: str
+) -> None:
+    """Publish a transactional PostgreSQL wakeup when notifications are enabled."""
+    if channel and engine.dialect.name == "postgresql":
+        conn.execute(
+            text("SELECT pg_notify(:channel, :payload)"),
+            {"channel": channel, "payload": payload},
+        )
 
 
 def create_all_tables(engine: Any) -> None:
@@ -72,7 +118,7 @@ def create_all_tables(engine: Any) -> None:
     here because `relay.persistence.schema` imports the stores that import this
     module.
     """
-    from . import schema  # noqa: PLC0415 - deferred to break the import cycle
+    from . import schema
 
     schema.metadata.create_all(engine)
 
@@ -266,11 +312,20 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
     if created.get("managedNodeId"):
         session["managedNodeId"] = created["managedNodeId"]
     for event in events:
-        session["events"].append(event)
-        session["updatedAt"] = event["timestamp"]
-        handler = SESSION_EVENT_HANDLERS.get(event.get("type"))
-        if handler:
-            handler(session, event)
+        apply_session_event(session, event)
+    return session
+
+
+def apply_session_event(
+    session: dict[str, Any], event: dict[str, Any], *, retain_event: bool = True
+) -> dict[str, Any]:
+    """Incrementally update a derived session projection with one event."""
+    if retain_event:
+        session.setdefault("events", []).append(event)
+    session["updatedAt"] = event["timestamp"]
+    handler = SESSION_EVENT_HANDLERS.get(event.get("type"))
+    if handler:
+        handler(session, event)
     return session
 
 

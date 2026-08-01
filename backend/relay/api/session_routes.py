@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import asyncio
 import base64
 import json
+import os
 import time
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
@@ -12,9 +12,11 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from loguru import logger
+from starlette.concurrency import run_in_threadpool
 
 from ..core.models import AGENT_NAMES
 from ..persistence.stores import valid_agent
+from ..services.event_notifier import session_event_key
 from ..services.team_dispatch import (
     TeamDispatchError,
     task_thread_assignments,
@@ -100,7 +102,7 @@ def session_brief_item(session: dict[str, Any]) -> dict[str, Any]:
         "archived": session.get("archived", False),
         "artifactCount": len(workspace_artifacts(session)),
         "runCount": len(session.get("agentRuns", [])),
-        "eventCount": len(session.get("events", [])),
+        "eventCount": session.get("eventCount", len(session.get("events", []))),
         "updatedAt": session.get("updatedAt"),
         "createdAt": session.get("createdAt"),
     }
@@ -215,14 +217,24 @@ def ensure_session_managed_affinity(
 @router.get("/threads")
 async def list_sessions(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
+    if request.query_params.get("view") == "summary":
+        try:
+            requested_limit = int(request.query_params.get("limit") or "100")
+        except ValueError as error:
+            raise HTTPException(400, "limit must be an integer.") from error
+        summaries = await run_in_threadpool(
+            ctx.session_store.list_session_summaries,
+            owner_employee_id=None if actor["isAdmin"] else actor["employeeId"],
+            limit=min(max(1, requested_limit), 200),
+        )
+        sessions = ensure_sessions_managed_affinity(ctx, summaries)
+        return {"sessions": [session_brief_item(session) for session in sessions]}
     visible = [
         session
         for session in ctx.session_store.list_sessions()
         if actor["isAdmin"] or session.get("ownerEmployeeId") == actor["employeeId"]
     ]
     sessions = ensure_sessions_managed_affinity(ctx, visible)
-    if request.query_params.get("view") == "summary":
-        return {"sessions": [session_brief_item(session) for session in sessions]}
     return {"sessions": sessions}
 
 
@@ -714,7 +726,12 @@ TERMINAL_SESSION_STATUSES = frozenset({"completed", "failed", "cancelled"})
 # Agent subprocesses emit output in small chunks, but this tail loop is the
 # final hop before the browser. A 50 ms tail interval feels continuous while
 # still batching subprocess chunks into a single browser cache update.
-_STREAM_POLL_SECONDS = 0.05
+_STREAM_FALLBACK_SECONDS = max(
+    1.0, float(os.environ.get("RELAY_STREAM_FALLBACK_SECONDS", "5"))
+)
+_STREAM_EVENT_PAGE_LIMIT = max(
+    1, min(1000, int(os.environ.get("RELAY_STREAM_EVENT_PAGE_LIMIT", "256")))
+)
 _STREAM_HEARTBEAT_SECONDS = 15.0
 _STREAM_MAX_SECONDS = 60 * 30
 
@@ -732,7 +749,7 @@ async def session_events(
 ) -> StreamingResponse:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     # Authorize before the stream opens so 403/404 surface as normal responses.
-    get_session_for_actor(ctx.session_store, session_id, actor)
+    await run_in_threadpool(get_session_for_actor, ctx.session_store, session_id, actor)
 
     async def event_stream() -> AsyncIterator[str]:
         # Server-side tail-poll: read only newly appended rows from the event
@@ -749,42 +766,64 @@ async def session_events(
         next_sequence: int | None = None
         start = time.monotonic()
         last_heartbeat = start
+        notification_key = session_event_key(session_id)
         while True:
             if await request.is_disconnected():
                 return
-            try:
-                page = ctx.session_store.read_event_page(
-                    session_id,
-                    after_event_id=after_event_id if next_sequence is None else None,
-                    after_sequence=next_sequence,
+            with ctx.control_plane_notifier.observe(
+                notification_key
+            ) as observed_version:
+                try:
+                    page = await run_in_threadpool(
+                        ctx.session_store.read_event_page,
+                        session_id,
+                        after_event_id=(
+                            after_event_id if next_sequence is None else None
+                        ),
+                        after_sequence=next_sequence,
+                        limit=_STREAM_EVENT_PAGE_LIMIT,
+                    )
+                except KeyError:
+                    return
+                events = page["events"]
+                next_sequence = page["nextSequence"]
+                if events:
+                    for event in events:
+                        yield _sse_frame(event)
+                    last_heartbeat = time.monotonic()
+                status = page.get("status")
+                history_drained = next_sequence >= int(page.get("version") or 0)
+                if status in TERMINAL_SESSION_STATUSES and history_drained:
+                    yield _sse_frame({"status": status}, event="done")
+                    return
+                now = time.monotonic()
+                if now - last_heartbeat >= _STREAM_HEARTBEAT_SECONDS:
+                    yield _sse_frame(
+                        {
+                            "timestamp": datetime.now(timezone.utc)
+                            .isoformat()
+                            .replace("+00:00", "Z")
+                        },
+                        event="heartbeat",
+                    )
+                    last_heartbeat = now
+                if now - start >= _STREAM_MAX_SECONDS:
+                    yield _sse_frame(
+                        {"status": status, "reason": "timeout"}, event="done"
+                    )
+                    return
+                if events:
+                    continue
+                wait_seconds = min(
+                    _STREAM_FALLBACK_SECONDS,
+                    _STREAM_HEARTBEAT_SECONDS - (now - last_heartbeat),
+                    _STREAM_MAX_SECONDS - (now - start),
                 )
-            except KeyError:
-                return
-            events = page["events"]
-            next_sequence = page["nextSequence"]
-            if events:
-                for event in events:
-                    yield _sse_frame(event)
-                last_heartbeat = time.monotonic()
-            status = page.get("status")
-            if status in TERMINAL_SESSION_STATUSES:
-                yield _sse_frame({"status": status}, event="done")
-                return
-            now = time.monotonic()
-            if now - last_heartbeat >= _STREAM_HEARTBEAT_SECONDS:
-                yield _sse_frame(
-                    {
-                        "timestamp": datetime.now(timezone.utc)
-                        .isoformat()
-                        .replace("+00:00", "Z")
-                    },
-                    event="heartbeat",
+                await ctx.control_plane_notifier.wait(
+                    notification_key,
+                    observed_version,
+                    timeout=max(0.001, wait_seconds),
                 )
-                last_heartbeat = now
-            if now - start >= _STREAM_MAX_SECONDS:
-                yield _sse_frame({"status": status, "reason": "timeout"}, event="done")
-                return
-            await asyncio.sleep(_STREAM_POLL_SECONDS)
 
     return StreamingResponse(
         event_stream(),

@@ -8,10 +8,12 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from starlette.concurrency import run_in_threadpool
 
 from ..core.ids import new_database_id
 from ..services.agent_routing import select_workspace_node
 from ..services.agent_workspace_snapshot import snapshot_file, snapshot_listing
+from ..services.event_notifier import workspace_response_key
 from ..services.workspace_query import WORKSPACE_COMMAND_TIMEOUT_SECONDS
 from .deps import AppContext, AppContextDep
 from .helpers import newest_agent_workspace_artifacts, request_actor
@@ -62,14 +64,30 @@ def _path(raw: str | None, *, required: bool = False) -> str:
 async def _dispatch(
     ctx: AppContext, node: dict[str, Any], command: dict[str, Any]
 ) -> dict[str, Any]:
-    future = ctx.workspace_query_broker.register(command["id"], node["id"])
-    try:
-        ctx.registry.enqueue(node["id"], command)
-        return await asyncio.wait_for(future, timeout=WORKSPACE_COMMAND_TIMEOUT_SECONDS)
-    except asyncio.TimeoutError as error:
-        raise HTTPException(503, {"reason": "placement-unavailable"}) from error
-    finally:
-        ctx.workspace_query_broker.discard(command["id"])
+    key = workspace_response_key(command["id"])
+    deadline = asyncio.get_running_loop().time() + WORKSPACE_COMMAND_TIMEOUT_SECONDS
+    enqueued = False
+    while True:
+        with ctx.control_plane_notifier.observe(key) as observed_version:
+            if not enqueued:
+                try:
+                    await run_in_threadpool(ctx.registry.enqueue, node["id"], command)
+                except ValueError as error:
+                    raise HTTPException(
+                        503, {"reason": "placement-overloaded", "detail": str(error)}
+                    ) from error
+                enqueued = True
+            response = await run_in_threadpool(
+                ctx.daemon_store.get_workspace_response, command["id"]
+            )
+            if response is not None:
+                return response
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                raise HTTPException(503, {"reason": "placement-unavailable"})
+            await ctx.control_plane_notifier.wait(
+                key, observed_version, timeout=remaining
+            )
 
 
 def _workspace_error(event: dict[str, Any]) -> None:

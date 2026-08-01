@@ -48,6 +48,143 @@ def stored_daemon_event_types(store: object) -> list[str]:
 
 
 @pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_daemon_store_notifies_when_command_becomes_visible(
+    daemon_store_factory,
+) -> None:
+    with TemporaryDirectory() as root:
+        store = daemon_store_factory(root)
+        notified: list[str] = []
+        store.set_command_listener(notified.append)
+        store.register_node(store_node_payload())
+
+        store.enqueue_command("sbx_alice", run_start_command("cmd_one", "run_one"))
+
+        assert notified == ["sbx_alice"]
+
+
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_daemon_store_bounds_each_node_command_queue(
+    daemon_store_factory, monkeypatch
+) -> None:
+    monkeypatch.setenv("RELAY_DAEMON_MAX_QUEUED_COMMANDS_PER_NODE", "2")
+    with TemporaryDirectory() as root:
+        store = daemon_store_factory(root)
+        store.register_node(store_node_payload())
+        for index in range(2):
+            store.enqueue_command(
+                "sbx_alice",
+                {
+                    "id": f"cmd_workspace_{index}",
+                    "type": "workspace.list",
+                    "path": "",
+                },
+            )
+
+        with pytest.raises(ValueError, match="command queue is full"):
+            store.enqueue_command(
+                "sbx_alice",
+                {
+                    "id": "cmd_workspace_overflow",
+                    "type": "workspace.list",
+                    "path": "",
+                },
+            )
+
+
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_daemon_store_persists_workspace_responses(
+    daemon_store_factory,
+) -> None:
+    with TemporaryDirectory() as root:
+        store = daemon_store_factory(root)
+        notified: list[str] = []
+        store.set_workspace_listener(notified.append)
+        store.register_node(store_node_payload())
+        response = {
+            "type": "workspace.listing",
+            "commandId": "cmd_workspace",
+            "path": "",
+            "exists": True,
+            "entries": [],
+        }
+        store.enqueue_command(
+            "sbx_alice",
+            {"id": "cmd_workspace", "type": "workspace.list", "path": ""},
+        )
+        store.take_queued_commands("sbx_alice")
+
+        store.record_workspace_response("sbx_alice", response)
+
+        assert store.get_workspace_response("cmd_workspace") == response
+        assert notified == ["cmd_workspace"]
+
+
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_daemon_store_rejects_uncorrelated_workspace_responses(
+    daemon_store_factory,
+) -> None:
+    with TemporaryDirectory() as root:
+        store = daemon_store_factory(root)
+        store.register_node(store_node_payload())
+        store.register_node(
+            {
+                **store_node_payload(),
+                "id": "sbx_bob",
+                "employeeId": "bob",
+                "workspaceId": "repo:other",
+            }
+        )
+        store.enqueue_command(
+            "sbx_alice",
+            {"id": "cmd_workspace", "type": "workspace.list", "path": ""},
+        )
+        store.take_queued_commands("sbx_alice")
+        response = {
+            "type": "workspace.listing",
+            "commandId": "cmd_workspace",
+            "path": "",
+            "exists": True,
+            "entries": [],
+        }
+
+        with pytest.raises(PermissionError, match="different daemon node"):
+            store.record_workspace_response("sbx_bob", response)
+        with pytest.raises(KeyError):
+            store.record_workspace_response(
+                "sbx_alice", {**response, "commandId": "cmd_missing"}
+            )
+
+        assert store.get_workspace_response("cmd_workspace") is None
+
+
+def test_registry_hydrates_node_registered_after_replica_start() -> None:
+    with TemporaryDirectory() as root:
+        database_url = f"sqlite:///{root}/daemon.db"
+        first = DaemonNodeRegistry(
+            LocalSessionStore(root),
+            DatabaseDaemonStore(database_url, create_schema=True),
+        )
+        second = DaemonNodeRegistry(
+            LocalSessionStore(root), DatabaseDaemonStore(database_url)
+        )
+        first.register(
+            {
+                "sandboxId": "node_late",
+                "employeeId": "alice",
+                "token": "node_token",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+
+        heartbeat = second.heartbeat("node_late", "node_token")
+
+        assert heartbeat["timeoutMs"] > 0
+        assert second.get("node_late")["agents"]["codex"] == "ready"
+
+
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
 def test_provisioned_daemon_nodes_use_uuid_ids(daemon_store_factory) -> None:
     with TemporaryDirectory() as root:
         registry = DaemonNodeRegistry(
@@ -763,13 +900,15 @@ def test_daemon_output_retry_survives_event_log_write_failure(monkeypatch) -> No
             failed_once = False
 
             def append_with_one_failure(
-                session_id: str, event: dict[str, object]
+                session_id: str,
+                event: dict[str, object],
+                **kwargs: object,
             ) -> dict[str, object]:
                 nonlocal failed_once
                 if event.get("type") == "agent.output" and not failed_once:
                     failed_once = True
                     raise RuntimeError("disk unavailable")
-                return original_append(session_id, event)
+                return original_append(session_id, event, **kwargs)
 
             monkeypatch.setattr(session_store, "append_event", append_with_one_failure)
             with pytest.raises(RuntimeError, match="disk unavailable"):
@@ -2350,6 +2489,148 @@ def test_active_session_run_request_claim_is_atomic_across_store_instances(
         assert "already has an active daemon run" in str(failure)
 
 
+@pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
+def test_run_request_creation_reserves_node_capacity_atomically(store_factory) -> None:
+    with TemporaryDirectory() as root:
+        store = store_factory(root)
+        store.register_node(
+            {
+                **store_node_payload(),
+                "maxConcurrentRuns": 2,
+                "runCapacityByMode": {"action": 1, "review": 1, "ask": 2},
+            }
+        )
+
+        for index in range(2):
+            store.create_run_request(
+                {
+                    "nodeId": "sbx_alice",
+                    "sessionId": f"ses_capacity_{index}",
+                    "taskGoal": "answer independently",
+                    "assignments": [{"agent": "codex", "mode": "ask"}],
+                    "state": {},
+                }
+            )
+
+        with pytest.raises(ValueError, match="capacity is exhausted"):
+            store.create_run_request(
+                {
+                    "nodeId": "sbx_alice",
+                    "sessionId": "ses_capacity_overflow",
+                    "taskGoal": "one request too many",
+                    "assignments": [{"agent": "codex", "mode": "ask"}],
+                    "state": {},
+                }
+            )
+
+
+def test_backend_run_does_not_block_the_asyncio_event_loop() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            registry = DaemonNodeRegistry(
+                LocalSessionStore(root), LocalDaemonStore(root)
+            )
+            backend = ServerDaemonNodeBackend(registry)
+            request = {
+                "taskGoal": "exercise admission",
+                "assignments": [{"agent": "codex", "mode": "ask"}],
+            }
+            original = backend._normalize_run_request
+
+            def slow_normalize(sandbox_id, payload):
+                time.sleep(0.05)
+                return original(sandbox_id, payload)
+
+            backend._normalize_run_request = slow_normalize
+            started_at = time.monotonic()
+            task = asyncio.create_task(backend.run("missing", request))
+            await asyncio.sleep(0.005)
+
+            assert time.monotonic() - started_at < 0.03
+            with pytest.raises(KeyError):
+                await task
+
+    asyncio.run(run_flow())
+
+
+def test_dispatch_scopes_do_not_serialize_unrelated_nodes() -> None:
+    with TemporaryDirectory() as root:
+        registry = DaemonNodeRegistry(LocalSessionStore(root), LocalDaemonStore(root))
+        first_entered = Event()
+        release_first = Event()
+
+        def hold_first_node() -> None:
+            with registry.dispatch_scope(["node_a"]):
+                first_entered.set()
+                release_first.wait(timeout=1)
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(hold_first_node)
+            assert first_entered.wait(timeout=1)
+            with registry.dispatch_scope(["node_b"]):
+                pass
+            release_first.set()
+            future.result(timeout=1)
+        assert registry._dispatch_locks == {}
+
+
+def test_global_reaping_precedes_command_poll_node_scope(monkeypatch) -> None:
+    with TemporaryDirectory() as root:
+        registry = DaemonNodeRegistry(LocalSessionStore(root), LocalDaemonStore(root))
+        registry.register(
+            {
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        calls = []
+
+        def assert_no_node_lock(*, force: bool = True) -> None:
+            assert force is False
+            assert registry._dispatch_locks == {}
+            calls.append("reap")
+
+        monkeypatch.setattr(registry, "reap_stale_runs", assert_no_node_lock)
+
+        assert registry.take_commands("sbx_alice", "node_token") == []
+        assert calls == ["reap"]
+
+
+def test_cross_replica_node_hydration_precedes_node_scope(monkeypatch) -> None:
+    with TemporaryDirectory() as root:
+        database_url = f"sqlite:///{root}/daemon.db"
+        first = DaemonNodeRegistry(
+            LocalSessionStore(root),
+            DatabaseDaemonStore(database_url, create_schema=True),
+        )
+        second = DaemonNodeRegistry(
+            LocalSessionStore(root), DatabaseDaemonStore(database_url)
+        )
+        second.register(
+            {
+                "sandboxId": "sbx_remote",
+                "employeeId": "remote",
+                "token": "node_token",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        original_refresh = first._refresh_persisted_liveness
+
+        def assert_no_node_lock(sandbox_id: str | None = None) -> None:
+            assert first._dispatch_locks == {}
+            original_refresh(sandbox_id)
+
+        monkeypatch.setattr(first, "_refresh_persisted_liveness", assert_no_node_lock)
+
+        assert first.take_commands("sbx_remote", "node_token") == []
+
+
 def test_daemon_output_retry_after_registry_restart_is_deduplicated() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
@@ -3535,7 +3816,11 @@ def test_explicit_heartbeat_renews_local_and_managed_node_leases(
         registry.sandboxes[node_id] = {
             **registry.sandboxes[node_id],
             "nodeLocation": node_location,
-            **({"managedNodeId": "computer_alice"} if node_location == "managed" else {}),
+            **(
+                {"managedNodeId": "computer_alice"}
+                if node_location == "managed"
+                else {}
+            ),
             "status": "stopped",
             "lastSeenAt": "2020-01-01T00:00:00.000Z",
         }
@@ -3551,9 +3836,7 @@ def test_explicit_heartbeat_renews_local_and_managed_node_leases(
 
 def test_retired_node_cannot_renew_explicit_heartbeat() -> None:
     with TemporaryDirectory() as root:
-        registry = DaemonNodeRegistry(
-            LocalSessionStore(root), LocalDaemonStore(root)
-        )
+        registry = DaemonNodeRegistry(LocalSessionStore(root), LocalDaemonStore(root))
         registry.register(
             {
                 "sandboxId": "node_retired",
@@ -3564,9 +3847,7 @@ def test_retired_node_cannot_renew_explicit_heartbeat() -> None:
                 "status": "ready",
             }
         )
-        registry.sandboxes["node_retired"]["retiredAt"] = (
-            "2026-07-30T00:00:00.000Z"
-        )
+        registry.sandboxes["node_retired"]["retiredAt"] = "2026-07-30T00:00:00.000Z"
 
         with pytest.raises(PermissionError, match="Retired daemon node"):
             registry.heartbeat("node_retired", "node_token")
@@ -3627,9 +3908,7 @@ def test_explicit_heartbeat_renews_active_command_leases() -> None:
             }
         )
 
-        registry.heartbeat(
-            "node_busy", "node_token", [("command_one", "lease_one")]
-        )
+        registry.heartbeat("node_busy", "node_token", [("command_one", "lease_one")])
 
         assert daemon_store.renewals == [
             ("node_busy", [("command_one", "lease_one")], 60.0)
@@ -4577,7 +4856,9 @@ def test_a_materially_changed_registration_is_still_recorded() -> None:
             "updatedAt": "2026-07-30T00:00:00.000Z",
         }
         store.register_node(dict(payload))
-        store.register_node({**payload, "agents": {"claude": "ready", "codex": "ready"}})
+        store.register_node(
+            {**payload, "agents": {"claude": "ready", "codex": "ready"}}
+        )
         store.register_node({**payload, "employeeId": "alice"})
 
         events = stored_daemon_event_types(store)

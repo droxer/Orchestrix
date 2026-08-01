@@ -4,6 +4,8 @@ from collections import defaultdict
 from typing import Any
 from uuid import UUID, uuid5
 
+from starlette.concurrency import run_in_threadpool
+
 from ..core.ids import new_sandbox_id, now_iso
 from ..core.models import AGENT_NAMES, DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS
 from ..persistence.protocols import AgentPlacementStore, AgentStore, SessionStore
@@ -194,14 +196,27 @@ class ServerDaemonNodeBackend:
         }
 
     async def run(self, sandbox_id: str, request: dict[str, Any]) -> dict[str, Any]:
-        with self.registry.dispatch_lock:
-            request = self._normalize_run_request(sandbox_id, request)
+        return await run_in_threadpool(self._run_sync, sandbox_id, request)
+
+    def _run_sync(self, sandbox_id: str, request: dict[str, Any]) -> dict[str, Any]:
+        request = self._normalize_run_request(sandbox_id, request)
+        node_ids = [
+            sandbox_id,
+            *(
+                assignment.get("daemonNodeId")
+                for assignment in request["assignments"]
+                if assignment.get("daemonNodeId")
+            ),
+        ]
+        # Global recovery runs before node scopes so run admission follows the
+        # same global -> node order as terminal-event finalization.
+        self.registry.reap_stale_runs(force=False)
+        with self.registry.dispatch_scope(node_ids):
             run_request_id = self._run_request_id(request)
             idempotent_session = self._idempotent_session(request, run_request_id)
             if idempotent_session:
                 return idempotent_session
 
-            self.registry.reap_stale_runs()
             active_runs_by_node = self._active_runs_by_node()
             sandbox = self._validate_run_target(sandbox_id, request)
             existing_session = self._existing_session(request)
