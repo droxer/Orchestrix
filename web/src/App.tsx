@@ -71,6 +71,7 @@ const WORK_ROUTE_SKIP_IDS: Record<Exclude<AppRoute, "main">, string> = {
   teams: "teams-panel",
   channels: "channels-panel",
   admin: "admin-panel",
+  computer: "computer-panel",
 };
 
 function useStableEvent<TArgs extends unknown[], TResult>(handler: (...args: TArgs) => TResult): (...args: TArgs) => TResult {

@@ -19,6 +19,7 @@ const WORK_ROUTE_LABEL_KEYS: Record<Exclude<AppRoute, "main">, string> = {
   teams: "nav.teams",
   channels: "nav.channels",
   admin: "nav.admin",
+  computer: "nav.computer",
 };
 
 export type MobileChatChrome = {

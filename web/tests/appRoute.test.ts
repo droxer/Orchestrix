@@ -24,6 +24,7 @@ describe("app pathname routes", () => {
       "/teams": "teams",
       "/channels": "channels",
       "/admin": "admin",
+      "/computer": "computer",
     } as const;
     for (const [path, route] of Object.entries(routes)) {
       assert.equal(parseAppPath(path).route, route);
@@ -38,6 +39,7 @@ describe("app pathname routes", () => {
     assert.equal(hrefForRoute("main", "ses_123"), "/threads/ses_123");
     assert.equal(hrefForRoute("backlog"), "/backlog");
     assert.equal(hrefForRoute("routine"), "/routines");
+    assert.equal(hrefForRoute("computer"), "/computer");
   });
 
   it("marks unknown paths as not found instead of opening chat", () => {
