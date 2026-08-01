@@ -340,13 +340,6 @@ export function AgentProfilePanel({
               </div>
             )}
             <div className="workspace-dossier-meta">
-              <span className="workspace-dossier-availability">
-                <span
-                  className={`workspace-status-pip tone-${agentAvailabilityTone(agent.availability)}`}
-                  aria-hidden="true"
-                />
-                {t(`admin.v2.placement_status.${agent.availability}`, { defaultValue: agent.availability })}
-              </span>
               <span translate="no">@{agent.employeeId}</span>
             </div>
           </div>

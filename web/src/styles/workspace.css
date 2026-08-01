@@ -1170,12 +1170,6 @@
   font: var(--type-label);
 }
 
-.workspace-dossier-availability {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1-5);
-}
-
 /* The profile's durable inner character. Its slightly editorial treatment
    keeps identity separate from runtime configuration. */
 .agent-personality-card {
