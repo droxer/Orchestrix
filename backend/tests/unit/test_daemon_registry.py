@@ -2450,6 +2450,55 @@ def test_run_request_creation_reserves_node_capacity_atomically(store_factory) -
             )
 
 
+def test_backend_run_does_not_block_the_asyncio_event_loop() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            registry = DaemonNodeRegistry(
+                LocalSessionStore(root), LocalDaemonStore(root)
+            )
+            backend = ServerDaemonNodeBackend(registry)
+            request = {
+                "taskGoal": "exercise admission",
+                "assignments": [{"agent": "codex", "mode": "ask"}],
+            }
+            original = backend._normalize_run_request
+
+            def slow_normalize(sandbox_id, payload):
+                time.sleep(0.05)
+                return original(sandbox_id, payload)
+
+            backend._normalize_run_request = slow_normalize
+            started_at = time.monotonic()
+            task = asyncio.create_task(backend.run("missing", request))
+            await asyncio.sleep(0.005)
+
+            assert time.monotonic() - started_at < 0.03
+            with pytest.raises(KeyError):
+                await task
+
+    asyncio.run(run_flow())
+
+
+def test_dispatch_scopes_do_not_serialize_unrelated_nodes() -> None:
+    with TemporaryDirectory() as root:
+        registry = DaemonNodeRegistry(LocalSessionStore(root), LocalDaemonStore(root))
+        first_entered = Event()
+        release_first = Event()
+
+        def hold_first_node() -> None:
+            with registry.dispatch_scope(["node_a"]):
+                first_entered.set()
+                release_first.wait(timeout=1)
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(hold_first_node)
+            assert first_entered.wait(timeout=1)
+            with registry.dispatch_scope(["node_b"]):
+                pass
+            release_first.set()
+            future.result(timeout=1)
+
+
 def test_daemon_output_retry_after_registry_restart_is_deduplicated() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
