@@ -541,7 +541,7 @@ export function readNodeWorkspaceFile(
 }
 
 export function listTasks(signal?: AbortSignal): Promise<TasksResponse> {
-  return apiJson<TasksResponse>("/tasks", { signal });
+  return apiJson<TasksResponse>("/tasks?view=summary", { signal });
 }
 
 export function createTask(input: CreateTaskInput): Promise<RelayTask> {

@@ -138,7 +138,7 @@ def heartbeat_command_leases(body: dict[str, Any]) -> list[tuple[str, str | None
 
 
 @router.get("/daemon-nodes")
-async def list_daemon_nodes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+def list_daemon_nodes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     token = bearer_token(request)
     if token:
         nodes = ctx.registry.monitor_nodes_for_token(token)

@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { LogicalAgentAvailability, RelayTask } from "../types";
+import type { LogicalAgentAvailability, RelayTaskListItem } from "../types";
 import { cn } from "@/lib/utils";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { IdentityMonogram } from "./IdentityMonogram";
@@ -31,7 +31,7 @@ export function TaskAssignee({
   showAgent = true,
   assigneeIsSelf = false,
 }: {
-  task: RelayTask;
+  task: RelayTaskListItem;
   ready: boolean;
   availability?: LogicalAgentAvailability;
   unassignedLabel: string;
@@ -70,7 +70,7 @@ export function TaskExecutionBadge({
   availability,
   displayName,
 }: {
-  task: RelayTask;
+  task: RelayTaskListItem;
   ready: boolean;
   availability?: LogicalAgentAvailability;
   displayName?: string;

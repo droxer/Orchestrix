@@ -19,11 +19,14 @@ import {
   updateTask,
   updateTeam,
 } from "../api";
-import type { AgentRunInput, AgentTaskMode, CreateTaskInput, RelaySession, RelayTask, RunInput, TaskMutationInput, TeamMutationInput } from "../types";
-import { RELAY_QUERY_KEY, SESSIONS_QUERY_KEY, TASKS_QUERY_KEY } from "./useRelayData";
+import type { AgentRunInput, AgentTaskMode, CreateTaskInput, RelaySession, RelayTask, RelayTaskSummary, RunInput, TaskMutationInput, TeamMutationInput } from "../types";
+import { NODES_QUERY_KEY, RELAY_QUERY_KEY, SESSIONS_QUERY_KEY, TASKS_QUERY_KEY } from "./useRelayData";
 import { useMutationError } from "./useMutationError";
 import { useDialogs } from "../components/ui/DialogProvider";
 import { TEAMS_QUERY_KEY } from "./useTeams";
+import { mergeSessionSnapshotIntoSessions } from "../lib/sessionPollMerge";
+import { applySessionEventUnchecked } from "../lib/sessionEvents";
+import { mergeTaskSummaryIntoTasks, taskSummaryFromTask } from "../lib/taskSummary";
 
 type TokenArg = { token?: string };
 
@@ -34,7 +37,23 @@ export function useRelayMutations() {
   const { reportMutationError } = useMutationError();
 
   const invalidateRelay = () => queryClient.invalidateQueries({ queryKey: RELAY_QUERY_KEY });
+  const invalidateSessions = () => queryClient.invalidateQueries({ queryKey: SESSIONS_QUERY_KEY, exact: true });
+  const invalidateTasks = () => queryClient.invalidateQueries({ queryKey: TASKS_QUERY_KEY, exact: true });
+  const invalidateNodes = () => queryClient.invalidateQueries({ queryKey: NODES_QUERY_KEY, exact: true });
   const invalidateTeams = () => queryClient.invalidateQueries({ queryKey: [TEAMS_QUERY_KEY] });
+  const cacheSession = (session: RelaySession) => {
+    queryClient.setQueryData<RelaySession[]>(SESSIONS_QUERY_KEY, (current) =>
+      mergeSessionSnapshotIntoSessions(
+        current ?? [],
+        session,
+        applySessionEventUnchecked,
+      ));
+  };
+  const cacheTask = (task: RelayTask) => {
+    const summary = taskSummaryFromTask(task);
+    queryClient.setQueryData<RelayTaskSummary[]>(TASKS_QUERY_KEY, (current) =>
+      mergeTaskSummaryIntoTasks(current ?? [], summary));
+  };
 
   const onRelayError = (context: string, messageKey: string) => (error: unknown) => {
     reportMutationError(context, error, t(messageKey));
@@ -43,7 +62,7 @@ export function useRelayMutations() {
   const renameSessionMutation = useMutation({
     mutationFn: ({ sessionId, title, token }: { sessionId: string; title: string } & TokenArg) =>
       renameSession(sessionId, title, token),
-    onSuccess: () => void invalidateRelay(),
+    onSuccess: cacheSession,
     onError: onRelayError("Failed to rename thread", "errors.rename_thread"),
   });
 
@@ -57,7 +76,10 @@ export function useRelayMutations() {
       );
       return { previous };
     },
-    onSuccess: () => void invalidateRelay(),
+    onSuccess: () => {
+      void invalidateSessions();
+      void invalidateTasks();
+    },
     onError: (error, _input, context) => {
       if (context?.previous) {
         queryClient.setQueryData(SESSIONS_QUERY_KEY, context.previous);
@@ -73,7 +95,11 @@ export function useRelayMutations() {
       reason,
     }: { sessionId: string; reason?: string } & TokenArg) =>
       cancelRun(sessionId, token, reason),
-    onSuccess: () => void invalidateRelay(),
+    onSuccess: (session) => {
+      cacheSession(session);
+      void invalidateNodes();
+      void invalidateTasks();
+    },
     onError: onRelayError("Failed to cancel active run", "errors.cancel_run"),
   });
 
@@ -85,23 +111,32 @@ export function useRelayMutations() {
       token,
     }: { sessionId: string; kind: "approve" | "reject" | "mark_done"; note?: string } & TokenArg) =>
       recordDecision(sessionId, kind, note, token),
-    onSuccess: () => void invalidateRelay(),
+    onSuccess: (session) => {
+      cacheSession(session);
+      void invalidateTasks();
+    },
     onError: onRelayError("Failed to record decision", "errors.record_decision"),
   });
 
   const runSandboxMutation = useMutation({
     mutationFn: ({ input, token }: { input: RunInput; token?: string }) => runSandbox(input, token),
-    onSuccess: () => void invalidateRelay(),
+    onSuccess: (session) => {
+      cacheSession(session);
+      void invalidateNodes();
+    },
   });
 
   const runLogicalAgentsMutation = useMutation({
     mutationFn: (input: AgentRunInput) => runLogicalAgents(input),
-    onSuccess: () => void invalidateRelay(),
+    onSuccess: (session) => {
+      cacheSession(session);
+      void invalidateNodes();
+    },
   });
 
   const createTaskMutation = useMutation({
     mutationFn: (input: CreateTaskInput) => createTask(input),
-    onSuccess: () => void invalidateRelay(),
+    onSuccess: cacheTask,
     onError: onRelayError("Failed to create task", "errors.save_task"),
   });
 
@@ -116,8 +151,8 @@ export function useRelayMutations() {
       const status = input.status;
       if (!status) return { previous: undefined };
       await queryClient.cancelQueries({ queryKey: TASKS_QUERY_KEY });
-      const previous = queryClient.getQueryData<RelayTask[]>(TASKS_QUERY_KEY);
-      queryClient.setQueryData<RelayTask[]>(TASKS_QUERY_KEY, (current) =>
+      const previous = queryClient.getQueryData<RelayTaskSummary[]>(TASKS_QUERY_KEY);
+      queryClient.setQueryData<RelayTaskSummary[]>(TASKS_QUERY_KEY, (current) =>
         (current ?? []).map((task) => (task.id === taskId ? { ...task, status } : task)),
       );
       return { previous };
@@ -128,12 +163,16 @@ export function useRelayMutations() {
     },
     // Settled, not success: a rolled-back failure must resync from the server
     // too, otherwise the board keeps showing the pre-mutation snapshot.
-    onSettled: () => void invalidateRelay(),
+    onSuccess: cacheTask,
+    onSettled: () => void invalidateTasks(),
   });
 
   const deleteTaskMutation = useMutation({
     mutationFn: ({ taskId }: { taskId: string }) => deleteTask(taskId),
-    onSuccess: () => void invalidateRelay(),
+    onSuccess: (_result, { taskId }) => {
+      queryClient.setQueryData<RelayTaskSummary[]>(TASKS_QUERY_KEY, (current) =>
+        (current ?? []).filter((task) => task.id !== taskId));
+    },
     onError: (error: unknown) => {
       const messageKey = error instanceof RelayApiError && error.code === "task_execution_active"
         ? "errors.task_execution_active"
@@ -144,7 +183,7 @@ export function useRelayMutations() {
 
   const assignTaskMutation = useMutation({
     mutationFn: ({ taskId, agentId }: { taskId: string; agentId: string }) => assignTask(taskId, agentId),
-    onSuccess: () => void invalidateRelay(),
+    onSuccess: cacheTask,
     onError: onRelayError("Failed to assign task", "errors.task_action"),
   });
 
@@ -158,7 +197,9 @@ export function useRelayMutations() {
       assignments?: RunInput["assignments"];
     }) => startTask(taskId, input),
     onSuccess: (result) => {
-      void invalidateRelay();
+      cacheTask(result.task);
+      if (result.session) cacheSession(result.session);
+      void invalidateNodes();
       announce({
         message: result.dispatch.message ?? t("backlog.toast_started"),
         tone: result.dispatch.state === "rejected"
@@ -175,7 +216,6 @@ export function useRelayMutations() {
     mutationFn: (input: TeamMutationInput) => createTeam(input),
     onSuccess: () => {
       void invalidateTeams();
-      void invalidateRelay();
     },
     onError: onRelayError("Failed to create team", "errors.save_team"),
   });
@@ -185,7 +225,7 @@ export function useRelayMutations() {
       updateTeam(teamId, input),
     onSuccess: () => {
       void invalidateTeams();
-      void invalidateRelay();
+      void invalidateTasks();
     },
     onError: onRelayError("Failed to update team", "errors.save_team"),
   });
@@ -194,7 +234,7 @@ export function useRelayMutations() {
     mutationFn: (teamId: string) => deleteTeam(teamId),
     onSuccess: () => {
       void invalidateTeams();
-      void invalidateRelay();
+      void invalidateTasks();
     },
     onError: onRelayError("Failed to delete team", "errors.delete_team"),
   });

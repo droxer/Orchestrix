@@ -6,6 +6,7 @@ import shutil
 import time
 from collections import defaultdict
 from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import RLock
 from typing import Any
@@ -20,9 +21,12 @@ from sqlalchemy import (
     Table,
     Text,
     UniqueConstraint,
+    case,
     delete,
+    func,
     insert,
     inspect,
+    or_,
     select,
     text,
     update,
@@ -199,6 +203,17 @@ class LocalSessionStore:
                     "events": _read_jsonl(self._events_path(session_id)),
                 }
             return materialize_events(_read_jsonl(self._events_path(session_id)))
+
+    def get_session_header(self, session_id: str) -> dict[str, Any]:
+        """Read authorization and list fields without loading the event log."""
+        with self._lock:
+            if self._tombstone_path(session_id).exists():
+                raise KeyError(session_id)
+            snapshot_path = self._snapshot_path(session_id)
+            if snapshot_path.exists():
+                return _read_json(snapshot_path)
+            session = materialize_events(_read_jsonl(self._events_path(session_id)))
+            return compact_session_snapshot(session)
 
     def read_event_page(
         self,
@@ -452,7 +467,9 @@ class DatabaseSessionStore:
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
         Index("ix_sessions_updated_at", "updated_at"),
+        Index("ix_sessions_created_at", "created_at"),
         Index("ix_sessions_owner_employee_id", "owner_employee_id"),
+        Index("ix_sessions_owner_updated_at", "owner_employee_id", "updated_at"),
         Index("ix_sessions_status", "status"),
     )
     events = Table(
@@ -474,6 +491,7 @@ class DatabaseSessionStore:
         ),
         Index("ix_session_events_session_id", "session_id"),
         Index("ix_session_events_timestamp", "timestamp"),
+        Index("ix_session_events_type_timestamp", "type", "timestamp"),
     )
     artifacts = Table(
         "session_artifacts",
@@ -867,6 +885,25 @@ class DatabaseSessionStore:
             events = self._events_for_session(conn, row["id"])
         return {**(row["snapshot"] or {}), "events": events}
 
+    def get_session_header(self, session_id: str) -> dict[str, Any]:
+        """Read authorization and list fields without loading the event log."""
+        with store_transaction(self.engine) as conn:
+            row = (
+                conn.execute(
+                    select(self.sessions.c.snapshot, self.sessions.c.version).where(
+                        self.sessions.c.id == session_id
+                    )
+                )
+                .mappings()
+                .first()
+            )
+        if not row:
+            raise KeyError(session_id)
+        return {
+            **(row["snapshot"] or {}),
+            "eventCount": int(row["version"] or 0),
+        }
+
     def read_event_page(
         self,
         session_id: str,
@@ -1091,6 +1128,207 @@ class DatabaseSessionStore:
                         self.run_token_usage.outerjoin(
                             self.sessions,
                             self.run_token_usage.c.session_id == self.sessions.c.id,
+                        )
+                    )
+                    .order_by(self.run_token_usage.c.completed_at.desc())
+                )
+                .mappings()
+                .all()
+            )
+        return [
+            {
+                "sessionId": row["session_id"],
+                "runId": row["run_id"],
+                "ownerEmployeeId": row["owner_employee_id"],
+                "taskGoal": row["task_goal"] or row["session_task_goal"],
+                "input": int(row["input_tokens"] or 0),
+                "output": int(row["output_tokens"] or 0),
+                "cache": int(row["cache_tokens"] or 0),
+                "total": int(row["total_tokens"] or 0),
+                "completedAt": _format_iso(row["completed_at"]),
+            }
+            for row in rows
+        ]
+
+    def dashboard_session_metrics(
+        self, *, day_window: int = 14, now: datetime | None = None
+    ) -> dict[str, Any]:
+        """Aggregate dashboard counters in SQL without hydrating session events."""
+        now = now or datetime.now(timezone.utc)
+        one_day = now - timedelta(hours=24)
+        seven_days = now - timedelta(days=7)
+        window_start = (now - timedelta(days=day_window - 1)).date()
+        window_start_at = datetime.combine(
+            window_start, datetime.min.time(), tzinfo=timezone.utc
+        )
+        day = func.date(self.sessions.c.created_at)
+        completed = func.sum(case((self.sessions.c.status == "completed", 1), else_=0))
+        failed = func.sum(case((self.sessions.c.status == "failed", 1), else_=0))
+        with store_transaction(self.engine) as conn:
+            total = int(conn.scalar(select(func.count()).select_from(self.sessions)) or 0)
+            last_24h = int(
+                conn.scalar(
+                    select(func.count())
+                    .select_from(self.sessions)
+                    .where(self.sessions.c.created_at >= one_day)
+                )
+                or 0
+            )
+            last_7d = int(
+                conn.scalar(
+                    select(func.count())
+                    .select_from(self.sessions)
+                    .where(self.sessions.c.created_at >= seven_days)
+                )
+                or 0
+            )
+            status_rows = conn.execute(
+                select(self.sessions.c.status, func.count())
+                .group_by(self.sessions.c.status)
+            ).all()
+            employee_rows = conn.execute(
+                select(self.sessions.c.owner_employee_id, func.count().label("count"))
+                .where(self.sessions.c.owner_employee_id.is_not(None))
+                .group_by(self.sessions.c.owner_employee_id)
+                .order_by(text("count DESC"))
+                .limit(5)
+            ).all()
+            daily_rows = conn.execute(
+                select(
+                    day.label("day"),
+                    func.count().label("count"),
+                    completed.label("completed"),
+                    failed.label("failed"),
+                )
+                .where(self.sessions.c.created_at >= window_start_at)
+                .group_by(day)
+                .order_by(day)
+            ).mappings().all()
+        daily_by_day = {
+            str(row["day"]): {
+                "count": int(row["count"] or 0),
+                "completed": int(row["completed"] or 0),
+                "failed": int(row["failed"] or 0),
+            }
+            for row in daily_rows
+        }
+        return {
+            "total": total,
+            "last24h": last_24h,
+            "last7d": last_7d,
+            "statusCounts": {str(status): int(count) for status, count in status_rows},
+            "dailyCounts": [
+                {
+                    "date": (window_start + timedelta(days=offset)).isoformat(),
+                    **daily_by_day.get(
+                        (window_start + timedelta(days=offset)).isoformat(),
+                        {"count": 0, "completed": 0, "failed": 0},
+                    ),
+                }
+                for offset in range(day_window)
+            ],
+            "topEmployees": [
+                {"employeeId": str(employee_id), "sessionCount": int(count)}
+                for employee_id, count in employee_rows
+            ],
+        }
+
+    def list_dashboard_activity(self, *, limit: int = 20) -> list[dict[str, Any]]:
+        """Return exact newest session activity candidates from indexed columns."""
+        limit = max(1, limit)
+        with store_transaction(self.engine) as conn:
+            created_rows = (
+                conn.execute(
+                    select(
+                        self.sessions.c.id,
+                        self.sessions.c.owner_employee_id,
+                        self.sessions.c.task_goal,
+                        self.sessions.c.created_at,
+                    )
+                    .order_by(self.sessions.c.created_at.desc())
+                    .limit(limit)
+                )
+                .mappings()
+                .all()
+            )
+            terminal_rows = (
+                conn.execute(
+                    select(
+                        self.events.c.session_id,
+                        self.sessions.c.owner_employee_id,
+                        self.sessions.c.task_goal,
+                        self.events.c.type,
+                        self.events.c.timestamp,
+                    )
+                    .select_from(
+                        self.events.join(
+                            self.sessions,
+                            self.events.c.session_id == self.sessions.c.id,
+                        )
+                    )
+                    .where(
+                        self.events.c.type.in_(("session.completed", "session.failed"))
+                    )
+                    .order_by(self.events.c.timestamp.desc())
+                    .limit(limit)
+                )
+                .mappings()
+                .all()
+            )
+        return [
+            {
+                "kind": "session.created",
+                "timestamp": _format_iso(row["created_at"]),
+                "sessionId": row["id"],
+                "employeeId": row["owner_employee_id"],
+                "message": row["task_goal"] or "Session created",
+            }
+            for row in created_rows
+        ] + [
+            {
+                "kind": row["type"],
+                "timestamp": _format_iso(row["timestamp"]),
+                "sessionId": row["session_id"],
+                "employeeId": row["owner_employee_id"],
+                "message": row["task_goal"]
+                or f"Session {str(row['type']).removeprefix('session.')}",
+            }
+            for row in terminal_rows
+        ]
+
+    def list_dashboard_token_usage(
+        self, *, since: datetime, recent_session_limit: int = 10
+    ) -> list[dict[str, Any]]:
+        """Read the reporting window plus complete runs for the newest sessions."""
+        recent_sessions = (
+            select(
+                self.run_token_usage.c.session_id,
+                func.max(self.run_token_usage.c.completed_at).label("latest"),
+            )
+            .group_by(self.run_token_usage.c.session_id)
+            .order_by(text("latest DESC"))
+            .limit(max(1, recent_session_limit))
+            .subquery()
+        )
+        with store_transaction(self.engine) as conn:
+            rows = (
+                conn.execute(
+                    select(
+                        self.run_token_usage,
+                        self.sessions.c.task_goal.label("session_task_goal"),
+                    )
+                    .select_from(
+                        self.run_token_usage.outerjoin(
+                            self.sessions,
+                            self.run_token_usage.c.session_id == self.sessions.c.id,
+                        )
+                    )
+                    .where(
+                        or_(
+                            self.run_token_usage.c.completed_at >= since,
+                            self.run_token_usage.c.session_id.in_(
+                                select(recent_sessions.c.session_id)
+                            ),
                         )
                     )
                     .order_by(self.run_token_usage.c.completed_at.desc())

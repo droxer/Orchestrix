@@ -49,6 +49,12 @@ route. `/` is replaced with `/threads`.
 Persisted media uses `/profile-images/{kind}/{id}` and intentionally stays
 outside the JSON version namespace.
 
+`GET /api/v1/tasks` returns complete task records for compatibility. Browser
+list views may request `GET /api/v1/tasks?view=summary`, which omits `events`
+and `activity` and returns `eventCount`, `activityCount`, and `lastActivity`
+instead. An optional `limit` is clamped to 1–500; omitting it does not silently
+truncate either projection.
+
 ## Normalized Mutations
 
 ```text

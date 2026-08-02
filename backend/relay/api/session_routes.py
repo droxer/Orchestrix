@@ -29,6 +29,7 @@ from .helpers import (
     artifact_index_item,
     assignment_list,
     get_session_for_actor,
+    get_session_header_for_actor,
     get_task_for_actor,
     is_workspace_artifact,
     json_body,
@@ -525,7 +526,7 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
 
 
 @router.get("/threads/{session_id}")
-async def get_session(
+def get_session(
     session_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
@@ -749,7 +750,9 @@ async def session_events(
 ) -> StreamingResponse:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     # Authorize before the stream opens so 403/404 surface as normal responses.
-    await run_in_threadpool(get_session_for_actor, ctx.session_store, session_id, actor)
+    await run_in_threadpool(
+        get_session_header_for_actor, ctx.session_store, session_id, actor
+    )
 
     async def event_stream() -> AsyncIterator[str]:
         # Server-side tail-poll: read only newly appended rows from the event

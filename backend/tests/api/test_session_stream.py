@@ -260,9 +260,9 @@ def test_session_events_reads_incremental_pages_after_authorization(
         response = client.get(f"/api/v1/threads/{session_id}/events")
 
         assert response.status_code == 200
-        # One full read authorizes the request; the stream loop itself must use
-        # the event table/page API instead of rematerializing the whole thread.
-        assert get_session_calls == 1
+        # Authorization uses the compact session header; neither the handshake
+        # nor the stream loop rematerializes the full thread event history.
+        assert get_session_calls == 0
 
 
 def test_session_events_unauthorized_is_forbidden_before_streaming(monkeypatch) -> None:

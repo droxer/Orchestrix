@@ -10,7 +10,7 @@ import { useTeams } from "../hooks/useTeams";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
-import { type CurrentUser, type DaemonNodeMonitorRecord, type EmployeeAgent, type RelaySession, type RelayTask } from "../types";
+import { type CurrentUser, type DaemonNodeMonitorRecord, type EmployeeAgent, type RelaySession, type RelayTaskListItem } from "../types";
 import { ActionCalendar, ActionStart, ViewGrid, ViewList } from "./icons";
 import { agentReadyForTask } from "../lib/backlog";
 import { TaskAssignee, TaskExecutionBadge } from "./TaskAssignee";
@@ -30,7 +30,7 @@ import { FiltersBar, FilterSelect } from "./FiltersBar";
 import { hrefForRoute } from "../lib/appRoute";
 
 interface RoutinesPageProps {
-  tasks: RelayTask[];
+  tasks: RelayTaskListItem[];
   sessions: RelaySession[];
   nodes: DaemonNodeMonitorRecord[];
   currentUser: CurrentUser;
@@ -69,7 +69,7 @@ function activeFilterCount(filters: RoutineFilters): number {
   return count;
 }
 
-function RoutineStats({ routines, tasks }: { routines: RelayTask[]; tasks: RelayTask[] }) {
+function RoutineStats({ routines, tasks }: { routines: RelayTaskListItem[]; tasks: RelayTaskListItem[] }) {
   const { t } = useTranslation();
   const stats = useMemo(() => {
     const enabled = routines.filter((task) => task.routineEnabled).length;
@@ -214,7 +214,7 @@ function RoutineCard({
   onEdit,
   onStart,
 }: {
-  task: RelayTask;
+  task: RelayTaskListItem;
   state: RoutineState;
   session?: RelaySession;
   ready: boolean;
@@ -310,7 +310,7 @@ function RoutineRow({
   onEdit,
   onStart,
 }: {
-  task: RelayTask;
+  task: RelayTaskListItem;
   state: RoutineState;
   session?: RelaySession;
   ready: boolean;
@@ -358,13 +358,13 @@ function RoutineDrawerMeta({
   session,
   onOpenThread,
 }: {
-  task: RelayTask;
+  task: RelayTaskListItem;
   state: RoutineState;
   session?: RelaySession;
   onOpenThread: (sessionId: string) => void;
 }) {
   const { t } = useTranslation();
-  const lastActivity = task.activity.at(-1);
+  const lastActivity = task.lastActivity;
 
   return (
     <section className="task-drawer-meta" aria-label={t("routine.meta")}>
@@ -434,7 +434,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
     setFormBaseline(null);
   }
 
-  function editTask(task: RelayTask) {
+  function editTask(task: RelayTaskListItem) {
     openRoutineForm({
       variant: "routine",
       id: task.id,
@@ -504,11 +504,11 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
     }
   }
 
-  function linkedSession(task: RelayTask): RelaySession | undefined {
+  function linkedSession(task: RelayTaskListItem): RelaySession | undefined {
     return latestRoutineSession(task, tasks, sessions);
   }
 
-  function taskAssignmentDisplay(task: RelayTask): { name?: string; ready: boolean } {
+  function taskAssignmentDisplay(task: RelayTaskListItem): { name?: string; ready: boolean } {
     const team = teams.find((candidate) => candidate.id === task.assignedTeamId);
     if (team) {
       return {
@@ -525,7 +525,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
   const editingTask = form?.id ? tasks.find((task) => task.id === form.id) : undefined;
   const editingSession = editingTask ? linkedSession(editingTask) : undefined;
 
-  function routineHandlers(task: RelayTask) {
+  function routineHandlers(task: RelayTaskListItem) {
     return {
       onEdit: () => editTask(task),
       onStart: () => void startTaskMutation.mutate({ taskId: task.id }),

@@ -257,15 +257,30 @@ def complete_linked_task_sessions(
 
 
 @router.get("/tasks")
-async def list_tasks(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+def list_tasks(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor(request, ctx.auth_store)
-    return {
-        "tasks": [
+    summary_view = request.query_params.get("view") == "summary"
+    raw_limit = request.query_params.get("limit")
+    limit: int | None = None
+    if raw_limit is not None:
+        try:
+            requested_limit = int(raw_limit)
+        except ValueError as error:
+            raise HTTPException(400, "limit must be an integer.") from error
+        limit = min(max(1, requested_limit), 500)
+    if summary_view and hasattr(ctx.task_store, "list_task_summaries"):
+        tasks = ctx.task_store.list_task_summaries(
+            employee_id=None if actor["isAdmin"] else actor["employeeId"],
+            limit=limit,
+        )
+    else:
+        accessible = [
             task
             for task in ctx.task_store.list_tasks()
             if actor_can_access_record(actor, task)
         ]
-    }
+        tasks = accessible if limit is None else accessible[:limit]
+    return {"tasks": tasks}
 
 
 @router.post("/tasks", status_code=201)
