@@ -11,7 +11,6 @@ from typing import Any
 
 from loguru import logger
 from sqlalchemy import (
-    JSON,
     BigInteger,
     Boolean,
     Column,
@@ -24,11 +23,13 @@ from sqlalchemy import (
     UniqueConstraint,
     case,
     delete,
+    func,
     insert,
     inspect,
     or_,
     select,
     text,
+    type_coerce,
     update,
 )
 from sqlalchemy.exc import IntegrityError
@@ -38,6 +39,7 @@ from .store_common import (
     DEFAULT_RELAY_DATA_DIR,
     AgentName,
     _append_jsonl,
+    _format_iso,
     _parse_iso,
     _read_json,
     _read_jsonl,
@@ -64,6 +66,29 @@ class TaskExecutionActiveError(RuntimeError):
 
 class _TaskWriteConflict(RuntimeError):
     pass
+
+
+def compact_task_summary(
+    task: dict[str, Any],
+    *,
+    event_count: int | None = None,
+    activity_count: int | None = None,
+) -> dict[str, Any]:
+    """Return an explicit task-list projection without authoritative histories."""
+    events = task.get("events") or []
+    activity = task.get("activity") or []
+    summary = {
+        key: value
+        for key, value in task.items()
+        if key not in {"events", "activity"}
+    }
+    summary["eventCount"] = len(events) if event_count is None else event_count
+    summary["activityCount"] = (
+        len(activity) if activity_count is None else activity_count
+    )
+    if activity:
+        summary["lastActivity"] = activity[-1]
+    return summary
 
 
 def _task_session_link_events(task_id: str, session_id: str) -> list[dict[str, Any]]:
@@ -304,6 +329,20 @@ class LocalTaskStore:
         ]
         live = [task for task in tasks if not task.get("deletedAt")]
         return sorted(live, key=lambda item: item["updatedAt"], reverse=True)
+
+    def list_task_summaries(
+        self, *, employee_id: str | None = None, limit: int | None = None
+    ) -> list[dict[str, Any]]:
+        tasks = self.list_tasks()
+        if employee_id is not None:
+            tasks = [
+                task
+                for task in tasks
+                if task.get("ownerEmployeeId") == employee_id
+                or task.get("assigneeEmployeeId") == employee_id
+            ]
+        selected = tasks if limit is None else tasks[: max(1, limit)]
+        return [compact_task_summary(task) for task in selected]
 
     def delete_task(
         self,
@@ -651,6 +690,7 @@ class DatabaseTaskStore:
         Column("version", BigInteger, nullable=False),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
+        Index("ix_tasks_created_at", "created_at"),
         Index("ix_tasks_updated_at", "updated_at"),
         Index("ix_tasks_status", "status"),
         Index("ix_tasks_assigned_agent", "assigned_agent"),
@@ -658,6 +698,8 @@ class DatabaseTaskStore:
         Index("ix_tasks_assigned_team_id", "assigned_team_id"),
         Index("ix_tasks_owner_employee_id", "owner_employee_id"),
         Index("ix_tasks_assignee_employee_id", "assignee_employee_id"),
+        Index("ix_tasks_owner_updated_at", "owner_employee_id", "updated_at"),
+        Index("ix_tasks_assignee_updated_at", "assignee_employee_id", "updated_at"),
         Index("ix_tasks_due_date", "due_date"),
         Index("ix_tasks_priority", "priority"),
         Index("ix_tasks_is_routine", "is_routine"),
@@ -899,6 +941,97 @@ class DatabaseTaskStore:
                 .all()
             )
         return [row["snapshot"] for row in rows if not row["snapshot"].get("deletedAt")]
+
+    def list_task_summaries(
+        self, *, employee_id: str | None = None, limit: int | None = None
+    ) -> list[dict[str, Any]]:
+        compact_snapshot = (
+            self.tasks.c.snapshot.op("-")("events").op("-")("activity")
+            if self.engine.dialect.name == "postgresql"
+            else func.json_remove(
+                self.tasks.c.snapshot,
+                "$.events",
+                "$.activity",
+            )
+        )
+        activity_count = (
+            func.jsonb_array_length(self.tasks.c.snapshot["activity"])
+            if self.engine.dialect.name == "postgresql"
+            else func.json_array_length(self.tasks.c.snapshot["activity"])
+        )
+        last_activity = (
+            select(self.events.c.payload["activity"])
+            .where(self.events.c.task_id == self.tasks.c.id)
+            .where(self.events.c.type == "task.activity")
+            .order_by(self.events.c.sequence.desc())
+            .limit(1)
+            .scalar_subquery()
+        )
+        statement = (
+            select(
+                type_coerce(compact_snapshot, json_type()).label("summary"),
+                self.tasks.c.version,
+                func.coalesce(activity_count, 0).label("activity_count"),
+                type_coerce(last_activity, json_type()).label("last_activity"),
+            )
+            .where(self.tasks.c.snapshot["deletedAt"].as_string().is_(None))
+            .order_by(self.tasks.c.updated_at.desc())
+        )
+        if employee_id is not None:
+            statement = statement.where(
+                or_(
+                    self.tasks.c.owner_employee_id == employee_id,
+                    self.tasks.c.assignee_employee_id == employee_id,
+                )
+            )
+        if limit is not None:
+            statement = statement.limit(max(1, limit))
+        with store_transaction(self.engine) as conn:
+            rows = conn.execute(statement).mappings().all()
+        return [
+            {
+                **compact_task_summary(
+                    row["summary"],
+                    event_count=int(row["version"] or 0),
+                    activity_count=int(row["activity_count"] or 0),
+                ),
+                **(
+                    {"lastActivity": row["last_activity"]}
+                    if row["last_activity"]
+                    else {}
+                ),
+            }
+            for row in rows
+        ]
+
+    def list_dashboard_activity(self, *, limit: int = 20) -> list[dict[str, Any]]:
+        """Return exact newest task creation activity from indexed columns."""
+        with store_transaction(self.engine) as conn:
+            rows = (
+                conn.execute(
+                    select(
+                        self.tasks.c.id,
+                        self.tasks.c.owner_employee_id,
+                        self.tasks.c.title,
+                        self.tasks.c.created_at,
+                    )
+                    .where(self.tasks.c.snapshot["deletedAt"].as_string().is_(None))
+                    .order_by(self.tasks.c.created_at.desc())
+                    .limit(max(1, limit))
+                )
+                .mappings()
+                .all()
+            )
+        return [
+            {
+                "kind": "task.created",
+                "timestamp": _format_iso(row["created_at"]),
+                "taskId": row["id"],
+                "employeeId": row["owner_employee_id"],
+                "message": row["title"] or "Task created",
+            }
+            for row in rows
+        ]
 
     def delete_task(
         self,

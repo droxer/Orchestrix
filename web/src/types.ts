@@ -10,6 +10,8 @@ import type {
   DaemonNodeMonitorRecord,
   RelayArtifact,
   RelayTask,
+  RelayTaskListItem,
+  RelayTaskSummary,
   RelaySession,
   SandboxRecord,
   SessionStatus,
@@ -33,6 +35,8 @@ export type {
   DaemonNodeMonitorRecord,
   RelayArtifact,
   RelayTask,
+  RelayTaskListItem,
+  RelayTaskSummary,
   RelaySession,
   SandboxRecord,
   SessionStatus,
@@ -238,7 +242,7 @@ export interface NodeWorkspaceFileResponse {
 }
 
 export interface TasksResponse {
-  tasks: RelayTask[];
+  tasks: RelayTaskSummary[];
 }
 
 export interface SandboxesResponse {

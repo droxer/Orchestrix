@@ -152,7 +152,7 @@ export function App() {
   const atBottomRef = useRef(true);
 
   const selectedEmployeeToken = tokens[selectedEmployee];
-  const { sandboxes, nodes, sessions, tasks, isRefreshing, refresh, setSandboxes, upsertSession } = useRelayData(selectedEmployeeToken, Boolean(user));
+  const { sandboxes, nodes, sessions, tasks, isRefreshing, refresh, setSandboxes } = useRelayData(selectedEmployeeToken, Boolean(user));
   const { localNodes, refreshLocalDaemonNodes } = useLocalDaemonNodes(
     hydrated && user?.role === "admin" && canUseLocalControlPanel(),
   );
@@ -749,17 +749,10 @@ export function App() {
         sessionId,
         ...(sessionId ? { userMessageId } : {}),
       });
-      // Seed the created session into the cache before pointing the selection
-      // at it. The invalidation refetch is still in flight here, so without
-      // this the selected id resolves to nothing and the transcript falls back
-      // to the most recent existing thread — showing the just-sent message in
-      // the previous thread until the refetch lands.
-      upsertSession(done);
       setActiveSessionId(done.id);
       setSelectedSessionId(done.id);
       setComposingNew(false);
       syncThreadUrl(done.id, true);
-      await refresh();
     } catch (error) {
       setPendingUserMessage(null);
       // The composer was cleared optimistically; a rejected dispatch (busy
@@ -834,7 +827,6 @@ export function App() {
           });
         setSelectedSessionId(done.id);
         syncThreadUrl(done.id, true);
-        await refresh();
       } catch (error) {
         reportMutationError(
           "Failed to rerun assignment",
@@ -890,7 +882,6 @@ export function App() {
         });
       setSelectedSessionId(done.id);
       syncThreadUrl(done.id, true);
-      await refresh();
     } catch (error) {
       reportMutationError(
         "Failed to retry agent response",
@@ -929,7 +920,6 @@ export function App() {
         });
       setSelectedSessionId(done.id); setHandoffNote(""); setHandoffMode("action"); setHandoffOpen(false); setActiveAgent(logicalAgent.executorKind); setActiveLogicalAgentId(logicalAgent.id);
       syncThreadUrl(done.id, true);
-      await refresh();
     } catch (error) {
       reportMutationError(
         "Failed to send handoff",

@@ -12,7 +12,7 @@ from relay.persistence.task_store import (
     LocalTaskStore,
     TaskExecutionActiveError,
 )
-from sqlalchemy import text
+from sqlalchemy import event, text
 
 
 def test_task_store_persists_assignment_status_activity_and_link() -> None:
@@ -159,6 +159,35 @@ def test_database_task_store_persists_assignment_status_activity_and_link() -> N
         assert task["status"] == "running"
         assert store.list_tasks()[0]["id"] == task["id"]
         assert any("Assigned to codex" in item["message"] for item in task["activity"])
+
+
+def test_database_task_summaries_project_histories_before_transfer() -> None:
+    with TemporaryDirectory() as root:
+        store = DatabaseTaskStore(
+            f"sqlite:///{root}/summary.db", create_schema=True
+        )
+        task = store.create_task({"title": "Compact at the database boundary"})
+        store.record_activity(task["id"], "Projected activity")
+        statements: list[str] = []
+
+        def capture_statement(_conn, _cursor, statement, _params, _context, _many):
+            statements.append(statement)
+
+        event.listen(store.engine, "before_cursor_execute", capture_statement)
+        try:
+            summaries = store.list_task_summaries()
+        finally:
+            event.remove(store.engine, "before_cursor_execute", capture_statement)
+
+        summary_select = next(
+            statement
+            for statement in statements
+            if statement.lstrip().upper().startswith("SELECT")
+        )
+        assert "json_remove(tasks.snapshot" in summary_select
+        assert "events" not in summaries[0]
+        assert "activity" not in summaries[0]
+        assert summaries[0]["lastActivity"]["message"] == "Projected activity"
 
 
 def test_database_task_store_link_session_is_idempotent() -> None:

@@ -9,7 +9,7 @@ import { useTeams } from "../hooks/useTeams";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
-import { type CurrentUser, type DaemonNodeMonitorRecord, type EmployeeAgent, type RelaySession, type RelayTask, type TaskStatus } from "../types";
+import { type CurrentUser, type DaemonNodeMonitorRecord, type EmployeeAgent, type RelaySession, type RelayTaskListItem, type TaskStatus } from "../types";
 import { ActionApprove, ActionCalendar, ActionStart, ActionStop, NavRefresh, ViewBoard, ViewList } from "./icons";
 import { agentReadyForTask, canDiscussTask, discussionAgentsForTask, dueTone, filterTasks, isTaskStatus, TASK_PRIORITIES, TASK_STATUSES, tasksByStatus, type BacklogFilters } from "../lib/backlog";
 import { readDraggedTaskId, TASK_DRAG_MEDIA_TYPE, taskDropRejection } from "../lib/taskDrag";
@@ -46,7 +46,7 @@ const TASK_STATUS_SHAPE: Record<TaskStatus, StateShape> = {
 };
 
 interface BacklogPageProps {
-  tasks: RelayTask[];
+  tasks: RelayTaskListItem[];
   sessions: RelaySession[];
   nodes: DaemonNodeMonitorRecord[];
   currentUser: CurrentUser;
@@ -100,7 +100,7 @@ function activeFilterCount(filters: BacklogFilters): number {
   return count;
 }
 
-function BacklogStats({ tasks }: { tasks: RelayTask[] }) {
+function BacklogStats({ tasks }: { tasks: RelayTaskListItem[] }) {
   const { t } = useTranslation();
   const stats = useMemo(() => {
     const active = tasks.filter((task) => ACTIVE_STATUSES.includes(task.status)).length;
@@ -245,7 +245,7 @@ function BacklogTaskCard({
   onToggleBlock,
   onDone,
 }: {
-  task: RelayTask;
+  task: RelayTaskListItem;
   session?: RelaySession;
   ready: boolean;
   assigneeDisplayName?: string;
@@ -372,7 +372,7 @@ function BacklogTaskRow({
   onToggleBlock,
   onDone,
 }: {
-  task: RelayTask;
+  task: RelayTaskListItem;
   ready: boolean;
   assigneeDisplayName?: string;
   assigneeIsSelf?: boolean;
@@ -507,7 +507,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     setFormBaseline(null);
   }
 
-  function editTask(task: RelayTask) {
+  function editTask(task: RelayTaskListItem) {
     openTaskForm({
       variant: "backlog",
       id: task.id,
@@ -570,12 +570,12 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     }
   }
 
-  function linkedSession(task: RelayTask): RelaySession | undefined {
+  function linkedSession(task: RelayTaskListItem): RelaySession | undefined {
     const latest = task.linkedSessionIds?.at(-1);
     return latest ? sessions.find((session) => session.id === latest) : undefined;
   }
 
-  function taskAssignmentDisplay(task: RelayTask): { name?: string; ready: boolean } {
+  function taskAssignmentDisplay(task: RelayTaskListItem): { name?: string; ready: boolean } {
     const team = teams.find((candidate) => candidate.id === task.assignedTeamId);
     if (team) {
       return {
@@ -594,7 +594,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     writeViewPreference(VIEW_STORAGE_KEY, next);
   }
 
-  function beginTaskDrag(task: RelayTask, event: DragEvent<HTMLElement>) {
+  function beginTaskDrag(task: RelayTaskListItem, event: DragEvent<HTMLElement>) {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData(TASK_DRAG_MEDIA_TYPE, task.id);
     event.dataTransfer.setData("text/plain", task.title);
@@ -675,7 +675,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     moveTaskToLane(taskId, status);
   }
 
-  function taskHandlers(task: RelayTask) {
+  function taskHandlers(task: RelayTaskListItem) {
     const discussionAgents = discussionAgentsForTask(task, nodes, logicalAgents);
     const discussionAssignments = logicalAgents
       .filter((agent) => agent.enabled && agent.availability === "ready")

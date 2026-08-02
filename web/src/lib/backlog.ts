@@ -1,4 +1,4 @@
-import type { AgentName, DaemonNodeMonitorRecord, EmployeeAgent, RelayTask, TaskPriority, TaskStatus } from "../types.js";
+import type { AgentName, DaemonNodeMonitorRecord, EmployeeAgent, RelayTaskListItem, TaskPriority, TaskStatus } from "../types.js";
 
 export const TASK_STATUSES: TaskStatus[] = ["backlog", "assigned", "running", "waiting_for_human", "review", "blocked", "done"];
 export const TASK_PRIORITIES: TaskPriority[] = ["high", "normal", "low"];
@@ -12,7 +12,7 @@ export interface BacklogFilters {
   due: "all" | "overdue" | "today" | "unscheduled";
 }
 
-export function filterTasks(tasks: RelayTask[], filters: BacklogFilters, today = isoToday()): RelayTask[] {
+export function filterTasks(tasks: RelayTaskListItem[], filters: BacklogFilters, today = isoToday()): RelayTaskListItem[] {
   const query = filters.query.trim().toLowerCase();
   const assignee = filters.assignee.trim().toLowerCase();
   return tasks.filter((task) => {
@@ -36,17 +36,17 @@ export function isTaskStatus(value: string | null | undefined): value is TaskSta
   return typeof value === "string" && (TASK_STATUSES as string[]).includes(value);
 }
 
-export function tasksByStatus(tasks: RelayTask[]): Record<TaskStatus, RelayTask[]> {
+export function tasksByStatus(tasks: RelayTaskListItem[]): Record<TaskStatus, RelayTaskListItem[]> {
   return TASK_STATUSES.reduce((acc, status) => {
     acc[status] = tasks.filter((task) => task.status === status);
     return acc;
-  }, {} as Record<TaskStatus, RelayTask[]>);
+  }, {} as Record<TaskStatus, RelayTaskListItem[]>);
 }
 
 // Employee workflows use named logical-agent availability only. Legacy
 // executor-only assignments stay visible but cannot be dispatched.
 export function agentReadyForTask(
-  task: RelayTask,
+  task: RelayTaskListItem,
   _nodes: DaemonNodeMonitorRecord[],
   logicalAgents: EmployeeAgent[] = [],
 ): boolean {
@@ -59,7 +59,7 @@ export function agentReadyForTask(
 }
 
 export function discussionAgentsForTask(
-  _task: RelayTask,
+  _task: RelayTaskListItem,
   _nodes: DaemonNodeMonitorRecord[],
   logicalAgents: EmployeeAgent[] = [],
 ): AgentName[] {
@@ -69,11 +69,11 @@ export function discussionAgentsForTask(
   return [...new Set(readyLogicalAgents.map((agent) => agent.executorKind))];
 }
 
-export function canDiscussTask(task: Pick<RelayTask, "assignedTeamId">): boolean {
+export function canDiscussTask(task: Pick<RelayTaskListItem, "assignedTeamId">): boolean {
   return !task.assignedTeamId;
 }
 
-export function dueTone(task: RelayTask, today = isoToday()): "neutral" | "warn" | "bad" {
+export function dueTone(task: RelayTaskListItem, today = isoToday()): "neutral" | "warn" | "bad" {
   if (!task.dueDate || task.status === "done") return "neutral";
   if (task.dueDate < today) return "bad";
   if (task.dueDate === today) return "warn";
@@ -91,7 +91,7 @@ export function localDateKey(date = new Date()): string {
 
 export const isoToday = localDateKey;
 
-function compareTasks(left: RelayTask, right: RelayTask): number {
+function compareTasks(left: RelayTaskListItem, right: RelayTaskListItem): number {
   return priorityRank(left.priority) - priorityRank(right.priority)
     || (left.dueDate ?? "9999-12-31").localeCompare(right.dueDate ?? "9999-12-31")
     || right.updatedAt.localeCompare(left.updatedAt);

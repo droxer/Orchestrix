@@ -338,6 +338,20 @@ def get_session_for_actor(store: Any, session_id: str, actor: dict[str, Any]) ->
     return session
 
 
+def get_session_header_for_actor(
+    store: Any, session_id: str, actor: dict[str, Any]
+) -> dict[str, Any]:
+    try:
+        session = store.get_session_header(session_id)
+    except KeyError:
+        raise HTTPException(404, "Session not found.")
+    if not session.get("id"):
+        raise HTTPException(404, "Session not found.")
+    if not actor_can_access_record(actor, session):
+        raise HTTPException(403, "Session access denied.")
+    return session
+
+
 def get_task_for_actor(store: Any, task_id: str, actor: dict[str, Any]) -> dict[str, Any]:
     task = get_task_or_404(store, task_id)
     if task.get("deletedAt"):

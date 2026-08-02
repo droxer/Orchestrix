@@ -2,37 +2,35 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { listDaemonNodes, listSandboxes, listSessionSummaries, listTasks } from "../api";
-import type { DaemonNodeMonitorRecord, RelaySession, RelayTask, SandboxRecord } from "../types";
-import { upsertThreadSession } from "../lib/threads";
+import type { DaemonNodeMonitorRecord, RelaySession, RelayTaskSummary, SandboxRecord } from "../types";
 import { mergeSessionSummaries } from "../lib/sessionPollMerge";
+import { RELAY_POLL_INTERVALS_MS } from "../lib/relayPolling";
 
 export const RELAY_QUERY_KEY = ["relay"] as const;
 const RELAY_KEY = RELAY_QUERY_KEY;
 const SANDBOXES_KEY = ["relay", "sandboxes"] as const;
-const NODES_KEY = ["relay", "daemon-nodes"] as const;
+export const NODES_QUERY_KEY = ["relay", "daemon-nodes"] as const;
+const NODES_KEY = NODES_QUERY_KEY;
 const SESSIONS_KEY = ["relay", "sessions"] as const;
 export const SESSIONS_QUERY_KEY = SESSIONS_KEY;
 const TASKS_KEY = ["relay", "tasks"] as const;
 export const TASKS_QUERY_KEY = TASKS_KEY;
-const POLL_INTERVAL_MS = 3000;
-
 type RelayDataResult = {
   sandboxes: SandboxRecord[];
   nodes: DaemonNodeMonitorRecord[];
   sessions: RelaySession[];
-  tasks: RelayTask[];
+  tasks: RelayTaskSummary[];
   isRefreshing: boolean;
   refresh: (signal?: AbortSignal, tokenOverride?: string) => Promise<void>;
   setSandboxes: Dispatch<SetStateAction<SandboxRecord[]>>;
   upsertNode: (node: DaemonNodeMonitorRecord) => void;
-  upsertSession: (session: RelaySession) => void;
 };
 
 // Server state for the control-plane console, owned by TanStack Query. The
-// steady 3s poll lives on each query's refetchInterval; dedup, cancellation,
-// and retry/backoff come from the cache instead of hand-rolled setInterval +
-// AbortController + Promise.allSettled. The hook keeps its previous external
-// shape so callers (App.tsx) are unchanged.
+// Freshness-critical nodes, sessions, and task state poll every 3s; stable
+// sandbox inventory reconciles less often. Dedup and retry/backoff come
+// from the cache instead of hand-rolled timers. The hook keeps its previous
+// external shape so callers (App.tsx) are unchanged.
 export function useRelayData(
   token: string | undefined,
   enabled: boolean,
@@ -58,7 +56,7 @@ export function useRelayData(
       {
         queryKey: SANDBOXES_KEY,
         enabled,
-        refetchInterval: POLL_INTERVAL_MS,
+        refetchInterval: RELAY_POLL_INTERVALS_MS.sandboxes,
         queryFn: async ({ signal }: { signal: AbortSignal }): Promise<SandboxRecord[]> => {
           const tk = fetchToken();
           return tk ? (await listSandboxes(tk, signal)).sandboxes : [];
@@ -67,7 +65,7 @@ export function useRelayData(
       {
         queryKey: NODES_KEY,
         enabled,
-        refetchInterval: POLL_INTERVAL_MS,
+        refetchInterval: RELAY_POLL_INTERVALS_MS.nodes,
         // Nodes are readable with the session cookie alone — the backend
         // scopes /daemon-nodes to what the actor owns. Skipping the fetch
         // without a sandbox token left every tokenless client blind to live
@@ -78,7 +76,7 @@ export function useRelayData(
       {
         queryKey: SESSIONS_KEY,
         enabled,
-        refetchInterval: POLL_INTERVAL_MS,
+        refetchInterval: RELAY_POLL_INTERVALS_MS.sessions,
         queryFn: async ({ signal }: { signal: AbortSignal }): Promise<RelaySession[]> => {
           const summaries = (await listSessionSummaries(signal)).sessions;
           return mergeSessionSummaries(
@@ -90,8 +88,8 @@ export function useRelayData(
       {
         queryKey: TASKS_KEY,
         enabled,
-        refetchInterval: POLL_INTERVAL_MS,
-        queryFn: async ({ signal }: { signal: AbortSignal }): Promise<RelayTask[]> =>
+        refetchInterval: RELAY_POLL_INTERVALS_MS.tasks,
+        queryFn: async ({ signal }: { signal: AbortSignal }): Promise<RelayTaskSummary[]> =>
           (await listTasks(signal)).tasks,
       },
     ],
@@ -115,8 +113,13 @@ export function useRelayData(
   }, [enabled, queryClient]);
 
   // Refetch under the new credential whenever the active token changes.
+  const previousTokenRef = useRef(token);
   useEffect(() => {
-    if (enabled) void queryClient.refetchQueries({ queryKey: RELAY_KEY });
+    const previous = previousTokenRef.current;
+    previousTokenRef.current = token;
+    if (enabled && previous !== token) {
+      void queryClient.refetchQueries({ queryKey: RELAY_KEY });
+    }
   }, [token, enabled, queryClient]);
 
   const refresh = useCallback(
@@ -148,17 +151,6 @@ export function useRelayData(
     [queryClient],
   );
 
-  // Seed a session a mutation just returned straight into the cache so the UI
-  // can select it before the invalidation refetch lands.
-  const upsertSession = useCallback(
-    (session: RelaySession) => {
-      queryClient.setQueryData<RelaySession[]>(SESSIONS_KEY, (current) =>
-        upsertThreadSession(current ?? [], session),
-      );
-    },
-    [queryClient],
-  );
-
   const upsertNode = useCallback(
     (node: DaemonNodeMonitorRecord) => {
       queryClient.setQueryData<DaemonNodeMonitorRecord[]>(NODES_KEY, (current) => {
@@ -180,6 +172,5 @@ export function useRelayData(
     refresh,
     setSandboxes,
     upsertNode,
-    upsertSession,
   };
 }

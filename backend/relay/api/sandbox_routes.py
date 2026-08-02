@@ -44,7 +44,7 @@ def require_sandbox_access(
 
 
 @router.get("/sandboxes")
-async def sandboxes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+def sandboxes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     token = bearer_token(request)
     if token:
         allowed = [

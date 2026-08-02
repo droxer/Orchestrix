@@ -72,7 +72,8 @@ def _create_agent(
 def test_task_create_update_and_retired_claim_next(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
-        client = TestClient(create_app(root))
+        app = create_app(root)
+        client = TestClient(app)
         _bootstrap_admin(client)
         _create_user(client, "alice", employee_id="alice")
         agent = _create_agent(client, "alice")
@@ -145,6 +146,66 @@ def test_task_create_update_and_retired_claim_next(monkeypatch) -> None:
             client.get(f"/api/v1/tasks/{normal.json()['id']}").json()["status"]
             == "assigned"
         )
+
+
+def test_task_list_summary_view_is_compact_and_keeps_default_contract(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+
+        created = client.post("/api/v1/tasks", json={"title": "Compact task"})
+        assert created.status_code == 201
+        task_id = created.json()["id"]
+        updated = client.patch(
+            f"/api/v1/tasks/{task_id}", json={"description": "Updated"}
+        )
+        assert updated.status_code == 200
+        app.state.task_store.record_activity(task_id, "Summary activity")
+
+        full_list = client.get("/api/v1/tasks?limit=1")
+        assert full_list.status_code == 200
+        full_task = full_list.json()["tasks"][0]
+        assert full_task["id"] == task_id
+        assert len(full_task["events"]) >= 2
+        assert len(full_task["activity"]) == 1
+
+        listed = client.get("/api/v1/tasks?view=summary&limit=1")
+        assert listed.status_code == 200
+        summary = listed.json()["tasks"][0]
+        assert summary["id"] == task_id
+        assert "events" not in summary
+        assert "activity" not in summary
+        assert summary["eventCount"] >= 2
+        assert summary["activityCount"] == 1
+        assert summary["lastActivity"]["message"] == "Summary activity"
+
+        detail = client.get(f"/api/v1/tasks/{task_id}")
+        assert detail.status_code == 200
+        assert len(detail.json()["events"]) == summary["eventCount"]
+
+
+def test_task_summary_view_without_limit_preserves_complete_list(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        observed: dict[str, object] = {}
+
+        def list_task_summaries(*, employee_id=None, limit=None):
+            observed.update(employee_id=employee_id, limit=limit)
+            return []
+
+        monkeypatch.setattr(
+            app.state.task_store, "list_task_summaries", list_task_summaries
+        )
+
+        response = client.get("/api/v1/tasks?view=summary")
+
+        assert response.status_code == 200
+        assert observed == {"employee_id": None, "limit": None}
 
 
 def test_routine_create_defaults_next_run_when_omitted(monkeypatch) -> None:

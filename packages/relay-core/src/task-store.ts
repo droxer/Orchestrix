@@ -57,6 +57,17 @@ export interface RelayTask {
   events: RelayTaskEvent[];
 }
 
+/** Materialized task fields shared by full records and list projections. */
+export type RelayTaskListItem = Omit<RelayTask, "events" | "activity"> & {
+  lastActivity?: RelayTaskActivity;
+};
+
+/** Task-list API projection with authoritative history counts. */
+export type RelayTaskSummary = RelayTaskListItem & {
+  eventCount: number;
+  activityCount: number;
+};
+
 export type RelayTaskEvent =
   | {
       id: string;

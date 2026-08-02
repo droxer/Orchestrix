@@ -47,6 +47,27 @@ def test_dashboard_sessions_returns_shape(monkeypatch) -> None:
         assert isinstance(body["statusCounts"], dict)
 
 
+def test_database_dashboard_avoids_full_session_and_token_history_reads(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        _create_session(client)
+
+        def unexpected_full_read():
+            raise AssertionError("dashboard must not materialize full history")
+
+        monkeypatch.setattr(app.state.session_store, "list_sessions", unexpected_full_read)
+        monkeypatch.setattr(app.state.session_store, "list_token_usage", unexpected_full_read)
+
+        assert client.get("/api/v1/admin/dashboard/sessions").status_code == 200
+        assert client.get("/api/v1/admin/dashboard/activity").status_code == 200
+        assert client.get("/api/v1/admin/dashboard/tokens").status_code == 200
+
+
 def test_dashboard_activity_returns_recent_items(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
@@ -61,6 +82,101 @@ def test_dashboard_activity_returns_recent_items(monkeypatch) -> None:
         assert len(body["items"]) >= 1
         first = body["items"][0]
         assert {"kind", "timestamp", "message"} <= set(first)
+
+
+def test_dashboard_activity_merges_exact_store_projections(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        observed: list[tuple[str, int]] = []
+
+        def session_activity(*, limit: int):
+            observed.append(("sessions", limit))
+            return [
+                {
+                    "kind": "session.created",
+                    "timestamp": "2026-08-02T10:00:00.000Z",
+                    "sessionId": "session_new",
+                    "employeeId": "alice",
+                    "message": "New session",
+                }
+            ]
+
+        def task_activity(*, limit: int):
+            observed.append(("tasks", limit))
+            return [
+                {
+                    "kind": "task.created",
+                    "timestamp": "2026-08-02T11:00:00.000Z",
+                    "taskId": "task_new",
+                    "employeeId": "alice",
+                    "message": "New task",
+                }
+            ]
+
+        monkeypatch.setattr(
+            app.state.session_store, "list_dashboard_activity", session_activity,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            app.state.task_store, "list_dashboard_activity", task_activity,
+            raising=False,
+        )
+
+        response = client.get("/api/v1/admin/dashboard/activity?limit=1")
+
+        assert response.status_code == 200
+        assert observed == [("sessions", 1), ("tasks", 1)]
+        assert response.json()["items"] == [
+            {
+                "kind": "task.created",
+                "timestamp": "2026-08-02T11:00:00.000Z",
+                "taskId": "task_new",
+                "employeeId": "alice",
+                "message": "New task",
+            }
+        ]
+
+
+def test_dashboard_activity_uses_terminal_event_time_and_hides_deleted_tasks(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        session_id = _create_session(client)
+        terminal_timestamp = "2026-07-01T12:00:00.000Z"
+        completed = relay_event(
+            "session.completed", session_id, {"outcome": "Finished"}
+        )
+        completed["timestamp"] = terminal_timestamp
+        app.state.session_store.append_event(session_id, completed)
+        renamed = client.patch(
+            f"/api/v1/threads/{session_id}", json={"title": "Renamed later"}
+        )
+        assert renamed.status_code == 200
+
+        task = client.post("/api/v1/tasks", json={"title": "Delete from feed"})
+        assert task.status_code == 201
+        task_id = task.json()["id"]
+        assert client.delete(f"/api/v1/tasks/{task_id}").status_code == 200
+
+        response = client.get("/api/v1/admin/dashboard/activity?limit=20")
+
+        assert response.status_code == 200
+        items = response.json()["items"]
+        terminal = next(
+            item
+            for item in items
+            if item["kind"] == "session.completed"
+            and item["sessionId"] == session_id
+        )
+        assert terminal["timestamp"] == terminal_timestamp
+        assert not any(item.get("taskId") == task_id for item in items)
 
 
 def test_control_plane_metrics_reports_notification_health(monkeypatch) -> None:
@@ -83,6 +199,19 @@ def test_control_plane_metrics_reports_notification_health(monkeypatch) -> None:
                 },
             "notificationBridge": {"enabled": False, "connected": False},
         }
+
+
+def test_api_responses_expose_server_timing(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+
+        response = client.get("/api")
+
+        assert response.status_code == 200
+        metric, value = response.headers["server-timing"].split(";dur=")
+        assert metric == "app"
+        assert float(value) >= 0
 
 
 def test_dashboard_tokens_returns_reported_usage(monkeypatch) -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import date, datetime
@@ -10,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI
 from loguru import logger
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from .api import (
     admin_routes,
@@ -79,6 +81,33 @@ load_backend_env()
 
 CONTROL_PANEL_VERSION = os.environ.get("RELAY_CONTROL_PANEL_VERSION") or "python"
 WEB_UI_PATH = "/"
+
+
+class ServerTimingMiddleware:
+    """Expose backend time-to-response-headers without buffering response bodies."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(
+        self, scope: Scope, receive: Receive, send: Send
+    ) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        started_at = time.perf_counter()
+
+        async def send_with_timing(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                duration_ms = (time.perf_counter() - started_at) * 1000
+                headers = list(message.get("headers", []))
+                headers.append(
+                    (b"server-timing", f"app;dur={duration_ms:.2f}".encode("ascii"))
+                )
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, send_with_timing)
 
 
 def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
@@ -161,6 +190,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
         openapi_url=API_OPENAPI_PATH,
         redoc_url=API_REDOC_PATH,
     )
+    app.add_middleware(ServerTimingMiddleware)
     app.state.session_store = session_store
     app.state.task_store = task_store
     app.state.daemon_store = daemon_store

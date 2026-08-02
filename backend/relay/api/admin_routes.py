@@ -12,7 +12,9 @@ from ..core.models import AGENT_NAMES
 from ..daemon_registry import public_sandbox_record
 from ..security.auth import require_admin_session
 from ..services.computer_names import normalize_computer_display_name, present_computer
-from ..services.employee_lifecycle import soft_delete_employee as soft_delete_employee_cascade
+from ..services.employee_lifecycle import (
+    soft_delete_employee as soft_delete_employee_cascade,
+)
 from ..services.node_agents import (
     assert_node_agent_runs_drained,
     remove_node_agents,
@@ -150,7 +152,7 @@ async def create_department(request: Request, ctx: AppContextDep) -> dict[str, A
 
 
 @router.get("/admin/employees")
-async def list_employees(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+def list_employees(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     if hasattr(ctx.auth_store, "list_employees"):
         return {"employees": ctx.auth_store.list_employees()}
@@ -358,7 +360,7 @@ async def delete_control_panel_daemon_node(node_id: str, request: Request, ctx: 
 
 
 @router.get("/admin/daemon-nodes")
-async def control_panel_nodes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+def control_panel_nodes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     observed = []
     for node in ctx.registry.control_panel_nodes():
@@ -654,8 +656,10 @@ def _parse_timestamp(value: Any) -> datetime | None:
 
 
 @router.get("/admin/dashboard/sessions")
-async def dashboard_sessions(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+def dashboard_sessions(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
+    if hasattr(ctx.session_store, "dashboard_session_metrics"):
+        return ctx.session_store.dashboard_session_metrics(day_window=_DAY_WINDOW)
     sessions = ctx.session_store.list_sessions()
     now = datetime.now(timezone.utc)
     window_start = (now - timedelta(days=_DAY_WINDOW - 1)).date()
@@ -713,7 +717,7 @@ async def dashboard_sessions(request: Request, ctx: AppContextDep) -> dict[str, 
 
 
 @router.get("/admin/dashboard/activity")
-async def dashboard_activity(
+def dashboard_activity(
     request: Request,
     ctx: AppContextDep,
     limit: int = 20,
@@ -721,14 +725,24 @@ async def dashboard_activity(
     require_admin_session(request, ctx.auth_store)
     limit = max(1, min(limit, 100))
 
-    sessions = ctx.session_store.list_sessions()
-    tasks = ctx.task_store.list_tasks() if hasattr(ctx.task_store, "list_tasks") else []
+    if hasattr(ctx.session_store, "list_dashboard_activity") and hasattr(
+        ctx.task_store, "list_dashboard_activity"
+    ):
+        items = [
+            *ctx.session_store.list_dashboard_activity(limit=limit),
+            *ctx.task_store.list_dashboard_activity(limit=limit),
+        ]
+    else:
+        items = _fallback_dashboard_activity(ctx)
 
+    items.sort(key=lambda item: item.get("timestamp") or "", reverse=True)
+    return {"items": items[:limit]}
+
+
+def _fallback_dashboard_activity(ctx: AppContextDep) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
-
-    for session in sessions:
+    for session in ctx.session_store.list_sessions():
         owner = session.get("ownerEmployeeId")
-        status = session.get("status")
         created_at = session.get("createdAt")
         if created_at:
             items.append({
@@ -738,6 +752,7 @@ async def dashboard_activity(
                 "employeeId": owner,
                 "message": session.get("taskGoal") or "Session created",
             })
+        status = session.get("status")
         if status in {"completed", "failed"} and session.get("updatedAt"):
             items.append({
                 "kind": f"session.{status}",
@@ -746,27 +761,30 @@ async def dashboard_activity(
                 "employeeId": owner,
                 "message": session.get("taskGoal") or f"Session {status}",
             })
-
+    tasks = ctx.task_store.list_tasks() if hasattr(ctx.task_store, "list_tasks") else []
     for task in tasks:
-        created_at = task.get("createdAt")
-        if not created_at:
-            continue
-        items.append({
-            "kind": "task.created",
-            "timestamp": created_at,
-            "taskId": task.get("id"),
-            "employeeId": task.get("ownerEmployeeId"),
-            "message": task.get("goal") or task.get("taskGoal") or "Task created",
-        })
-
-    items.sort(key=lambda item: item.get("timestamp") or "", reverse=True)
-    return {"items": items[:limit]}
+        if task.get("createdAt"):
+            items.append({
+                "kind": "task.created",
+                "timestamp": task["createdAt"],
+                "taskId": task.get("id"),
+                "employeeId": task.get("ownerEmployeeId"),
+                "message": task.get("title") or "Task created",
+            })
+    return items
 
 
 @router.get("/admin/dashboard/tokens")
-async def dashboard_tokens(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+def dashboard_tokens(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
-    usage_rows = ctx.session_store.list_token_usage() if hasattr(ctx.session_store, "list_token_usage") else [
+    now = datetime.now(timezone.utc)
+    window_start = (now - timedelta(days=_DAY_WINDOW - 1)).date()
+    usage_since = datetime.combine(
+        window_start, datetime.min.time(), tzinfo=timezone.utc
+    )
+    usage_rows = ctx.session_store.list_dashboard_token_usage(
+        since=usage_since, recent_session_limit=10
+    ) if hasattr(ctx.session_store, "list_dashboard_token_usage") else ctx.session_store.list_token_usage() if hasattr(ctx.session_store, "list_token_usage") else [
         {
             "sessionId": session.get("id"),
             "ownerEmployeeId": session.get("ownerEmployeeId"),
@@ -778,8 +796,6 @@ async def dashboard_tokens(request: Request, ctx: AppContextDep) -> dict[str, An
         for usage in [_token_usage(session.get("tokenUsage"))]
         if usage
     ]
-    now = datetime.now(timezone.utc)
-    window_start = (now - timedelta(days=_DAY_WINDOW - 1)).date()
     summary_start = (now - timedelta(days=6)).date()
     buckets: dict[str, dict[str, int]] = {
         (window_start + timedelta(days=offset)).isoformat(): {"input": 0, "output": 0, "cache": 0, "total": 0}

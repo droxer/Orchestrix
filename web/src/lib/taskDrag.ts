@@ -1,4 +1,4 @@
-import type { RelayTask, TaskStatus } from "../types.js";
+import type { RelayTaskListItem, TaskStatus } from "../types.js";
 
 /**
  * Board drags carry only the task id, under a Relay-specific media type so a
@@ -16,7 +16,7 @@ export type TaskDropRejection = "same_status" | "needs_assignment";
  * requires an agent or a team, so the board never issues a PATCH it knows
  * will come back 400.
  */
-export function taskDropRejection(task: RelayTask, status: TaskStatus): TaskDropRejection | null {
+export function taskDropRejection(task: RelayTaskListItem, status: TaskStatus): TaskDropRejection | null {
   if (task.status === status) return "same_status";
   if (status === "assigned" && !task.assignedAgentId && !task.assignedTeamId) return "needs_assignment";
   return null;

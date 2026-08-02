@@ -1,4 +1,4 @@
-import type { RelaySession, RelayTask, TaskRoutineCadence, TaskRoutineType } from "../types.js";
+import type { RelaySession, RelayTaskListItem, TaskRoutineCadence, TaskRoutineType } from "../types.js";
 
 export const TASK_ROUTINE_TYPES: TaskRoutineType[] = ["task", "job"];
 export const TASK_ROUTINE_CADENCES: TaskRoutineCadence[] = ["daily", "weekly", "monthly", "custom"];
@@ -12,7 +12,7 @@ export interface RoutineFilters {
   state: "all" | "enabled" | "disabled" | "due" | "unscheduled";
 }
 
-export function filterRoutineTasks(tasks: RelayTask[], filters: RoutineFilters, today = isoToday()): RelayTask[] {
+export function filterRoutineTasks(tasks: RelayTaskListItem[], filters: RoutineFilters, today = isoToday()): RelayTaskListItem[] {
   const query = filters.query.trim().toLowerCase();
   const assignee = filters.assignee.trim().toLowerCase();
   return tasks.filter((task) => {
@@ -55,7 +55,7 @@ export type RoutineState =
  * run already underway, and a live run is the more urgent fact to show.
  */
 export function routineState(
-  routine: RelayTask,
+  routine: RelayTaskListItem,
   running: ReadonlySet<string>,
   today = isoToday(),
 ): RoutineState {
@@ -67,7 +67,7 @@ export function routineState(
   return "scheduled";
 }
 
-export function routineDueTone(task: RelayTask, today = isoToday()): "neutral" | "warn" | "bad" {
+export function routineDueTone(task: RelayTaskListItem, today = isoToday()): "neutral" | "warn" | "bad" {
   if (!task.routineEnabled || !task.routineNextRunDate) return "neutral";
   if (task.routineNextRunDate < today) return "bad";
   if (task.routineNextRunDate === today) return "warn";
@@ -75,8 +75,8 @@ export function routineDueTone(task: RelayTask, today = isoToday()): "neutral" |
 }
 
 export function latestRoutineSession(
-  routine: RelayTask,
-  tasks: RelayTask[],
+  routine: RelayTaskListItem,
+  tasks: RelayTaskListItem[],
   sessions: RelaySession[],
 ): RelaySession | undefined {
   const occurrenceIds = new Set(routine.occurrenceIds ?? []);
@@ -100,7 +100,7 @@ export function latestRoutineSession(
  * passed to `routineState` so a board of N routines stays O(tasks) rather
  * than re-scanning the task list per card.
  */
-export function runningRoutineIds(tasks: RelayTask[]): Set<string> {
+export function runningRoutineIds(tasks: RelayTaskListItem[]): Set<string> {
   const ids = new Set<string>();
   for (const task of tasks) {
     if (task.isRoutine) continue;
@@ -112,24 +112,24 @@ export function runningRoutineIds(tasks: RelayTask[]): Set<string> {
 }
 
 export function runningRoutineCount(
-  routines: RelayTask[],
-  tasks: RelayTask[],
+  routines: RelayTaskListItem[],
+  tasks: RelayTaskListItem[],
 ): number {
   const running = runningRoutineIds(tasks);
   return routines.filter((routine) => running.has(routine.id)).length;
 }
 
-function compareRoutineTasks(left: RelayTask, right: RelayTask): number {
+function compareRoutineTasks(left: RelayTaskListItem, right: RelayTaskListItem): number {
   return enabledRank(left) - enabledRank(right)
     || routineDate(left).localeCompare(routineDate(right))
     || right.updatedAt.localeCompare(left.updatedAt);
 }
 
-function enabledRank(task: RelayTask): number {
+function enabledRank(task: RelayTaskListItem): number {
   return task.routineEnabled ? 0 : 1;
 }
 
-function routineDate(task: RelayTask): string {
+function routineDate(task: RelayTaskListItem): string {
   return task.routineNextRunDate ?? "9999-12-31";
 }
 
