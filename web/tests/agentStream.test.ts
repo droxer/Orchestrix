@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TFunction } from "i18next";
 
-import { AgentStreamAccumulator, displayAgentSegments, emptyAgentStreamSegments, hasStreamingTextCaret, hasTerminalOutcome, parseAgentStderr, parseAgentStream, userVisibleAgentSegments, agentMessagePlainText, type AgentSegment } from "../src/lib/agentStream.js";
+import { AgentStreamAccumulator, displayAgentSegments, displayAgentStreamSegments, emptyAgentStreamSegments, hasStreamingTextCaret, hasTerminalOutcome, parseAgentStderr, parseAgentStream, userVisibleAgentSegments, agentMessagePlainText, type AgentSegment } from "../src/lib/agentStream.js";
 
 describe("agent stream parsing", () => {
   it("filters Codex stdin notice from stderr", () => {
@@ -467,6 +467,24 @@ describe("agent stream parsing", () => {
   it("detects when the streaming caret should attach to text", () => {
     assert.equal(hasStreamingTextCaret([{ kind: "tool", name: "Read" }]), false);
     assert.equal(hasStreamingTextCaret([{ kind: "text", text: "Still typing" }]), true);
+  });
+
+  it("keeps stdout text live when stderr status rows trail it", () => {
+    const text = { kind: "text", text: "Still typing" } as const;
+    const warning = { kind: "status", tone: "warn", text: "retrying" } as const;
+    const displayed = displayAgentStreamSegments([text], [warning], true);
+
+    assert.deepEqual(displayed.segments, [text, warning]);
+    assert.equal(displayed.liveTextIndex, 0);
+  });
+
+  it("does not mark earlier text live after a stdout tool call", () => {
+    const displayed = displayAgentStreamSegments([
+      { kind: "text", text: "Checking." },
+      { kind: "tool", name: "Read" },
+    ], [{ kind: "status", tone: "warn", text: "slow command" }], true);
+
+    assert.equal(displayed.liveTextIndex, -1);
   });
 
   it("treats an agent's own end-of-turn frame as a terminal outcome", () => {
