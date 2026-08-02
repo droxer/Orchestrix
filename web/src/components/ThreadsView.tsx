@@ -10,7 +10,6 @@ import {
   buildLogicalAgentImageMap,
   buildLogicalAgentNameMap,
   displayNameForExecutor,
-  labelForAgentRun,
 } from "../lib/agentDisplayNames";
 import type { ThreadItem } from "./ThreadRow";
 import { ThreadListPanel } from "./ThreadListPanel";
@@ -42,15 +41,12 @@ export type ThreadsViewProps = {
   selectableLogicalAgents: EmployeeAgent[];
   activeLogicalAgentId: string | null;
   onLogicalAgentPicked: (agent: EmployeeAgent) => void;
-  runningAgent: AgentName | undefined;
-  isRefreshing: boolean;
   artifactCount: number;
   visibleArtifacts: RelayArtifact[];
   artifactsDrawerOpen: boolean;
   initialArtifactId: string | null;
   onOpenArtifacts: (artifact?: RelayArtifact) => void;
   onCloseArtifactsDrawer: () => void;
-  onRefresh: () => void;
   onBackToThreads: () => void;
   selectedEmployee: string;
   initializingThread: boolean;
@@ -98,15 +94,12 @@ export function ThreadsView({
   selectableLogicalAgents,
   activeLogicalAgentId,
   onLogicalAgentPicked,
-  runningAgent,
-  isRefreshing,
   artifactCount,
   visibleArtifacts,
   artifactsDrawerOpen,
   initialArtifactId,
   onOpenArtifacts,
   onCloseArtifactsDrawer,
-  onRefresh,
   onBackToThreads,
   selectedEmployee,
   initializingThread,
@@ -145,18 +138,6 @@ export function ThreadsView({
     () => activeLogicalAgent?.displayName ?? displayNameForExecutor(activeAgent, logicalAgents),
     [activeAgent, activeLogicalAgent, logicalAgents],
   );
-  // Name the agent actually running this thread. The in-flight run carries the
-  // logical agent id; without it the executor kind would name whichever agent
-  // happens to share that kind.
-  const runningAgentDisplayName = useMemo(() => {
-    if (!runningAgent) return undefined;
-    const runningRun = activeSession?.agentRuns.find((run) => run.status === "running");
-    return labelForAgentRun(
-      { agent: runningAgent, agentId: runningRun?.logicalAgentId },
-      logicalAgentNames,
-      agentDisplayNames,
-    );
-  }, [activeSession, agentDisplayNames, logicalAgentNames, runningAgent]);
 
   return (
     <>
@@ -174,12 +155,8 @@ export function ThreadsView({
       <section id="chat-panel" className="chat-panel" aria-label={t("nav.threads")} tabIndex={-1}>
         <ThreadHeader
           activeSession={activeSession}
-          runningAgent={runningAgent}
-          runningAgentDisplayName={runningAgentDisplayName}
-          isRefreshing={isRefreshing}
           artifactCount={artifactCount}
           onOpenArtifacts={onOpenArtifacts}
-          onRefresh={onRefresh}
           onBackToThreads={onBackToThreads}
         />
 

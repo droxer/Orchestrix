@@ -24,10 +24,7 @@ const WORK_ROUTE_LABEL_KEYS: Record<Exclude<AppRoute, "main">, string> = {
 
 export type MobileChatChrome = {
   artifactCount: number;
-  hasSession: boolean;
-  isRefreshing: boolean;
   onOpenArtifacts: () => void;
-  onRefresh: () => void;
 };
 
 type AppShellProps = {
@@ -124,10 +121,7 @@ export function AppShell({
               <div className="mobile-topbar-chat-tools">
                 <ArtifactNavButton
                   artifactCount={mobileChatChrome.artifactCount}
-                  hasSession={mobileChatChrome.hasSession}
-                  isRefreshing={mobileChatChrome.isRefreshing}
                   onOpenArtifacts={mobileChatChrome.onOpenArtifacts}
-                  onRefresh={mobileChatChrome.onRefresh}
                 />
                 <PreferencesButton prefsOpen={prefsOpen} setPrefsOpen={setPrefsOpen} />
               </div>

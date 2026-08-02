@@ -970,10 +970,7 @@ export function App() {
       activeThreadLabel={activeThreadLabel}
       mobileChatChrome={{
         artifactCount: visibleArtifacts.length,
-        hasSession: Boolean(activeSession),
-        isRefreshing,
         onOpenArtifacts: () => openArtifactsDrawer(),
-        onRefresh: () => void refresh(),
       }}
       user={user}
       onLogout={() => void handleLogout()}
@@ -1057,15 +1054,12 @@ export function App() {
               setActiveLogicalAgentId(agent.id);
               setActiveAgent(agent.executorKind);
             }}
-            runningAgent={activeRun?.agent}
-            isRefreshing={isRefreshing}
             artifactCount={visibleArtifacts.length}
             visibleArtifacts={visibleArtifacts}
             artifactsDrawerOpen={artifactsDrawerOpen}
             initialArtifactId={initialArtifactId}
             onOpenArtifacts={openArtifactsDrawer}
             onCloseArtifactsDrawer={() => setArtifactsDrawerOpen(false)}
-            onRefresh={() => void refresh()}
             onBackToThreads={() => navigateToMobileView("threads")}
             selectedEmployee={selectedEmployee}
             initializingThread={initializingThread}
