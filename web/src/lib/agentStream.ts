@@ -165,6 +165,23 @@ export function displayAgentSegments(segments: AgentSegment[], streaming: boolea
   );
 }
 
+/**
+ * Prepare the combined transcript while tracking the active stdout tail
+ * independently from stderr rows, which are always rendered afterward.
+ */
+export function displayAgentStreamSegments(
+  stdoutSegments: AgentSegment[],
+  stderrSegments: AgentSegment[],
+  streaming: boolean,
+): { segments: AgentSegment[]; liveTextIndex: number } {
+  const segments = displayAgentSegments([...stdoutSegments, ...stderrSegments], streaming);
+  if (!streaming) return { segments, liveTextIndex: -1 };
+  const visibleStdout = displayAgentSegments(stdoutSegments, true);
+  const stdoutTail = visibleStdout[visibleStdout.length - 1];
+  if (stdoutTail?.kind !== "text") return { segments, liveTextIndex: -1 };
+  return { segments, liveTextIndex: segments.indexOf(stdoutTail) };
+}
+
 export function hasStreamingTextCaret(segments: AgentSegment[]): boolean {
   return segments[segments.length - 1]?.kind === "text";
 }
