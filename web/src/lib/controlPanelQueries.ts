@@ -8,5 +8,5 @@ export const ADMIN_EMPLOYEES_KEY = ["admin", "employees"] as const;
 export const CONTROL_PANEL_POLL_MS = 3000;
 
 export async function fetchControlPanelNodes(signal?: AbortSignal): Promise<ControlPanelDaemonNodeRecord[]> {
-  return (await listControlPanelDaemonNodes(signal)).nodes;
+  return (await listControlPanelDaemonNodes(signal)).nodes ?? [];
 }

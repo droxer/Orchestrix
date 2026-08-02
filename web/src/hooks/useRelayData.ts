@@ -61,7 +61,7 @@ export function useRelayData(
         refetchInterval: POLL_INTERVAL_MS,
         queryFn: async ({ signal }: { signal: AbortSignal }): Promise<SandboxRecord[]> => {
           const tk = fetchToken();
-          return tk ? (await listSandboxes(tk, signal)).sandboxes : [];
+          return tk ? ((await listSandboxes(tk, signal)).sandboxes ?? []) : [];
         },
       },
       {
@@ -73,14 +73,14 @@ export function useRelayData(
         // without a sandbox token left every tokenless client blind to live
         // runs: no working badge, and a cancel button with no node to talk to.
         queryFn: async ({ signal }: { signal: AbortSignal }): Promise<DaemonNodeMonitorRecord[]> =>
-          (await listDaemonNodes(fetchToken(), signal)).nodes,
+          (await listDaemonNodes(fetchToken(), signal)).nodes ?? [],
       },
       {
         queryKey: SESSIONS_KEY,
         enabled,
         refetchInterval: POLL_INTERVAL_MS,
         queryFn: async ({ signal }: { signal: AbortSignal }): Promise<RelaySession[]> => {
-          const summaries = (await listSessionSummaries(signal)).sessions;
+          const summaries = (await listSessionSummaries(signal)).sessions ?? [];
           return mergeSessionSummaries(
             queryClient.getQueryData<RelaySession[]>(SESSIONS_KEY) ?? [],
             summaries,
@@ -92,7 +92,7 @@ export function useRelayData(
         enabled,
         refetchInterval: POLL_INTERVAL_MS,
         queryFn: async ({ signal }: { signal: AbortSignal }): Promise<RelayTask[]> =>
-          (await listTasks(signal)).tasks,
+          (await listTasks(signal)).tasks ?? [],
       },
     ],
   });
