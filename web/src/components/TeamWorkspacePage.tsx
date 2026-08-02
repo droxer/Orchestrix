@@ -439,7 +439,7 @@ export function TeamWorkspacePage({
   return (
     <section className="workspace-page team-workspace-page" aria-label={t("teams.profile_title", { name: team.name })}>
       <PageHeader
-        kicker={t("teams.title")}
+        kicker={t("nav.workforce")}
         title={(
           <span className="workspace-header-title">
             <span className="workspace-header-mark" aria-hidden="true">

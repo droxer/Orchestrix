@@ -425,7 +425,7 @@ export function AgentWorkspacePage({
       tabIndex={-1}
     >
       <PageHeader
-        kicker={t("agents_page.title")}
+        kicker={t("nav.workforce")}
         title={(
           <span className="workspace-header-title">
             <span className="workspace-header-mark" aria-hidden="true">

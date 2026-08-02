@@ -60,7 +60,7 @@ export function TeamsPage({
     <section id="teams-panel" className="teams-page" aria-label={t("teams.title")} tabIndex={-1}>
       <div className="teams-roster">
         <PageHeader
-          kicker={t("nav.workspace")}
+          kicker={t("nav.workforce")}
           title={t("teams.title")}
           count={t("teams.count", { count: teams.length })}
           titleVariant="display"

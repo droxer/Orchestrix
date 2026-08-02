@@ -413,7 +413,7 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
       tabIndex={-1}
     >
       <PageHeader
-        kicker={t("nav.admin")}
+        kicker={t("nav.manage")}
         title={viewTitle}
         count={headerCount}
         actions={
