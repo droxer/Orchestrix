@@ -1,6 +1,7 @@
 import type { AgentName, AgentState, AgentTaskMode } from "./state.js";
 import type { TokenUsage } from "./token-usage.js";
 import type { CodexCollaborationEvent } from "./codex-collaboration.js";
+import type { WorkspaceLayout } from "./session-store.js";
 
 export type DaemonNodeStatus = "ready" | "busy" | "stopped";
 export type DaemonNodeSandboxMode = "none" | "boxlite";
@@ -56,7 +57,7 @@ export const DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS: readonly number[] = [1];
  * in its run.completed event, so the backend never has to walk the workspace
  * itself (which only works when they share a filesystem).
  */
-export type DaemonNodeCapability = "generated-files" | "workspace-read" | "workspace-read-shared" | "structured-agent-events";
+export type DaemonNodeCapability = "generated-files" | "workspace-read" | "workspace-read-shared" | "structured-agent-events" | "thread-workspaces";
 export const DAEMON_CAPABILITY_GENERATED_FILES: DaemonNodeCapability = "generated-files";
 /** The daemon can serve agent-home file listings and reads via workspace commands. */
 export const DAEMON_CAPABILITY_WORKSPACE_READ: DaemonNodeCapability = "workspace-read";
@@ -64,10 +65,12 @@ export const DAEMON_CAPABILITY_WORKSPACE_READ: DaemonNodeCapability = "workspace
 export const DAEMON_CAPABILITY_WORKSPACE_READ_SHARED: DaemonNodeCapability = "workspace-read-shared";
 /** The daemon emits normalized nested-agent lifecycle events in addition to raw output. */
 export const DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS: DaemonNodeCapability = "structured-agent-events";
+/** The daemon executes each thread below its configured node workspace root. */
+export const DAEMON_CAPABILITY_THREAD_WORKSPACES: DaemonNodeCapability = "thread-workspaces";
 
 /** A workspace file a run created or changed, reported by the daemon. */
 export interface DaemonGeneratedFile {
-  /** Path relative to the daemon's workspace root (posix separators). */
+  /** Path relative to the run workspace (thread child or legacy node root). */
   relativePath: string;
   title: string;
   bytes: number;
@@ -119,6 +122,9 @@ export interface DaemonNodeHeartbeatResponse {
   heartbeat: DaemonNodeHeartbeatSettings;
 }
 
+/** Legacy sessions stay at the node root; newly-created sessions use a thread child. */
+export type DaemonWorkspaceLayout = WorkspaceLayout;
+
 export interface DaemonNodeRunCommand {
   id: string;
   type: "run.start";
@@ -134,6 +140,8 @@ export interface DaemonNodeRunCommand {
   agentVersion?: number;
   mode: AgentTaskMode;
   workspacePath?: string;
+  /** Missing means node-root for compatibility with commands from older backends. */
+  workspaceLayout?: DaemonWorkspaceLayout;
   state?: AgentState;
 }
 
@@ -172,6 +180,9 @@ export interface DaemonWorkspaceListCommand {
   leaseId?: string;
   leaseExpiresAt?: string;
   attempt?: number;
+  /** Thread workspace to read. Omitted only for node-root administration. */
+  sessionId?: string;
+  workspaceLayout?: DaemonWorkspaceLayout;
   scope?: DaemonWorkspaceScope;
   /** Required for agent-home scope; optional for shared scope. */
   agentId?: string;
@@ -184,6 +195,9 @@ export interface DaemonWorkspaceReadCommand {
   leaseId?: string;
   leaseExpiresAt?: string;
   attempt?: number;
+  /** Thread workspace to read. Omitted only for node-root administration. */
+  sessionId?: string;
+  workspaceLayout?: DaemonWorkspaceLayout;
   scope?: DaemonWorkspaceScope;
   /** Required for agent-home scope; optional for shared scope. */
   agentId?: string;

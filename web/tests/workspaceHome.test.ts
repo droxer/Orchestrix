@@ -2,7 +2,20 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { RelayApiError } from "../src/api.js";
-import { isWorkspaceRetryableError, workspaceFilesEmptyState, workspaceHomeStatus } from "../src/lib/workspaceHome.js";
+import { isWorkspaceRetryableError, preferredWorkspaceThreadId, workspaceFilesEmptyState, workspaceHomeStatus } from "../src/lib/workspaceHome.js";
+
+describe("preferredWorkspaceThreadId", () => {
+  const threads = [{ id: "ses_new" }, { id: "ses_old" }];
+
+  it("keeps an explicitly selected available thread", () => {
+    assert.equal(preferredWorkspaceThreadId(threads, "ses_old"), "ses_old");
+  });
+
+  it("falls back to the newest available thread", () => {
+    assert.equal(preferredWorkspaceThreadId(threads, "missing"), "ses_new");
+    assert.equal(preferredWorkspaceThreadId([], "ses_old"), "");
+  });
+});
 
 describe("workspaceHomeStatus", () => {
   it("shows the live chip with the serving node when the listing is live", () => {

@@ -377,9 +377,9 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
         for artifact in workspace_artifacts(session)
     ]
 
-    recent_sessions = sorted(
+    workspace_sessions = sorted(
         sessions, key=lambda item: item.get("updatedAt") or "", reverse=True
-    )[:8]
+    )
     active_tasks = [
         task for task in tasks if task.get("status") in ACTIVE_TASK_STATUSES
     ]
@@ -395,7 +395,7 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
         "activeRuns": sorted(
             active_runs, key=lambda item: item.get("startedAt") or "", reverse=True
         ),
-        "sessions": [session_brief_item(session) for session in recent_sessions],
+        "sessions": [session_brief_item(session) for session in workspace_sessions],
         "tasks": [
             task_brief_item(task)
             for task in sorted(

@@ -36,12 +36,14 @@ import {
   agentHomePath,
   DAEMON_CAPABILITY_GENERATED_FILES,
   DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
+  DAEMON_CAPABILITY_THREAD_WORKSPACES,
   DAEMON_CAPABILITY_WORKSPACE_READ,
   DAEMON_CAPABILITY_WORKSPACE_READ_SHARED,
   DAEMON_NODE_PROTOCOL_VERSION,
   relayApiUrl,
 } from "relay-core";
 import { workspaceCommandEvent } from "./workspace-read.js";
+import { ThreadWorkspaceManager } from "./thread-workspace.js";
 
 export type DaemonSandboxMode = DaemonNodeSandboxMode;
 const DEFAULT_DAEMON_SANDBOX_MODE: DaemonSandboxMode = "boxlite";
@@ -177,6 +179,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     ?? positiveIntEnv("RELAY_DAEMON_LIVENESS_HEARTBEAT_MS");
   const inventoryDiscoveryTimeoutMs = options.inventoryDiscoveryTimeoutMs ?? positiveIntEnv("RELAY_DAEMON_INVENTORY_TIMEOUT_MS") ?? 10_000;
   const environment = options.environment ?? createExecutionEnvironment(sandboxMode, sandboxId, workspacePath, logger);
+  const threadWorkspaces = new ThreadWorkspaceManager(workspacePath, environment.sandboxMode);
   let health: DaemonHealthState | undefined;
   const setHealth = (next: DaemonHealthState, fields: DaemonLogFields = {}): void => {
     if (health === next) return;
@@ -224,6 +227,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
       DAEMON_CAPABILITY_WORKSPACE_READ,
       DAEMON_CAPABILITY_WORKSPACE_READ_SHARED,
       DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
+      DAEMON_CAPABILITY_THREAD_WORKSPACES,
     ],
     agentHealth,
     ...(Object.keys(agentInventory).length > 0 ? { agentInventory } : {}),
@@ -459,6 +463,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
               fetchFn,
               logger,
               workspacePath,
+              threadWorkspaces,
               environment,
               controller.signal,
               cancellationTerminalEventSignal,
@@ -516,7 +521,12 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
           });
           activeRuns.get(command.commandId)?.controller.abort(command.reason);
         } else if (command.type === "workspace.list" || command.type === "workspace.read") {
-          const event = workspaceCommandEvent(workspacePath, command);
+          const commandWorkspacePath = command.sessionId
+            ? (command.workspaceLayout === "thread"
+                ? threadWorkspaces.resolve(command.sessionId)
+                : threadWorkspaces.nodeRoot(command.sessionId)).hostPath
+            : workspacePath;
+          const event = workspaceCommandEvent(commandWorkspacePath, command);
           await postJsonWithRetry(fetchFn, relayApiUrl(backendUrl, `/daemon-nodes/${encodeURIComponent(sandboxId)}/events`), event, token, runtimeSignal).catch((error: unknown) => {
             logger.error("workspace event post failed", { sandboxId, commandId: command.id, error: error instanceof Error ? error.message : String(error) });
           });
@@ -711,6 +721,7 @@ async function executeCommand(
   fetchFn: typeof fetch,
   logger: DaemonLogger,
   nodeWorkspacePath: string,
+  threadWorkspaces: ThreadWorkspaceManager,
   environment: DaemonExecutionEnvironment,
   signal?: AbortSignal,
   cancellationTerminalEventSignal?: () => AbortSignal | undefined,
@@ -723,6 +734,9 @@ async function executeCommand(
       `Daemon workspace mismatch: command expects ${command.workspacePath} but this daemon serves ${nodeWorkspacePath}.`,
     );
   }
+  const threadWorkspace = command.workspaceLayout === "thread"
+    ? threadWorkspaces.ensure(command.sessionId)
+    : threadWorkspaces.nodeRoot(command.sessionId);
   await environment.ensureAgentReady(command.agent, signal);
   if (signal?.aborted) {
     await postRunCancelled(fetchFn, eventUrl, command, token, signal.reason, cancellationTerminalEventSignal?.()).catch((error: unknown) => {
@@ -817,15 +831,15 @@ async function executeCommand(
       );
     },
   };
-  // Runs execute at the shared node workspace root so agents on the same
-  // computer collaborate through it. Each logical agent keeps a personal home
-  // subdirectory for private state; the host directory is created before the
-  // run since BoxLite bind-mounts make it immediately visible in the guest.
+  // Runs in one thread collaborate through that thread's directory. Different
+  // threads never share a writable cwd, even when the node runs concurrent ask
+  // commands. Each logical agent keeps a private subdirectory inside the
+  // thread workspace.
   const agentHomeSubdir = command.logicalAgentId
     ? agentWorkspaceSubpath(command.logicalAgentId).split(sep).join("/")
     : undefined;
   if (command.logicalAgentId) {
-    ensureAgentWorkspaceDir(nodeWorkspacePath, command.logicalAgentId);
+    ensureAgentWorkspaceDir(threadWorkspace.hostPath, command.logicalAgentId);
   }
   const scanOptions = { ownAgentHomeSubdir: agentHomeSubdir };
   const options = {
@@ -834,13 +848,14 @@ async function executeCommand(
     runId: command.runId,
     agent: command.agent,
     signal,
+    workspacePath: threadWorkspace.executionPath,
   };
   const runState = agentHomeSubdir
     ? { ...state, agent_home_subdir: agentHomeSubdir }
     : state;
   // Snapshot document-type workspace files so a successful run can report
   // exactly what it created or changed (see generated-files.ts).
-  const workspaceSnapshot = snapshotGeneratedFiles(nodeWorkspacePath, scanOptions);
+  const workspaceSnapshot = snapshotGeneratedFiles(threadWorkspace.hostPath, scanOptions);
   const patch = await runAgentNode(command.agent, command.mode, runState, options);
   const next = mergeAgentState(state, patch);
   await outputPostChain;
@@ -874,7 +889,7 @@ async function executeCommand(
     return;
   }
   const generatedFiles = next.last_exit_code === 0
-    ? diffGeneratedFiles(nodeWorkspacePath, workspaceSnapshot, scanOptions)
+    ? diffGeneratedFiles(threadWorkspace.hostPath, workspaceSnapshot, scanOptions)
     : [];
   logger.info("run completed", {
     ...commandLogFields(sandboxId, command),
@@ -1524,3 +1539,8 @@ export {
 } from "./sandbox-session.js";
 
 export { discoverAgentInventory, parseInventoryOutput } from "./agent-inventory.js";
+
+export {
+  ThreadWorkspaceManager,
+  type ThreadWorkspace,
+} from "./thread-workspace.js";

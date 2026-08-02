@@ -31,6 +31,7 @@ from sqlalchemy.exc import IntegrityError
 
 from .store_common import (
     DEFAULT_RELAY_DATA_DIR,
+    SESSION_WORKSPACE_LAYOUT_THREAD,
     _append_jsonl,
     _format_iso,
     _parse_iso,
@@ -85,6 +86,9 @@ class LocalSessionStore:
                 session_id,
                 {
                     "workspacePath": payload["workspacePath"],
+                    "workspaceLayout": payload.get(
+                        "workspaceLayout", SESSION_WORKSPACE_LAYOUT_THREAD
+                    ),
                     **(
                         {"ownerEmployeeId": payload["ownerEmployeeId"]}
                         if payload.get("ownerEmployeeId")
@@ -279,9 +283,9 @@ class LocalSessionStore:
                 for item in summaries
                 if item.get("ownerEmployeeId") == owner_employee_id
             ]
-        return sorted(
-            summaries, key=lambda item: item["updatedAt"], reverse=True
-        )[: max(1, limit)]
+        return sorted(summaries, key=lambda item: item["updatedAt"], reverse=True)[
+            : max(1, limit)
+        ]
 
     def list_token_usage(self) -> list[dict[str, Any]]:
         rows = [
@@ -619,6 +623,9 @@ class DatabaseSessionStore:
                 session_id,
                 {
                     "workspacePath": payload["workspacePath"],
+                    "workspaceLayout": payload.get(
+                        "workspaceLayout", SESSION_WORKSPACE_LAYOUT_THREAD
+                    ),
                     **(
                         {"ownerEmployeeId": payload["ownerEmployeeId"]}
                         if payload.get("ownerEmployeeId")
@@ -1054,9 +1061,9 @@ class DatabaseSessionStore:
     def list_session_summaries(
         self, *, owner_employee_id: str | None = None, limit: int = 100
     ) -> list[dict[str, Any]]:
-        statement = select(
-            self.sessions.c.snapshot, self.sessions.c.version
-        ).order_by(self.sessions.c.updated_at.desc())
+        statement = select(self.sessions.c.snapshot, self.sessions.c.version).order_by(
+            self.sessions.c.updated_at.desc()
+        )
         if owner_employee_id is not None:
             statement = statement.where(
                 self.sessions.c.owner_employee_id == owner_employee_id

@@ -253,7 +253,7 @@ test("managed reconciler creates an attempt and starts the declared provider", a
 
   assert.deepEqual(result, { nodes: 1, started: 1, skipped: 0, healthy: 0, failed: 0 });
   assert.equal(provider.calls[0].enrollmentCredential, "grant.secret");
-  assert.equal(provider.calls[0].workspaceId, "employee:alice:home");
+  assert.equal(provider.calls[0].workspaceId, "managed-node:mnode_alice:workspace-root");
   assert.deepEqual(backend.updates, [
     { status: "allocating" },
     { status: "registering", providerInstanceId: "mnode_alice:1" },
@@ -267,7 +267,7 @@ test("managed workspace identity is explicit when configured and node-affine oth
   );
   assert.equal(
     workspaceIdForManagedNode({ ...managedNode(), employeeId: undefined, workspacePolicy: { kind: "node-affine" } }),
-    "managed-node:mnode_alice",
+    "managed-node:mnode_alice:workspace-root",
   );
 });
 

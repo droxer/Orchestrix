@@ -1,0 +1,80 @@
+import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+
+import { ThreadWorkspaceManager } from "../src/thread-workspace.js";
+
+test("thread workspaces are persistent and isolated beneath the configured local root", () => {
+  const root = mkdtempSync(join(tmpdir(), "relay-thread-workspaces-"));
+  try {
+    const manager = new ThreadWorkspaceManager(root, "none");
+
+    const first = manager.ensure("ses_first");
+    const same = manager.ensure("ses_first");
+    const second = manager.ensure("ses_second");
+
+    assert.equal(first.hostPath, join(root, "ses_first"));
+    assert.equal(first.executionPath, first.hostPath);
+    assert.deepEqual(same, first);
+    assert.equal(second.hostPath, join(root, "ses_second"));
+    assert.notEqual(second.hostPath, first.hostPath);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("cloud BoxLite workspaces use the same thread identity under the guest mount", () => {
+  const root = mkdtempSync(join(tmpdir(), "relay-cloud-thread-workspaces-"));
+  try {
+    const workspace = new ThreadWorkspaceManager(root, "boxlite").ensure(
+      "019fbff6-5fd8-71d1-8140-29fd1f767b39",
+    );
+
+    assert.equal(
+      workspace.hostPath,
+      join(root, "019fbff6-5fd8-71d1-8140-29fd1f767b39"),
+    );
+    assert.equal(
+      workspace.executionPath,
+      "/workspace/019fbff6-5fd8-71d1-8140-29fd1f767b39",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("thread workspace ids cannot escape the configured root", () => {
+  const root = mkdtempSync(join(tmpdir(), "relay-thread-workspace-security-"));
+  const outside = mkdtempSync(join(tmpdir(), "relay-thread-workspace-outside-"));
+  try {
+    const manager = new ThreadWorkspaceManager(root, "none");
+
+    for (const invalid of ["", ".", "..", "../escape", "nested/thread", "nested\\thread", "NUL", "COM1.txt", "ses_trailing."] as const) {
+      assert.throws(() => manager.ensure(invalid), /Invalid thread id/);
+    }
+
+    symlinkSync(outside, join(root, "ses_link"));
+    assert.throws(() => manager.ensure("ses_link"), /symbolic link/);
+
+    mkdirSync(join(root, "ses_valid"));
+    assert.equal(manager.ensure("ses_valid").hostPath, join(root, "ses_valid"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("thread workspace setup never creates the employee or supervisor configured root", () => {
+  const parent = mkdtempSync(join(tmpdir(), "relay-thread-workspace-parent-"));
+  try {
+    const missingRoot = join(parent, "employee-selected-root");
+    assert.throws(
+      () => new ThreadWorkspaceManager(missingRoot, "none"),
+      /ENOENT|no such file/i,
+    );
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+});

@@ -41,14 +41,14 @@ export async function runAgentNode(
   const reviewMode = mode === "review";
   const command =
     mode === "review"
-      ? def.buildReviewCommand(state)
+      ? def.buildReviewCommand(state, options.workspacePath)
       : mode === "ask"
-        ? def.buildAskCommand(state)
-        : def.buildActionCommand(state);
+        ? def.buildAskCommand(state, options.workspacePath)
+        : def.buildActionCommand(state, options.workspacePath);
   const actionLabel = mode === "ask" ? def.askLabel : def.actionLabel;
-  // Runs execute at the shared workspace root so agents on the same computer
-  // collaborate through it; state.agent_home_subdir names the private area.
-  const cwd = agentWorkspacePath();
+  // Daemons pass a thread-specific directory. Direct callers retain the
+  // environment-backed workspace for compatibility.
+  const cwd = options.workspacePath ?? agentWorkspacePath();
   const result = await execute("bash", ["-c", command], {
     cwd,
     stdoutRenderer: (chunk) => {

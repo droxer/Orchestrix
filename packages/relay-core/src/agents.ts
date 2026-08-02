@@ -37,10 +37,10 @@ export interface AgentDefinition {
   maxFailures: number;
   /** Mode chosen when a caller addresses the agent without specifying one. */
   defaultMode: AgentTaskMode;
-  buildActionCommand(state: AgentState): string;
-  buildReviewCommand(state: AgentState): string;
+  buildActionCommand(state: AgentState, workspacePath?: string): string;
+  buildReviewCommand(state: AgentState, workspacePath?: string): string;
   /** Read-only Q&A command (UI "Ask" mode). */
-  buildAskCommand(state: AgentState): string;
+  buildAskCommand(state: AgentState, workspacePath?: string): string;
   createRenderer(mode: AgentTaskMode): StreamRenderer;
   /** Label shown for the action-mode artifact/log header. */
   actionLabel: string;

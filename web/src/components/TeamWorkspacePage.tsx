@@ -414,7 +414,7 @@ export function TeamWorkspacePage({
   const briefQuery = useQuery({
     queryKey: ["team-workspace-brief", team.id],
     queryFn: ({ signal }) => getWorkspaceBrief({ teamId: team.id }, signal),
-    enabled: pageTab === "activities",
+    enabled: pageTab !== "profile",
     refetchInterval: pageTab === "activities" ? TEAM_BRIEF_POLL_MS : false,
   });
   const workspaceAgentId = teamWorkspaceAgentId(team);
@@ -422,7 +422,7 @@ export function TeamWorkspacePage({
   async function refreshTeam(): Promise<void> {
     if (pageTab === "workspace") setWorkspaceRefreshVersion((current) => current + 1);
     await Promise.all([
-      pageTab === "activities" ? briefQuery.refetch() : Promise.resolve(),
+      pageTab !== "profile" ? briefQuery.refetch() : Promise.resolve(),
       onRefresh(),
     ]);
   }
@@ -489,6 +489,8 @@ export function TeamWorkspacePage({
           {workspaceAgentId ? (
             <WorkspaceFilesBrowser
               agentId={workspaceAgentId}
+              teamId={team.id}
+              threads={briefQuery.data?.sessions ?? []}
               fixedScope="shared"
               emptyMark={<TeamMark size={18} />}
               refreshVersion={workspaceRefreshVersion}

@@ -157,6 +157,15 @@ controller instance can resume reconciliation.
 Only one non-deleted dedicated managed node may be active for the same employee
 and policy slot. This constraint is enforced in storage, not by list ordering.
 
+The provider resolves `workspacePolicy` to one node workspace root before it
+starts the daemon. In accordance with [ADR-013](adr/013-thread-scoped-workspaces.md),
+the daemon—not the provider or backend—creates `<root>/<thread-id>` and selects
+that child as the run working directory. Employee-owned nodes receive their
+root from employee setup; cloud providers provision it, including persistence
+or recovery appropriate to the provider. Sessions created before the
+thread-layout event field continue at the legacy node root after an upgrade;
+Relay does not copy an ambiguous shared root into a thread automatically.
+
 ### ProvisioningAttempt
 
 | Field | Type | Notes |

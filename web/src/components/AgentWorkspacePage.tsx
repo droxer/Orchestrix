@@ -9,9 +9,10 @@ import type {
   AgentWorkspaceFileResponse,
   WorkspaceFileEntry,
   AgentWorkspaceFilesResponse,
+  WorkspaceBriefSession,
 } from "../types";
 import { agentLabel } from "../lib/plan";
-import { isWorkspaceRetryableError, workspaceFilesEmptyState, workspaceHomeStatus } from "../lib/workspaceHome";
+import { isWorkspaceRetryableError, preferredWorkspaceThreadId, workspaceFilesEmptyState, workspaceHomeStatus } from "../lib/workspaceHome";
 import { NavRefresh, ActionRemove, WorkspaceFile, WorkspaceFolder } from "./icons";
 import { AgentMark } from "./AgentMark";
 import { IdentityMonogram } from "./IdentityMonogram";
@@ -33,6 +34,7 @@ import { ProfileImage } from "./ProfileImagePicker";
 import { agentAvailabilityTone } from "../lib/adminHelpers";
 import { describeAgentPlacements } from "../lib/agentPlacements";
 import { AgentPlacementBadge } from "./AgentPlacementBadge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
 export type WorkspacePageTab = "profile" | "workspace" | "activities";
 
@@ -157,11 +159,15 @@ function WorkspacePathBreadcrumb({
 
 export function WorkspaceFilesBrowser({
   agentId,
+  teamId,
+  threads = [],
   fixedScope,
   emptyMark,
   refreshVersion = 0,
 }: {
   agentId: string;
+  teamId?: string;
+  threads?: WorkspaceBriefSession[];
   fixedScope?: WorkspaceFileScope;
   emptyMark?: ReactNode;
   refreshVersion?: number;
@@ -169,6 +175,7 @@ export function WorkspaceFilesBrowser({
   const { t } = useTranslation();
   const [filePath, setFilePath] = useUrlSearchState("path", "", parseString, (value) => value || null);
   const [selectedKey, setSelectedKey] = useUrlSearchState("item", "", parseString, (value) => value || null);
+  const [requestedThreadId, setRequestedThreadId] = useUrlSearchState("thread", "", parseString, (value) => value || null);
   const [selectableScope, setSelectableScope] = useUrlSearchState(
     "scope",
     "personal" as WorkspaceFileScope,
@@ -176,25 +183,30 @@ export function WorkspaceFilesBrowser({
     (value) => value === "personal" ? null : value,
   );
   const [snapshotBannerDismissed, setSnapshotBannerDismissed] = useState(false);
+  const selectedThreadId = preferredWorkspaceThreadId(threads, requestedThreadId);
   const fileScope = fixedScope ?? selectableScope;
   const selectedPath = selectedKey.startsWith("file:") ? selectedKey.slice(5) : "";
   const selected: FileSelection | null = selectedPath
     ? { path: selectedPath, name: selectedPath.split("/").at(-1) || selectedPath }
     : null;
   const fileQuery = useQuery({
-    queryKey: ["agent-workspace", agentId, fileScope, filePath, refreshVersion],
+    queryKey: ["agent-workspace", agentId, teamId, selectedThreadId, fileScope, filePath, refreshVersion],
     queryFn: ({ signal }) => listAgentWorkspaceFiles({
       agentId,
+      threadId: selectedThreadId || undefined,
+      teamId,
       path: filePath,
       scope: fileScope === "shared" ? "shared" : undefined,
     }, signal),
-    enabled: Boolean(agentId),
+    enabled: Boolean(agentId && (fileScope !== "shared" || selectedThreadId)),
   });
   const contentQuery = useQuery({
-    queryKey: ["agent-workspace-file", agentId, fileScope, selectedPath, refreshVersion],
-    enabled: Boolean(agentId && selectedPath),
+    queryKey: ["agent-workspace-file", agentId, teamId, selectedThreadId, fileScope, selectedPath, refreshVersion],
+    enabled: Boolean(agentId && selectedThreadId && selectedPath),
     queryFn: ({ signal }) => readAgentWorkspaceFile({
       agentId,
+      threadId: selectedThreadId,
+      teamId,
       path: selectedPath,
       scope: fileScope === "shared" ? "shared" : undefined,
     }, signal),
@@ -203,7 +215,7 @@ export function WorkspaceFilesBrowser({
 
   useEffect(() => {
     setSnapshotBannerDismissed(false);
-  }, [agentId, fileScope]);
+  }, [agentId, selectedThreadId, fileScope]);
 
   function openDirectory(path: string): void {
     setFilePath(path);
@@ -217,6 +229,13 @@ export function WorkspaceFilesBrowser({
     setSelectedKey("");
   }
 
+  function switchThread(next: string | null): void {
+    if (!next || next === selectedThreadId) return;
+    setRequestedThreadId(next);
+    setFilePath("");
+    setSelectedKey("");
+  }
+
   if (!agentId) {
     return <WorkspaceEmpty title={t("workspace.files_unavailable")} mark={emptyMark ?? <WorkspaceFile size={18} />} announce />;
   }
@@ -225,6 +244,23 @@ export function WorkspaceFilesBrowser({
     <div className={`workspace-panes${selected ? "" : " is-browse-only"}`}>
       <section className="workspace-pane workspace-pane-browse" aria-label={t("workspace.tab_files")}>
         <div className="workspace-tabpanel-files">
+          {threads.length ? (
+            <div className="workspace-scope-toggle">
+              <span className="workspace-scope-hint">{t("workspace.thread_label")}</span>
+              <Select value={selectedThreadId} onValueChange={switchThread}>
+                <SelectTrigger aria-label={t("workspace.thread_label")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {threads.map((thread) => (
+                    <SelectItem key={thread.id} value={thread.id}>
+                      {thread.title || thread.taskGoal || thread.id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           {!fixedScope && fileScope === "personal" && homeStatus.kind === "snapshot-banner" ? (
             <SnapshotBanner onDismiss={() => setSnapshotBannerDismissed(true)} />
           ) : null}
@@ -336,7 +372,7 @@ export function AgentWorkspacePage({
     queryKey: ["agent-workspace-brief", agent.id],
     refetchInterval: pageTab === "activities" ? WORKSPACE_BRIEF_POLL_MS : false,
     queryFn: ({ signal }) => getWorkspaceBrief({ agentId: agent.id }, signal),
-    enabled: pageTab === "activities",
+    enabled: pageTab !== "profile",
   });
   const brief = query.data;
   const activitiesLoading = pageTab === "activities" && query.isLoading && !brief;
@@ -348,7 +384,7 @@ export function AgentWorkspacePage({
   async function refreshWorkspace(): Promise<void> {
     if (pageTab === "workspace") setWorkspaceRefreshVersion((current) => current + 1);
     await Promise.all([
-      pageTab === "activities" ? query.refetch() : Promise.resolve(),
+      pageTab !== "profile" ? query.refetch() : Promise.resolve(),
       onRefresh(),
     ]);
   }
@@ -508,6 +544,7 @@ export function AgentWorkspacePage({
         >
           <WorkspaceFilesBrowser
             agentId={agent.id}
+            threads={brief?.sessions ?? []}
             emptyMark={<AgentMark agent={agent.executorKind} size={18} />}
             refreshVersion={workspaceRefreshVersion}
           />

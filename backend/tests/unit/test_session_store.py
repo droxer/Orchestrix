@@ -8,7 +8,7 @@ from uuid import UUID
 
 import pytest
 from relay.persistence.session_store import DatabaseSessionStore, LocalSessionStore
-from relay.persistence.store_common import relay_event
+from relay.persistence.store_common import materialize_events, relay_event
 from relay.persistence.task_store import DatabaseTaskStore
 from relay.sessions.controller import SessionController, SessionRunInFlightError
 from sqlalchemy import select, text
@@ -30,6 +30,24 @@ def test_session_stores_create_uuid_thread_ids() -> None:
             )
 
             assert str(UUID(created["id"])) == created["id"]
+            assert created["workspaceLayout"] == "thread"
+            assert created["events"][0]["workspaceLayout"] == "thread"
+
+
+def test_historical_session_without_layout_retains_legacy_node_root() -> None:
+    created = relay_event(
+        "session.created",
+        "ses_legacy",
+        {
+            "workspacePath": "/workspace/alice",
+            "taskGoal": "continue existing checkout",
+            "participants": ["human"],
+        },
+    )
+
+    session = materialize_events([created])
+
+    assert "workspaceLayout" not in session
 
 
 def test_session_stores_preserve_team_provenance() -> None:
@@ -221,9 +239,7 @@ def test_session_summary_pages_are_bounded_and_event_free() -> None:
                     }
                 )
 
-            summaries = store.list_session_summaries(
-                owner_employee_id="alice", limit=1
-            )
+            summaries = store.list_session_summaries(owner_employee_id="alice", limit=1)
 
             assert len(summaries) == 1
             assert summaries[0]["ownerEmployeeId"] == "alice"

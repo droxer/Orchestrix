@@ -5,11 +5,11 @@ from datetime import date
 from tempfile import TemporaryDirectory
 
 from relay.daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
+from relay.persistence.agent_placement_store import LocalAgentPlacementStore
 from relay.persistence.daemon_store import LocalDaemonStore
+from relay.persistence.employee_agent_store import LocalEmployeeAgentStore
 from relay.persistence.session_store import LocalSessionStore
 from relay.persistence.task_store import LocalTaskStore
-from relay.persistence.employee_agent_store import LocalEmployeeAgentStore
-from relay.persistence.agent_placement_store import LocalAgentPlacementStore
 from relay.persistence.team_store import LocalTeamStore
 from relay.services.managed_nodes import LocalManagedNodeStore
 from relay.tasks import ROUTINE_SKIP_NO_AGENT_MESSAGE, TaskScheduler, next_routine_date
@@ -55,6 +55,7 @@ def test_scheduler_dispatches_assigned_task_to_ready_node() -> None:
                     "workspacePath": "/workspace/alice",
                     "protocolVersion": 1,
                     "supportedAgents": ["codex"],
+                    "capabilities": ["thread-workspaces"],
                     "status": "ready",
                 },
                 "ui_token",
@@ -112,6 +113,7 @@ def test_scheduler_dispatches_when_employee_owns_multiple_computers() -> None:
                         "workspacePath": f"/workspace/alice/{suffix}",
                         "protocolVersion": 1,
                         "supportedAgents": ["codex"],
+                        "capabilities": ["thread-workspaces"],
                         "status": "ready",
                     },
                     "ui_token",
@@ -170,7 +172,7 @@ def test_scheduler_requests_managed_capacity_once_when_no_node_is_ready() -> Non
             scheduler = TaskScheduler(
                 task_store=task_store,
                 registry=registry,
-                    backend=backend,
+                backend=backend,
                 managed_node_store=managed_nodes,
             )
 
@@ -188,7 +190,9 @@ def test_scheduler_requests_managed_capacity_once_when_no_node_is_ready() -> Non
     asyncio.run(run_flow())
 
 
-def test_scheduler_waits_for_an_employee_device_node_regardless_of_sandbox_mode() -> None:
+def test_scheduler_waits_for_an_employee_device_node_regardless_of_sandbox_mode() -> (
+    None
+):
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
             task_store = LocalTaskStore(root)
@@ -285,6 +289,7 @@ def test_scheduler_dispatches_task_by_logical_agent_placement() -> None:
                     "workspacePath": "/workspace/alice",
                     "protocolVersion": 1,
                     "supportedAgents": ["codex"],
+                    "capabilities": ["thread-workspaces"],
                     "status": "ready",
                 },
                 "ui_token",
@@ -331,6 +336,7 @@ def test_scheduler_promotes_due_routine_and_advances_next_run() -> None:
                     "workspacePath": "/workspace/alice",
                     "protocolVersion": 1,
                     "supportedAgents": ["codex"],
+                    "capabilities": ["thread-workspaces"],
                     "status": "ready",
                 },
                 "ui_token",
@@ -396,6 +402,7 @@ def test_scheduler_dispatches_by_priority_not_recency() -> None:
                     "workspacePath": "/workspace/alice",
                     "protocolVersion": 1,
                     "supportedAgents": ["codex"],
+                    "capabilities": ["thread-workspaces"],
                     "status": "ready",
                 },
                 "ui_token",
@@ -502,6 +509,7 @@ def test_scheduler_backs_off_after_failed_dispatch() -> None:
                     "workspacePath": "/workspace/alice",
                     "protocolVersion": 1,
                     "supportedAgents": ["codex"],
+                    "capabilities": ["thread-workspaces"],
                     "status": "ready",
                 },
                 "ui_token",
@@ -594,6 +602,7 @@ def test_scheduler_materializes_and_dispatches_legacy_assignment() -> None:
                     "workspacePath": "/workspace/alice",
                     "protocolVersion": 1,
                     "supportedAgents": ["codex"],
+                    "capabilities": ["thread-workspaces"],
                     "status": "ready",
                 },
                 "ui_token",
@@ -639,6 +648,7 @@ def test_scheduler_materializes_legacy_routine_before_promotion() -> None:
                     "workspacePath": "/workspace/alice",
                     "protocolVersion": 1,
                     "supportedAgents": ["codex"],
+                    "capabilities": ["thread-workspaces"],
                     "status": "ready",
                 },
                 "ui_token",
@@ -684,6 +694,7 @@ def test_scheduler_routes_assignment_through_task_assignee() -> None:
                     "workspacePath": "/workspace/alice",
                     "protocolVersion": 1,
                     "supportedAgents": ["codex"],
+                    "capabilities": ["thread-workspaces"],
                     "status": "ready",
                 },
                 "ui_token",
@@ -740,6 +751,7 @@ def test_scheduler_dispatches_all_team_members_lead_first() -> None:
                     "workspacePath": "/workspace/alice",
                     "protocolVersion": 1,
                     "supportedAgents": ["codex", "claude"],
+                    "capabilities": ["thread-workspaces"],
                     "status": "ready",
                     "maxConcurrentRuns": 2,
                 },
@@ -863,6 +875,7 @@ def test_scheduler_promotes_team_routine_into_team_owned_thread() -> None:
                     "workspacePath": "/workspace/alice",
                     "protocolVersion": 1,
                     "supportedAgents": ["codex", "claude"],
+                    "capabilities": ["thread-workspaces"],
                     "status": "ready",
                 },
                 "ui_token",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -11,16 +12,24 @@ from fastapi import APIRouter, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
 from ..core.ids import new_database_id
-from ..services.agent_routing import select_workspace_node
+from ..services.agent_routing import (
+    resolve_session_daemon_node_id,
+)
 from ..services.agent_workspace_snapshot import snapshot_file, snapshot_listing
 from ..services.event_notifier import workspace_response_key
 from ..services.workspace_query import WORKSPACE_COMMAND_TIMEOUT_SECONDS
 from .deps import AppContext, AppContextDep
-from .helpers import newest_agent_workspace_artifacts, request_actor
+from .helpers import (
+    artifact_index_item,
+    newest_agent_workspace_artifacts,
+    request_actor,
+    workspace_artifacts,
+)
 from .session_routes import agent_supervisor_employee_id
 
 router = APIRouter()
 WORKSPACE_FILE_PREVIEW_LIMIT = 256 * 1024
+THREAD_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$")
 
 
 def _timestamp() -> str:
@@ -59,6 +68,54 @@ def _path(raw: str | None, *, required: bool = False) -> str:
     if required and not value:
         raise HTTPException(400, "Workspace file path is required.")
     return value
+
+
+def _thread_session(
+    ctx: AppContext, request: Request, agent_id: str, scope: str
+) -> tuple[str | None, dict[str, Any] | None]:
+    thread_id = (request.query_params.get("threadId") or "").strip()
+    if not thread_id:
+        return None, None
+    if (
+        not THREAD_ID_PATTERN.fullmatch(thread_id)
+        or thread_id in (".", "..")
+        or thread_id.endswith(".")
+    ):
+        raise HTTPException(400, "Thread id is invalid.")
+    try:
+        session = ctx.session_store.get_session(thread_id)
+    except KeyError as error:
+        raise HTTPException(404, "Thread not found.") from error
+    team_id = (request.query_params.get("teamId") or "").strip()
+    team_participates = False
+    if team_id:
+        if scope != "shared":
+            raise HTTPException(400, "teamId requires shared workspace scope.")
+        team = ctx.team_store.get_team(team_id)
+        actor = request_actor(request, ctx.auth_store)
+        if (
+            not team
+            or team.get("deletedAt")
+            or session.get("teamId") != team_id
+            or agent_id not in team.get("memberAgentIds", [])
+            or (
+                not actor["isAdmin"]
+                and team.get("ownerEmployeeId") != actor["employeeId"]
+            )
+        ):
+            raise HTTPException(404, "Team workspace thread not found.")
+        team_participates = True
+    participates = (
+        team_participates
+        or session.get("ownerAgentId") == agent_id
+        or any(
+            run.get("logicalAgentId") == agent_id
+            for run in session.get("agentRuns", [])
+        )
+    )
+    if not participates:
+        raise HTTPException(404, "Agent has no workspace in this thread.")
+    return thread_id, session
 
 
 async def _dispatch(
@@ -104,30 +161,68 @@ def _workspace_error(event: dict[str, Any]) -> None:
     raise HTTPException(status, message)
 
 
-def _select_node(
-    ctx: AppContext, agent: dict[str, Any], scope: str
+def _select_thread_node(
+    ctx: AppContext, session: dict[str, Any], scope: str
 ) -> dict[str, Any] | None:
+    if session.get("workspaceLayout") != "thread":
+        return None
     capability = "workspace-read-shared" if scope == "shared" else "workspace-read"
-    return select_workspace_node(
-        agent,
+    nodes = ctx.registry.monitor_nodes()
+    node_id = resolve_session_daemon_node_id(
+        session,
         ctx.agent_placement_store,
-        ctx.registry.monitor_nodes(),
-        capability=capability,
+        nodes,
+        ctx.registry.daemon_store,
     )
+    node = next((item for item in nodes if item["id"] == node_id), None)
+    if (
+        node is None
+        or not node.get("online")
+        or node.get("stale")
+        or capability not in (node.get("capabilities") or [])
+        or "thread-workspaces" not in (node.get("capabilities") or [])
+    ):
+        return None
+    return node
 
 
-def _scope_command(scope: str, agent_id: str) -> dict[str, Any]:
-    return {"agentId": agent_id, **({"scope": "shared"} if scope == "shared" else {})}
+def _scope_command(
+    scope: str,
+    agent_id: str,
+    thread_id: str | None,
+    workspace_layout: str | None,
+) -> dict[str, Any]:
+    return {
+        "agentId": agent_id,
+        **({"scope": "shared"} if scope == "shared" else {}),
+        **({"sessionId": thread_id} if thread_id else {}),
+        **({"workspaceLayout": workspace_layout} if workspace_layout else {}),
+    }
+
+
+def _snapshot_artifacts(
+    ctx: AppContext, agent_id: str, session: dict[str, Any] | None
+) -> list[dict[str, Any]]:
+    if session is None:
+        return newest_agent_workspace_artifacts(ctx.session_store, agent_id)
+    return [
+        artifact_index_item(session, artifact)
+        for artifact in workspace_artifacts(session)
+        if artifact.get("agentId") == agent_id
+    ]
 
 
 @router.get("/agents/{agent_id}/workspace/files")
 async def agent_workspace_files(
     agent_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
-    agent = _authorized_agent(ctx, request, agent_id)
+    _authorized_agent(ctx, request, agent_id)
     scope = _scope(request)
     path = _path(request.query_params.get("path"))
-    node = _select_node(ctx, agent, scope)
+    thread_id, session = _thread_session(ctx, request, agent_id, scope)
+    # Agent homes are thread-scoped. Without an explicit thread, serve the
+    # durable cross-thread artifact view instead of reading the legacy node root.
+    node = _select_thread_node(ctx, session, scope) if session else None
     if node:
         event = await _dispatch(
             ctx,
@@ -135,7 +230,12 @@ async def agent_workspace_files(
             {
                 "id": new_database_id(),
                 "type": "workspace.list",
-                **_scope_command(scope, agent_id),
+                **_scope_command(
+                    scope,
+                    agent_id,
+                    thread_id,
+                    session.get("workspaceLayout") if session else None,
+                ),
                 "path": path,
             },
         )
@@ -145,6 +245,7 @@ async def agent_workspace_files(
             "scope": scope,
             "source": "live",
             "nodeId": node["id"],
+            **({"threadId": thread_id} if thread_id else {}),
             "path": event.get("path", path),
             "exists": bool(event.get("exists")),
             "entries": event.get("entries") or [],
@@ -153,7 +254,7 @@ async def agent_workspace_files(
     if scope == "shared":
         # The shared workspace only exists on a live computer; no snapshot fallback.
         raise HTTPException(503, {"reason": "placement-unavailable"})
-    artifacts = newest_agent_workspace_artifacts(ctx.session_store, agent_id)
+    artifacts = _snapshot_artifacts(ctx, agent_id, session)
     return {
         "agentId": agent_id,
         "scope": scope,
@@ -169,10 +270,11 @@ async def agent_workspace_files(
 async def agent_workspace_file(
     agent_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
-    agent = _authorized_agent(ctx, request, agent_id)
+    _authorized_agent(ctx, request, agent_id)
     scope = _scope(request)
     path = _path(request.query_params.get("path"), required=True)
-    node = _select_node(ctx, agent, scope)
+    thread_id, session = _thread_session(ctx, request, agent_id, scope)
+    node = _select_thread_node(ctx, session, scope) if session else None
     if node:
         event = await _dispatch(
             ctx,
@@ -180,7 +282,12 @@ async def agent_workspace_file(
             {
                 "id": new_database_id(),
                 "type": "workspace.read",
-                **_scope_command(scope, agent_id),
+                **_scope_command(
+                    scope,
+                    agent_id,
+                    thread_id,
+                    session.get("workspaceLayout") if session else None,
+                ),
                 "path": path,
             },
         )
@@ -196,6 +303,7 @@ async def agent_workspace_file(
             "scope": scope,
             "source": "live",
             "nodeId": node["id"],
+            **({"threadId": thread_id} if thread_id else {}),
             "path": event.get("path", path),
             "exists": True,
             "isBinary": bool(event.get("isBinary")),
@@ -209,7 +317,7 @@ async def agent_workspace_file(
         raise HTTPException(503, {"reason": "placement-unavailable"})
     result = snapshot_file(
         ctx.session_store,
-        newest_agent_workspace_artifacts(ctx.session_store, agent_id),
+        _snapshot_artifacts(ctx, agent_id, session),
         agent_id,
         path,
     )

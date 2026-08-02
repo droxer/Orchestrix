@@ -19,7 +19,8 @@ Options:
                         One-time managed-node enrollment token (also
                         RELAY_ENROLLMENT_TOKEN). Replaces --sandbox-id and
                         --token for the first start.
-  --workspace <path>    Host workspace to expose to local agent CLIs
+  --workspace <path>    Employee-selected or supervisor-provisioned workspace
+                        root; Relay creates <path>/<thread-id> per thread
                         (also RELAY_WORKSPACE or WORKSPACE).
   --workspace-id <id>   Stable workspace identity for continuity and drift
                         detection on this daemon node
@@ -176,6 +177,13 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     process.exitCode = 1;
     return;
   }
+  const workspacePath = args.workspace ?? process.env.RELAY_WORKSPACE ?? process.env.WORKSPACE;
+  if (!workspacePath) {
+    console.error("Error: --workspace/RELAY_WORKSPACE is required and must point to the workspace root selected during setup.");
+    showHelp();
+    process.exitCode = 1;
+    return;
+  }
   if (args.doctor) {
     if (!sandboxId) {
       console.error("Error: --doctor requires an enrolled --sandbox-id.");
@@ -187,7 +195,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
       sandboxId,
       employeeId: args.employeeId ?? process.env.RELAY_EMPLOYEE_ID,
       token: args.token ?? process.env.RELAY_DAEMON_NODE_TOKEN ?? process.env.RELAY_DAEMON_TOKEN,
-      workspacePath: args.workspace ?? process.env.RELAY_WORKSPACE ?? process.env.WORKSPACE,
+      workspacePath,
       workspaceId: args.workspaceId ?? process.env.RELAY_WORKSPACE_ID,
       sandbox: resolveSandboxMode(args.sandbox ?? process.env.RELAY_SANDBOX_MODE),
       agentHome: args.useLocalAgentHome ? homedir() : undefined,
@@ -204,7 +212,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     employeeId: args.employeeId ?? process.env.RELAY_EMPLOYEE_ID,
     token: args.token ?? process.env.RELAY_DAEMON_NODE_TOKEN ?? process.env.RELAY_DAEMON_TOKEN,
     enrollmentToken,
-    workspacePath: args.workspace ?? process.env.RELAY_WORKSPACE ?? process.env.WORKSPACE,
+    workspacePath,
     workspaceId: args.workspaceId ?? process.env.RELAY_WORKSPACE_ID,
     sandbox: resolveSandboxMode(args.sandbox ?? process.env.RELAY_SANDBOX_MODE),
     agentHome: args.useLocalAgentHome ? homedir() : undefined,

@@ -84,6 +84,7 @@ export {
 export {
   DAEMON_CAPABILITY_GENERATED_FILES,
   DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
+  DAEMON_CAPABILITY_THREAD_WORKSPACES,
   DAEMON_CAPABILITY_WORKSPACE_READ,
   DAEMON_CAPABILITY_WORKSPACE_READ_SHARED,
   DAEMON_NODE_PROTOCOL_VERSION,
@@ -228,6 +229,7 @@ export {
   type RelayArtifactKind,
   type RelayEvent,
   type RelaySession,
+  type WorkspaceLayout,
   type SessionStatus,
 } from "./session-store.js";
 

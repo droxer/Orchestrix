@@ -182,7 +182,7 @@ export interface WorkspaceFileEntry {
 
 export type AgentWorkspaceSource = "live" | "snapshot";
 
-/** Personal agent home vs the computer's shared workspace root. */
+/** Personal agent home vs a thread or computer shared workspace root. */
 export type WorkspaceScope = "agent-home" | "shared";
 
 export interface AgentWorkspaceFilesResponse {
@@ -190,6 +190,7 @@ export interface AgentWorkspaceFilesResponse {
   scope?: WorkspaceScope;
   source: AgentWorkspaceSource;
   nodeId?: string;
+  threadId?: string;
   path: string;
   exists: boolean;
   entries: WorkspaceFileEntry[];
@@ -201,6 +202,7 @@ export interface AgentWorkspaceFileResponse {
   scope?: WorkspaceScope;
   source: AgentWorkspaceSource;
   nodeId?: string;
+  threadId?: string;
   path: string;
   exists: boolean;
   isBinary: boolean;

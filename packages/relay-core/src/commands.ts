@@ -12,23 +12,23 @@ import { kimiModel } from "./env.js";
 import { escapeRegExp, shellCommand, shellQuote } from "./shell.js";
 import type { AgentState } from "./state.js";
 
-export function buildCodexReviewCommand(state: AgentState): string {
-  const argv = [...codexBaseArgv(), reviewPrompt(state)];
-  return runAsAgent(shellCommand(argv), "codex");
+export function buildCodexReviewCommand(state: AgentState, workspacePath?: string): string {
+  const argv = [...codexBaseArgv({ workspacePath }), reviewPrompt(state)];
+  return runAsAgent(shellCommand(argv), "codex", workspacePath);
 }
 
-export function buildCodexActionCommand(state: AgentState): string {
-  const argv = [...codexBaseArgv(), codexActionPrompt(state)];
-  return runAsAgent(shellCommand(argv), "codex");
+export function buildCodexActionCommand(state: AgentState, workspacePath?: string): string {
+  const argv = [...codexBaseArgv({ workspacePath }), codexActionPrompt(state)];
+  return runAsAgent(shellCommand(argv), "codex", workspacePath);
 }
 
-export function buildCodexAskCommand(state: AgentState): string {
-  const argv = [...codexBaseArgv({ readOnly: true }), askPrompt(state)];
-  return runAsAgent(shellCommand(argv), "codex");
+export function buildCodexAskCommand(state: AgentState, workspacePath?: string): string {
+  const argv = [...codexBaseArgv({ readOnly: true, workspacePath }), askPrompt(state)];
+  return runAsAgent(shellCommand(argv), "codex", workspacePath);
 }
 
-function codexBaseArgv({ readOnly = false }: { readOnly?: boolean } = {}): string[] {
-  const workspace = agentWorkspacePath();
+function codexBaseArgv({ readOnly = false, workspacePath }: { readOnly?: boolean; workspacePath?: string } = {}): string[] {
+  const workspace = workspacePath ?? agentWorkspacePath();
   const argv = [
     "stdbuf",
     "-oL",
@@ -51,25 +51,25 @@ function codexBaseArgv({ readOnly = false }: { readOnly?: boolean } = {}): strin
   return argv;
 }
 
-export function buildClaudeActionCommand(state: AgentState): string {
-  return buildClaudeCommand(claudeTaskPrompt(state));
+export function buildClaudeActionCommand(state: AgentState, workspacePath?: string): string {
+  return buildClaudeCommand(claudeTaskPrompt(state), { workspacePath });
 }
 
-export function buildClaudeReviewCommand(state: AgentState): string {
-  return buildClaudeCommand(reviewPrompt(state));
+export function buildClaudeReviewCommand(state: AgentState, workspacePath?: string): string {
+  return buildClaudeCommand(reviewPrompt(state), { workspacePath });
 }
 
-export function buildClaudeAskCommand(state: AgentState): string {
+export function buildClaudeAskCommand(state: AgentState, workspacePath?: string): string {
   // Plan mode runs Claude read-only: it can inspect the workspace but cannot
   // edit files, so it answers the question without making changes.
-  return buildClaudeCommand(askPrompt(state), { permissionMode: "plan" });
+  return buildClaudeCommand(askPrompt(state), { permissionMode: "plan", workspacePath });
 }
 
 function buildClaudeCommand(
   prompt: string,
-  { permissionMode = "bypassPermissions" }: { permissionMode?: string } = {},
+  { permissionMode = "bypassPermissions", workspacePath }: { permissionMode?: string; workspacePath?: string } = {},
 ): string {
-  const workspace = agentWorkspacePath();
+  const workspace = workspacePath ?? agentWorkspacePath();
   const argv = [
     "stdbuf",
     "-oL",
@@ -88,24 +88,24 @@ function buildClaudeCommand(
   const model = anthropicModel();
   if (model) argv.push("--model", model);
   argv.push(prompt);
-  return runAsAgent(shellCommand(argv), "claude");
+  return runAsAgent(shellCommand(argv), "claude", workspacePath);
 }
 
-export function buildPiActionCommand(state: AgentState): string {
-  return buildPiCommand(piTaskPrompt(state));
+export function buildPiActionCommand(state: AgentState, workspacePath?: string): string {
+  return buildPiCommand(piTaskPrompt(state), workspacePath);
 }
 
-export function buildPiReviewCommand(state: AgentState): string {
-  return buildPiCommand(reviewPrompt(state));
+export function buildPiReviewCommand(state: AgentState, workspacePath?: string): string {
+  return buildPiCommand(reviewPrompt(state), workspacePath);
 }
 
 // Pi has no confirmed native read-only flag yet, so ask mode relies on the
 // read-only ask prompt. Tighten with a CLI flag once one is confirmed.
-export function buildPiAskCommand(state: AgentState): string {
-  return buildPiCommand(askPrompt(state));
+export function buildPiAskCommand(state: AgentState, workspacePath?: string): string {
+  return buildPiCommand(askPrompt(state), workspacePath);
 }
 
-function buildPiCommand(prompt: string): string {
+function buildPiCommand(prompt: string, workspacePath?: string): string {
   const argv = ["stdbuf", "-oL", "-eL", "pi", "--no-session"];
   const provider = piProvider();
   if (provider) argv.push("--provider", provider);
@@ -121,33 +121,34 @@ function buildPiCommand(prompt: string): string {
   return runAsAgent(
     `if ${supportsJsonMode}; then ${jsonCommand}; elif ${supportsStreamingPrint}; then ${streamingCommand}; else ${printCommand}; fi`,
     "pi",
+    workspacePath,
   );
 }
 
 // Kimi (Moonshot AI) CLI. The exact flags are provisional — confirm `-p`/model
 // flags against the installed Kimi CLI version before relying on this in prod.
-export function buildKimiActionCommand(state: AgentState): string {
-  return buildKimiCommand(kimiTaskPrompt(state));
+export function buildKimiActionCommand(state: AgentState, workspacePath?: string): string {
+  return buildKimiCommand(kimiTaskPrompt(state), workspacePath);
 }
 
-export function buildKimiReviewCommand(state: AgentState): string {
-  return buildKimiCommand(reviewPrompt(state));
+export function buildKimiReviewCommand(state: AgentState, workspacePath?: string): string {
+  return buildKimiCommand(reviewPrompt(state), workspacePath);
 }
 
 // Kimi flags are provisional; ask mode relies on the read-only ask prompt until
 // a native read-only flag is confirmed against the installed CLI.
-export function buildKimiAskCommand(state: AgentState): string {
-  return buildKimiCommand(askPrompt(state));
+export function buildKimiAskCommand(state: AgentState, workspacePath?: string): string {
+  return buildKimiCommand(askPrompt(state), workspacePath);
 }
 
-function buildKimiCommand(prompt: string): string {
+function buildKimiCommand(prompt: string, workspacePath?: string): string {
   const argv = ["kimi"];
   const model = kimiModel();
   if (model) argv.push("--model", model);
   // stream-json emits one JSON message object per stdout line (parsed by
   // KimiStreamRenderer) and keeps thinking + the resume notice off stdout.
   argv.push("--output-format", "stream-json", "--prompt", prompt);
-  return runAsAgent(shellCommand(argv), "kimi");
+  return runAsAgent(shellCommand(argv), "kimi", workspacePath);
 }
 
 export function buildPiPreflightCommand(): string {

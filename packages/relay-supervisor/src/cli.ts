@@ -2,7 +2,7 @@
 import { pathToFileURL } from "node:url";
 import { loadPackageEnv } from "relay-core";
 import { SupervisorBackendClient } from "./backend-client.js";
-import { CommandTemplateLauncher, LocalDaemonLauncher, workspaceForEmployee } from "./launchers.js";
+import { CommandTemplateLauncher, LocalDaemonLauncher, workspaceForEmployee, workspaceForManagedNode } from "./launchers.js";
 import { ManagedNodeReconciler } from "./managed-reconcile.js";
 import { LocalProcessProvider } from "./providers.js";
 import { RelaySupervisor } from "./reconcile.js";
@@ -41,7 +41,8 @@ function showHelp(): void {
 Options:
   --backend-url <url>       Relay backend URL (also RELAY_BACKEND_URL).
   --admin-token <token>     Admin bearer token (also RELAY_ADMIN_TOKEN).
-  --workspace-root <path>   Root for local employee workspaces.
+  --workspace-root <path>   Root for managed computer workspace roots; each
+                            daemon creates one child directory per thread.
   --provider <name>         "local" or "command" (default: local).
   --sandbox <mode>          Local provider sandbox mode: "none" or "boxlite"
                             (default: boxlite).
@@ -127,7 +128,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
         backend,
         providers: [new LocalProcessProvider({ logger: consoleLogger })],
         backendUrl,
-        workspacePathForNode: (node) => workspaceForEmployee(workspaceRoot, node.employeeId ?? node.id),
+        workspacePathForNode: (node) => workspaceForManagedNode(workspaceRoot, node.id),
         logger: consoleLogger,
       });
 
