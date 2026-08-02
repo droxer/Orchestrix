@@ -51,9 +51,16 @@ const MARKDOWN_COMPONENTS: Components = {
 export function Markdown({ text }: { text: string }) {
   return (
     <div className="agent-prose">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
-        {text}
-      </ReactMarkdown>
+      <MarkdownContent text={text} />
     </div>
+  );
+}
+
+/** Markdown content without the prose wrapper, for composition in live output. */
+export function MarkdownContent({ text }: { text: string }) {
+  return (
+    <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+      {text}
+    </ReactMarkdown>
   );
 }

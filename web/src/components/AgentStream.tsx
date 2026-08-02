@@ -12,10 +12,11 @@ import {
   parseAgentStderr,
   type AgentSegment,
 } from "../lib/agentStream";
-import { Markdown } from "./Markdown";
+import { Markdown, MarkdownContent } from "./Markdown";
 import { buildCollaborationTree } from "../lib/collaborationTree";
 import { SubagentTree } from "./SubagentTree";
 import { useDebouncedStreamingAnnouncement, useSmoothStreamingText } from "../lib/smoothStreamingText";
+import { splitStreamingMarkdown } from "../lib/streamingMarkdown";
 
 function StreamActivity({ label }: { label: string }) {
   return (
@@ -164,13 +165,24 @@ function TextSegment({ text, live }: { text: string; live: boolean }) {
       {live
         ? (
             <>
-              <div className="agent-prose agent-prose-live" aria-hidden="true"><p>{visibleText}</p></div>
+              <StreamingProse text={visibleText} />
               <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
                 {announcement}
               </span>
             </>
           )
         : renderProse(text)}
+    </div>
+  );
+}
+
+function StreamingProse({ text }: { text: string }) {
+  const parts = splitStreamingMarkdown(text);
+  return (
+    <div className="agent-prose agent-prose-live" aria-hidden="true">
+      {parts.map((part, index) => part.kind === "markdown"
+        ? <MarkdownContent key={`markdown-${index}`} text={part.text} />
+        : <p key={`text-${index}`}>{part.text}</p>)}
     </div>
   );
 }
