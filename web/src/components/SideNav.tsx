@@ -255,24 +255,6 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             <NavRoutine size={18} />
             <span className="sidenav-label sr-only">{t("nav.routine")}</span>
           </a>
-          {/* Lives in Workspace, not beside Threads: ComputerPage's own
-              header prints the "Workspace" kicker, so the rail has to agree
-              with the breadcrumb the page shows. */}
-          <a
-            className={`sidenav-btn ${route === "computer" ? "active" : ""}`}
-            data-nav="computer"
-            href={hrefForRoute("computer")}
-            aria-label={t("nav.computer")}
-            aria-current={route === "computer" ? "page" : undefined}
-            onClick={(event) => handleRouteClick(event, "computer")}
-            onMouseEnter={(e) => showNavTooltip(t("nav.computer"), e.currentTarget)}
-            onMouseLeave={hideNavTooltip}
-            onFocus={(e) => showNavTooltip(t("nav.computer"), e.currentTarget)}
-            onBlur={hideNavTooltip}
-          >
-            <NavComputer size={18} aria-hidden="true" />
-            <span className="sidenav-label sr-only">{t("nav.computer")}</span>
-          </a>
         </div>
         <div className="sidenav-group sidenav-group--separated" role="group" aria-label={t("nav.workforce")}>
           <span className="sidenav-group-label sr-only" aria-hidden="true">{t("nav.workforce")}</span>
@@ -307,28 +289,43 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             <span className="sidenav-label sr-only">{t("nav.teams")}</span>
           </a>
         </div>
-        {isAdmin ? (
-          <div className="sidenav-group sidenav-group--separated" role="group" aria-label={t("nav.manage")}>
-            <span className="sidenav-group-label sidenav-overflow-item sr-only" aria-hidden="true">{t("nav.manage")}</span>
-            {/* Keeps role=button + aria-disabled so assistive tech still
-                announces it as an unavailable destination, but drops
-                tabIndex: it has no activation handler, so a keyboard user
-                tabbing in hit a dead stop with no way to learn why. The
-                focus tooltip goes with it. */}
-            <span
-              className="sidenav-btn sidenav-overflow-item"
-              data-nav="channels"
-              role="button"
-              aria-disabled="true"
-              aria-label={channelsHint}
-              onMouseEnter={(e) => showNavTooltip(channelsHint, e.currentTarget)}
-              onMouseLeave={hideNavTooltip}
-            >
-              <NavChannels size={18} />
-              <span className="sidenav-label sr-only">{t("nav.channels")}</span>
-              <span className="sidenav-badge" aria-hidden="true">{t("nav.coming_soon_short")}</span>
-              <span className="sidenav-badge-dot" aria-hidden="true" />
-            </span>
+        <div className="sidenav-group sidenav-group--separated" role="group" aria-label={t("nav.manage")}>
+          <span className="sidenav-group-label sidenav-overflow-item sr-only" aria-hidden="true">{t("nav.manage")}</span>
+          <a
+            className={`sidenav-btn ${route === "computer" ? "active" : ""}`}
+            data-nav="computer"
+            href={hrefForRoute("computer")}
+            aria-label={t("nav.computer")}
+            aria-current={route === "computer" ? "page" : undefined}
+            onClick={(event) => handleRouteClick(event, "computer")}
+            onMouseEnter={(e) => showNavTooltip(t("nav.computer"), e.currentTarget)}
+            onMouseLeave={hideNavTooltip}
+            onFocus={(e) => showNavTooltip(t("nav.computer"), e.currentTarget)}
+            onBlur={hideNavTooltip}
+          >
+            <NavComputer size={18} aria-hidden="true" />
+            <span className="sidenav-label sr-only">{t("nav.computer")}</span>
+          </a>
+          {/* Keeps role=button + aria-disabled so assistive tech still
+              announces it as an unavailable destination, but drops
+              tabIndex: it has no activation handler, so a keyboard user
+              tabbing in hit a dead stop with no way to learn why. The
+              focus tooltip goes with it. */}
+          <span
+            className="sidenav-btn sidenav-overflow-item"
+            data-nav="channels"
+            role="button"
+            aria-disabled="true"
+            aria-label={channelsHint}
+            onMouseEnter={(e) => showNavTooltip(channelsHint, e.currentTarget)}
+            onMouseLeave={hideNavTooltip}
+          >
+            <NavChannels size={18} />
+            <span className="sidenav-label sr-only">{t("nav.channels")}</span>
+            <span className="sidenav-badge" aria-hidden="true">{t("nav.coming_soon_short")}</span>
+            <span className="sidenav-badge-dot" aria-hidden="true" />
+          </span>
+          {isAdmin ? (
             <a
               className={`sidenav-btn sidenav-overflow-item ${route === "admin" ? "active" : ""}`}
               data-nav="admin"
@@ -344,26 +341,26 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
               <NavAdmin size={18} />
               <span className="sidenav-label sr-only">{t("nav.admin")}</span>
             </a>
-            <Button
-              ref={moreButtonRef}
-              type="button"
-              variant="ghost"
-              className={`sidenav-btn sidenav-more-btn ${moreActive || moreMenu ? "active" : ""}`}
-              data-nav="more"
-              aria-label={t("nav.more_label")}
-              aria-haspopup="menu"
-              aria-expanded={Boolean(moreMenu)}
-              onClick={(event) => toggleMoreMenu(event.currentTarget)}
-              onMouseEnter={(e) => showNavTooltip(t("nav.more"), e.currentTarget)}
-              onMouseLeave={hideNavTooltip}
-              onFocus={(e) => showNavTooltip(t("nav.more"), e.currentTarget)}
-              onBlur={hideNavTooltip}
-            >
-              <NavMore size={18} />
-              <span className="sidenav-label sr-only">{t("nav.more")}</span>
-            </Button>
-          </div>
-        ) : null}
+          ) : null}
+          <Button
+            ref={moreButtonRef}
+            type="button"
+            variant="ghost"
+            className={`sidenav-btn sidenav-more-btn ${moreActive || moreMenu ? "active" : ""}`}
+            data-nav="more"
+            aria-label={t("nav.more_label")}
+            aria-haspopup="menu"
+            aria-expanded={Boolean(moreMenu)}
+            onClick={(event) => toggleMoreMenu(event.currentTarget)}
+            onMouseEnter={(e) => showNavTooltip(t("nav.more"), e.currentTarget)}
+            onMouseLeave={hideNavTooltip}
+            onFocus={(e) => showNavTooltip(t("nav.more"), e.currentTarget)}
+            onBlur={hideNavTooltip}
+          >
+            <NavMore size={18} />
+            <span className="sidenav-label sr-only">{t("nav.more")}</span>
+          </Button>
+        </div>
       </nav>
       <div className="sidenav-bottom">
         <Button
@@ -436,16 +433,18 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             <span>{t("nav.channels")}</span>
             <span className="sidenav-badge" aria-hidden="true">{t("nav.coming_soon_short")}</span>
           </span>
-          <a
-            className={`sidenav-more-item ${route === "admin" ? "active" : ""}`}
-            role="menuitem"
-            href={hrefForRoute("admin")}
-            aria-current={route === "admin" ? "page" : undefined}
-            onClick={(event) => handleRouteClick(event, "admin")}
-          >
-            <NavAdmin size={16} />
-            <span>{t("nav.admin")}</span>
-          </a>
+          {isAdmin ? (
+            <a
+              className={`sidenav-more-item ${route === "admin" ? "active" : ""}`}
+              role="menuitem"
+              href={hrefForRoute("admin")}
+              aria-current={route === "admin" ? "page" : undefined}
+              onClick={(event) => handleRouteClick(event, "admin")}
+            >
+              <NavAdmin size={16} />
+              <span>{t("nav.admin")}</span>
+            </a>
+          ) : null}
         </div>,
         document.body,
       ) : null}
