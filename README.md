@@ -8,48 +8,34 @@
 
 <p align="center"><strong>Every Employee. Amplified.</strong></p>
 
-Relay is a local-first control plane for AI work. Employees can start threads,
-assign durable tasks, schedule routines, and coordinate named AI agents and
-teams. Relay keeps identity, policy, approvals, history, and computer placement
-in one place while Claude Code, Codex, Pi, and Kimi execute through daemon
-processes.
+Relay is a local-first control plane for AI work. Employees can start threads, assign durable tasks, schedule routines, and coordinate named AI agents and teams from one interface.
+
+Relay records identity, computer placement, approvals, tasks, and history.
+
+The Python backend never executes an agent CLI. Daemons run Claude Code, Codex, Pi, and Kimi on local or managed computers, inside BoxLite or a configured local environment.
+
+## What you can do
+
+- Start a thread with an explicit agent, computer, and Ask, Action, or Review mode. Stream tool output, approve decisions, cancel or retry work, and hand the thread to another agent.
+- Plan work in a backlog, schedule recurring routines, assign agents or teams, set due dates, and follow dispatch and event history.
+- Create named agents and teams with profiles, computer placements, workspace files, generated artifacts, and recent activity.
+- Enroll employee computers or reconcile managed computers while tracking health, capacity, command leases, and restart-safe identity.
+- Connect Discord, Telegram, and Lark through one chat gateway that maps external identities and conversations to Relay.
+- Operate employees, agents, computers, fleet health, activity, and token usage from the administration area.
+
+## Product snapshots
+
+### Start and direct a thread
+
+Choose where work runs, which named agent handles it, and whether the turn asks, acts, or reviews.
 
 <p align="center">
   <img src="docs/images/relay-threads-phosphor.png" alt="Relay thread composer with agent and computer selection" width="960">
 </p>
 
-This repository contains the developer MVP: a Python/FastAPI control plane,
-TypeScript daemons and clients, a Next.js web app, database-backed thread and
-task storage, and BoxLite-backed execution. Relay can also run an agent on an
-employee's existing computer without BoxLite.
-
-## What works today
-
-- Threaded chat with explicit agent, computer, and Ask, Action, or Review mode.
-- A task backlog and recurring routines with assignment, scheduling, dispatch,
-  and event history.
-- Named agents and teams with profiles, files, generated artifacts, and recent
-  activity.
-- Local computers and managed computers with durable names, agent placement,
-  health, command leases, and restart-safe enrollment.
-- Daemon execution for Claude Code, Codex, Pi, and Kimi, including streamed tool
-  output and normalized token usage.
-- Human approval, cancellation, retry, and handoff flows in the web app.
-- A provider-neutral chat gateway with Discord, Telegram, and Lark adapters.
-- Admin views for employees, computers, fleet health, activity, and token usage.
-- Database-backed thread and task event stores, with optional file-backed
-  development stores only for non-thread operational state.
-
-The backend never runs an agent CLI. It records state and queues commands. A
-daemon claims each command, executes it in BoxLite or a configured local
-environment, and streams ordered events back to the control plane.
-
-## Product snapshots
-
 ### Plan and dispatch work
 
-The backlog keeps priority, assignee, due date, status, and dispatch controls in
-one view.
+The backlog keeps priority, assignment, due date, status, and dispatch context in one view.
 
 <p align="center">
   <img src="docs/images/relay-backlog-phosphor.png" alt="Relay task backlog" width="960">
@@ -57,7 +43,7 @@ one view.
 
 ### Coordinate agent teams
 
-Team workspaces collect active tasks, threads, artifacts, and member activity.
+Team workspaces bring active runs, tasks, threads, workspace files, and member activity together.
 
 <p align="center">
   <img src="docs/images/relay-teams-phosphor.png" alt="Relay team workspace" width="960">
@@ -72,18 +58,16 @@ Team workspaces collect active tasks, threads, artifacts, and member activity.
 - Python 3.12 or newer
 - [uv](https://docs.astral.sh/uv/)
 - Docker and hardware virtualization when using BoxLite
-- Credentials or local login state for the agent CLIs you want to run
+- Credentials or local login state for each agent CLI you want to run
 
-Install the workspace and run the test suite:
+Install dependencies and build the TypeScript packages, daemons, supervisor, and web app:
 
 ```bash
 npm install
-npm test
+npm run build
 ```
 
-Configure authentication, storage, and agent credentials as described in
-[Local Development](docs/local-development.md). Then start the services in
-separate terminals:
+Configure authentication, storage, and agent credentials as described in [Local Development](docs/local-development.md). Then start each service in a separate terminal:
 
 ```bash
 make backend                     # FastAPI control plane on 127.0.0.1:8790
@@ -93,17 +77,17 @@ make web                         # Next.js app on 127.0.0.1:5000
 
 Open <http://127.0.0.1:5000>.
 
-Useful commands:
+Run verification and operational commands as needed:
 
 ```bash
+npm test                # build and run the TypeScript and Python test suites
 make supervisor         # reconcile requested managed computers
 make backend-migrate    # apply Alembic migrations
 make pre-commit-run     # run repository checks
 make stop               # stop Relay, daemon, supervisor, and BoxLite
 ```
 
-Rebuild the BoxLite devbox with `make run-fresh` only after changing
-`dockerfile` or the image contents.
+Use `make run-fresh` only after changing `dockerfile` or the BoxLite image contents.
 
 ## Architecture
 
@@ -119,20 +103,14 @@ flowchart LR
     Supervisor["Managed-computer supervisor"] --> Daemon
 ```
 
-The control plane owns sessions, tasks, agent and team identity, computer
-placement, policy, and audit history. Daemons own execution and workspace
-access. The supervisor reconciles requested managed computers into daemon
-processes; its current provider runs local processes, with a command-template
-provider available for external infrastructure.
+The control plane owns durable threads, tasks, agent and team identity, computer placement, approvals, and audit history. Daemons own agent execution and workspace access. Every agent run flows through the leased daemon command path.
 
-The current repository map, state ownership, and operational invariants are
-maintained in [`AGENTS.md`](AGENTS.md). The target architecture and its
-implementation blueprint live in
-[`docs/system-architecture.md`](docs/system-architecture.md) and
-[`docs/implementation-plan.md`](docs/implementation-plan.md).
+The supervisor reconciles requested managed computers into daemon processes. Its built-in provider runs local processes; a command-template provider can connect external infrastructure.
+
+The repository map, state ownership, and engineering invariants are maintained in [`AGENTS.md`](AGENTS.md).
+
+Target architecture and implementation details live in [`docs/system-architecture.md`](docs/system-architecture.md) and [`docs/implementation-plan.md`](docs/implementation-plan.md).
 
 ## Documentation
 
-Start with the [`docs/` index](docs/README.md), which identifies the canonical
-owner for setup, APIs, product, architecture, design, decisions, and
-operational guidance.
+Start with the [`docs/` index](docs/README.md) for the canonical setup, API, product, architecture, design, decision, and operations documents.
