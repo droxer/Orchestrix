@@ -14,7 +14,7 @@ import type { AppRoute } from "../lib/viewTypes";
 // collapsed-state hover tooltip (only shown while the rail is collapsed).
 export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigateRoute, hrefForRoute, isAdmin, prefsOpen, setPrefsOpen, onLogout }: {
   sidenavExpanded: boolean;
-  setSidenavExpanded: Dispatch<SetStateAction<boolean>>;
+  setSidenavExpanded: (expanded: boolean) => void;
   route: AppRoute;
   onNavigateRoute: (route: AppRoute) => void;
   hrefForRoute: (route: AppRoute) => string;
@@ -191,6 +191,12 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
 
   return (
     <aside className="sidenav-panel" aria-label={t("nav.brand", { defaultValue: "Relay" })} data-expanded={sidenavExpanded ? "true" : "false"}>
+      {/* Brand only. The collapse toggle used to share this row and had to
+          drop onto a second line when the rail narrowed to 72px (a 36px mark
+          and a 32px control do not fit), so the button jumped ~70px out from
+          under the cursor that had just clicked it. It now lives in the
+          footer with the other rail-level control, at a stable position in
+          both states. */}
       <div className="sidenav-brand-row">
         <div className="sidenav-brand" aria-hidden="true">
           <span className="sidenav-brand-mark"><RelayMark width={24} height={24} /></span>
@@ -198,21 +204,6 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             <span className="sidenav-brand-word sr-only">Relay</span>
           </span>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          aria-label={sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar")}
-          className="sidenav-btn sidenav-toggle"
-          onClick={() => setSidenavExpanded((v) => !v)}
-          title={sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar")}
-          onMouseEnter={(e) => showNavTooltip(sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar"), e.currentTarget)}
-          onMouseLeave={hideNavTooltip}
-          onFocus={(e) => showNavTooltip(sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar"), e.currentTarget)}
-          onBlur={hideNavTooltip}
-        >
-          {sidenavExpanded ? <NavSidebarCollapse size={16} /> : <NavSidebarExpand size={16} />}
-          <span className="sidenav-toggle-label sr-only">{sidenavExpanded ? t("nav.collapse") : t("nav.expand")}</span>
-        </Button>
       </div>
       <nav className="sidenav-nav" aria-label={t("nav.workspace_label")}>
         <div className="sidenav-group" role="group">
@@ -230,21 +221,6 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
           >
             <NavThreads size={18} />
             <span className="sidenav-label sr-only">{t("nav.threads")}</span>
-          </a>
-          <a
-            className={`sidenav-btn ${route === "computer" ? "active" : ""}`}
-            data-nav="computer"
-            href={hrefForRoute("computer")}
-            aria-label={t("nav.computer")}
-            aria-current={route === "computer" ? "page" : undefined}
-            onClick={(event) => handleRouteClick(event, "computer")}
-            onMouseEnter={(e) => showNavTooltip(t("nav.computer"), e.currentTarget)}
-            onMouseLeave={hideNavTooltip}
-            onFocus={(e) => showNavTooltip(t("nav.computer"), e.currentTarget)}
-            onBlur={hideNavTooltip}
-          >
-            <NavComputer size={18} aria-hidden="true" />
-            <span className="sidenav-label sr-only">{t("nav.computer")}</span>
           </a>
         </div>
         <div className="sidenav-group sidenav-group--separated" role="group" aria-label={t("nav.workspace")}>
@@ -278,6 +254,24 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
           >
             <NavRoutine size={18} />
             <span className="sidenav-label sr-only">{t("nav.routine")}</span>
+          </a>
+          {/* Lives in Workspace, not beside Threads: ComputerPage's own
+              header prints the "Workspace" kicker, so the rail has to agree
+              with the breadcrumb the page shows. */}
+          <a
+            className={`sidenav-btn ${route === "computer" ? "active" : ""}`}
+            data-nav="computer"
+            href={hrefForRoute("computer")}
+            aria-label={t("nav.computer")}
+            aria-current={route === "computer" ? "page" : undefined}
+            onClick={(event) => handleRouteClick(event, "computer")}
+            onMouseEnter={(e) => showNavTooltip(t("nav.computer"), e.currentTarget)}
+            onMouseLeave={hideNavTooltip}
+            onFocus={(e) => showNavTooltip(t("nav.computer"), e.currentTarget)}
+            onBlur={hideNavTooltip}
+          >
+            <NavComputer size={18} aria-hidden="true" />
+            <span className="sidenav-label sr-only">{t("nav.computer")}</span>
           </a>
         </div>
         <div className="sidenav-group sidenav-group--separated" role="group" aria-label={t("nav.workforce")}>
@@ -316,17 +310,19 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
         {isAdmin ? (
           <div className="sidenav-group sidenav-group--separated" role="group" aria-label={t("nav.manage")}>
             <span className="sidenav-group-label sidenav-overflow-item sr-only" aria-hidden="true">{t("nav.manage")}</span>
+            {/* Keeps role=button + aria-disabled so assistive tech still
+                announces it as an unavailable destination, but drops
+                tabIndex: it has no activation handler, so a keyboard user
+                tabbing in hit a dead stop with no way to learn why. The
+                focus tooltip goes with it. */}
             <span
               className="sidenav-btn sidenav-overflow-item"
               data-nav="channels"
               role="button"
-              tabIndex={0}
               aria-disabled="true"
               aria-label={channelsHint}
               onMouseEnter={(e) => showNavTooltip(channelsHint, e.currentTarget)}
               onMouseLeave={hideNavTooltip}
-              onFocus={(e) => showNavTooltip(channelsHint, e.currentTarget)}
-              onBlur={hideNavTooltip}
             >
               <NavChannels size={18} />
               <span className="sidenav-label sr-only">{t("nav.channels")}</span>
@@ -370,6 +366,22 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
         ) : null}
       </nav>
       <div className="sidenav-bottom">
+        <Button
+          type="button"
+          variant="ghost"
+          aria-label={sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar")}
+          className="sidenav-btn sidenav-toggle"
+          data-nav="collapse"
+          onClick={() => setSidenavExpanded(!sidenavExpanded)}
+          title={sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar")}
+          onMouseEnter={(e) => showNavTooltip(sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar"), e.currentTarget)}
+          onMouseLeave={hideNavTooltip}
+          onFocus={(e) => showNavTooltip(sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar"), e.currentTarget)}
+          onBlur={hideNavTooltip}
+        >
+          {sidenavExpanded ? <NavSidebarCollapse size={18} /> : <NavSidebarExpand size={18} />}
+          <span className="sidenav-label sr-only">{sidenavExpanded ? t("nav.collapse") : t("nav.expand")}</span>
+        </Button>
         <Button
           ref={preferencesButtonRef}
           variant="ghost"

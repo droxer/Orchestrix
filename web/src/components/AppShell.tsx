@@ -37,7 +37,7 @@ type AppShellProps = {
   mobileView: MobileView;
   onMobileViewChange: (view: MobileView) => void;
   sidenavExpanded: boolean;
-  setSidenavExpanded: Dispatch<SetStateAction<boolean>>;
+  setSidenavExpanded: (expanded: boolean) => void;
   prefsOpen: boolean;
   setPrefsOpen: Dispatch<SetStateAction<boolean>>;
   skipLinkHref: string;

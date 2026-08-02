@@ -1,0 +1,416 @@
+/* =====================================================================
+   My Computer — the employee's own machines.
+
+   The route shipped with no stylesheet at all, which cost it the three
+   things every other work route gets from its own file:
+
+   1. A scroll body. The shell is `overflow: hidden`, so a page that just
+      grows past the viewport is clipped with no way to reach the bottom
+      — a roster of 25 computers put its last card ~700px below the fold
+      and neither the page nor the document would scroll to it.
+   2. Inline padding. `.adm-fleet-grid` carries none, so the cards sat
+      flush against the sidenav hairline, outdented 32px from the title
+      in their own header, and bled off the right edge.
+   3. A mobile row assignment (responsive.css) and a background.
+   ===================================================================== */
+
+.computer-page {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface-0);
+}
+
+/* Inline padding matches .page-header's `px-xl` (--sp-7) so the roster
+   lines up with the title above it. */
+.computer-page-body {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sp-6) var(--sp-7) var(--sp-8);
+}
+
+.computer-page .relay-empty {
+  margin-top: var(--sp-8);
+}
+
+/* One or two machines, not a fleet: a stack of records rather than an
+   auto-fill tile grid, capped so a 2560px display doesn't stretch a
+   three-fact list across the whole canvas. */
+.computer-list {
+  display: flex;
+  max-width: 68rem;
+  flex-direction: column;
+  gap: var(--sp-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ---- record ---------------------------------------------------------- */
+
+.computer-card {
+  container-type: inline-size;
+  container-name: computer;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-3);
+  background: var(--surface-1);
+  overflow: hidden;
+}
+
+.computer-card-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border-bottom: 1px solid var(--line-1);
+}
+
+.computer-card-avatar {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+
+.computer-card-identity {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.computer-card-nameline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.computer-card-name {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-1);
+  font-family: var(--font-display);
+  font-size: var(--fs-4);
+  font-weight: 550;
+  letter-spacing: var(--track-display);
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Ownership, isolation, and heartbeat on one quiet line. These were three
+   separate chips on the admin tile; here they are context, not status. */
+.computer-card-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  color: var(--ink-3);
+  font: var(--type-micro);
+}
+
+.computer-card-sep {
+  color: var(--ink-4);
+}
+
+.computer-card-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+/* ---- sections -------------------------------------------------------- */
+
+.computer-card-activity,
+.computer-card-panel {
+  min-width: 0;
+  padding: var(--sp-4);
+}
+
+.computer-card-activity {
+  border-bottom: 1px solid var(--line-1);
+}
+
+.computer-card-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-3);
+  color: var(--ink-3);
+  font: var(--type-label-strong);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+.computer-card-count {
+  padding: 0 var(--sp-1-5);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-full);
+  color: var(--ink-3);
+  font: var(--type-micro);
+}
+
+.computer-card-idle {
+  margin: 0;
+  color: var(--ink-3);
+  font: var(--type-body-sm);
+}
+
+/* ---- running work ---------------------------------------------------- */
+
+.computer-run-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.computer-run-open {
+  display: grid;
+  grid-template-columns: auto auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-2);
+  background: transparent;
+  color: var(--ink-2);
+  font: var(--type-body-sm);
+  text-align: left;
+}
+
+button.computer-run-open {
+  cursor: pointer;
+}
+
+button.computer-run-open:hover {
+  border-color: var(--line-2);
+  background: var(--surface-2);
+}
+
+button.computer-run-open:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.computer-run-mark {
+  --mark-accent: var(--live);
+}
+
+.computer-run-agent-mark {
+  color: var(--ink-3);
+}
+
+.computer-run-agent {
+  color: var(--ink-2);
+  font: var(--type-label-strong);
+}
+
+.computer-run-goal {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The one place the accent belongs on this surface: a counter that is
+   moving because an agent is working right now. */
+.computer-run-elapsed {
+  color: var(--live);
+  font: var(--type-micro);
+}
+
+/* ---- runtimes + facts ------------------------------------------------ */
+
+.computer-card-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Container, not viewport: the pane's width depends on whether the rail is
+   collapsed, so viewport width is not a usable proxy for it. */
+@container computer (min-width: 768px) {
+  .computer-card-body {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  }
+
+  .computer-card-body > .computer-card-panel + .computer-card-panel {
+    border-left: 1px solid var(--line-1);
+  }
+}
+
+.computer-card-body > .computer-card-panel + .computer-card-panel {
+  border-top: 1px solid var(--line-1);
+}
+
+@container computer (min-width: 768px) {
+  .computer-card-body > .computer-card-panel + .computer-card-panel {
+    border-top: 0;
+  }
+}
+
+.computer-runtime-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Named, versioned, and stated — the admin tile's four bare vendor glyphs
+   left the reader guessing which mark was which and what it meant. */
+.computer-runtime-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  color: var(--ink-2);
+  font: var(--type-body-sm);
+}
+
+.computer-runtime-row .adm-agent-dot { background: var(--ink-4); }
+.computer-runtime-row.tone-warn .adm-agent-dot { background: var(--warn); }
+.computer-runtime-row.tone-bad .adm-agent-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.25px var(--err);
+}
+
+.computer-runtime-row.is-disabled {
+  opacity: 0.5;
+}
+
+.computer-runtime-mark {
+  color: var(--ink-3);
+}
+
+.computer-runtime-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.computer-runtime-state,
+.computer-runtime-version {
+  color: var(--ink-3);
+  font: var(--type-micro);
+}
+
+.computer-runtime-version {
+  font-family: var(--font-mono);
+}
+
+.computer-fact-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0;
+}
+
+.computer-fact {
+  display: grid;
+  grid-template-columns: minmax(0, 7rem) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.computer-fact dt {
+  color: var(--ink-3);
+  font: var(--type-micro);
+}
+
+.computer-fact dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--ink-2);
+  font: var(--type-body-sm);
+}
+
+/* Wraps rather than truncates. A tail ellipsis would cut the identifying
+   end of the path, and the `direction: rtl` trick that front-truncates it
+   reorders the leading slash — `/workspace` rendered as `workspace/`. A
+   path is short enough to take a second line. */
+.computer-fact-path {
+  display: block;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.computer-fact-id {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.computer-fact-id .code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2);
+}
+
+@media (max-width: 820px) {
+  /* The mobile topbar already names the route, so responsive.css clips
+     every work route's .page-header-lead. Routes that keep an actions
+     toolbar still have something in that band; this one has neither
+     toolbar nor actions, so what survived was 48px of padding and a
+     hairline — an empty grey strip under the topbar. */
+  .computer-page .page-header {
+    display: none;
+  }
+
+  .computer-page-body {
+    padding: var(--sp-4);
+  }
+
+  /* Actions drop below the identity rather than squeezing it: two labelled
+     buttons and a name do not share a 390pt row. */
+  .computer-card-hero {
+    flex-wrap: wrap;
+  }
+
+  .computer-card-actions {
+    width: 100%;
+  }
+
+  .computer-card-actions > * {
+    flex: 1;
+  }
+
+  /* The meta line wraps at this width, which left a dangling "·" at the end
+     of the first line. Space carries the separation instead. */
+  .computer-card-sep {
+    display: none;
+  }
+
+  .computer-card-sub {
+    column-gap: var(--sp-3);
+  }
+}

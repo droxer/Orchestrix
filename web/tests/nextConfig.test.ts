@@ -16,7 +16,10 @@ describe("Next development API proxy", () => {
   it("serves only recognized clean browser routes through the SPA", async () => {
     const configSource = await readFile(resolve("web/next.config.ts"), "utf8");
 
-    for (const route of ["login", "threads", "backlog", "routines", "agents", "teams", "channels", "admin"]) {
+    // Every WORK_PATHS entry in web/src/lib/appRoute.ts needs a fallback here
+    // or a direct load / refresh of that URL 404s in dev — which is how
+    // /computer shipped: client-side nav worked, F5 did not.
+    for (const route of ["login", "threads", "backlog", "computer", "routines", "agents", "teams", "channels", "admin"]) {
       assert.match(configSource, new RegExp(`source: "\\/${route}`));
     }
   });

@@ -13,6 +13,7 @@ export const tokenStorageKey = "relay-web.tokens";
 export const selectedEmployeeKey = "relay-web.selectedEmployee";
 export const themeStorageKey = "relay-web.theme";
 export const languageStorageKey = "relay-web.language";
+export const sidenavExpandedKey = "relay-web.sidenavExpanded";
 
 export function readTokens(): TokenMap {
   if (typeof window === "undefined") return {};
@@ -46,6 +47,16 @@ export function writeTheme(theme: Theme): void {
 
 export function writeLanguage(language: Language): void {
   if (typeof window !== "undefined") localStorage.setItem(languageStorageKey, language);
+}
+
+/** Rail collapse state. Defaults to expanded; only an explicit "0" collapses. */
+export function readSidenavExpanded(): boolean {
+  if (typeof window === "undefined") return true;
+  return localStorage.getItem(sidenavExpandedKey) !== "0";
+}
+
+export function writeSidenavExpanded(expanded: boolean): void {
+  if (typeof window !== "undefined") localStorage.setItem(sidenavExpandedKey, expanded ? "1" : "0");
 }
 
 /** Resolve the OS color-scheme preference; defaults to light off-DOM. */

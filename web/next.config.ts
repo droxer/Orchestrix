@@ -25,6 +25,7 @@ const nextConfig = (phase: string): NextConfig => {
                 { source: "/threads", destination: "/" },
                 { source: "/threads/:path*", destination: "/" },
                 { source: "/backlog", destination: "/" },
+                { source: "/computer", destination: "/" },
                 { source: "/routines", destination: "/" },
                 { source: "/agents", destination: "/" },
                 { source: "/agents/:path*", destination: "/" },

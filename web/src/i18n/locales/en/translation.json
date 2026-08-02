@@ -377,7 +377,18 @@
     "count_one": "{{count}} computer",
     "count_other": "{{count}} computers",
     "empty_title": "No computer assigned yet",
-    "empty_body": "Ask an admin to assign a computer to you."
+    "empty_body": "Ask an admin to assign a computer to you.",
+    "unnamed": "Unnamed computer",
+    "last_seen": "Last seen {{time}}",
+    "now_running": "Now running",
+    "idle": "Nothing running right now.",
+    "untitled_run": "Untitled run",
+    "open_run_thread": "Open this thread",
+    "details": "Details",
+    "fact_workspace": "Workspace",
+    "fact_id": "Computer ID",
+    "fact_unset": "Not reported",
+    "runtime_no_signal": "No signal"
   },
   "routine": {
     "title": "Routines",

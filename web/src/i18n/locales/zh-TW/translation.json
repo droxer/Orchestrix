@@ -377,7 +377,18 @@
     "count_one": "{{count}} 台電腦",
     "count_other": "{{count}} 台電腦",
     "empty_title": "尚未分配電腦",
-    "empty_body": "請聯繫管理員為你分配一台電腦。"
+    "empty_body": "請聯繫管理員為你分配一台電腦。",
+    "unnamed": "未命名電腦",
+    "last_seen": "最後上線 {{time}}",
+    "now_running": "正在執行",
+    "idle": "目前沒有任務執行。",
+    "untitled_run": "未命名執行",
+    "open_run_thread": "開啟該對話",
+    "details": "詳細資訊",
+    "fact_workspace": "工作目錄",
+    "fact_id": "電腦 ID",
+    "fact_unset": "未回報",
+    "runtime_no_signal": "無訊號"
   },
   "routine": {
     "title": "例行任務",

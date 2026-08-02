@@ -26,14 +26,6 @@
   margin-bottom: var(--sp-4);
 }
 
-.sidenav-panel:not([data-expanded="true"]) .sidenav-brand-row {
-  flex-direction: column;
-}
-
-.sidenav-panel[data-expanded="true"] .sidenav-brand-row {
-  justify-content: space-between;
-}
-
 .sidenav-brand {
   display: flex;
   align-items: center;
@@ -322,13 +314,6 @@
   border-color: var(--line-2);
 }
 
-/* The collapse toggle is a smaller 32px control; the extra class lifts it
-   above atelier.css's 44px .sidenav-btn sizing. */
-.sidenav-btn.sidenav-toggle {
-  width: 32px;
-  height: 32px;
-}
-
 /* Collapsed-mode tooltip rendered via React so it escapes the panel's overflow */
 .sidenav-tooltip {
   position: fixed;
@@ -360,17 +345,20 @@
   }
 }
 
-/* Staggered label reveal when expanding */
-.sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(1) .sidenav-label { transition-delay: calc(var(--t-fast) * 0.25); }
-.sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(2) .sidenav-label { transition-delay: calc(var(--t-fast) * 0.5); }
-.sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(3) .sidenav-label { transition-delay: calc(var(--t-fast) * 0.75); }
-.sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(4) .sidenav-label { transition-delay: var(--t-fast); }
-.sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(5) .sidenav-label { transition-delay: var(--t-fast); }
-.sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(6) .sidenav-label { transition-delay: var(--t-fast); }
-.sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(7) .sidenav-label { transition-delay: var(--t-fast); }
-.sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(8) .sidenav-label { transition-delay: var(--t-fast); }
-.sidenav-panel[data-expanded="true"] .sidenav-bottom .sidenav-btn:nth-child(1) .sidenav-label { transition-delay: var(--t-fast); }
-.sidenav-panel[data-expanded="true"] .sidenav-bottom .sidenav-btn:nth-child(2) .sidenav-label { transition-delay: var(--t-fast); }
+/* Staggered label reveal when expanding.
+
+   Staggered per GROUP, not per button: the buttons live inside
+   .sidenav-group wrappers, so a bare `.sidenav-btn:nth-child(N)` restarts
+   the count in every group — and is offset by one wherever the group
+   carries a label span. The old per-button ladder therefore replayed
+   1,2 / 2,3 / 2,3 / 2,3,4 down the rail instead of counting to eight.
+   Group-level steps are monotonic by construction and stay correct when
+   an item is added to or removed from a group. */
+.sidenav-panel[data-expanded="true"] .sidenav-group:nth-child(1) .sidenav-label { transition-delay: calc(var(--t-fast) * 0.25); }
+.sidenav-panel[data-expanded="true"] .sidenav-group:nth-child(2) .sidenav-label { transition-delay: calc(var(--t-fast) * 0.5); }
+.sidenav-panel[data-expanded="true"] .sidenav-group:nth-child(3) .sidenav-label { transition-delay: calc(var(--t-fast) * 0.75); }
+.sidenav-panel[data-expanded="true"] .sidenav-group:nth-child(4) .sidenav-label { transition-delay: var(--t-fast); }
+.sidenav-panel[data-expanded="true"] .sidenav-bottom .sidenav-label { transition-delay: var(--t-fast); }
 
 /* Expanded button layout: icon + label side by side. Compact rows at the
    40px control height (not the 48px collapsed square), tight label rhythm. */
@@ -390,8 +378,7 @@
   gap: var(--sp-1);
 }
 
-.sidenav-btn .sidenav-label,
-.sidenav-btn .sidenav-toggle-label {
+.sidenav-btn .sidenav-label {
   /* Fade-in when visible */
   transition: opacity var(--t-fast) var(--ease) calc(var(--t-fast) * 0.5);
   opacity: 0;
@@ -415,11 +402,6 @@
 
 .sidenav-toggle svg {
   flex-shrink: 0;
-}
-
-.sidenav-panel[data-expanded="true"] .sidenav-toggle {
-  width: 32px;
-  flex: 0 0 32px;
 }
 
 .thread-panel {
