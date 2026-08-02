@@ -229,6 +229,7 @@ export {
   type RelayArtifactKind,
   type RelayEvent,
   type RelaySession,
+  type WorkspaceLayout,
   type SessionStatus,
 } from "./session-store.js";
 

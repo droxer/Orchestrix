@@ -25,6 +25,7 @@ from ..core.models import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RELAY_DATA_DIR = REPO_ROOT / ".relay"
+SESSION_WORKSPACE_LAYOUT_THREAD = "thread"
 
 # Every database-backed store registers its tables here. One MetaData is what
 # lets foreign keys cross aggregate boundaries (agents -> employees, placements
@@ -301,6 +302,8 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         "events": [],
         "archived": False,
     }
+    if created.get("workspaceLayout"):
+        session["workspaceLayout"] = created["workspaceLayout"]
     if created.get("ownerEmployeeId"):
         session["ownerEmployeeId"] = created["ownerEmployeeId"]
     if created.get("ownerAgentId"):

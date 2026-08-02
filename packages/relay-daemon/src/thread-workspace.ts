@@ -65,6 +65,15 @@ export class ThreadWorkspaceManager {
     // replaced during creation is rejected before it reaches an agent run.
     return this.resolve(sessionId);
   }
+
+  /** Existing sessions created before thread directories keep their node-root cwd. */
+  nodeRoot(sessionId: string): ThreadWorkspace {
+    return {
+      sessionId,
+      hostPath: this.rootPath,
+      executionPath: this.sandboxMode === "boxlite" ? GUEST_WORKSPACE : this.rootPath,
+    };
+  }
 }
 
 function validateThreadId(sessionId: string): void {

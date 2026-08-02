@@ -522,7 +522,9 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
           activeRuns.get(command.commandId)?.controller.abort(command.reason);
         } else if (command.type === "workspace.list" || command.type === "workspace.read") {
           const commandWorkspacePath = command.sessionId
-            ? threadWorkspaces.resolve(command.sessionId).hostPath
+            ? (command.workspaceLayout === "thread"
+                ? threadWorkspaces.resolve(command.sessionId)
+                : threadWorkspaces.nodeRoot(command.sessionId)).hostPath
             : workspacePath;
           const event = workspaceCommandEvent(commandWorkspacePath, command);
           await postJsonWithRetry(fetchFn, relayApiUrl(backendUrl, `/daemon-nodes/${encodeURIComponent(sandboxId)}/events`), event, token, runtimeSignal).catch((error: unknown) => {
@@ -732,7 +734,9 @@ async function executeCommand(
       `Daemon workspace mismatch: command expects ${command.workspacePath} but this daemon serves ${nodeWorkspacePath}.`,
     );
   }
-  const threadWorkspace = threadWorkspaces.ensure(command.sessionId);
+  const threadWorkspace = command.workspaceLayout === "thread"
+    ? threadWorkspaces.ensure(command.sessionId)
+    : threadWorkspaces.nodeRoot(command.sessionId);
   await environment.ensureAgentReady(command.agent, signal);
   if (signal?.aborted) {
     await postRunCancelled(fetchFn, eventUrl, command, token, signal.reason, cancellationTerminalEventSignal?.()).catch((error: unknown) => {

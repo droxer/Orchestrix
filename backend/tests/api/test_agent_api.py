@@ -127,6 +127,7 @@ def test_unprovisioned_daemon_registration_cannot_mint_logical_agents(
                 "nodeLocation": "employee-device",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "stopped",
             },
         )
@@ -146,6 +147,7 @@ def test_unprovisioned_daemon_registration_cannot_mint_logical_agents(
                 "nodeLocation": "employee-device",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             },
         )
@@ -203,6 +205,7 @@ def test_control_plane_provisioned_node_materializes_compatibility_agents(
                 "workspacePath": "/workspace/alice",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             },
         )
@@ -284,6 +287,7 @@ def test_legacy_sandbox_run_blocks_unenforced_agent_policy(monkeypatch) -> None:
                 "workspacePath": "/workspace/alice",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
         )
@@ -422,6 +426,7 @@ def test_admin_places_agents_on_different_runtime_nodes(monkeypatch) -> None:
                     "token": f"token_{node_id}",
                     "protocolVersion": 1,
                     "supportedAgents": [executor],
+                    "capabilities": ["thread-workspaces"],
                     "status": "ready",
                 }
             )
@@ -496,6 +501,7 @@ def test_agent_placements_describe_managed_and_local_runtime_nodes(monkeypatch) 
                 "sandboxMode": "none",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
         )
@@ -522,6 +528,7 @@ def test_agent_placements_describe_managed_and_local_runtime_nodes(monkeypatch) 
                     "sandboxMode": "boxlite",
                     "protocolVersion": 1,
                     "supportedAgents": ["codex"],
+                    "capabilities": ["thread-workspaces"],
                     "status": "ready",
                 },
             ).status_code
@@ -609,6 +616,7 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
                 "workspacePath": "/workspace/alice",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
         )
@@ -709,7 +717,9 @@ def test_existing_thread_resumes_after_managed_runtime_replacement_without_read(
         client = TestClient(app)
         _bootstrap_admin(client)
         managed = app.state.managed_node_store.create_node({"employeeId": "admin"})
-        attempt, _credential = app.state.managed_node_store.create_attempt(managed["id"])
+        attempt, _credential = app.state.managed_node_store.create_attempt(
+            managed["id"]
+        )
         runtime, runtime_token = app.state.registry.enroll_managed_node(
             managed,
             attempt,
@@ -724,6 +734,7 @@ def test_existing_thread_resumes_after_managed_runtime_replacement_without_read(
                 "token": runtime_token,
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
         )
@@ -747,8 +758,8 @@ def test_existing_thread_resumes_after_managed_runtime_replacement_without_read(
         )
 
         app.state.registry.delete(old_runtime_id)
-        replacement_attempt, _credential = (
-            app.state.managed_node_store.create_attempt(managed["id"])
+        replacement_attempt, _credential = app.state.managed_node_store.create_attempt(
+            managed["id"]
         )
         replacement, replacement_token = app.state.registry.enroll_managed_node(
             app.state.managed_node_store.get_node(managed["id"]),
@@ -764,6 +775,7 @@ def test_existing_thread_resumes_after_managed_runtime_replacement_without_read(
                 "token": replacement_token,
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
         )
@@ -785,8 +797,7 @@ def test_existing_thread_resumes_after_managed_runtime_replacement_without_read(
         persisted = app.state.session_store.get_session(session["id"])
         assert persisted["managedNodeId"] == managed["id"]
         assert any(
-            event["type"] == "session.runtime_affinity"
-            for event in persisted["events"]
+            event["type"] == "session.runtime_affinity" for event in persisted["events"]
         )
 
 
@@ -817,6 +828,7 @@ def test_existing_session_dispatch_normalizes_legacy_agent_supervisor(
                 "workspacePath": "/workspace/alice",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
         )
@@ -879,6 +891,7 @@ def test_logical_agent_handoff_records_the_target_agent_id(monkeypatch) -> None:
                 "workspacePath": "/workspace/alice",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
         )
@@ -946,6 +959,7 @@ def test_employee_cannot_dispatch_a_team_across_shared_workspace_nodes(
                     "workspaceId": f"machine:alice:{node_id}",
                     "protocolVersion": 1,
                     "supportedAgents": [executor],
+                    "capabilities": ["thread-workspaces"],
                     "maxConcurrentRuns": 2,
                     "runCapacityByMode": {"ask": 2},
                     "status": "ready",
@@ -1021,6 +1035,7 @@ def test_new_thread_runs_on_the_selected_computer(monkeypatch) -> None:
                     "workspacePath": f"/workspace/{node_id}",
                     "protocolVersion": 1,
                     "supportedAgents": ["codex"],
+                    "capabilities": ["thread-workspaces"],
                     "status": "ready",
                 }
             )
@@ -1095,6 +1110,7 @@ def test_new_thread_rejects_an_agent_outside_the_selected_computer(
                     "workspacePath": f"/workspace/{node_id}",
                     "protocolVersion": 1,
                     "supportedAgents": ["codex"],
+                    "capabilities": ["thread-workspaces"],
                     "status": "ready",
                 }
             )
@@ -1148,6 +1164,7 @@ def test_employee_cannot_list_or_dispatch_another_employees_agent(monkeypatch) -
                 "workspacePath": "/workspace/shared",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
         )
@@ -1214,6 +1231,7 @@ def test_legacy_run_materializes_compatibility_agent_without_get_side_effects(
                 "workspacePath": "/workspace/alice",
                 "protocolVersion": 1,
                 "supportedAgents": ["claude", "codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
         )
@@ -1278,6 +1296,7 @@ def test_compatibility_agent_drops_from_roster_when_its_computer_is_gone(
                 "workspacePath": "/workspace/alice",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
         )
@@ -1362,6 +1381,7 @@ def test_compatibility_agent_drops_when_its_computer_is_deregistered(
                 "workspacePath": "/workspace/alice",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
         )
@@ -1422,6 +1442,7 @@ def test_task_persists_and_dispatches_a_logical_agent_assignment(monkeypatch) ->
                 "workspacePath": "/workspace/alice",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
         )
@@ -1612,6 +1633,7 @@ def test_manual_start_materializes_a_legacy_task_assignment(monkeypatch) -> None
                 "workspacePath": "/workspace/alice",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
         )
@@ -1675,6 +1697,7 @@ def test_failed_agent_first_run_finalizes_instead_of_wedging(monkeypatch) -> Non
                 "workspacePath": "/workspace/alice",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
         )

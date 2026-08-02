@@ -54,6 +54,20 @@ root. Generated-file paths remain thread-relative in session artifacts. A
 daemon advertises the `thread-workspaces` capability so the backend can resolve
 host paths correctly during rolling upgrades.
 
+Each `session.created` event records its workspace layout. New sessions use
+`thread`; historical sessions without the field are treated as `node-root`.
+This compatibility rule keeps an upgraded session on its existing checkout
+instead of silently moving it into an empty child directory. Because the old
+root could contain work from several sessions, Relay does not guess how to
+split or copy it. A future explicit migration may checkpoint a legacy session
+into a thread child after an operator verifies its contents.
+
+During a backend-first rolling deployment, a new session marked `thread` may
+reach an older daemon. Relay rejects that dispatch until a daemon advertising
+`thread-workspaces` is available; it never weakens a new session to the shared
+node root. Only genuinely historical sessions whose creation event has no
+workspace layout retain `node-root` compatibility.
+
 ## Ownership and lifecycle
 
 - Employee devices: the selected root remains local configuration and must
@@ -62,6 +76,8 @@ host paths correctly during rolling upgrades.
 - Cloud computers: the supervisor/provider provisions the root and its
   persistent volume or recovery mechanism before starting the daemon.
 - Daemon restart: an existing thread child is reused.
+- Daemon upgrade: sessions already created under the legacy shared-root model
+  continue at that root; only newly-created sessions select thread children.
 - Thread archive or deletion: directory retention and garbage collection are a
   separate policy decision; this change does not delete employee or cloud data.
 - Node reassignment: ADR-011's immutable thread runtime still applies. Moving a
@@ -77,9 +93,11 @@ host paths correctly during rolling upgrades.
 - Live agent-home reads include a thread ID. Cross-thread agent workspace views
   use durable artifacts instead of treating the legacy node root as an agent
   home.
-- Existing daemons without `thread-workspaces` retain legacy node-root behavior
-  until upgraded; the backend continues to interpret their artifacts using the
-  legacy root.
+- Existing daemons without `thread-workspaces` may continue genuinely
+  historical sessions at the legacy node root. The backend rejects new
+  thread-layout runs and never sends those daemons a thread-scoped live-read
+  command. Upgraded daemons honor each session's recorded layout, and the
+  backend interprets generated-file paths using the same layout.
 - A mounted node root is still visible to the BoxLite guest. This decision
   provides working-directory isolation, not a stronger per-thread VM security
   boundary; a future hard-isolation mode may mount only the selected thread.

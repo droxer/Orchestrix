@@ -34,8 +34,13 @@ describe("Agent team management", () => {
     assert.match(teamWorkspaceSource, /"profile", "workspace", "activities"/);
     assert.match(teamWorkspaceSource, /WorkspaceFilesBrowser/);
     assert.match(teamWorkspaceSource, /fixedScope="shared"/);
+    assert.match(teamWorkspaceSource, /threads=\{briefQuery\.data\?\.sessions/);
+    assert.match(teamWorkspaceSource, /teamId=\{team\.id\}/);
+    assert.match(agentWorkspaceSource, /threadId: selectedThreadId/);
     assert.doesNotMatch(teamWorkspaceSource, /getTeamArtifacts|TeamArtifacts/);
     assert.match(teamWorkspaceSource, /getWorkspaceBrief\(\{ teamId: team\.id \}/);
+    assert.match(agentWorkspaceSource, /pageTab !== "profile" \? query\.refetch\(\)/);
+    assert.match(teamWorkspaceSource, /pageTab !== "profile" \? briefQuery\.refetch\(\)/);
     assert.match(teamsSource, /actions=\{teamId \? null :/);
     assert.match(teamsSource, /open=\{!teamId && addTeam\}/);
     assert.match(agentsSource, /isDetailRoute \? null : \(/);

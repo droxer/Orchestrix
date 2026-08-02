@@ -6,6 +6,7 @@ export type AgentRole = "implementer" | "reviewer" | "planner" | "tester" | "fix
 export type SessionStatus = "running" | "waiting_for_human" | "completed" | "failed" | "cancelled";
 export type RelayArtifactKind = "plan" | "diff" | "review" | "test_output" | "command_log" | "summary" | "agent_output" | "workspace_file";
 export type HumanDecisionKind = "approve" | "reject" | "cancel" | "rerun" | "handoff" | "mark_done";
+export type WorkspaceLayout = "node-root" | "thread";
 
 export interface AgentRun {
   id: string;
@@ -58,6 +59,8 @@ export interface HumanDecision {
 export interface RelaySession {
   id: string;
   workspacePath: string;
+  /** Missing on historical sessions, which retain the legacy node-root layout. */
+  workspaceLayout?: WorkspaceLayout;
   /** Daemon node selected as this thread's immutable runtime boundary. */
   daemonNodeId?: string;
   /** Stable managed Computer identity; survives daemon runtime replacement. */
@@ -92,6 +95,7 @@ export type RelayEvent =
       sessionId: string;
       timestamp: string;
       workspacePath: string;
+      workspaceLayout?: WorkspaceLayout;
       daemonNodeId?: string;
       managedNodeId?: string;
       ownerEmployeeId?: string;
@@ -246,6 +250,7 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
   const session: RelaySession = {
     id: created.sessionId,
     workspacePath: created.workspacePath,
+    ...(created.workspaceLayout ? { workspaceLayout: created.workspaceLayout } : {}),
     ...(created.daemonNodeId ? { daemonNodeId: created.daemonNodeId } : {}),
     ...(created.managedNodeId ? { managedNodeId: created.managedNodeId } : {}),
     ...(created.ownerEmployeeId ? { ownerEmployeeId: created.ownerEmployeeId } : {}),

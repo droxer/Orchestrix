@@ -18,7 +18,9 @@ Required:
 - `RELAY_WORKSPACE` or `WORKSPACE`: node workspace root. On an employee-owned
   computer, the employee selects this existing writable directory during
   setup. On a managed cloud computer, the supervisor/provider provisions it.
-  The daemon creates and reuses `<root>/<thread-id>/` for each thread.
+  The daemon creates and reuses `<root>/<thread-id>/` for each new thread.
+  Historical threads created before this layout retain the node root so an
+  upgrade does not strand their existing files.
 
 Optional:
 
@@ -97,8 +99,8 @@ relay-daemon \
 The daemon has two scheduling classes. `action` and `review` are exclusive work
 modes: only one can run on the computer at a time. `ask` mode can run
 concurrently up to the configured ask capacity so lightweight conversations do
-not block each other. Each run receives its thread directory explicitly, so
-concurrent threads do not share a working directory.
+not block each other. New-layout runs receive their thread directory
+explicitly, so concurrent new threads do not share a working directory.
 
 ## Thread workspace layout
 
@@ -119,6 +121,15 @@ Relay uses:
 
 BoxLite and cloud nodes use the same host layout. The node root is mounted at
 `/workspace`, and the agent runs from `/workspace/<thread-id>`.
+
+The backend stamps new threads with `workspaceLayout: thread`. A historical
+thread without that event field runs from the configured node root for backward
+compatibility. Thread-scoped live reads additionally require the daemon's
+`thread-workspaces` capability; older daemons are never asked to interpret a
+thread id they do not understand. The backend rejects a new thread-layout run
+on an older daemon rather than weakening its isolation. Only genuinely
+historical threads whose creation event has no workspace layout continue at
+the node root.
 
 ## Delivery Semantics
 

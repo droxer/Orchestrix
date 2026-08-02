@@ -1,4 +1,13 @@
-import type { AgentWorkspaceFilesResponse, AgentWorkspaceSource } from "../types.js";
+import type { AgentWorkspaceFilesResponse, AgentWorkspaceSource, WorkspaceBriefSession } from "../types.js";
+
+export function preferredWorkspaceThreadId(
+  threads: Array<Pick<WorkspaceBriefSession, "id">>,
+  requestedThreadId: string,
+): string {
+  return threads.some((thread) => thread.id === requestedThreadId)
+    ? requestedThreadId
+    : threads[0]?.id ?? "";
+}
 
 /** What the Files pane header shows about the agent home's data source. */
 export type WorkspaceHomeStatus =

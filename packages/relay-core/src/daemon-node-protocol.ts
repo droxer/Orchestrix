@@ -1,6 +1,7 @@
 import type { AgentName, AgentState, AgentTaskMode } from "./state.js";
 import type { TokenUsage } from "./token-usage.js";
 import type { CodexCollaborationEvent } from "./codex-collaboration.js";
+import type { WorkspaceLayout } from "./session-store.js";
 
 export type DaemonNodeStatus = "ready" | "busy" | "stopped";
 export type DaemonNodeSandboxMode = "none" | "boxlite";
@@ -69,7 +70,7 @@ export const DAEMON_CAPABILITY_THREAD_WORKSPACES: DaemonNodeCapability = "thread
 
 /** A workspace file a run created or changed, reported by the daemon. */
 export interface DaemonGeneratedFile {
-  /** Path relative to the run's thread workspace (posix separators). */
+  /** Path relative to the run workspace (thread child or legacy node root). */
   relativePath: string;
   title: string;
   bytes: number;
@@ -121,6 +122,9 @@ export interface DaemonNodeHeartbeatResponse {
   heartbeat: DaemonNodeHeartbeatSettings;
 }
 
+/** Legacy sessions stay at the node root; newly-created sessions use a thread child. */
+export type DaemonWorkspaceLayout = WorkspaceLayout;
+
 export interface DaemonNodeRunCommand {
   id: string;
   type: "run.start";
@@ -136,6 +140,8 @@ export interface DaemonNodeRunCommand {
   agentVersion?: number;
   mode: AgentTaskMode;
   workspacePath?: string;
+  /** Missing means node-root for compatibility with commands from older backends. */
+  workspaceLayout?: DaemonWorkspaceLayout;
   state?: AgentState;
 }
 
@@ -176,6 +182,7 @@ export interface DaemonWorkspaceListCommand {
   attempt?: number;
   /** Thread workspace to read. Omitted only for node-root administration. */
   sessionId?: string;
+  workspaceLayout?: DaemonWorkspaceLayout;
   scope?: DaemonWorkspaceScope;
   /** Required for agent-home scope; optional for shared scope. */
   agentId?: string;
@@ -190,6 +197,7 @@ export interface DaemonWorkspaceReadCommand {
   attempt?: number;
   /** Thread workspace to read. Omitted only for node-root administration. */
   sessionId?: string;
+  workspaceLayout?: DaemonWorkspaceLayout;
   scope?: DaemonWorkspaceScope;
   /** Required for agent-home scope; optional for shared scope. */
   agentId?: string;

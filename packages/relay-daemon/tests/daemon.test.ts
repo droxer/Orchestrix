@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { homedir, tmpdir } from "node:os";
@@ -85,6 +85,7 @@ function runCommand(id = "cmd_1"): DaemonNodeRunCommand {
     agent: "codex",
     mode: "action",
     workspacePath: process.cwd(),
+    workspaceLayout: "thread",
   };
 }
 
@@ -1914,6 +1915,64 @@ test("relay daemon reports generated workspace documents in run.completed", asyn
   assert.equal(Buffer.from(file.contentBase64 ?? "", "base64").toString("utf-8"), "pdf bytes");
 });
 
+test("upgraded daemon keeps legacy sessions on the existing node root", async (t: TestContext) => {
+  const workspace = mkdtempSync(join(tmpdir(), "relay-daemon-legacy-workspace-"));
+  t.after(() => rmSync(workspace, { recursive: true, force: true }));
+  writeFileSync(join(workspace, "existing-checkout.txt"), "preserve me");
+
+  const stop = new AbortController();
+  const events: DaemonNodeEvent[] = [];
+  let commandServed = false;
+  const command: DaemonNodeRunCommand = {
+    ...runCommand("cmd_legacy"),
+    workspacePath: workspace,
+  };
+  delete command.workspaceLayout;
+
+  await runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: workspace,
+    token: "node_token",
+    pollIntervalMs: 5,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: fakeEnvironment({
+      exec: async (_cmd, args, options) => {
+        if (!isInventoryProbe(args)) {
+          assert.equal(options?.cwd, workspace);
+          assert.equal(readFileSync(join(workspace, "existing-checkout.txt"), "utf8"), "preserve me");
+        }
+        return { exit_code: 0, stdout: "done\n", stderr: "" };
+      },
+    }),
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        if (!commandServed) {
+          commandServed = true;
+          return jsonResponse({ commands: [command] });
+        }
+        return jsonResponse({ commands: [] });
+      }
+      if (path.endsWith("/events")) {
+        const event = await jsonBody<DaemonNodeEvent>(init);
+        events.push(event);
+        if (event.type === "run.completed") stop.abort();
+        return jsonResponse({ ok: true }, 202);
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  assert.equal(events.some((event) => event.type === "run.completed"), true);
+  assert.equal(existsSync(join(workspace, command.sessionId)), false);
+});
+
 test("generated-file diff detects changed files and skips excluded directories", async (t: TestContext) => {
   const { mkdtempSync, mkdirSync: makeDir, rmSync, writeFileSync: writeFile } = await import("node:fs");
   const { tmpdir } = await import("node:os");
@@ -2053,9 +2112,9 @@ test("relay daemon serves agent-home workspace commands", async () => {
       if (path === "/api/v1/daemon-node-registrations") { registration = await jsonBody<DaemonNodeRegistration>(init); return jsonResponse({ ok: true }); }
       if (path.endsWith("/commands")) {
         if (!served) { served = true; return jsonResponse({ commands: [
-          { id: "cmd_ls", type: "workspace.list", sessionId: threadId, agentId: "agent_1", path: "" },
-          { id: "cmd_read", type: "workspace.read", sessionId: threadId, agentId: "agent_1", path: "report.md" },
-          { id: "cmd_bad", type: "workspace.read", sessionId: threadId, agentId: "agent_1", path: "../escape" },
+          { id: "cmd_ls", type: "workspace.list", sessionId: threadId, workspaceLayout: "thread", agentId: "agent_1", path: "" },
+          { id: "cmd_read", type: "workspace.read", sessionId: threadId, workspaceLayout: "thread", agentId: "agent_1", path: "report.md" },
+          { id: "cmd_bad", type: "workspace.read", sessionId: threadId, workspaceLayout: "thread", agentId: "agent_1", path: "../escape" },
         ] }); }
         return jsonResponse({ commands: [] });
       }

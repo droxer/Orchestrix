@@ -525,6 +525,7 @@ def test_agent_pickup_thread_is_owned_by_the_task_assignee(monkeypatch) -> None:
                 "workspacePath": "/workspace/alice",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
         )
@@ -678,6 +679,7 @@ def test_task_assigned_to_team_starts_all_members_lead_first_in_assignee_thread(
                 "workspacePath": "/workspace/alice",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex", "claude"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
         )
@@ -765,6 +767,7 @@ def test_team_task_start_propagates_review_mode_to_every_member(monkeypatch) -> 
                 "workspacePath": "/workspace/alice",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex", "claude"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
         )
@@ -884,6 +887,7 @@ def test_unroutable_team_start_requests_capacity_and_queues_scheduler_retry(
                 "sandboxMode": "boxlite",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             },
         )
@@ -1055,6 +1059,7 @@ def test_manual_team_routine_start_reuses_occurrence_promoted_today(
                 "workspacePath": "/workspace/alice",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
         )

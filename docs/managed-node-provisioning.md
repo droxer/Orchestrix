@@ -162,7 +162,9 @@ starts the daemon. In accordance with [ADR-013](adr/013-thread-scoped-workspaces
 the daemon—not the provider or backend—creates `<root>/<thread-id>` and selects
 that child as the run working directory. Employee-owned nodes receive their
 root from employee setup; cloud providers provision it, including persistence
-or recovery appropriate to the provider.
+or recovery appropriate to the provider. Sessions created before the
+thread-layout event field continue at the legacy node root after an upgrade;
+Relay does not copy an ambiguous shared root into a thread automatically.
 
 ### ProvisioningAttempt
 
