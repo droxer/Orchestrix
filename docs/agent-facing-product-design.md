@@ -5,6 +5,11 @@
 Relay is an agent-facing product. An employee uses named agents to do work;
 employees do not operate executors, sandboxes, placements, or nodes.
 
+This document owns the product projection of the model. The durable identity,
+placement, and dispatch mechanics are defined in
+[Agent-First Runtime Design](agent-first-runtime-design.md) and are not repeated
+here.
+
 ```text
 employee (identity and ownership)
   -> agent (product identity and policy)
@@ -26,10 +31,11 @@ not be a selector in the employee experience.
 
 ### Agent
 
-An agent is the primary employee-facing object and a capability hosted by a
-node. Relay materializes a stable ID for each employee/node agent capability so
-threads and assignments do not use node IDs, but administrators do not create
-agents separately. Starting or assigning a node publishes its available agents.
+An agent is the primary employee-facing object: a durable employee-owned
+identity with a name, executor kind, instructions, and policy. Its ID remains
+stable when an administrator moves it to another node. Administrators may
+create and configure agents; compatibility agents may also be materialized
+from registered node capabilities during migration.
 
 ### Placement
 
@@ -56,7 +62,7 @@ Employee navigation:
 Administrator navigation:
 
 1. **Employees** — identity, access, departments, and owned agents.
-2. **Agents** — read-only inventory derived from node capabilities and availability.
+2. **Agents** — identity, configuration, availability, and placement management.
 3. **Infrastructure** — nodes, capabilities, capacity, heartbeats, and leases.
 4. **Channels** — external identity mapping and the default named agent.
 
@@ -104,8 +110,9 @@ agent run request
 - Shell state owns `activeAgentId` and `activeSessionId`.
 - Server state owns agents, sessions, tasks, routines, placements, and nodes.
 - Browser storage must not hold per-node tokens for the normal employee flow.
-- Agent behavior comes from the agent runtime on its node. Relay does not assign
-  default roles or expose a separate create-agent workflow.
+- Relay stores agent identity and instructions; the selected placement supplies
+  the executor runtime. Agent creation and placement remain administrative
+  workflows, not employee-facing infrastructure controls.
 
 ## Migration rules
 

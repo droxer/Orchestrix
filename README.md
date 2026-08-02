@@ -1,5 +1,7 @@
 # Relay
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 <p align="center">
   <img src="assets/brand/relay-logo.svg" alt="Relay logo" width="380">
 </p>
@@ -123,61 +125,14 @@ access. The supervisor reconciles requested managed computers into daemon
 processes; its current provider runs local processes, with a command-template
 provider available for external infrastructure.
 
-### Repository map
-
-- `backend/`: FastAPI application, auth, event stores, task scheduler, agent and
-  team services, managed-computer state, and HTTP routes.
-- `packages/relay-core/`: shared protocol, command builders, prompts, renderers,
-  token accounting, and client helpers.
-- `packages/relay-chat/`: chat gateway plus Discord, Telegram, and Lark
-  adapters.
-- `packages/relay-daemon/`: computer registration, leased command polling,
-  workspace access, BoxLite lifecycle, and agent execution.
-- `packages/relay-supervisor/`: managed-computer reconciliation and provider
-  lifecycle.
-- `web/`: Next.js interface for threads, backlog, routines, agents, teams,
-  channels, and administration.
-
-## State and storage
-
-Thread/session state is always stored in the configured database. Local
-development may still store non-thread generated state under `.relay/`.
-Agent workspace views use live daemon reads when a computer is online and fall
-back to generated-file snapshots when possible.
-
-Configure `RELAY_DATABASE_URL` (or `DATABASE_URL`) before starting the backend;
-threads, ordered events, artifact snapshots, token usage, tasks, and thread-task
-links are database-only.
-Set `RELAY_STORAGE=postgres` to place the remaining control-plane records in
-PostgreSQL as well.
+The current repository map, state ownership, and operational invariants are
+maintained in [`AGENTS.md`](AGENTS.md). The target architecture and its
+implementation blueprint live in
+[`docs/system-architecture.md`](docs/system-architecture.md) and
+[`docs/implementation-plan.md`](docs/implementation-plan.md).
 
 ## Documentation
 
-- [Local Development](docs/local-development.md): setup, environment, service
-  commands, data layout, and tests.
-- [HTTP API and Web URLs](docs/api.md): canonical browser paths, `/api/v1`
-  namespaces, and operation semantics.
-- [Product Design](docs/product.md): product direction, users, scenarios, and
-  roadmap.
-- [Architecture Design](docs/system-architecture.md): target planes, sandbox
-  strategy, MCP gateway, memory, and governance.
-- [Technical Implementation Design](docs/implementation-plan.md): components,
-  data model, APIs, security, and rollout phases.
-- [Chat Integrations](docs/chat-integrations.md): provider adapters, identity
-  mapping, commands, and security.
-- [Architecture Decisions](docs/adr/README.md): accepted decisions for
-  governance, sandboxing, and control-plane boundaries.
-- [Visual Design](docs/design-system.md): product and brand design system.
-- [Brand Assets](assets/brand/README.md): logo files and color tokens.
-
-## Verification
-
-```bash
-npm run build
-npm run test:ts
-npm run test:py
-npm test
-```
-
-Use focused tests while developing, then run `npm test` before handing off a
-behavior change.
+Start with the [`docs/` index](docs/README.md), which identifies the canonical
+owner for setup, APIs, product, architecture, design, decisions, and
+operational guidance.

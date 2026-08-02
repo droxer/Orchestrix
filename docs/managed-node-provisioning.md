@@ -9,10 +9,10 @@ grants, managed daemon linkage, control-plane APIs, daemon enrollment, and the
 resources, database-backed reconcile leases, remote providers, and the final
 control-panel workflow remain rollout work described below.
 
-The employee-facing ownership and dispatch model is being reconsidered by the
-proposed [Agent-First Runtime Design](agent-first-runtime-design.md). Under that
-design, managed nodes remain infrastructure desired state while employee-owned
-logical agents are connected to runtime nodes through placements.
+The employee-facing ownership and dispatch model is defined by the accepted
+[Agent-First Runtime Design](agent-first-runtime-design.md). Managed nodes remain
+infrastructure desired state while employee-owned logical agents connect to
+runtime nodes through placements.
 
 ## Summary
 

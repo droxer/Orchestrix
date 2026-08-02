@@ -128,66 +128,9 @@ By default the hooks run:
 
 ## Backend Database Migrations
 
-Alembic migration files live under `backend/migrations/`. The initial migration
-creates the PostgreSQL storage tables for sessions, tasks, artifacts, daemon
-nodes, daemon commands, daemon runs, daemon events, auth users, and auth
-sessions, and employees. Later migrations add backlog task fields, routine
-cadence metadata, session titles, token usage, and related control-plane
-columns.
-
-Run migrations with the database URL in `backend/.env`:
-
-```bash
-make backend-migrate
-```
-
-Or override the URL for one run:
-
-```bash
-make backend-migrate DATABASE_URL=postgresql+psycopg://relay:relay@localhost:5432/relay
-```
-
-Or call Alembic directly:
-
-```bash
-RELAY_DATABASE_URL=postgresql+psycopg://relay:relay@localhost:5432/relay \
-  UV_CACHE_DIR=.uv-cache uv run --project backend --extra dev alembic -c backend/alembic.ini upgrade head
-```
-
-`RELAY_DATABASE_URL` takes precedence over `DATABASE_URL`; both override the
-placeholder URL in `backend/alembic.ini`. Values from the shell take precedence over
-values loaded from `backend/.env`.
-
-`RELAY_DATABASE_URL` is mandatory because sessions, session events, retained
-artifact content, token usage, tasks, task events, and thread-task links are
-database-only. Set
-`RELAY_STORAGE=postgres` to store the remaining operational state in PostgreSQL:
-daemon nodes, daemon commands, daemon runs, daemon events, auth users, browser
-sessions, and employees. Session
-tokens and daemon node tokens are stored as hashes; raw tokens are returned only
-once when created.
-
-Without `RELAY_STORAGE=postgres`, non-thread stores may still use local
-`.relay/*.json` files for development; sessions and tasks never do. The older
-`RELAY_AUTH_STORE=database` and
-`RELAY_DAEMON_STORE=database` switches still work for targeted compatibility,
-but new product deployments should use `RELAY_STORAGE=postgres`.
-
-### Importing legacy thread files
-
-Stop the backend, back up both PostgreSQL and `.relay`, then validate the
-legacy event logs without writing database rows:
-
-```bash
-RELAY_DATABASE_URL=postgresql+psycopg://relay:relay@localhost:5432/relay \
-  uv run --project backend relay migrate-local-sessions \
-  --data-dir .relay --dry-run
-```
-
-Remove `--dry-run` to import. The command is idempotent when the database has
-the identical ordered event history and fails on divergent session IDs. It
-never edits or deletes the source directory. Keep the legacy directory
-read-only through the rollback window; the running backend does not read it.
+See the canonical
+[`backend/migrations/README.md`](../backend/migrations/README.md) for applying
+Alembic migrations, storage settings, and importing legacy session files.
 
 ## BoxLite Devbox
 

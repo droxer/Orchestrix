@@ -682,195 +682,21 @@ The phases are ordered to keep the current local product usable while extracting
 - Multi-region or private deployment mode.
 - Sandbox tiering across BoxLite, Kubernetes/gVisor, E2B/Kata, and Cloud Workstations.
 
-## 10. Current Local Implementation Map
+## 10. Current Local Implementation
 
-This section maps the current local Python backend and TypeScript client/daemon
-implementation to the target implementation design. It should be kept current
-while the product is still local-first.
+This blueprint does not duplicate the fast-changing repository map or local
+operator workflow. Use these living owners instead:
 
-### 10.1 Runtime Entrypoints
+- [AGENTS.md](../AGENTS.md) for current module ownership, runtime
+  invariants, and verification expectations.
+- [Local Development](local-development.md) for setup, environment, service
+  commands, data layout, and tests.
+- [HTTP API and Web URL Contract](api.md) for current browser and API paths.
+- [Relay Daemon Node](../packages/relay-daemon/README.md) for the execution-plane
+  environment, workspace, and delivery contract.
 
-| Entry | File | Behavior |
-| :- | :- | :- |
-| `relay-core` | `packages/relay-core/src/index.ts` | Shared protocol, agent state, prompts, command builders, renderers, guest helpers, and agent execution units. |
-| `backend` | `backend/relay/cli.py` -> `backend/relay/app.py` | Starts the Python backend/control plane. |
-| `relay-daemon` | `packages/relay-daemon/src/cli.ts` -> `packages/relay-daemon/src/index.ts` | Starts the daemon node. |
-| TypeScript shared exports | `packages/relay-core/src/index.ts` | Re-exports protocol types, command builders, renderers, and agent runtime helpers. |
-
-Keep backend runtime code in `backend/`, TypeScript protocol
-exports in `packages/relay-core/src/index.ts`, and sandbox/execution exports in
-`packages/relay-daemon/src/index.ts`. Package binary wrappers should stay
-minimal.
-
-### 10.2 Local Data Model
-
-The local MVP persists two durable records:
-
-- `RelayTask`: backlog/Kanban work item.
-- `RelaySession`: append-only execution history for one run or handoff chain.
-
-Both models are event-sourced. The event log is authoritative; `snapshot.json` is a materialized convenience view rebuilt after each append.
-
-Routine tasks reuse the task model with `isRoutine`, `routineCadence`, and
-`routineNextRunDate` fields. The backend `TaskScheduler`
-(`backend/relay/services/task_scheduler.py`) promotes due routines and dispatches
-assigned tasks to ready daemon nodes.
-
-```text
-.relay/
-  tasks/
-    <task-id>/
-      events.jsonl
-      snapshot.json
-  sessions/
-    <session-id>/
-      events.jsonl
-      snapshot.json
-      artifacts/
-        <artifact-id>.<ext>
-  daemon/
-    nodes/
-    commands/
-    runs/
-    run-requests/
-    events/
-  daemon-nodes/
-    <employee-id>.token
-    logs/
-      *.jsonl
-```
-
-`LocalTaskStore` in `backend/relay/persistence/task_store.py` owns task
-persistence and materialization (`backend/relay/stores.py` and
-`backend/relay/task_store.py` re-export). It emits events such as
-`task.created`, `task.updated`, `task.assigned`, `task.status`,
-`task.session_linked`, and `task.activity`.
-
-`LocalSessionStore` in `backend/relay/persistence/session_store.py` owns session
-persistence, artifact files, and session materialization
-(`backend/relay/session_store.py` re-exports). It emits events such as
-`session.created`, `session.status`, `agent.started`, `agent.output`,
-`artifact.created`, `human.decision`, `agent.completed`,
-`session.completed`, and `session.failed`.
-
-When adding a new event type, update the materializer and tests together.
-
-### 10.3 Execution Controller
-
-`SessionController` in `backend/relay/services/controller.py` is the backend
-boundary between durable state and daemon execution
-(`backend/relay/controller.py` re-exports).
-Responsibilities:
-
-- create sessions and link them to an optional task
-- emit agent lifecycle and output events
-- write command output artifacts
-- record human decisions
-- mark sessions completed or failed
-- update linked task status and activity as agent steps progress
-
-Do not bypass `SessionController` when adding writable execution controls to the API.
-
-### 10.4 Agent Execution
-
-Agent-specific execution lives in `packages/relay-core/src/nodes.ts`.
-
-| Node | Command Builder | Renderer | Output State |
-| :- | :- | :- | :- |
-| `claudeImplementNode()` | `buildClaudeImplementCommand()` | `ClaudeStreamRenderer` | Last log tail, exit code, Claude failure count |
-| `piImplementNode()` | `buildPiImplementCommand()` | `PlainTextStreamRenderer` | Last log tail, exit code, Pi failure count |
-| `codexImplementNode()` | `buildCodexImplementCommand()` | `CodexStreamRenderer` | Last log tail, exit code, Codex failure count |
-| `codexReviewNode()` | `buildCodexReviewCommand()` | `CodexStreamRenderer` | Full review log, exit code |
-
-Execution contracts:
-
-- Claude runs with `--output-format stream-json`; render JSONL through `ClaudeStreamRenderer`.
-- Codex runs with `exec --json`; render JSONL through `CodexStreamRenderer`.
-- Pi uses `-P` only when `pi --help` advertises streaming print support; otherwise it falls back to `-p`.
-- Nodes stream human-readable output to the sink and forward raw chunks to `AgentEventSink.agentOutput()`.
-- Review mode is informational: agents emit prose review notes; no machine-readable verdict marker is required.
-
-### 10.5 Workflow and BoxLite Runtime
-
-Daemon-side sandbox orchestration in `packages/relay-daemon/src/sandbox-session.ts` wraps agent execution:
-
-1. Ensures only one Relay orchestrator is active.
-2. Ensures the devbox image is exported as OCI.
-3. Creates a BoxLite runtime using `@boxlite-ai/boxlite`.
-4. Mounts the host workspace into the guest at `/workspace`.
-5. Syncs guest workspace ownership.
-6. Configures guest auth/env for Codex and Pi when needed.
-7. Runs the requested action.
-8. Stops and removes the BoxLite runtime.
-
-`ensureAgentReady()` performs per-agent preflight checks and caches readiness for the current orchestrator session:
-
-- Claude: `claude --version`
-- Codex: writes guest auth, then `codex login status`
-- Pi: writes guest auth/model config, then `buildPiPreflightCommand()`
-
-Normal execution should use separate `make backend`, `make daemon`, and `make web`
-processes. Use `make run-fresh` only when `dockerfile` or the devbox image changes.
-
-### 10.6 Local API
-
-The Python API in `backend/relay/app.py` exposes canonical `/api/v1`
-task/thread/daemon/chat endpoints and starts the background task scheduler by default. Current API
-routes can create tasks (including backlog and routine metadata), create pending
-sessions, attach assignment-plan artifacts, record decisions, and expose
-historical events/artifacts. Scheduled dispatch and daemon execution still flow
-through `ServerDaemonNodeBackend.run`; the backend does not execute agent CLIs
-in-process.
-
-The web UI on the clean paths documented in [api.md](api.md) adds chat, backlog, routines, MCP, skills, channels, and
-the admin console on top of the same backend APIs.
-
-Future execution endpoints must call the same `SessionController` and daemon
-readiness flow used by the existing API.
-
-### 10.7 Environment, Auth, and Testing
-
-Environment helpers live in `packages/relay-core/src/env.ts`; guest setup helpers live in `packages/relay-core/src/guest.ts`.
-
-Host-side configuration is converted into guest files/env:
-
-- Codex auth/config under `/home/agent/.codex`
-- Pi auth/model config under `/home/agent/.pi/agent`
-- workspace mounted at `/workspace`
-- commands executed as the guest `agent` user through `runAsAgent()`
-
-Do not put long-lived secrets into prompts or persisted session artifacts.
-
-Run local tests with:
-
-```text
-npm test
-```
-
-Test coverage is organized as:
-
-- `backend/tests/`: Python event stores, artifacts, controller behavior, linked
-  task updates, daemon registry behavior, task scheduler/routine promotion, and
-  HTTP API routes.
-- `packages/relay-core/tests/handoff.test.ts`: prompt contracts, review-mode command generation (no verdict markers), stream renderers, BoxLite execution helpers.
-- `web/tests/status.test.ts`: web daemon-node status derivation.
-- `web/tests/backlog.test.ts`: backlog filtering, sorting, and display helpers.
-
-### 10.8 Local Change Guidelines
-
-- Keep backend/control-plane runtime code in `backend/relay/` (`core/`,
-  `persistence/`, `security/`, `services/`, and `api/`). Keep shared protocol,
-  daemon execution, and web client code in TypeScript.
-- Use BoxLite's Node SDK for VM lifecycle and command execution.
-- Keep durable state append-only; add events instead of mutating history.
-- Keep snapshots derived from event logs.
-- Keep tasks and sessions loosely coupled through `task.session_linked`.
-- Keep API state real: no seeded demo tasks, fake agent runs, or dummy artifacts.
-- Keep agent execution isolated to `nodes.ts`, command construction to
-  `commands.ts`, backend workflow state in `backend/relay/services/controller.py`,
-  scheduled task dispatch in `backend/relay/services/task_scheduler.py`, and
-  daemon sandbox lifecycle in `packages/relay-daemon/src/sandbox-session.ts` /
-  `packages/relay-daemon/src/box.ts`.
+Update those owners when the implementation changes; keep this document focused
+on the target system and its delivery phases.
 
 ## 11. Key Engineering Decisions
 
@@ -885,11 +711,10 @@ Test coverage is organized as:
 | Tool access | MCP Gateway with policy and audit |
 | Memory | layered memory with reviewed writeback |
 | API state | task/session APIs are canonical, channels are clients |
-| Current local mode | `.relay` file store remains acceptable for developer MVP |
+| Current local mode | PostgreSQL is required for sessions and tasks; local files are limited to remaining operational compatibility state |
 
 ## 12. Open Technical Questions
 
-- Which backend language should own the cloud control plane: TypeScript for code reuse, or FastAPI/Go for enterprise service conventions?
 - Should the guest worker use stdio, Unix socket, or localhost HTTP inside the sandbox?
 - What is the minimum policy language for tool and approval rules?
 - How much LangGraph is needed once Temporal owns durable state?

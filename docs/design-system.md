@@ -1,153 +1,3 @@
----
-version: 1.0
-name: Relay-Phosphor
-description: Phosphor — a true-neutral, dual-register design system for an agent-orchestration control plane, built on one rule: Relay is grey until something is working. A neutral canvas (#101214 dark / #f7f8f9 light) with a four-step surface ladder carries the chrome; the ACTION color is pure monochrome, Linear-style — white (#f2f4f6) on dark, black (#16181b) on light — brand mark, primary CTA, focus ring, link emphasis. Status is a grey brightness hierarchy (loud = bright, calm = dim) carried as dots, borders, and text — never fills, never actions; "info" is neutral ink. Exactly one chromatic role exists, --live (#3ee08a dark / #0b7a45 light), and it means one thing only: an agent is doing work right now. A screen's color density is therefore a utilization readout. Both registers are designed side by side — neither derives from the other. JetBrains Mono carries the display tier and technical text, separated by weight and tracking rather than by face, while Geist carries dense UI and reading roles. Geometry is tight — 4px chips, 6px controls, 10px cards — and depth comes from hairline borders, not shadows. Motion is one ease, two speeds, no overshoot. The result reads as serious infrastructure software — a dense, calm control plane that visibly comes alive when its workforce runs.
-
-colors:
-  action: "#f2f4f6"
-  action-hover: "#ffffff"
-  action-soft: "color-mix(in srgb, #f2f4f6 9%, transparent)"
-  on-action: "#101214"
-  ink-1: "#f2f4f6"
-  ink-2: "#c9ced4"
-  ink-3: "#99a0a8"
-  ink-4: "#6b727b"
-  line-1: "#282c31"
-  line-2: "#1f2226"
-  surface-0: "#101214"
-  surface-1: "#16181b"
-  surface-2: "#1c1f23"
-  surface-3: "#22262b"
-  ok: "#7d848d"
-  warn: "#b2b9c1"
-  err: "#f2f4f6"
-  info: "#99a0a8"
-  live: "#3ee08a"
-
-typography:
-  display:
-    fontFamily: "var(--font-app-mono), 'JetBrains Mono', monospace"
-    fontSize: 32px
-    fontWeight: 700
-    lineHeight: 1.15
-    letterSpacing: -0.04em
-  title:
-    fontFamily: "var(--font-app-mono), 'JetBrains Mono', monospace"
-    fontSize: 20px
-    fontWeight: 700
-    lineHeight: 1.2
-    letterSpacing: -0.04em
-  heading:
-    fontFamily: "var(--font-app-mono), 'JetBrains Mono', monospace"
-    fontSize: 16px
-    fontWeight: 600
-    lineHeight: 1.3
-    letterSpacing: -0.04em
-  body:
-    fontFamily: "'Geist', sans-serif"
-    fontSize: 15px
-    fontWeight: 400
-    lineHeight: 1.5
-    letterSpacing: 0
-  body-sm:
-    fontFamily: "'Geist', sans-serif"
-    fontSize: 14px
-    fontWeight: 400
-    lineHeight: 1.5
-    letterSpacing: 0
-  label:
-    fontFamily: "'Geist', sans-serif"
-    fontSize: 13px
-    fontWeight: 500
-    lineHeight: 1.4
-    letterSpacing: 0
-  label-strong:
-    fontFamily: "'Geist', sans-serif"
-    fontSize: 13px
-    fontWeight: 600
-    lineHeight: 1.4
-    letterSpacing: 0
-  micro:
-    fontFamily: "'Geist', sans-serif"
-    fontSize: 11px
-    fontWeight: 500
-    lineHeight: 1.4
-    letterSpacing: 0.03em
-  number:
-    fontFamily: "var(--font-app-mono), 'JetBrains Mono', monospace"
-    fontSize: 19px
-    fontWeight: 700
-    lineHeight: 1.4
-    letterSpacing: -0.04em
-  code:
-    fontFamily: "var(--font-app-mono), 'JetBrains Mono', monospace"
-    fontSize: 13px
-    fontWeight: 400
-    lineHeight: 1.5
-    letterSpacing: 0
-
-rounded:
-  r-1: 4px
-  r-2: 6px
-  r-3: 10px
-  r-4: 14px
-  full: 9999px
-
-spacing:
-  sp-0-5: 2px
-  sp-1: 4px
-  sp-1-5: 6px
-  sp-2: 8px
-  sp-3: 12px
-  sp-4: 16px
-  sp-5: 20px
-  sp-6: 24px
-  sp-7: 32px
-  sp-8: 48px
-  sp-9: 64px
-
-components:
-  side-nav:
-    backgroundColor: "{colors.surface-1}"
-    activeBackgroundColor: "{colors.action-soft}"
-    textColor: "{colors.ink-2}"
-    widthCollapsed: 72px
-    widthExpanded: 228px
-  button-primary:
-    backgroundColor: "{colors.action}"
-    textColor: "{colors.on-action}"
-    typography: "{typography.label-strong}"
-    rounded: "{rounded.r-2}"
-    height: 40px
-  button-secondary:
-    backgroundColor: "{colors.surface-2}"
-    textColor: "{colors.ink-1}"
-    typography: "{typography.label-strong}"
-    rounded: "{rounded.r-2}"
-    border: "1px solid {colors.line-1}"
-  card:
-    backgroundColor: "{colors.surface-1}"
-    textColor: "{colors.ink-1}"
-    rounded: "{rounded.r-3}"
-    border: "1px solid {colors.line-1}"
-    padding: 16px
-  text-input:
-    backgroundColor: "{colors.surface-2}"
-    textColor: "{colors.ink-1}"
-    typography: "{typography.body}"
-    rounded: "{rounded.r-2}"
-    height: 40px
-  badge:
-    backgroundColor: transparent
-    textColor: "{colors.ink-2}"
-    typography: "{typography.label}"
-    rounded: "{rounded.full}"
-    border: "1px solid {colors.line-1}"
-  status-dot:
-    rounded: "{rounded.full}"
-    size: 7px
----
-
 # Relay Design — Phosphor
 
 <p align="center">
@@ -166,7 +16,7 @@ chromatic role, reserved entirely for work an agent is doing *right now*. Every
 step of brightness is a unit of information, and the single unit of color is
 liveness.
 
-- **One action color.** White on dark, black on light (`{colors.action}` —
+- **One action color.** White on dark, black on light (`--action` —
   #f2f4f6 dark / #16181b light) carries the brand mark, primary CTAs, focus,
   links, and selection. On dark the fill is bright, so on-action text is dark
   ink (#101214); on light the fill is black and carries white. There is no
@@ -182,11 +32,10 @@ liveness.
   side in `palette.css`. Dark is the default register (`:root`);
   `html[data-theme="light"]` overrides it.
 - **Color means "alive", and nothing else.** `--live` (#3ee08a dark /
-  #0b7a45 light) marks work in flight — presence dot, active-row wash and
-  edge, elapsed timer, running bar. It is never an action, never a status,
-  never decoration. Because idle surfaces hold no color, a screen's color
-  density reads as a utilization gauge from across the room. Both register
-  values pass AA as small text.
+  #0b7a45 light) marks work in flight — active dot or ring, elapsed timer,
+  and running bar. It is never an action, status, fill, or decoration. Because
+  idle surfaces hold no color, a screen's color density reads as a utilization
+  gauge from across the room. Both register values pass AA as small text.
 - **One mono, two jobs.** JetBrains Mono carries the display tier *and*
   technical text; they are separated by weight, tracking, and color rather
   than by face — 700/600 in `--ink-1` with `--track-display` for titles,
@@ -198,8 +47,9 @@ liveness.
 - **One ease, two speeds.** `--ease` `cubic-bezier(0.2, 0, 0, 1)`,
   `--t-fast` 120ms, `--t-slow` 320ms. Nothing overshoots.
 
-A living specimen page is `docs/design-system-preview.html` — open it in a
-browser; it implements these exact tokens with a register toggle.
+The executable source is `web/src/styles/tokens/`. Review the application in
+both registers when changing tokens; do not maintain a second hard-coded token
+demo.
 
 ## Token architecture
 
@@ -268,11 +118,10 @@ Dark register / light register:
 | `--action-soft` | 9% action wash | 7% action wash | selection wash, active nav |
 | `--on-action` | `#101214` | `#ffffff` | text on the action fill |
 | `--ok` | `#7d848d` | `#6b727b` | ready, passed, done — calm (dim) |
-| `--warn` | `#99a0a8` | `#5c636b` | attention, degraded |
+| `--warn` | `#b2b9c1` | `#484f57` | attention, degraded |
 | `--err` | `#f2f4f6` | `#16181b` | failed, destructive — loud (bright) |
 | `--info` | = `--ink-3` | = `--ink-3` | neutral notice |
 | `--live` | `#3ee08a` | `#0b7a45` | an agent is working *right now* |
-| `--live-wash` | 7% live wash | 7% live wash | active-row tint |
 | `--scrim` | `rgba(0,0,0,.66)` | `rgba(12,14,16,.55)` | overlay scrim (one layer) |
 
 `--action-soft` is not a hex: it is `color-mix(in srgb, <action> 9%, transparent)`
@@ -425,7 +274,7 @@ through to Geist by design rather than shipping a second file.
   focus ring, link emphasis, selection.
 - Pair the action fill with `--on-action` — dark ink on the dark register's
   white fill, white on the light register's black fill.
-- Use `--action-soft` for selected rows, active nav, running affordances.
+- Use `--action-soft` for selected rows and active navigation.
 - Carry status as dots/borders/text on the grey brightness hierarchy
   (loud = bright, calm = dim); use `--info` (neutral ink) for status
   without alarm.
@@ -468,26 +317,3 @@ token-usage chart uses a fixed three-segment ramp: input = `--action`
 bars and activity charts use the status greys inside chart segments only
 (`chart-3/4/5` alias `--ok`/`--warn`/`--err`, so they follow the palette
 for free).
-
-## History
-
-Graphite (2026-07-19) replaces the Sleek Forest identity (warm near-black +
-forest green + Instrument Serif) and its four-tier primitives/semantic token
-system. Design rationale and the migration map live in
-`docs/superpowers/specs/2026-07-19-graphite-tokens-design.md`.
-
-The monochrome remap (2026-07-20) then retired Graphite's steel-blue action
-color and chromatic status hues in favor of the Linear-style white/black
-action and the grey status brightness hierarchy — a token-value-only change;
-the architecture above is unchanged. Rationale and the exact value map live
-in `docs/superpowers/specs/2026-07-20-monochrome-tokens-design.md`.
-
-**Phosphor (2026-07-28)** keeps that monochrome ramp intact and changes what
-the system is *about*. Seven identities in eight weeks had each been a palette
-swap, and each was judged "generic" within weeks — so this pass changed the
-subject instead of the hue: color was reduced to a single role, `--live`, tied
-to the product's own subject matter (agents working), and the display tier
-moved to JetBrains Mono so type and color argue the same point. Mona Sans and
-Geist Mono were retired for a net ~164 KB less font payload. Rationale,
-contrast measurements, and the scope rule live in
-`docs/superpowers/specs/2026-07-28-phosphor-identity-design.md`.
