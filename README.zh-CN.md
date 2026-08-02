@@ -11,7 +11,7 @@
 Relay 是一个本地优先的 AI 工作控制平面。员工可以发起对话、分配持久任务、安排例行任务，并协调具名 AI 智能体与团队。Claude Code、Codex、Pi 和 Kimi 通过守护进程执行工作，Relay 则统一管理身份、策略、审批、历史记录和计算机部署位置。
 
 <p align="center">
-  <img src="docs/images/relay.png" alt="Relay 对话编辑器，可选择智能体和计算机" width="960">
+  <img src="docs/images/relay-threads-phosphor-zh-CN.png" alt="Relay 对话编辑器，可选择智能体和计算机" width="960">
 </p>
 
 本仓库包含开发者 MVP：Python/FastAPI 控制平面、TypeScript 守护进程与客户端、Next.js Web 应用、数据库支持的对话与任务存储，以及基于 BoxLite 的执行环境。Relay 也可以不使用 BoxLite，直接在员工现有的计算机上运行智能体。
@@ -37,7 +37,7 @@ Relay 是一个本地优先的 AI 工作控制平面。员工可以发起对话�
 任务看板在同一视图中管理优先级、负责人、截止日期、状态和派发控制。
 
 <p align="center">
-  <img src="docs/images/relay-backlog.png" alt="Relay 任务看板" width="960">
+  <img src="docs/images/relay-backlog-phosphor-zh-CN.png" alt="Relay 任务看板" width="960">
 </p>
 
 ### 协调智能体团队
@@ -45,7 +45,7 @@ Relay 是一个本地优先的 AI 工作控制平面。员工可以发起对话�
 团队工作区集中展示进行中的任务、对话、产物和成员活动。
 
 <p align="center">
-  <img src="docs/images/relay-teams.png" alt="Relay 团队工作区" width="960">
+  <img src="docs/images/relay-teams-phosphor-zh-CN.png" alt="Relay 团队工作区" width="960">
 </p>
 
 ## 快速开始

@@ -15,7 +15,7 @@ in one place while Claude Code, Codex, Pi, and Kimi execute through daemon
 processes.
 
 <p align="center">
-  <img src="docs/images/relay.png" alt="Relay thread composer with agent and computer selection" width="960">
+  <img src="docs/images/relay-threads-phosphor.png" alt="Relay thread composer with agent and computer selection" width="960">
 </p>
 
 This repository contains the developer MVP: a Python/FastAPI control plane,
@@ -52,7 +52,7 @@ The backlog keeps priority, assignee, due date, status, and dispatch controls in
 one view.
 
 <p align="center">
-  <img src="docs/images/relay-backlog.png" alt="Relay task backlog" width="960">
+  <img src="docs/images/relay-backlog-phosphor.png" alt="Relay task backlog" width="960">
 </p>
 
 ### Coordinate agent teams
@@ -60,7 +60,7 @@ one view.
 Team workspaces collect active tasks, threads, artifacts, and member activity.
 
 <p align="center">
-  <img src="docs/images/relay-teams.png" alt="Relay team workspace" width="960">
+  <img src="docs/images/relay-teams-phosphor.png" alt="Relay team workspace" width="960">
 </p>
 
 ## Quick start

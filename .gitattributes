@@ -1,1 +1,7 @@
 docs/images/relay.png filter=lfs diff=lfs merge=lfs -text
+docs/images/relay-backlog-phosphor-zh-CN.png filter=lfs diff=lfs merge=lfs -text
+docs/images/relay-backlog-phosphor.png filter=lfs diff=lfs merge=lfs -text
+docs/images/relay-teams-phosphor-zh-CN.png filter=lfs diff=lfs merge=lfs -text
+docs/images/relay-teams-phosphor.png filter=lfs diff=lfs merge=lfs -text
+docs/images/relay-threads-phosphor-zh-CN.png filter=lfs diff=lfs merge=lfs -text
+docs/images/relay-threads-phosphor.png filter=lfs diff=lfs merge=lfs -text
