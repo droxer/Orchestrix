@@ -31,10 +31,7 @@ export interface ManagedReconcileResult {
 export function workspaceIdForManagedNode(node: ManagedNodeRecord): string {
   const configured = node.workspacePolicy.workspaceId;
   if (typeof configured === "string" && configured.trim()) return configured.trim();
-  if (node.workspacePolicy.kind === "employee-home" && node.employeeId) {
-    return `employee:${node.employeeId}:home`;
-  }
-  return `managed-node:${node.id}`;
+  return `managed-node:${node.id}:workspace-root`;
 }
 
 const DEFAULT_RETRY_BASE_MS = 10_000;

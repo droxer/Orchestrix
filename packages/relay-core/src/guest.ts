@@ -248,8 +248,8 @@ function pushEnv(env: Array<[string, string]>, key: string, value: string | unde
  * it exits, so no provider key persists in the VM or leaks across agents. The
  * agentless form falls back to the (non-secret) session env for legacy callers.
  */
-export function runAsAgent(command: string, agent?: AgentName): string {
-  const workspace = agentWorkspacePath();
+export function runAsAgent(command: string, agent?: AgentName, workspacePath?: string): string {
+  const workspace = workspacePath ?? agentWorkspacePath();
   const home = agentHomePath();
   const credentialExports = agent ? envExports(agentCredentialEnv(agent)) : guestEnvExports();
   if (process.env.RELAY_RUN_AS_CURRENT_USER === "1") {

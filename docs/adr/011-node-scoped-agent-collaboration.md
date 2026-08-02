@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted.
+Accepted, as refined by [ADR-013](013-thread-scoped-workspaces.md). Thread
+runtime affinity remains node-scoped; writable working directories are now
+thread-scoped beneath that node's configured workspace root.
 
 Relay permits an employee's independent agents to be placed on different
 computers, but a collaborative team and every multi-agent session must resolve

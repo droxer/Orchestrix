@@ -53,9 +53,20 @@ def test_live_workspace_timeout_returns_placement_unavailable(monkeypatch, tmp_p
     client = TestClient(app)
     _bootstrap(client)
     agent = _agent(client)
+    session = app.state.session_store.create_session(
+        {
+            "workspacePath": "/workspace",
+            "ownerEmployeeId": "alice",
+            "ownerAgentId": agent["id"],
+            "daemonNodeId": "node_1",
+            "taskGoal": "live timeout",
+        }
+    )
     app.state.registry.register({"sandboxId": "node_1", "employeeId": "alice", "token": "node_token", "protocolVersion": 1, "supportedAgents": ["codex"], "capabilities": ["workspace-read"], "status": "ready"})
     app.state.agent_placement_store.create_placement(agent, "node_1", {})
-    response = client.get(f"/api/v1/agents/{agent['id']}/workspace/files")
+    response = client.get(
+        f"/api/v1/agents/{agent['id']}/workspace/files?threadId={session['id']}"
+    )
     assert response.status_code == 503
     assert response.json()["detail"] == {"reason": "placement-unavailable"}
 
@@ -66,28 +77,52 @@ def test_live_workspace_listing_uses_the_selected_placement(monkeypatch, tmp_pat
     client = TestClient(app)
     _bootstrap(client)
     agent = _agent(client)
+    session = app.state.session_store.create_session(
+        {
+            "workspacePath": "/workspace",
+            "ownerEmployeeId": "alice",
+            "ownerAgentId": agent["id"],
+            "daemonNodeId": "node_1",
+            "taskGoal": "live files",
+        }
+    )
     app.state.registry.register({"sandboxId": "node_1", "employeeId": "alice", "token": "node_token", "protocolVersion": 1, "supportedAgents": ["codex"], "capabilities": ["workspace-read"], "status": "ready"})
-    app.state.agent_placement_store.create_placement(agent, "node_1", {})
+    app.state.registry.register({"sandboxId": "node_2", "employeeId": "alice", "token": "node_token_2", "protocolVersion": 1, "supportedAgents": ["codex"], "capabilities": ["workspace-read"], "status": "ready"})
+    app.state.agent_placement_store.create_placement(agent, "node_1", {"priority": 100})
+    app.state.agent_placement_store.create_placement(agent, "node_2", {"priority": 1})
 
     async def listing(_ctx, node, command):
         assert node["id"] == "node_1"
         assert command["type"] == "workspace.list"
+        assert command["sessionId"] == session["id"]
         return {"type": "workspace.listing", "path": "", "exists": True, "entries": [{"name": "report.md", "path": "report.md", "kind": "file", "bytes": 5, "updatedAt": "2026-07-11T00:00:00Z"}]}
 
     monkeypatch.setattr("relay.api.agent_workspace_routes._dispatch", listing)
-    response = client.get(f"/api/v1/agents/{agent['id']}/workspace/files")
+    response = client.get(
+        f"/api/v1/agents/{agent['id']}/workspace/files?threadId={session['id']}"
+    )
     assert response.status_code == 200
     assert response.json()["source"] == "live"
     assert response.json()["nodeId"] == "node_1"
+    assert response.json()["threadId"] == session["id"]
     assert response.json()["entries"][0]["name"] == "report.md"
 
 
-def test_shared_scope_lists_the_node_workspace_root(monkeypatch, tmp_path):
+def test_shared_scope_lists_the_thread_workspace_root(monkeypatch, tmp_path):
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     app = create_app(tmp_path)
     client = TestClient(app)
     _bootstrap(client)
     agent = _agent(client)
+    session = app.state.session_store.create_session(
+        {
+            "workspacePath": "/workspace",
+            "ownerEmployeeId": "alice",
+            "ownerAgentId": agent["id"],
+            "daemonNodeId": "node_1",
+            "taskGoal": "shared thread files",
+        }
+    )
     app.state.registry.register({"sandboxId": "node_1", "employeeId": "alice", "token": "node_token", "protocolVersion": 1, "supportedAgents": ["codex"], "capabilities": ["workspace-read", "workspace-read-shared"], "status": "ready"})
     app.state.agent_placement_store.create_placement(agent, "node_1", {})
 
@@ -95,10 +130,14 @@ def test_shared_scope_lists_the_node_workspace_root(monkeypatch, tmp_path):
         assert node["id"] == "node_1"
         assert command["type"] == "workspace.list"
         assert command["scope"] == "shared"
+        assert command["sessionId"] == session["id"]
         return {"type": "workspace.listing", "path": "", "exists": True, "entries": [{"name": "shared.md", "path": "shared.md", "kind": "file", "bytes": 5, "updatedAt": "2026-07-19T00:00:00Z"}]}
 
     monkeypatch.setattr("relay.api.agent_workspace_routes._dispatch", listing)
-    response = client.get(f"/api/v1/agents/{agent['id']}/workspace/files?scope=shared")
+    response = client.get(
+        f"/api/v1/agents/{agent['id']}/workspace/files"
+        f"?scope=shared&threadId={session['id']}"
+    )
     assert response.status_code == 200, response.text
     assert response.json()["source"] == "live"
     assert response.json()["scope"] == "shared"

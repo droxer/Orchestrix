@@ -49,7 +49,7 @@ function promptPreludes(state: AgentState): string[] {
     preludes.push(
       [
         "[Workspace]",
-        "The current directory is a workspace shared with the other agents on this computer; files here are visible to all of them.",
+        "The current directory is the workspace for this thread; files here are shared with the other agents participating in this thread.",
         `Your private directory is \`${state.agent_home_subdir}/\`; keep personal state there and collaborate through the shared workspace.`,
       ].join("\n"),
     );

@@ -499,10 +499,11 @@ export function getWorkspaceBrief(
 }
 
 export function listAgentWorkspaceFiles(
-  input: { agentId: string; path?: string; scope?: WorkspaceScope },
+  input: { agentId: string; threadId?: string; path?: string; scope?: WorkspaceScope },
   signal?: AbortSignal,
 ): Promise<AgentWorkspaceFilesResponse> {
   const params = new URLSearchParams();
+  if (input.threadId) params.set("threadId", input.threadId);
   if (input.path) params.set("path", input.path);
   if (input.scope && input.scope !== "agent-home") params.set("scope", input.scope);
   const query = params.toString();
@@ -510,10 +511,11 @@ export function listAgentWorkspaceFiles(
 }
 
 export function readAgentWorkspaceFile(
-  input: { agentId: string; path: string; scope?: WorkspaceScope },
+  input: { agentId: string; threadId?: string; path: string; scope?: WorkspaceScope },
   signal?: AbortSignal,
 ): Promise<AgentWorkspaceFileResponse> {
   const params = new URLSearchParams({ path: input.path });
+  if (input.threadId) params.set("threadId", input.threadId);
   if (input.scope && input.scope !== "agent-home") params.set("scope", input.scope);
   return apiJson<AgentWorkspaceFileResponse>(`/agents/${encodeURIComponent(input.agentId)}/workspace/file?${params.toString()}`, { signal });
 }

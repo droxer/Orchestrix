@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ControlPanelDaemonNodeRecord } from "relay-core";
-import { LocalDaemonLauncher, workspaceForEmployee } from "../src/launchers.js";
+import { LocalDaemonLauncher, workspaceForEmployee, workspaceForManagedNode } from "../src/launchers.js";
 import { RelaySupervisor } from "../src/reconcile.js";
 import type {
   DaemonLaunchRequest,
@@ -147,6 +147,17 @@ test("local supervisor launcher defaults daemon nodes to BoxLite mode", async ()
 
 test("managed employee workspaces are absolute when the configured root is relative", () => {
   assert.equal(workspaceForEmployee(".relay/employee-workspaces", "alice"), join(process.cwd(), ".relay/employee-workspaces/alice"));
+});
+
+test("managed cloud computers receive distinct node workspace roots", () => {
+  assert.equal(
+    workspaceForManagedNode(".relay/managed-workspaces", "mnode_cloud_1"),
+    join(process.cwd(), ".relay/managed-workspaces/mnode_cloud_1"),
+  );
+  assert.notEqual(
+    workspaceForManagedNode(".relay/managed-workspaces", "mnode_cloud_1"),
+    workspaceForManagedNode(".relay/managed-workspaces", "mnode_cloud_2"),
+  );
 });
 
 test("supervisor skips online nodes and does not assume a BoxLite provider", async () => {

@@ -258,7 +258,7 @@ describe("prompts", () => {
       );
     }
   });
-  it("describes the shared workspace and the agent's private home", () => {
+  it("describes the shared thread workspace and the agent's private home", () => {
     const sharedWorkspaceState = state({
       task_goal: "Draft the report",
       agent_home_subdir: "agents/agent-YWdlbnRfMQ",
@@ -266,14 +266,14 @@ describe("prompts", () => {
 
     const prompt = claudeTaskPrompt(sharedWorkspaceState);
 
-    assert.match(prompt, /\[Workspace\]\n.*shared with the other agents on this computer/);
+    assert.match(prompt, /\[Workspace\]\n.*workspace for this thread/);
     assert.match(prompt, /Your private directory is `agents\/agent-YWdlbnRfMQ\/`/);
     assert.match(prompt, /\[User\]\nDraft the report$/);
   });
   it("omits the workspace prelude when no personal home is set", () => {
     assert.doesNotMatch(claudeTaskPrompt(state({ task_goal: "Fix auth" })), /\[Workspace\]/);
   });
-  it("runs agents at the shared workspace root", async () => {
+  it("runs agents at the configured workspace root", async () => {
     const workspace = mkdtempSync(join(tmpdir(), "relay-shared-root-"));
     const cwds: Array<string | undefined> = [];
     await withEnvAsync({ ...process.env, RELAY_AGENT_WORKSPACE: workspace }, () =>
@@ -286,6 +286,26 @@ describe("prompts", () => {
     );
 
     assert.deepEqual(cwds, [workspace]);
+  });
+  it("uses an explicit thread workspace without mutating process-global configuration", async () => {
+    const rootWorkspace = mkdtempSync(join(tmpdir(), "relay-node-root-"));
+    const threadWorkspace = join(rootWorkspace, "ses_explicit");
+    mkdirSync(threadWorkspace);
+    const cwds: Array<string | undefined> = [];
+
+    await withEnvAsync({ ...process.env, RELAY_AGENT_WORKSPACE: rootWorkspace }, () =>
+      runAgentNode("codex", "action", state(), {
+        workspacePath: threadWorkspace,
+        execStream: async (_command, args, options) => {
+          cwds.push(options?.cwd);
+          assert.equal(process.env.RELAY_AGENT_WORKSPACE, rootWorkspace);
+          assert.match(args?.[1] ?? "", new RegExp(threadWorkspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+          return { exit_code: 0, stdout: "", stderr: "" };
+        },
+      }),
+    );
+
+    assert.deepEqual(cwds, [threadWorkspace]);
   });
   it("keeps the head of long agent output in the completed agent log", async () => {
     const head = "HEAD-OF-REPLY-MARKER";

@@ -22,6 +22,10 @@ export function workspaceForEmployee(workspaceRoot: string, employeeId: string):
   return resolve(workspaceRoot, safePathSegment(employeeId));
 }
 
+export function workspaceForManagedNode(workspaceRoot: string, nodeId: string): string {
+  return resolve(workspaceRoot, safePathSegment(nodeId));
+}
+
 export class LocalDaemonLauncher implements DaemonLauncher {
   readonly name = "local";
   private readonly backendUrl: string;

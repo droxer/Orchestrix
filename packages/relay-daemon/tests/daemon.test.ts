@@ -1848,6 +1848,7 @@ test("relay daemon reports generated workspace documents in run.completed", asyn
     workspacePath: workspace,
     logicalAgentId: "agent_research",
   };
+  const threadWorkspace = joinPath(workspace, command.sessionId);
   await runRelayDaemon({
     backendUrl: "http://relay.test",
     sandboxId: "sbx_test",
@@ -1861,11 +1862,12 @@ test("relay daemon reports generated workspace documents in run.completed", asyn
     environment: fakeEnvironment({
       exec: async (_cmd, args, options) => {
         if (!isInventoryProbe(args)) {
-          writeFile(joinPath(workspace, agentWorkspaceSubpath("agent_research"), "quarterly-report.pdf"), "pdf bytes");
-          writeFile(joinPath(workspace, agentWorkspaceSubpath("agent_research"), "server.key"), "not a document");
-          writeFile(joinPath(workspace, "shared-summary.csv"), "a,b\n");
-          makeDir(joinPath(workspace, agentWorkspaceSubpath("agent_other")), { recursive: true });
-          writeFile(joinPath(workspace, agentWorkspaceSubpath("agent_other"), "private.pdf"), "sibling private");
+          assert.equal(options?.cwd, threadWorkspace);
+          writeFile(joinPath(threadWorkspace, agentWorkspaceSubpath("agent_research"), "quarterly-report.pdf"), "pdf bytes");
+          writeFile(joinPath(threadWorkspace, agentWorkspaceSubpath("agent_research"), "server.key"), "not a document");
+          writeFile(joinPath(threadWorkspace, "shared-summary.csv"), "a,b\n");
+          makeDir(joinPath(threadWorkspace, agentWorkspaceSubpath("agent_other")), { recursive: true });
+          writeFile(joinPath(threadWorkspace, agentWorkspaceSubpath("agent_other"), "private.pdf"), "sibling private");
         }
         const rendered = options?.stdoutRenderer?.("done\n") ?? "done\n";
         options?.sink?.(rendered);
@@ -1896,6 +1898,7 @@ test("relay daemon reports generated workspace documents in run.completed", asyn
   });
 
   assert.equal(registrations[0]?.capabilities?.includes("generated-files"), true);
+  assert.equal(registrations[0]?.capabilities?.includes("thread-workspaces"), true);
   const completed = events.find((event) => event.type === "run.completed");
   assert.ok(completed && completed.type === "run.completed");
   const reported = (completed.generatedFiles ?? []).map((item) => item.relativePath).sort();
@@ -2032,7 +2035,8 @@ test("shared-scope workspace reads expose the node root but never escape it", ()
 
 test("relay daemon serves agent-home workspace commands", async () => {
   const root = mkdtempSync(join(tmpdir(), "relay-ws-"));
-  const home = join(root, agentWorkspaceSubpath("agent_1"));
+  const threadId = "ses_workspace_read";
+  const home = join(root, threadId, agentWorkspaceSubpath("agent_1"));
   mkdirSync(home, { recursive: true });
   writeFileSync(join(home, "report.md"), "hello");
   const stop = new AbortController();
@@ -2049,9 +2053,9 @@ test("relay daemon serves agent-home workspace commands", async () => {
       if (path === "/api/v1/daemon-node-registrations") { registration = await jsonBody<DaemonNodeRegistration>(init); return jsonResponse({ ok: true }); }
       if (path.endsWith("/commands")) {
         if (!served) { served = true; return jsonResponse({ commands: [
-          { id: "cmd_ls", type: "workspace.list", agentId: "agent_1", path: "" },
-          { id: "cmd_read", type: "workspace.read", agentId: "agent_1", path: "report.md" },
-          { id: "cmd_bad", type: "workspace.read", agentId: "agent_1", path: "../escape" },
+          { id: "cmd_ls", type: "workspace.list", sessionId: threadId, agentId: "agent_1", path: "" },
+          { id: "cmd_read", type: "workspace.read", sessionId: threadId, agentId: "agent_1", path: "report.md" },
+          { id: "cmd_bad", type: "workspace.read", sessionId: threadId, agentId: "agent_1", path: "../escape" },
         ] }); }
         return jsonResponse({ commands: [] });
       }

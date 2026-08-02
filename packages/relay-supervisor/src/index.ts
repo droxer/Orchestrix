@@ -1,5 +1,5 @@
 export { SupervisorBackendClient } from "./backend-client.js";
-export { CommandTemplateLauncher, LocalDaemonLauncher, workspaceForEmployee } from "./launchers.js";
+export { CommandTemplateLauncher, LocalDaemonLauncher, workspaceForEmployee, workspaceForManagedNode } from "./launchers.js";
 export { RelaySupervisor } from "./reconcile.js";
 export { ManagedNodeReconciler } from "./managed-reconcile.js";
 export { LocalProcessProvider } from "./providers.js";

@@ -1093,12 +1093,19 @@ def test_daemon_reported_generated_files_index_without_shared_filesystem() -> No
                     "workspacePath": "/remote/daemon/workspace",
                     "protocolVersion": 1,
                     "supportedAgents": ["codex"],
-                    "capabilities": ["generated-files", "bogus-capability"],
+                    "capabilities": [
+                        "generated-files",
+                        "thread-workspaces",
+                        "bogus-capability",
+                    ],
                     "status": "ready",
                 },
                 "ui_token",
             )
-            assert registry.get("sbx_alice")["capabilities"] == ["generated-files"]
+            assert registry.get("sbx_alice")["capabilities"] == [
+                "generated-files",
+                "thread-workspaces",
+            ]
 
             session = await backend.run(
                 "sbx_alice",
@@ -1165,7 +1172,8 @@ def test_daemon_reported_generated_files_index_without_shared_filesystem() -> No
                 "agents/agent-YWdlbnRfcmVzZWFyY2g/output/summary.md",
             ]
             assert files[0]["path"].startswith(
-                "/remote/daemon/workspace/agents/agent-YWdlbnRfcmVzZWFyY2g/"
+                f"/remote/daemon/workspace/{session['id']}/agents/"
+                "agent-YWdlbnRfcmVzZWFyY2g/"
             )
             assert all(artifact["agentRunId"] == command["runId"] for artifact in files)
             assert files[0]["bytes"] == 9

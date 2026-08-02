@@ -30,9 +30,9 @@ export interface AgentState {
   /** Durable personality profile for the selected logical agent identity. */
   agent_instructions?: string;
   /**
-   * Personal home subdir (slash-separated, under the shared node workspace)
+   * Personal home subdir (slash-separated, under the shared thread workspace)
    * for this run's logical agent, e.g. "agents/agent-<b64>". Runs execute at
-   * the shared workspace root; this names the agent's private area.
+   * the thread workspace root; this names the agent's private area.
    */
   agent_home_subdir?: string;
 }
@@ -44,6 +44,8 @@ export interface AgentRunOptions {
   eventSink?: AgentEventSink;
   runId?: string;
   agent?: AgentName;
+  /** Explicit workspace for this run. Required by daemons that isolate threads. */
+  workspacePath?: string;
 }
 
 export interface AgentEventSink {

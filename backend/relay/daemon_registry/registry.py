@@ -7,6 +7,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from threading import RLock
 from typing import Any
 
@@ -119,12 +120,14 @@ DAEMON_CAPABILITY_GENERATED_FILES = "generated-files"
 DAEMON_CAPABILITY_WORKSPACE_READ = "workspace-read"
 DAEMON_CAPABILITY_WORKSPACE_READ_SHARED = "workspace-read-shared"
 DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS = "structured-agent-events"
+DAEMON_CAPABILITY_THREAD_WORKSPACES = "thread-workspaces"
 DAEMON_NODE_CAPABILITIES = frozenset(
     {
         DAEMON_CAPABILITY_GENERATED_FILES,
         DAEMON_CAPABILITY_WORKSPACE_READ,
         DAEMON_CAPABILITY_WORKSPACE_READ_SHARED,
         DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
+        DAEMON_CAPABILITY_THREAD_WORKSPACES,
     }
 )
 DAEMON_SANDBOX_MODES = frozenset({"none", "boxlite"})
@@ -2163,9 +2166,16 @@ class DaemonNodeRegistry:
     ) -> None:
         session_id = run_request["sessionId"]
         workspace_path = sandbox.get("workspacePath")
+        artifact_workspace_path = workspace_path
+        if (
+            workspace_path
+            and DAEMON_CAPABILITY_THREAD_WORKSPACES
+            in (sandbox.get("capabilities") or [])
+        ):
+            artifact_workspace_path = str(Path(workspace_path) / session_id)
         if isinstance(event.get("generatedFiles"), list):
             items = daemon_reported_generated_files(
-                workspace_path, event["generatedFiles"]
+                artifact_workspace_path, event["generatedFiles"]
             )
         elif self._node_reports_generated_files(sandbox):
             # A capable daemon reported nothing for this run.
