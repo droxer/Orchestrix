@@ -1,11 +1,6 @@
-"use client";
-
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-// Shared route header — fixes the header height, spacing, and typography in
-// one place so per-route copies can't drift. Title sits on the baseline with
-// an optional mono count; `actions` render right-aligned (refresh + primary).
 export function PageHeader({
   title,
   count,
@@ -22,9 +17,7 @@ export function PageHeader({
   subtitle?: ReactNode;
   toolbar?: ReactNode;
   actions?: ReactNode;
-  /** `display` — stacked route title (`--type-title`). */
   titleVariant?: "default" | "display";
-  /** `stacked` — kicker, title, subtitle, and toolbar in a left column (admin). */
   layout?: "inline" | "stacked";
 }) {
   const stacked = layout === "stacked";
@@ -32,21 +25,16 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "page-header surface-header flex shrink-0 justify-between gap-base px-xl max-[820px]:px-base",
-        stacked ? "items-start py-lg" : "min-h-[var(--header-h)] items-center max-[820px]:py-sm",
+        "page-header surface-header",
+        stacked ? "page-header--stacked" : "page-header--inline",
       )}
     >
-      <div
-        className={cn(
-          "page-header-lead flex min-w-0",
-          stacked ? "flex-col gap-xs" : "items-baseline gap-sm",
-        )}
-      >
+      <div className={cn("page-header-lead", stacked && "page-header-lead--stacked")}>
         {kicker ? <span className="page-header-kicker">{kicker}</span> : null}
-        <div className={cn("flex min-w-0 items-baseline gap-sm", stacked && "flex-wrap")}>
+        <div className={cn("page-header-title-row", stacked && "page-header-title-row--wrap")}>
           <h1
             className={cn(
-              "m-0 text-balance text-ink",
+              "page-header-title",
               titleVariant === "display"
                 ? "page-header-title--display"
                 : "page-header-title--inline",
@@ -55,14 +43,14 @@ export function PageHeader({
             {title}
           </h1>
           {count != null ? (
-            <span className="tnum truncate text-xs font-medium text-muted-foreground">{count}</span>
+            <span className="page-header-count">{count}</span>
           ) : null}
         </div>
         {subtitle ? <p className="page-header-subtitle">{subtitle}</p> : null}
         {toolbar ? <div className="page-header-toolbar">{toolbar}</div> : null}
       </div>
       {actions ? (
-        <div className={cn("page-header-actions flex shrink-0 flex-wrap items-center justify-end gap-xs", stacked && "pt-0.5")}>
+        <div className={cn("page-header-actions", stacked && "page-header-actions--stacked")}>
           {actions}
         </div>
       ) : null}

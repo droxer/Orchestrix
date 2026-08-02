@@ -113,6 +113,13 @@
     border: 0;
   }
 
+  .adm-command-status {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font-size: var(--fs-2);
+  }
+
   .adm-command-status-text {
     max-width: 9rem;
     overflow: hidden;

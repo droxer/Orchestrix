@@ -421,7 +421,7 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
             <AdminViewToggle view={view} onChange={setView} />
             {headerError ? (
               <span
-                className="adm-command-status flex items-center gap-xs text-xs"
+                className="adm-command-status"
                 role="status"
                 aria-live="polite"
                 aria-atomic="true"

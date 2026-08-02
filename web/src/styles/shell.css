@@ -29,8 +29,83 @@
   display: none;
 }
 
-/* Stacked PageHeader — the .page-header-kicker eyebrow grammar is canonical
-   in atelier.css (shared with .mobile-topbar-eyebrow). */
+/* ── PageHeader — shared route header ────────────────────────────────
+   One component, one set of rules. Inline layout (default) centres the
+   title bar vertically at --header-h; stacked layout (admin routes)
+   drops a kicker, title, subtitle, and toolbar into a left column.
+   Title sits on the baseline with an optional mono count; actions render
+   right-aligned. */
+
+.page-header {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding-inline: var(--sp-7);
+}
+
+.page-header--inline {
+  min-height: var(--header-h);
+  align-items: center;
+}
+
+.page-header--stacked {
+  align-items: flex-start;
+  padding-block: var(--sp-6);
+}
+
+.page-header-lead {
+  display: flex;
+  min-width: 0;
+}
+
+.page-header-lead:not(.page-header-lead--stacked) {
+  align-items: baseline;
+  gap: var(--sp-3);
+}
+
+.page-header-lead--stacked {
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.page-header-title-row {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--sp-3);
+}
+
+.page-header-title-row--wrap {
+  flex-wrap: wrap;
+}
+
+.page-header-title {
+  margin: 0;
+  color: var(--ink-1);
+}
+
+.page-header-title--display {
+  font: var(--type-title);
+  letter-spacing: var(--track-display);
+}
+
+.page-header-title--inline {
+  font: var(--type-heading);
+  letter-spacing: var(--track-display);
+}
+
+.page-header-count {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-2);
+  font-weight: 500;
+  color: var(--ink-3);
+}
 
 .page-header-subtitle {
   margin: 0;
@@ -44,16 +119,25 @@
   margin-top: var(--sp-3);
 }
 
-/* Stacked route titles use the restrained Mona display tier rather than a
-   hero scale, keeping dense workspace headers compact. */
-.page-header-title--display {
-  font: var(--type-title);
-  letter-spacing: var(--track-display);
+.page-header-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
 }
 
-/* Inline (non-display) route titles — role-token type instead of arbitrary
-   size/weight/leading utilities. */
-.page-header-title--inline {
-  font: var(--type-heading);
-  letter-spacing: var(--track-display);
+.page-header-actions--stacked {
+  padding-top: 2px;
+}
+
+@media (max-width: 820px) {
+  .page-header {
+    padding-inline: var(--sp-4);
+  }
+
+  .page-header--inline {
+    padding-block: var(--sp-3);
+  }
 }
