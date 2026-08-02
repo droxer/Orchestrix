@@ -158,7 +158,6 @@ function RosterRow({
                 <>
                   <ComputerIcon size={12} aria-hidden="true" />
                   <span className="agents-roster-row-computer" translate="no">{computer.nodeName}</span>
-                  <span className="agents-roster-row-kind">{computerKindLabel}</span>
                 </>
               ) : (
                 <span>{t("agents_page.no_placements")}</span>

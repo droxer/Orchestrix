@@ -21,7 +21,7 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@boxlite-ai/boxlite": "^0.9.5",
+    "@boxlite-ai/boxlite": "^0.9.7",
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.16",
     "typescript": "^5.9.0"

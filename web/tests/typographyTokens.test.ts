@@ -134,4 +134,18 @@ describe("application typography roles", () => {
     assert.ok(!eyebrowRule.includes("text-transform: uppercase"), "generic eyebrows should preserve sentence case");
     assert.ok(!headerKickerRule.includes("text-transform: uppercase"), "page kickers should preserve sentence case");
   });
+
+  it("keeps CJK fallbacks available for multilingual transcripts in any UI language", () => {
+    const palette = readWebSource("styles/tokens/palette.css");
+    const root = palette.match(/:root\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+
+    // Agent output can be Chinese while the surrounding controls remain in
+    // English, so glyph coverage cannot depend only on html:lang(zh-*).
+    for (const role of ["display", "sans", "mono"]) {
+      const family = root.match(new RegExp(`--font-${role}:\\s*([^;]+);`))?.[1] ?? "";
+      assert.match(family, /"PingFang SC"/, `${role} is missing the macOS CJK fallback`);
+      assert.match(family, /"Microsoft YaHei/, `${role} is missing the Windows CJK fallback`);
+      assert.match(family, /"Noto Sans/, `${role} is missing the Linux CJK fallback`);
+    }
+  });
 });

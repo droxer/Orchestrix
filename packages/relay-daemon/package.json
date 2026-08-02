@@ -14,7 +14,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@boxlite-ai/boxlite": "^0.9.5",
+    "@boxlite-ai/boxlite": "^0.9.7",
     "relay-core": "0.1.0"
   },
   "engines": {

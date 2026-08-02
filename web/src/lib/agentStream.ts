@@ -20,6 +20,29 @@ export function stripAnsi(value: string): string {
   return value.replace(ANSI_PATTERN, "");
 }
 
+function sameRenderedText(rendered: string, candidate: string): boolean {
+  if (rendered === candidate) return true;
+  if (!candidate.includes("\uFFFD")) return false;
+
+  // BoxLite <= 0.9.5 decoded each gRPC byte chunk independently. When a
+  // multibyte codepoint crossed a chunk boundary, the terminal result could
+  // therefore contain one replacement character per byte while the preceding
+  // assistant frame still held the intact reply. Treat only a long, highly
+  // similar candidate as that historical corrupted copy; short or materially
+  // different result-only replies must remain visible.
+  const cleanLength = candidate.replace(/\uFFFD/g, "").length;
+  if (cleanLength < 32 || cleanLength / Math.max(rendered.length, 1) < 0.9) return false;
+
+  const pattern = candidate
+    .split(/(\uFFFD+)/)
+    .filter(Boolean)
+    .map((part) => part[0] === "\uFFFD"
+      ? `[\\s\\S]{0,${part.length}}`
+      : part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("");
+  return new RegExp(`^${pattern}$`).test(rendered);
+}
+
 export function parseAgentStream(agent: AgentName, raw: string): AgentSegment[] {
   if (!raw) return [];
   if (agent === "claude") return parseClaude(raw);
@@ -58,6 +81,23 @@ export class AgentStreamAccumulator {
     }
     this.raw = raw;
 
+    // A completed Claude transcript is small enough to parse canonically once.
+    // More importantly, the full parse can reconcile replayed assistant frames
+    // with the streamed deltas that preceded them. Keeping checkpoint slices
+    // at this boundary can strand a historical U+FFFD-corrupted frame even
+    // though another frame in the same raw log contains the intact text.
+    if (
+      this.agent === "claude"
+      && agentCheckpoints(this.agent, raw, 0).some((checkpoint) => checkpoint.value.type === "result")
+    ) {
+      this.stableOffset = 0;
+      this.stableSegments = [];
+      this.seenCheckpointIds.clear();
+      this.turnTextSignatures.clear();
+      this.segments = parseAgentStream(this.agent, raw);
+      return this.segments;
+    }
+
     let sliceStart = this.stableOffset;
     for (const checkpoint of agentCheckpoints(this.agent, raw, this.stableOffset)) {
       const checkpointId = agentCheckpointId(this.agent, checkpoint.value);
@@ -73,7 +113,8 @@ export class AgentStreamAccumulator {
           } else if (checkpoint.value.type === "result") {
             if (this.turnTextSignatures.size > 0) {
               parsed = parsed.filter(
-                (segment) => segment.kind !== "text" || !this.turnTextSignatures.has(segment.text.trimEnd()),
+                (segment) => segment.kind !== "text" || ![...this.turnTextSignatures]
+                  .some((rendered) => sameRenderedText(rendered, segment.text.trimEnd())),
               );
               this.turnTextSignatures.clear();
             }
@@ -559,7 +600,7 @@ function parseClaude(raw: string): AgentSegment[] {
         // copy of a successful answer.
         const resultText = typeof event.result === "string" ? event.result.trimEnd() : "";
         const alreadyRendered = resultText
-          ? out.some((segment) => segment.kind === "text" && segment.text.trimEnd() === resultText)
+          ? out.some((segment) => segment.kind === "text" && sameRenderedText(segment.text.trimEnd(), resultText))
           : false;
         if (resultText && !alreadyRendered) out.push({ kind: "text", text: resultText });
         out.push(narration("agent_stream.claude_finished", undefined, "good"));

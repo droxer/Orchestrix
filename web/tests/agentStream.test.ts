@@ -826,6 +826,50 @@ describe("agent stream parsing", () => {
     ]);
   });
 
+  it("drops a historical replacement-corrupted Claude result when the assistant frame is intact", () => {
+    const intact = "如果你是想自己做模组/插件，从哪一步开始。这里还有一段足够长的上下文，用来确认终态结果确实是同一份回复。";
+    const corrupted = "如果你是想自己做模组/插件，从哪一步���始。这里还有一段足够长的上下文，用来确认终态结果确实是同一份回复。";
+    const assistantFrame = JSON.stringify({
+      type: "assistant",
+      message: { id: "msg_utf8", role: "assistant", content: [{ type: "text", text: intact }] },
+    });
+    const resultFrame = JSON.stringify({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      result: corrupted,
+    });
+    const accumulator = new AgentStreamAccumulator("claude");
+
+    assert.deepEqual(accumulator.update(assistantFrame), [{ kind: "text", text: intact }]);
+    assert.deepEqual(accumulator.update(`${assistantFrame}\n${resultFrame}`), [
+      { kind: "text", text: intact },
+      { kind: "narration", key: "agent_stream.claude_finished", params: { tone: "good" } },
+    ]);
+  });
+
+  it("uses the canonical full parse once a Claude result closes the transcript", () => {
+    const streamed = JSON.stringify({
+      type: "stream_event",
+      event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "完整的中文回复。" } },
+    });
+    const assistant = JSON.stringify({
+      type: "assistant",
+      message: { id: "msg_terminal", role: "assistant", content: [{ type: "text", text: "完整的中文回复。" }] },
+    });
+    const result = JSON.stringify({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      result: "完整的中文回复。",
+    });
+    const raw = `${streamed}\n${assistant}\n${result}`;
+    const accumulator = new AgentStreamAccumulator("claude");
+
+    accumulator.update(`${streamed}\n${assistant}`);
+    assert.deepEqual(accumulator.update(raw), parseAgentStream("claude", raw));
+  });
+
   it("keeps a Claude result-only reply that differs from the streamed text", () => {
     const turn = [
       JSON.stringify({

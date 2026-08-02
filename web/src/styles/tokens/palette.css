@@ -192,9 +192,12 @@
      (terminal lineage, and in a terminal green means "a process is running");
      Geist stays calm and compact for UI/body copy. Display vs. technical is
      separated by weight, tracking, and colour, not by face — see roles.css. */
-  --font-display: var(--font-app-mono), "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --font-sans: var(--font-app-sans), "Geist", "Avenir Next", "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-app-mono), "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  /* Transcript content is multilingual even when the UI language is English.
+     Keep explicit Han fallbacks in the default stacks so agent-authored CJK
+     never depends on a browser's last-resort missing-glyph substitution. */
+  --font-display: var(--font-app-mono), "JetBrains Mono", "PingFang SC", "PingFang TC", "Microsoft YaHei UI", "Microsoft JhengHei UI", "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans SC", "Noto Sans TC", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-sans: var(--font-app-sans), "Geist", "PingFang SC", "PingFang TC", "Microsoft YaHei UI", "Microsoft JhengHei UI", "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans SC", "Noto Sans TC", "Avenir Next", "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-app-mono), "JetBrains Mono", "PingFang SC", "PingFang TC", "Microsoft YaHei", "Microsoft JhengHei", "Noto Sans Mono CJK SC", "Noto Sans Mono CJK TC", "Noto Sans SC", "Noto Sans TC", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 
   /* Motion — one ease, two speeds, no overshoot.
      --t-fast: state change under the pointer (hover, press, menu open).
