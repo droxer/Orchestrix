@@ -535,7 +535,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
   return (
     <section id="routine-panel" className="routine-page backlog-page" aria-label={t("routine.title")} tabIndex={-1}>
       <PageHeader
-        kicker={t("nav.routine")}
+        kicker={t("nav.workspace")}
         title={t("routine.title")}
         count={t("routine.sub", { count: routineTasks.length })}
         actions={

@@ -703,7 +703,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   return (
     <section id="backlog-panel" className="backlog-page" data-view={view} data-density="compact" aria-label={t("backlog.title")} tabIndex={-1}>
       <PageHeader
-        kicker={t("nav.backlog")}
+        kicker={t("nav.workspace")}
         title={t("backlog.title")}
         count={t("backlog.sub", { count: backlogTasks.length })}
         actions={
