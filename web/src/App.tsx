@@ -18,7 +18,7 @@ import { mergeThreadRuntimeNodes, mergeVisibleDaemonNodes } from "./lib/daemonNo
 import { formatDispatchError } from "./lib/agentReadiness";
 import { isEmployeeAgentRoutable, preferredRoutableAgent } from "./lib/agentDisplayNames";
 import { routeComposerMessage } from "./lib/messageRouting";
-import { applyTheme, readLanguage, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeTheme } from "./lib/appStorage";
+import { applyTheme, readLanguage, readSidenavExpanded, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeSidenavExpanded, writeTheme } from "./lib/appStorage";
 import { canUseLocalControlPanel } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
 import { useAuthSession } from "./hooks/useAuthSession";
@@ -395,7 +395,18 @@ export function App() {
     if (!mounted) return;
     setTheme(readTheme());
     setLanguage(readLanguage());
+    // Read after mount, not in the initializer: the export is prerendered,
+    // so touching localStorage during the first render mismatches hydration.
+    setSidenavExpanded(readSidenavExpanded());
   }, [mounted]);
+
+  // Persisted on toggle rather than in an effect on `sidenavExpanded`: the
+  // effect would also fire for the hydration read above and write the
+  // pre-read default back over the stored value.
+  const applySidenavExpanded = useCallback((expanded: boolean) => {
+    setSidenavExpanded(expanded);
+    writeSidenavExpanded(expanded);
+  }, []);
 
   useEffect(() => {
     invalidatePreferenceRequests(user?.id ?? null);
@@ -962,7 +973,7 @@ export function App() {
       mobileView={mobileView}
       onMobileViewChange={navigateToMobileView}
       sidenavExpanded={sidenavExpanded}
-      setSidenavExpanded={setSidenavExpanded}
+      setSidenavExpanded={applySidenavExpanded}
       prefsOpen={prefsOpen}
       setPrefsOpen={setPrefsOpen}
       skipLinkHref={skipLinkHref}
@@ -1030,6 +1041,7 @@ export function App() {
           <ComputerPage
             nodes={runtimeNodes}
             currentUser={user}
+            onOpenThread={openThread}
           />
         ) : (
           <ThreadsView

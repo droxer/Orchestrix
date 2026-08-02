@@ -255,7 +255,13 @@
     flex-direction: row;
     align-items: stretch;
     gap: var(--sp-1);
-    min-width: max-content;
+    /* `max-content` here floored the row at the sum of the tabs' unwrapped
+       label widths, which defeated the `flex: 1 1 0` below: at seven tabs
+       the row measured 412px inside a 390px phone and the rightmost tab
+       (More — the only route to Admin) was clipped off-screen, with
+       `scrollbar-width: none` on the rail hiding any hint it could scroll.
+       Let the tabs share the width and ellipsize instead. */
+    min-width: 0;
     width: 100%;
   }
 
@@ -316,13 +322,14 @@
     animation: rise var(--t-fast) var(--ease) forwards;
   }
 
-  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(1) { animation-delay: calc(var(--t-fast) * 0.25); }
-  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(2) { animation-delay: calc(var(--t-fast) * 0.5); }
-  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(3) { animation-delay: calc(var(--t-fast) * 0.75); }
-  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(4) { animation-delay: var(--t-fast); }
-  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(5) { animation-delay: calc(var(--t-fast) * 1.25); }
-  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(6) { animation-delay: calc(var(--t-fast) * 1.5); }
-  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(7) { animation-delay: calc(var(--t-fast) * 1.75); }
+  /* Per group, for the same reason as the desktop label stagger in
+     sidenav.css: .sidenav-group restarts :nth-child() even under
+     `display: contents`, so a per-button ladder never counted past the
+     largest group. */
+  .messenger-shell .sidenav-nav .sidenav-group:nth-child(1) .sidenav-btn { animation-delay: calc(var(--t-fast) * 0.25); }
+  .messenger-shell .sidenav-nav .sidenav-group:nth-child(2) .sidenav-btn { animation-delay: calc(var(--t-fast) * 0.5); }
+  .messenger-shell .sidenav-nav .sidenav-group:nth-child(3) .sidenav-btn { animation-delay: calc(var(--t-fast) * 0.75); }
+  .messenger-shell .sidenav-nav .sidenav-group:nth-child(4) .sidenav-btn { animation-delay: var(--t-fast); }
 
   /* Admin Channels/Admin collapse into a More overflow so the primary tabs
      (Threads, My Computer, Backlog, Routines, Agents, Teams) fit a 390pt
@@ -368,6 +375,7 @@
   .routine-page,
   .agents-page,
   .teams-page,
+  .computer-page,
   .admin-console {
     grid-row: 2;
     min-height: 0;

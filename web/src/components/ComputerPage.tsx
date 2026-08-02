@@ -7,7 +7,7 @@ import type { ControlPanelDaemonNodeRecord, CurrentUser, DaemonNodeMonitorRecord
 import { nodesAssignedToEmployee } from "../lib/computerNodes";
 import { useMutationError } from "../hooks/useMutationError";
 import { useDialogs } from "./ui/DialogProvider";
-import { NodeCard } from "./admin/NodeCard";
+import { ComputerCard } from "./computer/ComputerCard";
 import { ManageExecutorsDrawer } from "./admin/ManageExecutorsDrawer";
 import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
@@ -16,9 +16,13 @@ import { AdminNode } from "./icons";
 export function ComputerPage({
   nodes,
   currentUser,
+  onOpenThread,
 }: {
   nodes: DaemonNodeMonitorRecord[];
   currentUser: CurrentUser;
+  /** Opens the thread behind a run, so "something is running" is one click
+      away from "here is what it is doing". */
+  onOpenThread?: (sessionId: string) => void;
 }) {
   const { t } = useTranslation();
   const { prompt } = useDialogs();
@@ -71,25 +75,31 @@ export function ComputerPage({
         titleVariant="display"
         layout="stacked"
       />
-      {myNodes.length === 0 ? (
-        <RelayEmptyState
-          title={t("computer.empty_title")}
-          body={t("computer.empty_body")}
-          illustration={<AdminNode size={40} aria-hidden="true" />}
-        />
-      ) : (
-        <div className="adm-fleet-grid">
-          {myNodes.map((node) => (
-            <NodeCard
-              key={node.id}
-              node={node}
-              onRename={(target) => void handleRenameNode(target)}
-              onManageExecutors={(target) => setManageExecutorsNodeId(target.id)}
-              t={t}
-            />
-          ))}
-        </div>
-      )}
+      {/* The shell clips its children, so the roster needs its own scroll
+          container — see computer.css. */}
+      <div className="computer-page-body">
+        {myNodes.length === 0 ? (
+          <RelayEmptyState
+            title={t("computer.empty_title")}
+            body={t("computer.empty_body")}
+            illustration={<AdminNode size={40} aria-hidden="true" />}
+          />
+        ) : (
+          <ul className="computer-list">
+            {myNodes.map((node) => (
+              <li key={node.id}>
+                <ComputerCard
+                  node={node}
+                  onRename={(target) => void handleRenameNode(target)}
+                  onManageExecutors={(target) => setManageExecutorsNodeId(target.id)}
+                  onOpenThread={onOpenThread}
+                  t={t}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       <ManageExecutorsDrawer
         open={manageExecutorsNodeId !== null}
         onClose={() => setManageExecutorsNodeId(null)}
