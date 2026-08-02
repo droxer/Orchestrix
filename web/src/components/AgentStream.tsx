@@ -6,16 +6,17 @@ import type { CodexCollaborationEvent } from "relay-core";
 import type { AgentName } from "../types";
 import {
   AgentStreamAccumulator,
-  displayAgentSegments,
+  displayAgentStreamSegments,
   emptyAgentStreamSegments,
-  hasStreamingTextCaret,
   hasTerminalOutcome,
   parseAgentStderr,
   type AgentSegment,
 } from "../lib/agentStream";
-import { Markdown } from "./Markdown";
+import { Markdown, MarkdownContent } from "./Markdown";
 import { buildCollaborationTree } from "../lib/collaborationTree";
 import { SubagentTree } from "./SubagentTree";
+import { useDebouncedStreamingAnnouncement, useSmoothStreamingText } from "../lib/smoothStreamingText";
+import { splitStreamingMarkdown } from "../lib/streamingMarkdown";
 
 function StreamActivity({ label }: { label: string }) {
   return (
@@ -52,15 +53,16 @@ export function AgentStream({ agent, stdout, stderr, streaming, collaborations }
   const accumulator = useMemo(() => new AgentStreamAccumulator(agent), [agent, streaming]);
   // Completed turns stay checkpointed in the accumulator; only the unfinished
   // suffix is reparsed as new SSE output arrives.
-  const segments = useMemo(
-    () => displayAgentSegments([...accumulator.update(stdout), ...parseAgentStderr(stderr)], streaming),
+  const displayed = useMemo(
+    () => displayAgentStreamSegments(accumulator.update(stdout), parseAgentStderr(stderr), streaming),
     [accumulator, stdout, stderr, streaming],
   );
+  const { segments, liveTextIndex } = displayed;
   const workingLabel = t("agent_stream.empty_working");
   // The run stays `streaming` until the daemon posts `agent.completed`, which
   // lands after the CLI's own end-of-turn frame — don't keep pulsing "Working…"
   // beneath a line that already says the agent finished.
-  const showActivity = streaming && !hasStreamingTextCaret(segments) && !hasTerminalOutcome(segments);
+  const showActivity = streaming && liveTextIndex < 0 && !hasTerminalOutcome(segments);
   const collaborationNodes = useMemo(
     () => buildCollaborationTree(collaborations, { settled: !streaming }),
     [collaborations, streaming],
@@ -101,7 +103,7 @@ export function AgentStream({ agent, stdout, stderr, streaming, collaborations }
     <div className={`agent-stream ${streaming ? "streaming" : ""}`}>
       <SubagentTree nodes={collaborationNodes} />
       {keyedSegments(segments).map(({ key, segment }, index) => (
-        <SegmentView key={key} segment={segment} live={streaming && index === segments.length - 1} />
+        <SegmentView key={key} segment={segment} live={index === liveTextIndex} />
       ))}
       {showActivity ? <StreamActivity label={workingLabel} /> : null}
     </div>
@@ -111,13 +113,7 @@ export function AgentStream({ agent, stdout, stderr, streaming, collaborations }
 function SegmentView({ segment, live = false }: { segment: AgentSegment; live?: boolean }) {
   const { t } = useTranslation();
   if (segment.kind === "text") {
-    return (
-      <div className="agent-text">
-        {live
-          ? <div className="agent-prose agent-prose-live"><p>{segment.text}</p></div>
-          : renderProse(segment.text)}
-      </div>
-    );
+    return <TextSegment text={segment.text} live={live} />;
   }
   if (segment.kind === "thinking") {
     return null;
@@ -159,6 +155,36 @@ function SegmentView({ segment, live = false }: { segment: AgentSegment; live?: 
     );
   }
   return <pre className="agent-raw">{segment.text}</pre>;
+}
+
+function TextSegment({ text, live }: { text: string; live: boolean }) {
+  const visibleText = useSmoothStreamingText(text, live);
+  const announcement = useDebouncedStreamingAnnouncement(text, live);
+  return (
+    <div className={`agent-text ${live ? "is-live" : ""}`}>
+      {live
+        ? (
+            <>
+              <StreamingProse text={visibleText} />
+              <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+                {announcement}
+              </span>
+            </>
+          )
+        : renderProse(text)}
+    </div>
+  );
+}
+
+function StreamingProse({ text }: { text: string }) {
+  const parts = splitStreamingMarkdown(text);
+  return (
+    <div className="agent-prose agent-prose-live" aria-hidden="true">
+      {parts.map((part, index) => part.kind === "markdown"
+        ? <MarkdownContent key={`markdown-${index}`} text={part.text} />
+        : <p key={`text-${index}`}>{part.text}</p>)}
+    </div>
+  );
 }
 
 function StatusIcon({ tone }: { tone: "good" | "bad" | "warn" | "info" }) {

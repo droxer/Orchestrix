@@ -105,9 +105,9 @@
   overflow-wrap: anywhere;
 }
 
-/* Parsing a growing Markdown document on every token is expensive. Keep the
-   unfinished tail as whitespace-preserving text; it is rendered as Markdown
-   once the run settles. */
+/* Parsing a growing Markdown document on every token is expensive. Complete
+   code fences render as stable highlighted blocks; the unfinished tail stays
+   whitespace-preserving text until the run settles. */
 .agent-prose-live {
   white-space: pre-wrap;
 }
@@ -452,11 +452,11 @@
 /* The caret rides whatever block the streamed text currently ends in — plain
    paragraph, heading, list item, blockquote, or code fence — so a turn that
    is mid-list or mid-fence still shows liveness in the body. */
-.agent-stream.streaming .agent-text:last-child .agent-prose > :last-child:is(p, h1, h2, h3, h4, h5, h6, div, span)::after,
-.agent-stream.streaming .agent-text:last-child .agent-prose > :last-child:is(ul, ol) li:last-child::after,
-.agent-stream.streaming .agent-text:last-child .agent-prose > blockquote:last-child p:last-child::after,
-.agent-stream.streaming .agent-text:last-child .agent-prose > pre:last-child > code::after,
-.agent-stream.streaming .agent-text:last-child .agent-prose > table:last-child tbody tr:last-child td:last-child::after,
+.agent-stream.streaming .agent-text.is-live .agent-prose > :last-child:is(p, h1, h2, h3, h4, h5, h6, div, span)::after,
+.agent-stream.streaming .agent-text.is-live .agent-prose > :last-child:is(ul, ol) li:last-child::after,
+.agent-stream.streaming .agent-text.is-live .agent-prose > blockquote:last-child p:last-child::after,
+.agent-stream.streaming .agent-text.is-live .agent-prose > pre:last-child > code::after,
+.agent-stream.streaming .agent-text.is-live .agent-prose > table:last-child tbody tr:last-child td:last-child::after,
 .agent-stream.streaming .agent-thinking:last-child .agent-thinking-body p:last-child::after {
   content: "";
   display: inline-block;
@@ -469,11 +469,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .agent-stream.streaming .agent-text:last-child .agent-prose > :last-child:is(p, h1, h2, h3, h4, h5, h6, div, span)::after,
-  .agent-stream.streaming .agent-text:last-child .agent-prose > :last-child:is(ul, ol) li:last-child::after,
-  .agent-stream.streaming .agent-text:last-child .agent-prose > blockquote:last-child p:last-child::after,
-  .agent-stream.streaming .agent-text:last-child .agent-prose > pre:last-child > code::after,
-  .agent-stream.streaming .agent-text:last-child .agent-prose > table:last-child tbody tr:last-child td:last-child::after,
+  .agent-stream.streaming .agent-text.is-live .agent-prose > :last-child:is(p, h1, h2, h3, h4, h5, h6, div, span)::after,
+  .agent-stream.streaming .agent-text.is-live .agent-prose > :last-child:is(ul, ol) li:last-child::after,
+  .agent-stream.streaming .agent-text.is-live .agent-prose > blockquote:last-child p:last-child::after,
+  .agent-stream.streaming .agent-text.is-live .agent-prose > pre:last-child > code::after,
+  .agent-stream.streaming .agent-text.is-live .agent-prose > table:last-child tbody tr:last-child td:last-child::after,
   .agent-stream.streaming .agent-thinking:last-child .agent-thinking-body p:last-child::after {
     animation: none;
   }

@@ -39,7 +39,7 @@ export function useAdminNodes(enabled: boolean, live: boolean = true): {
       {
         queryKey: ADMIN_EMPLOYEES_KEY,
         queryFn: async ({ signal }: { signal: AbortSignal }) =>
-          (await listControlPanelEmployees(signal)).employees,
+          (await listControlPanelEmployees(signal)).employees ?? [],
         enabled,
         refetchInterval: live ? CONTROL_PANEL_POLL_MS : false,
       },
