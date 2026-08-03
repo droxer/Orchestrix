@@ -93,6 +93,21 @@ describe("My Computer record card", () => {
     assert.match(page, /tone: "danger"/, "removal is confirmed destructively");
   });
 
+  it("connects a personal computer as direct-run, with no runtime to pick", async () => {
+    // BoxLite is provisioned on admin hardware. Offering "Isolated" here let an
+    // employee ask their own laptop for a sandbox it was never set up to boot,
+    // and the enrollment would hand back a start command for that VM.
+    const [drawer, api] = await Promise.all([
+      read("web/src/components/computer/ConnectComputerDrawer.tsx"),
+      read("web/src/api.ts"),
+    ]);
+    assert.doesNotMatch(drawer, /boxlite/);
+    assert.doesNotMatch(drawer, /connect-computer-sandbox-mode/);
+    const enrollment = api.match(/createLocalDeviceEnrollment\([\s\S]*?\n\}/)?.[0] ?? "";
+    assert.notEqual(enrollment.trim(), "", "the enrollment-call regex stopped matching — refresh it");
+    assert.match(enrollment, /sandboxMode: "none"/);
+  });
+
   it("keeps poll-derived liveness out of optimistic overrides", async () => {
     // `online`, `stale`, `activeRuns`, and `queuedCommandCount` are derived per
     // read and never bump `updatedAt`, so a wholesale override pinned a

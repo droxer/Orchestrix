@@ -312,11 +312,12 @@ export interface CreateControlPanelDaemonNodeResponse {
   daemonEnv: Record<string, string>;
 }
 
-/** Self-service registration of the caller's own device — no employeeId, the backend attributes it to the authenticated actor. */
+/** Self-service registration of the caller's own device — no employeeId, the backend
+    attributes it to the authenticated actor, and no sandboxMode: a personal computer
+    runs its agents directly. */
 export interface CreateLocalDeviceEnrollmentInput {
   workspacePath: string;
   displayName?: string;
-  sandboxMode?: "boxlite" | "none";
 }
 
 export interface CreateLocalDeviceEnrollmentResponse extends CreateControlPanelDaemonNodeResponse {

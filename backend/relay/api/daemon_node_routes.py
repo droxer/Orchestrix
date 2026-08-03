@@ -41,6 +41,9 @@ WORKSPACE_EVENT_TYPES = frozenset(
     {"workspace.listing", "workspace.file", "workspace.error"}
 )
 
+# A self-enrolled personal computer is direct-run only; see the enrollment route.
+LOCAL_ENROLLMENT_SANDBOX_MODE = "none"
+
 MAX_COMMAND_POLL_WAIT_SECONDS = 30.0
 MAX_COMMAND_POLL_LIMIT = 50
 MAX_COMMAND_LEASE_SECONDS = 60 * 60.0
@@ -229,10 +232,11 @@ async def create_local_device_enrollment(
         raise HTTPException(401, "Authentication required.")
     body = await json_body(request)
     workspace_path = string_field(body, "workspacePath")
-    # No implicit default: the two modes differ in how much isolation the
-    # employee's machine gets, and inferring that from an absent field would
-    # quietly pick one. The caller states it.
-    sandbox_mode = string_field(body, "sandboxMode")
+    # An employee's own machine runs its agents directly, against the agent
+    # installs already on it. BoxLite isolation belongs to hardware an admin
+    # provisions, so this route offers no runtime choice — but it refuses a
+    # caller that asks for the isolated one rather than silently substituting.
+    sandbox_mode = body.get("sandboxMode", LOCAL_ENROLLMENT_SANDBOX_MODE)
     try:
         display_name = normalize_computer_display_name(body.get("displayName"))
     except ValueError as error:
@@ -241,8 +245,10 @@ async def create_local_device_enrollment(
         raise HTTPException(
             400, "An absolute workspacePath on the employee device is required."
         )
-    if sandbox_mode not in ("boxlite", "none"):
-        raise HTTPException(400, 'sandboxMode must be "boxlite" or "none".')
+    if sandbox_mode != LOCAL_ENROLLMENT_SANDBOX_MODE:
+        raise HTTPException(
+            400, 'sandboxMode must be "none": a personal computer runs agents directly.'
+        )
     # Provisioning adopts an existing computer for this employee rather than
     # stacking duplicates, so say which happened — the client cannot infer it,
     # and "connected" and "already connected" need different instructions.

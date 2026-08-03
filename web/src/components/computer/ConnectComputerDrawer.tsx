@@ -10,8 +10,6 @@ import { Drawer } from "../ui/Drawer";
 import { CredCopyRow } from "../admin/CredCopyRow";
 import { COPY_FEEDBACK_MS, copyText } from "../admin/helpers";
 
-type SandboxMode = "boxlite" | "none";
-
 interface ConnectComputerDrawerProps {
   open: boolean;
   onClose: () => void;
@@ -24,12 +22,16 @@ interface ConnectComputerDrawerProps {
  * to admin's AssignNodeDrawer, but scoped to the caller's own device: no
  * employee picker, no "assign an existing node" branch, just "connect this
  * one" against POST /daemon-node-enrollments/local.
+ *
+ * A personal computer runs its agents directly, so there is no runtime to
+ * pick here: BoxLite isolation is provisioned on admin-owned hardware, and
+ * offering it as a choice to the person at the keyboard only invited them to
+ * ask their own laptop for a sandbox it was never set up to boot.
  */
 export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectComputerDrawerProps) {
   const { t } = useTranslation();
   const [workspacePath, setWorkspacePath] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [sandboxMode, setSandboxMode] = useState<SandboxMode>("none");
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
@@ -42,7 +44,6 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
     if (open) {
       setWorkspacePath("");
       setDisplayName("");
-      setSandboxMode("none");
       setFieldError(null);
       setError(null);
       setIsBusy(false);
@@ -70,7 +71,6 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
       const response = await createLocalDeviceEnrollment({
         workspacePath: trimmedPath,
         displayName: displayName.trim() || undefined,
-        sandboxMode,
       });
       setResult(response);
       onConnected(response);
@@ -193,31 +193,10 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
                 </span>
               ) : null}
             </Field>
-            <div className="adm-profile-field">
-              <div className="adm-profile-segment" role="radiogroup" aria-label={t("computer.connect_sandbox_label")}>
-                {(["none", "boxlite"] as const).map((mode) => {
-                  const selected = sandboxMode === mode;
-                  return (
-                    <label key={mode} className="adm-profile-segment-option">
-                      <input
-                        className="adm-profile-segment-input"
-                        type="radio"
-                        name="connect-computer-sandbox-mode"
-                        value={mode}
-                        checked={selected}
-                        disabled={isBusy}
-                        onChange={() => setSandboxMode(mode)}
-                      />
-                      <span className="adm-profile-segment-btn" data-active={selected ? "true" : "false"}>
-                        <span className="adm-profile-segment-dot" data-kind={mode === "boxlite" ? "managed" : "local"} aria-hidden="true" />
-                        {t(`computer.connect_sandbox_${mode}`)}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-              <p className="adm-form-hint">{t(`computer.connect_sandbox_${sandboxMode}_desc`)}</p>
-            </div>
+            {/* Stated, not chosen: the employee should know their agents run
+                as plain processes against the installs already on this
+                machine, but the mode is not theirs to change. */}
+            <p className="adm-form-hint">{t("computer.connect_run_hint")}</p>
           </fieldset>
 
           {error ? <div className="adm-form-error" role="alert">{error}</div> : null}

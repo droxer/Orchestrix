@@ -82,7 +82,9 @@ describe("type-face utilities", () => {
   it("keeps identifiers on .code and figures on .tnum", () => {
     // Identifiers: things an operator could type, paste, or diff.
     assert.match(readWebSource("components/admin/NodeRow.tsx"), /adm-node-card-handle code[^]*?\{node\.id\}/);
-    assert.match(readWebSource("components/admin/CredentialsDrawer.tsx"), /adm-cred-value code/);
+    // The credential row moved into CredCopyRow when the connect-computer
+    // drawer started sharing it; the face assertion follows the markup.
+    assert.match(readWebSource("components/admin/CredCopyRow.tsx"), /adm-cred-value code/);
     assert.match(readWebSource("components/admin/AssignNodeDrawer.tsx"), /adm-assign-node-path code/);
     assert.match(readWebSource("components/AgentWorkspacePage.tsx"), /workspace-path-segment code/);
     assert.match(readWebSource("components/admin/EmployeeCard.tsx"), /adm-emp-card-email code/);

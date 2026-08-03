@@ -2066,7 +2066,7 @@ def test_employee_can_create_own_device_enrollment(monkeypatch) -> None:
             json={
                 "displayName": "Travel Laptop",
                 "workspacePath": "/Users/alice/project",
-                "sandboxMode": "boxlite",
+                "sandboxMode": "none",
             },
         )
 
@@ -2104,9 +2104,9 @@ def _enroll_employee(client: TestClient, employee_id: str) -> None:
     )
 
 
-def test_local_enrollment_requires_an_explicit_sandbox_mode(monkeypatch) -> None:
-    # The two modes differ in how isolated the employee's machine is, so an
-    # absent field must not silently pick one.
+def test_local_enrollment_defaults_to_direct_execution(monkeypatch) -> None:
+    # A personal computer has one runtime, so an omitted field is unambiguous:
+    # agents run as processes against the installs already on that machine.
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
@@ -2116,6 +2116,28 @@ def test_local_enrollment_requires_an_explicit_sandbox_mode(monkeypatch) -> None
         response = client.post(
             "/api/v1/daemon-node-enrollments/local",
             json={"workspacePath": "/Users/alice/project"},
+        )
+
+        assert response.status_code == 201
+        body = response.json()
+        assert body["node"]["sandboxMode"] == "none"
+        assert body["daemonEnv"]["RELAY_SANDBOX_MODE"] == "none"
+        assert "--use-local-agent-home" in body["daemonCommand"]
+
+
+def test_local_enrollment_refuses_the_isolated_runtime(monkeypatch) -> None:
+    # BoxLite is provisioned on admin-owned hardware; asking an employee's own
+    # laptop for it must fail loudly rather than be quietly downgraded, or the
+    # start command would contradict what the caller asked for.
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _enroll_employee(client, "alice")
+
+        response = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "boxlite"},
         )
 
         assert response.status_code == 400
@@ -2293,7 +2315,7 @@ def test_employee_can_manage_own_computer_executors(monkeypatch) -> None:
         )
         enrolled = client.post(
             "/api/v1/daemon-node-enrollments/local",
-            json={"workspacePath": "/Users/alice/project", "sandboxMode": "boxlite"},
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
         )
         assert enrolled.status_code == 201
         node_id = enrolled.json()["node"]["id"]
@@ -2336,7 +2358,7 @@ def test_employee_cannot_manage_another_employees_computer_executors(
         )
         enrolled = client.post(
             "/api/v1/daemon-node-enrollments/local",
-            json={"workspacePath": "/Users/alice/project", "sandboxMode": "boxlite"},
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
         )
         assert enrolled.status_code == 201
         node_id = enrolled.json()["node"]["id"]
@@ -2382,7 +2404,7 @@ def test_admin_can_manage_any_computers_executors(monkeypatch) -> None:
         )
         enrolled = client.post(
             "/api/v1/daemon-node-enrollments/local",
-            json={"workspacePath": "/Users/alice/project", "sandboxMode": "boxlite"},
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
         )
         assert enrolled.status_code == 201
         node_id = enrolled.json()["node"]["id"]
@@ -2424,7 +2446,7 @@ def test_disabled_agents_endpoint_rejects_invalid_payload(monkeypatch) -> None:
         )
         enrolled = client.post(
             "/api/v1/daemon-node-enrollments/local",
-            json={"workspacePath": "/Users/alice/project", "sandboxMode": "boxlite"},
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
         )
         assert enrolled.status_code == 201
         node_id = enrolled.json()["node"]["id"]
