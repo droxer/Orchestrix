@@ -22,16 +22,19 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  /* Relay palette as utilities: bg-surface-soft, text-ink, border-hairline… */
+  /* Relay palette as utilities: text-ink, border-hairline, bg-row-hover…
+     Additive names — Tailwind ships no default for any of these, so an entry
+     here exists only if some component actually asks for it. bg-surface-soft
+     and bg-surface-dark were declared and never used by anything; they are
+     gone. (Contrast the radius/text/spacing blocks below, which override stock
+     Tailwind scales and must stay complete whether or not each step is used.) */
   --color-ink: var(--ink-1);
   --color-body: var(--ink-2);
   --color-muted-soft: var(--ink-4);
   --color-on-primary: var(--on-action);
   --color-primary-active: var(--action-hover);
-  --color-surface-soft: var(--surface-1);
   --color-surface-strong: var(--surface-2);
   --color-surface-raised: var(--surface-3);
-  --color-surface-dark: var(--dark-surface);
   --color-hairline: var(--line-1);
   --color-hairline-soft: var(--line-2);
   --color-hairline-strong: var(--line-strong);
@@ -41,6 +44,15 @@
   --color-warning: var(--warn);
   --color-info: var(--info);
   --color-brand-soft: var(--action-soft);
+
+  /* ---- Scale guards ----
+     Everything below OVERRIDES a stock Tailwind scale. Deleting an unused step
+     does not remove the utility, it hands it back to Tailwind's default — so
+     `rounded-xl` would silently become 0.75rem (12px), off the 4/6/10/14 ramp,
+     and `text-2xl` would become 1.5rem, off the type scale. These blocks are
+     therefore kept COMPLETE on purpose; an unused row here is a guard, not
+     dead weight, and the usage argument that removed the two colour aliases
+     above does not apply to any of them. */
 
   /* Radii → rounded-* utilities. */
   --radius-xs: var(--r-1);
@@ -68,15 +80,12 @@
      on floats (1rem/3.5*1.5 = 5.99999px). */
   --spacing: var(--sp-1);
 
-  /* Spacing → p-md, gap-sm, … (named keys coexist with numeric p-4). */
-  --spacing-xxs: var(--sp-1);
-  --spacing-xs: var(--sp-2);
-  --spacing-sm: var(--sp-3);
-  --spacing-base: var(--sp-4);
-  --spacing-md: var(--sp-5);
-  --spacing-lg: var(--sp-6);
-  --spacing-xl: var(--sp-7);
-  --spacing-xxl: var(--sp-8);
+  /* There is deliberately no named spacing scale (p-sm, gap-md, …). It was a
+     second spelling for the grid the numeric scale above already covers, so
+     `p-sm` and `p-3` were the same 12px reached two ways, and a reader had to
+     know both tables to compare two components. The numeric scale is the one
+     that maps 1:1 onto --sp-N, so it wins; the fourteen call sites that used
+     names were migrated to numbers. */
 
   /* Type sizes → text-* utilities. */
   --text-micro: var(--fs-1);
@@ -86,7 +95,7 @@
   --text-base: var(--fs-3);
   --text-md: var(--fs-4);
   --text-lg: var(--fs-heading);
-  --text-xl: var(--fs-number);
+  --text-xl: var(--fs-title);
   --text-2xl: var(--fs-5);
   --text-3xl: var(--fs-6);
   --text-4xl: var(--fs-6);

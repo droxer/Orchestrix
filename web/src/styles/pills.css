@@ -5,7 +5,7 @@
    consumed via <StatusPill>. Focus ring lives in tokens.css; motion helpers
    below remain global. */
 
-.spin { animation: spin 0.9s linear infinite; }
+.spin { animation: spin var(--t-tick) linear infinite; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 

@@ -209,8 +209,8 @@ button.computer-run-open:hover {
 }
 
 button.computer-run-open:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .computer-run-mark {
@@ -322,6 +322,7 @@ button.computer-run-open:focus-visible {
 
 .computer-runtime-version {
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
 }
 
 .computer-fact-list {
@@ -359,6 +360,7 @@ button.computer-run-open:focus-visible {
   display: block;
   min-width: 0;
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -373,6 +375,7 @@ button.computer-run-open:focus-visible {
 
 .computer-fact-id .code {
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
 }
 

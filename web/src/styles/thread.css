@@ -122,8 +122,8 @@
 }
 
 .conversation-row-inner:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .conversation-row:hover {
@@ -274,7 +274,7 @@
   color: var(--on-action);
   background: var(--action);
   cursor: pointer;
-  transition: background var(--t-fast) var(--ease), transform 80ms var(--ease), box-shadow var(--t-fast) var(--ease);
+  transition: background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
 }
 
 .conversation-header .conversation-new-btn:hover {
@@ -286,8 +286,8 @@
 }
 
 .conversation-header .conversation-new-btn:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .conversation-stamp {
@@ -320,8 +320,8 @@
 }
 
 .icon-button:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .icon-button:disabled {

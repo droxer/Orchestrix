@@ -114,7 +114,8 @@
 
 .handoff-panel > input:focus-visible {
   border-color: var(--action);
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .handoff-actions {

@@ -141,8 +141,8 @@
 }
 
 .pref-nav-item:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .pref-content {
@@ -212,13 +212,15 @@
 }
 
 .pref-option-row:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
   z-index: 1;
 }
 
 .pref-option-row.selected:focus-visible {
-  box-shadow: inset 2px 0 0 var(--action), var(--focus-ring);
+  box-shadow: inset 2px 0 0 var(--action);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .pref-option-copy {

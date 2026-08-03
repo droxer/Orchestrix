@@ -59,7 +59,7 @@ function TableHeader({
       {
         role: "row",
         className: cn(
-          "sticky top-0 z-1 grid grid-cols-(--table-cols) items-center gap-sm border-b border-hairline bg-background px-sm py-xs",
+          "sticky top-0 z-1 grid grid-cols-(--table-cols) items-center gap-3 border-b border-hairline bg-background px-3 py-2",
           className
         ),
       },
@@ -125,7 +125,7 @@ function TableRow({
       {
         role: "row",
         className: cn(
-          "grid min-w-0 grid-cols-(--table-cols) items-center gap-sm border-b border-l-2 border-hairline-soft border-l-transparent px-sm py-sm transition-[background-color,border-color] duration-(--t-fast) ease-(--ease)",
+          "grid min-w-0 grid-cols-(--table-cols) items-center gap-3 border-b border-l-2 border-hairline-soft border-l-transparent px-3 py-3 transition-[background-color,border-color] duration-(--t-fast) ease-(--ease)",
           "hover:bg-row-hover",
           "data-[selected=true]:border-l-primary data-[selected=true]:bg-brand-soft",
           className

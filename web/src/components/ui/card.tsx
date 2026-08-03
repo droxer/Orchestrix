@@ -28,8 +28,8 @@ const cardVariants = cva(
           "transition-[border-color] duration-(--t-fast) ease-(--ease) hover:border-hairline-strong",
       },
       padding: {
-        default: "gap-base p-md",
-        compact: "gap-sm p-base",
+        default: "gap-4 p-5",
+        compact: "gap-3 p-4",
         none: "",
       },
     },
@@ -68,7 +68,7 @@ function CardHeader({
     props: mergeProps<"div">(
       {
         className: cn(
-          "grid auto-rows-min items-start gap-xxs has-data-[slot=card-action]:grid-cols-[minmax(0,1fr)_auto]",
+          "grid auto-rows-min items-start gap-1 has-data-[slot=card-action]:grid-cols-[minmax(0,1fr)_auto]",
           className
         ),
       },
@@ -127,7 +127,7 @@ function CardAction({
     props: mergeProps<"div">(
       {
         className: cn(
-          "col-start-2 row-span-2 row-start-1 flex shrink-0 items-center gap-xs self-start justify-self-end",
+          "col-start-2 row-span-2 row-start-1 flex shrink-0 items-center gap-2 self-start justify-self-end",
           className
         ),
       },
@@ -154,7 +154,7 @@ function CardContent({
   })
 }
 
-/* `[.border-t]:pt-sm` — a footer only pays for the divider padding when the
+/* `[.border-t]:pt-3` — a footer only pays for the divider padding when the
    call site actually asks for a divider, matching shadcn's opt-in rule. */
 function CardFooter({
   className,
@@ -166,7 +166,7 @@ function CardFooter({
     props: mergeProps<"div">(
       {
         className: cn(
-          "mt-auto flex items-center gap-sm border-hairline-soft [.border-t]:pt-sm",
+          "mt-auto flex items-center gap-3 border-hairline-soft [.border-t]:pt-3",
           className
         ),
       },

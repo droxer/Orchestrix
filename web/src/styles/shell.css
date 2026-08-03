@@ -109,7 +109,7 @@
 
 .page-header-subtitle {
   margin: 0;
-  max-width: 46ch;
+  max-width: var(--measure);
   font-size: var(--fs-3);
   line-height: 1.45;
   color: var(--ink-3);

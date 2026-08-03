@@ -46,7 +46,8 @@
    the two rings never double up. */
 .relay-search input:focus-visible,
 .adm-search-input:focus-visible {
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .relay-search:focus-within input:focus-visible,
@@ -63,7 +64,8 @@
 .adm-search:focus-within {
   border-color: var(--action);
   background: var(--surface-0);
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .search-connect-btn {

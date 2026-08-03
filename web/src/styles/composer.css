@@ -161,6 +161,7 @@
 .thread-runtime-option-id {
   overflow: hidden;
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -218,7 +219,8 @@
 .mode-chip:active { transform: scale(0.97); }
 
 .mode-chip:focus-visible {
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .mode-chip-icon {
@@ -262,7 +264,9 @@
 }
 
 .composer-input-wrap:has(.composer-input:focus-within) {
-  box-shadow: var(--focus-ring), var(--shadow-2);
+  box-shadow: var(--shadow-2);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 /* Running state — quiet action hairline; send→stop carries the state change. */
@@ -360,8 +364,8 @@
 }
 
 .send-button:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .send-button:disabled {
@@ -386,7 +390,8 @@
 }
 
 .send-button.send-button-cancel:focus-visible {
-  box-shadow: var(--focus-ring-danger);
+  outline: var(--focus-outline-danger);
+  outline-offset: var(--focus-offset);
 }
 
 /* Send↔stop glyph swap — same fade the mode chip's icon gets, so the

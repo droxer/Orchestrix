@@ -169,12 +169,12 @@
 .adm-dash-chart-line {
   stroke-dasharray: var(--chart-path-length, 1000);
   stroke-dashoffset: var(--chart-path-length, 1000);
-  animation: adm-chart-draw var(--t-draw) var(--ease) 0.15s forwards;
+  animation: adm-chart-draw var(--t-draw) var(--ease) calc(var(--t-stagger) * 4) forwards;
 }
 
 .adm-dash-chart-area {
   opacity: 0;
-  animation: adm-chart-area-in var(--t-draw) var(--ease) 0.5s forwards;
+  animation: adm-chart-area-in var(--t-draw) var(--ease) calc(var(--t-stagger) * 12) forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -289,7 +289,7 @@
   margin: 0;
   font-size: var(--fs-2);
   color: var(--ink-3);
-  max-width: 28ch;
+  max-width: var(--measure-tight);
   background: var(--surface-1);
   padding: 0 var(--sp-2);
 }

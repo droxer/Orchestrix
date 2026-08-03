@@ -120,7 +120,7 @@ html[data-theme="dark"] .relay-bleed-mark {
 
 .relay-empty-body {
   margin: 0;
-  max-width: 38ch;
+  max-width: var(--measure-tight);
   color: var(--ink-2);
   font: var(--type-body-sm);
   line-height: var(--leading-loose);

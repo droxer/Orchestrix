@@ -31,13 +31,13 @@
 
 /* Focus replacement for containers that delegate focus to descendants */
 .adm-search:focus-within {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .pref-modal:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 /* Large operational collections stay cheap without changing DOM semantics or
@@ -240,13 +240,15 @@
     --ink-2: var(--ink-1);
     --line-1: color-mix(in srgb, var(--ink-1) 42%, var(--surface-0));
     --line-2: color-mix(in srgb, var(--ink-1) 28%, var(--surface-0));
-    --focus-ring: 0 0 0 3px var(--ink-1);
+    --focus-w: 3px;
+    --focus-outline: var(--focus-w) solid var(--ink-1);
   }
 
   html[data-theme="dark"] {
     --ink-2: color-mix(in srgb, var(--dark-ink) 92%, var(--dark-surface));
     --line-1: color-mix(in srgb, var(--dark-ink) 38%, var(--dark-surface));
     --line-2: color-mix(in srgb, var(--dark-ink) 26%, var(--dark-surface));
-    --focus-ring: 0 0 0 3px var(--dark-ink);
+    --focus-w: 3px;
+    --focus-outline: var(--focus-w) solid var(--dark-ink);
   }
 }

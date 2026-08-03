@@ -120,6 +120,7 @@
   background: color-mix(in srgb, var(--lg-canvas) 70%, transparent);
   color: var(--lg-ink);
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
   caret-color: var(--lg-accent);
   touch-action: manipulation;
@@ -131,9 +132,9 @@
 }
 
 .login-input:focus-visible {
-  outline: none;
   border-color: var(--lg-accent);
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .login-input:-webkit-autofill {
@@ -156,6 +157,7 @@
   background: color-mix(in srgb, var(--lg-err) 10%, var(--lg-canvas));
   color: var(--lg-err);
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
   font-weight: 600;
   line-height: var(--leading-normal);
@@ -252,6 +254,7 @@
 .login-checking-text {
   margin: 0;
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
   --blink-from: 0.55;
   animation: blink var(--t-pulse) var(--ease) infinite;

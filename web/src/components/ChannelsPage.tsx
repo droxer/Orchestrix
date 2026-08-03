@@ -35,7 +35,7 @@ export function ChannelsPage() {
           ) : null
         }
       />
-      <div className="min-h-0 flex-1 overflow-y-auto p-xl max-[820px]:p-base">
+      <div className="min-h-0 flex-1 overflow-y-auto p-7 max-[820px]:p-4">
         <ChannelsView
           createOpen={createOpen}
           onCreateOpenChange={setCreateOpen}
