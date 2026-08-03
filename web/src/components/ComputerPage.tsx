@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { updateComputerDisplayName, updateDaemonNodeDisabledAgents } from "../api";
+import { disconnectComputer, updateComputerDisplayName, updateDaemonNodeDisabledAgents } from "../api";
 import type {
   ControlPanelDaemonNodeRecord,
   CreateLocalDeviceEnrollmentResponse,
@@ -32,17 +32,31 @@ export function ComputerPage({
   onOpenThread?: (sessionId: string) => void;
 }) {
   const { t } = useTranslation();
-  const { prompt } = useDialogs();
+  const { confirm, prompt } = useDialogs();
   const { reportMutationError } = useMutationError();
   const [overrides, setOverrides] = useState<Record<string, ControlPanelDaemonNodeRecord>>({});
   const [manageExecutorsNodeId, setManageExecutorsNodeId] = useState<string | null>(null);
   const [connectDrawerOpen, setConnectDrawerOpen] = useState(false);
+  // Removed ids are held locally so the row disappears on confirm instead of
+  // lingering until the next 3s poll catches up with the delete.
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
 
   const myNodes = useMemo<ControlPanelDaemonNodeRecord[]>(() => {
     const merged = nodesAssignedToEmployee(nodes, currentUser.employeeId).map(
       (node): ControlPanelDaemonNodeRecord => {
         const override = overrides[node.id];
-        return override && override.updatedAt >= node.updatedAt ? override : node;
+        if (!override || override.updatedAt < node.updatedAt) return node;
+        // Overlay only what this page can edit, rather than letting the whole
+        // override win: `online`, `stale`, `activeRuns`, and
+        // `queuedCommandCount` are derived per read and never bump
+        // `updatedAt`, so a wholesale override would pin a computer to the
+        // liveness it had when we wrote it — rename a machine, power it off,
+        // and it reads as online until a reload.
+        return {
+          ...node,
+          displayName: override.displayName,
+          disabledAgents: override.disabledAgents,
+        };
       },
     );
     // A freshly-connected computer lives only in `overrides` until the next
@@ -52,8 +66,9 @@ export function ComputerPage({
     const newlyConnected = Object.values(overrides).filter(
       (node) => !knownIds.has(node.id) && node.employeeId === currentUser.employeeId,
     );
-    return [...newlyConnected, ...merged];
-  }, [nodes, currentUser.employeeId, overrides]);
+    const removed = new Set(removedIds);
+    return [...newlyConnected, ...merged].filter((node) => !removed.has(node.id));
+  }, [nodes, currentUser.employeeId, overrides, removedIds]);
   const manageExecutorsNode = myNodes.find((node) => node.id === manageExecutorsNodeId) ?? null;
 
   function handleNodeUpdated(updated: ControlPanelDaemonNodeRecord) {
@@ -61,7 +76,32 @@ export function ComputerPage({
   }
 
   function handleConnected(result: CreateLocalDeviceEnrollmentResponse) {
+    // Re-connecting an id that was just removed must bring it back.
+    setRemovedIds((prev) => prev.filter((id) => id !== result.node.id));
     handleNodeUpdated(result.node);
+  }
+
+  async function handleDisconnectNode(node: ControlPanelDaemonNodeRecord) {
+    const named = node.displayName?.trim() && node.displayName !== node.id
+      ? node.displayName.trim()
+      : t("computer.unnamed");
+    const confirmed = await confirm({
+      title: t("computer.disconnect_title"),
+      message: t("computer.disconnect_message", { name: named }),
+      confirmLabel: t("computer.disconnect"),
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    try {
+      await disconnectComputer(node.id);
+      setRemovedIds((prev) => (prev.includes(node.id) ? prev : [...prev, node.id]));
+      setOverrides((prev) => {
+        const { [node.id]: _removed, ...rest } = prev;
+        return rest;
+      });
+    } catch (error) {
+      reportMutationError("Failed to disconnect computer", error, t("errors.disconnect_computer"));
+    }
   }
 
   async function handleRenameNode(node: ControlPanelDaemonNodeRecord) {
@@ -124,6 +164,7 @@ export function ComputerPage({
                   node={node}
                   onRename={(target) => void handleRenameNode(target)}
                   onManageExecutors={(target) => setManageExecutorsNodeId(target.id)}
+                  onDisconnect={(target) => void handleDisconnectNode(target)}
                   onOpenThread={onOpenThread}
                   t={t}
                 />

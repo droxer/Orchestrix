@@ -319,7 +319,11 @@ export interface CreateLocalDeviceEnrollmentInput {
   sandboxMode?: "boxlite" | "none";
 }
 
-export type CreateLocalDeviceEnrollmentResponse = CreateControlPanelDaemonNodeResponse;
+export interface CreateLocalDeviceEnrollmentResponse extends CreateControlPanelDaemonNodeResponse {
+  /** True when an existing computer was adopted instead of a new one created —
+      its token was issued once and cannot be reproduced. */
+  reused?: boolean;
+}
 
 export type ManagedNodePhase =
   | "requested"

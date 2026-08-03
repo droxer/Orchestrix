@@ -875,6 +875,13 @@ class DaemonNodeRegistry:
                 updates: dict[str, Any] = {}
                 if not existing.get("sandboxMode"):
                     updates["sandboxMode"] = sandbox_mode
+                # `find_by_employee` treats a pathless node as matching any
+                # workspace, so reuse can land on a record that never learned
+                # where its work goes. Adopt the caller's path instead of
+                # silently discarding it — an enrollment that reports back a
+                # blank workspace is worse than a second node.
+                if workspace_path and not existing.get("workspacePath"):
+                    updates["workspacePath"] = workspace_path
                 if not existing.get("nodeLocation") and node_location:
                     updates["nodeLocation"] = node_location
                 if display_name and display_name != existing.get("displayName"):
