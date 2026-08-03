@@ -15,6 +15,7 @@
   "errors": {
     "rename_thread": "Couldn't rename the thread. Refresh the thread list and try again.",
     "rename_computer": "Couldn't rename the computer. Check the connection and try again.",
+    "disconnect_computer": "Couldn't disconnect that computer. Check your connection and try again.",
     "save_preferences": "Couldn't save your preferences. Check the connection and try again.",
     "delete_thread": "Couldn't delete the thread. Check the connection and try again.",
     "send_message": "Couldn't send the message. Check the daemon connection and try again.",
@@ -380,6 +381,9 @@
     "empty_title": "No computer connected yet",
     "empty_body": "Connect this computer to run agents on it, or ask an admin to assign you one.",
     "unnamed": "Unnamed computer",
+    "disconnect": "Disconnect",
+    "disconnect_title": "Disconnect computer",
+    "disconnect_message": "Remove \"{{name}}\" from your computers? Agents will stop being dispatched to it. You can connect it again later.",
     "last_seen": "Last seen {{time}}",
     "now_running": "Now running",
     "idle": "Nothing running right now.",
@@ -404,7 +408,9 @@
     "connect_connecting": "Connecting…",
     "connect_error": "Couldn't connect this computer: {{message}}",
     "connect_success": "This computer is registered. Run the command below to start the daemon.",
-    "connect_token_once": "This token is shown once — copy it now."
+    "connect_success_existing": "This computer is already connected. Run the command below to start its daemon.",
+    "connect_token_once": "This token is shown once — copy it now.",
+    "connect_token_on_device": "Its token was issued when it was first connected and is not shown again — the daemon on that machine already stores it."
   },
   "routine": {
     "title": "Routines",

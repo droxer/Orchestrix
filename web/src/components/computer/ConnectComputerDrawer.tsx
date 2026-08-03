@@ -111,7 +111,13 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
     >
       {result ? (
         <div className="adm-form">
-          <p className="adm-cred-note">{t("computer.connect_success")}</p>
+          {/* A token is issued once. When the backend adopts a computer that
+              already enrolled it cannot reproduce one — so the panel must stop
+              promising a token and point at the copy the machine already has,
+              rather than leaving the reader holding an id and no next step. */}
+          <p className="adm-cred-note">
+            {token ? t("computer.connect_success") : t("computer.connect_success_existing")}
+          </p>
           <CredCopyRow
             label={t("admin.node_id")}
             hint={t("admin.node_id_hint")}
@@ -139,7 +145,9 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
               onCopy={() => void handleCopy("command", result.daemonCommand!)}
             />
           ) : null}
-          <p className="adm-cred-note">{t("computer.connect_token_once")}</p>
+          <p className="adm-cred-note">
+            {token ? t("computer.connect_token_once") : t("computer.connect_token_on_device")}
+          </p>
           <div className="adm-form-actions">
             <Button size="cta" type="button" onClick={onClose}>
               {t("admin.v2.close_drawer")}
@@ -160,7 +168,10 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
                 disabled={isBusy}
               />
             </Field>
-            <Field label={t("workspace_label")}>
+            {/* `workspace_label` lives under `nav`, so the bare key resolved to
+                nothing and the field rendered the literal "workspace_label".
+                This is the same word the card's Details row already uses. */}
+            <Field label={t("computer.fact_workspace")}>
               <input
                 ref={workspacePathRef}
                 name="connect-computer-workspace-path"

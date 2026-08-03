@@ -15,6 +15,7 @@
   "errors": {
     "rename_thread": "无法重命名对话。请刷新对话列表后重试。",
     "rename_computer": "无法重命名电脑。请检查连接后重试。",
+    "disconnect_computer": "无法断开该电脑的连接。请检查连接后重试。",
     "save_preferences": "无法保存偏好设置。请检查连接后重试。",
     "delete_thread": "无法删除对话。请检查连接后重试。",
     "send_message": "无法发送消息。请检查 daemon 连接后重试。",
@@ -380,6 +381,9 @@
     "empty_title": "尚未连接电脑",
     "empty_body": "连接这台电脑即可在其上运行智能体，或请管理员为你分配一台。",
     "unnamed": "未命名电脑",
+    "disconnect": "断开连接",
+    "disconnect_title": "断开电脑连接",
+    "disconnect_message": "要将“{{name}}”从你的电脑中移除吗？将不再向它派发智能体。之后可以重新连接。",
     "last_seen": "最后在线 {{time}}",
     "now_running": "正在运行",
     "idle": "当前没有任务运行。",
@@ -404,7 +408,9 @@
     "connect_connecting": "连接中…",
     "connect_error": "连接这台电脑失败：{{message}}",
     "connect_success": "这台电脑已注册。运行下面的命令以启动守护进程。",
-    "connect_token_once": "该令牌仅显示一次，请立即复制。"
+    "connect_success_existing": "这台电脑已连接。运行下面的命令即可启动其守护进程。",
+    "connect_token_once": "该令牌仅显示一次，请立即复制。",
+    "connect_token_on_device": "令牌在首次连接时已签发，不会再次显示——那台电脑上的守护进程已保存了它。"
   },
   "routine": {
     "title": "例行任务",

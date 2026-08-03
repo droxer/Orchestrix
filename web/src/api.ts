@@ -319,6 +319,11 @@ export function createControlPanelDaemonNode(
   });
 }
 
+/** Self-service: take the caller's own computer off the roster. */
+export function disconnectComputer(nodeId: string): Promise<void> {
+  return apiJson<void>(`/daemon-nodes/${encodeURIComponent(nodeId)}`, { method: "DELETE" });
+}
+
 /** Self-service: register the caller's own device as a computer, no admin involved. */
 export function createLocalDeviceEnrollment(
   input: CreateLocalDeviceEnrollmentInput,
