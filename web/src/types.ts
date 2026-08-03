@@ -306,6 +306,15 @@ export interface CreateControlPanelDaemonNodeResponse {
   daemonEnv: Record<string, string>;
 }
 
+/** Self-service registration of the caller's own device — no employeeId, the backend attributes it to the authenticated actor. */
+export interface CreateLocalDeviceEnrollmentInput {
+  workspacePath: string;
+  displayName?: string;
+  sandboxMode?: "boxlite" | "none";
+}
+
+export type CreateLocalDeviceEnrollmentResponse = CreateControlPanelDaemonNodeResponse;
+
 export type ManagedNodePhase =
   | "requested"
   | "allocating"
