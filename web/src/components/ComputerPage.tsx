@@ -3,15 +3,22 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { updateComputerDisplayName, updateDaemonNodeDisabledAgents } from "../api";
-import type { ControlPanelDaemonNodeRecord, CurrentUser, DaemonNodeMonitorRecord } from "../types";
+import type {
+  ControlPanelDaemonNodeRecord,
+  CreateLocalDeviceEnrollmentResponse,
+  CurrentUser,
+  DaemonNodeMonitorRecord,
+} from "../types";
 import { nodesAssignedToEmployee } from "../lib/computerNodes";
 import { useMutationError } from "../hooks/useMutationError";
 import { useDialogs } from "./ui/DialogProvider";
 import { ComputerCard } from "./computer/ComputerCard";
+import { ConnectComputerDrawer } from "./computer/ConnectComputerDrawer";
 import { ManageExecutorsDrawer } from "./admin/ManageExecutorsDrawer";
+import { Button } from "./ui/button";
 import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
-import { AdminNode } from "./icons";
+import { ActionAdd, AdminNode } from "./icons";
 
 export function ComputerPage({
   nodes,
@@ -29,19 +36,32 @@ export function ComputerPage({
   const { reportMutationError } = useMutationError();
   const [overrides, setOverrides] = useState<Record<string, ControlPanelDaemonNodeRecord>>({});
   const [manageExecutorsNodeId, setManageExecutorsNodeId] = useState<string | null>(null);
+  const [connectDrawerOpen, setConnectDrawerOpen] = useState(false);
 
-  const myNodes = useMemo<ControlPanelDaemonNodeRecord[]>(
-    () =>
-      nodesAssignedToEmployee(nodes, currentUser.employeeId).map((node): ControlPanelDaemonNodeRecord => {
+  const myNodes = useMemo<ControlPanelDaemonNodeRecord[]>(() => {
+    const merged = nodesAssignedToEmployee(nodes, currentUser.employeeId).map(
+      (node): ControlPanelDaemonNodeRecord => {
         const override = overrides[node.id];
         return override && override.updatedAt >= node.updatedAt ? override : node;
-      }),
-    [nodes, currentUser.employeeId, overrides],
-  );
+      },
+    );
+    // A freshly-connected computer lives only in `overrides` until the next
+    // nodes poll folds it into `nodes` — surface it immediately instead of
+    // waiting on a refetch.
+    const knownIds = new Set(merged.map((node) => node.id));
+    const newlyConnected = Object.values(overrides).filter(
+      (node) => !knownIds.has(node.id) && node.employeeId === currentUser.employeeId,
+    );
+    return [...newlyConnected, ...merged];
+  }, [nodes, currentUser.employeeId, overrides]);
   const manageExecutorsNode = myNodes.find((node) => node.id === manageExecutorsNodeId) ?? null;
 
   function handleNodeUpdated(updated: ControlPanelDaemonNodeRecord) {
     setOverrides((prev) => ({ ...prev, [updated.id]: updated }));
+  }
+
+  function handleConnected(result: CreateLocalDeviceEnrollmentResponse) {
+    handleNodeUpdated(result.node);
   }
 
   async function handleRenameNode(node: ControlPanelDaemonNodeRecord) {
@@ -74,6 +94,12 @@ export function ComputerPage({
         count={t("computer.count", { count: myNodes.length })}
         titleVariant="display"
         layout="stacked"
+        actions={
+          <Button type="button" size="sm" onClick={() => setConnectDrawerOpen(true)}>
+            <ActionAdd size={14} aria-hidden="true" />
+            {t("computer.connect_button")}
+          </Button>
+        }
       />
       {/* The shell clips its children, so the roster needs its own scroll
           container — see computer.css. */}
@@ -83,6 +109,12 @@ export function ComputerPage({
             title={t("computer.empty_title")}
             body={t("computer.empty_body")}
             illustration={<AdminNode size={40} aria-hidden="true" />}
+            actions={
+              <Button type="button" onClick={() => setConnectDrawerOpen(true)}>
+                <ActionAdd size={14} aria-hidden="true" />
+                {t("computer.connect_button")}
+              </Button>
+            }
           />
         ) : (
           <ul className="computer-list">
@@ -106,6 +138,11 @@ export function ComputerPage({
         node={manageExecutorsNode}
         onUpdated={handleNodeUpdated}
         onSave={updateDaemonNodeDisabledAgents}
+      />
+      <ConnectComputerDrawer
+        open={connectDrawerOpen}
+        onClose={() => setConnectDrawerOpen(false)}
+        onConnected={handleConnected}
       />
     </section>
   );

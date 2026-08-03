@@ -12,6 +12,8 @@ import type {
   CreateControlPanelEmployeeResponse,
   CreateControlPanelDaemonNodeInput,
   CreateControlPanelDaemonNodeResponse,
+  CreateLocalDeviceEnrollmentInput,
+  CreateLocalDeviceEnrollmentResponse,
   CreateManagedNodeInput,
   CreateManagedNodeResponse,
   ManagedNodesResponse,
@@ -313,6 +315,20 @@ export function createControlPanelDaemonNode(
       ...(input.workspacePath ? { workspacePath: input.workspacePath } : {}),
       ...(input.sandboxMode ? { sandboxMode: input.sandboxMode } : {}),
       ...(input.nodeLocation ? { nodeLocation: input.nodeLocation } : {}),
+    },
+  });
+}
+
+/** Self-service: register the caller's own device as a computer, no admin involved. */
+export function createLocalDeviceEnrollment(
+  input: CreateLocalDeviceEnrollmentInput,
+): Promise<CreateLocalDeviceEnrollmentResponse> {
+  return apiJson<CreateLocalDeviceEnrollmentResponse>("/daemon-node-enrollments/local", {
+    method: "POST",
+    body: {
+      workspacePath: input.workspacePath,
+      ...(input.displayName ? { displayName: input.displayName } : {}),
+      ...(input.sandboxMode ? { sandboxMode: input.sandboxMode } : {}),
     },
   });
 }

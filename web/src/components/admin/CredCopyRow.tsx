@@ -1,0 +1,38 @@
+"use client";
+
+import { useTranslation } from "react-i18next";
+import { ActionApprove, ActionCopy } from "../icons";
+import { Button } from "@/components/ui/button";
+
+interface CredCopyRowProps {
+  label: string;
+  value: string;
+  copyLabel: string;
+  copied: boolean;
+  onCopy: () => void;
+  hint?: string;
+}
+
+export function CredCopyRow({ label, value, copyLabel, copied, onCopy, hint }: CredCopyRowProps) {
+  const { t } = useTranslation();
+  return (
+    <div className="adm-cred-row">
+      <span className="adm-cred-label">{label}</span>
+      {hint ? <span className="adm-cred-hint">{hint}</span> : null}
+      <div className="adm-cred-value-line">
+        <code className="adm-cred-value code">{value}</code>
+        <Button variant="ghost"
+          type="button"
+          className={`adm-copy-pill ${copied ? "copied" : ""}`}
+          onClick={onCopy}
+          aria-label={copyLabel}
+          title={copyLabel}
+        >
+          {copied ? <ActionApprove size={14} aria-hidden="true" /> : <ActionCopy size={14} aria-hidden="true" />}
+          <span>{copied ? t("admin.copied") : t("admin.copy")}</span>
+          <span className="sr-only" aria-live="polite">{copied ? t("admin.copied") : ""}</span>
+        </Button>
+      </div>
+    </div>
+  );
+}
