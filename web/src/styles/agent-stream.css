@@ -72,6 +72,7 @@
 .collaboration-meta {
   color: var(--ink-3);
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
 }
 
@@ -127,6 +128,7 @@
   background: var(--surface-2);
   color: var(--ink-1);
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
   font-weight: 500;
 }
@@ -162,12 +164,15 @@
   margin-top: 0;
 }
 
-/* In-message heading ladder stays under the 22px conversation title so a
-   content heading never visually rivals the page title. Smooth steps down to
-   the 14px body: 18 / 16 / 15 / 14. */
-.agent-prose h1 { font-size: var(--fs-subhead); } /* 18px */
-.agent-prose h2 { font-size: var(--fs-heading); } /* 16px */
-.agent-prose h3 { font-size: var(--fs-4); } /* 15px */
+/* In-message heading ladder stays under the 20px conversation title so a
+   content heading never visually rivals the page title: 17 / 15 / 14. The
+   ladder lost a rung when the 16px and 18px steps were retired from the scale
+   (they sat 1px from their neighbours and bought no hierarchy). h3 and below
+   now share the body size and separate by weight, which is how the rest of the
+   system already distinguishes roles inside one size. */
+.agent-prose h1 { font-size: var(--fs-heading); } /* 17px */
+.agent-prose h2 { font-size: var(--fs-4); } /* 15px */
+.agent-prose h3,
 .agent-prose h4,
 .agent-prose h5,
 .agent-prose h6 { font-size: var(--fs-3); } /* 14px */
@@ -247,12 +252,13 @@
 }
 
 .agent-prose a {
-  color: var(--action);
+  color: var(--link);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .agent-prose a:hover {
+  color: var(--link-hover);
   text-decoration-thickness: 2px;
 }
 
@@ -291,6 +297,7 @@
   background: var(--surface-2);
   color: var(--ink-1);
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
   line-height: var(--leading-loose);
   white-space: pre;
@@ -339,6 +346,7 @@
 .agent-thinking-marker {
   flex: none;
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
   line-height: var(--leading-loose);
   color: var(--ink-4);
@@ -371,6 +379,7 @@
   gap: var(--sp-2);
   min-width: 0;
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
   line-height: 1.5;
   color: var(--ink-2);
@@ -443,6 +452,7 @@
   background: var(--surface-1);
   color: var(--ink-2);
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
   line-height: var(--leading-loose);
   white-space: pre-wrap;
@@ -465,7 +475,7 @@
   margin-left: 3px;
   vertical-align: -2px;
   background: var(--action);
-  animation: caret 1s steps(1, end) infinite;
+  animation: caret var(--t-tick) steps(1, end) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

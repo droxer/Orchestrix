@@ -205,8 +205,8 @@
 }
 
 .sidenav-settings-menu button:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .sidenav-settings-menu button.danger {
@@ -263,8 +263,8 @@
 }
 
 .sidenav-more-item:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .sidenav-more-item svg {
@@ -304,8 +304,8 @@
 }
 
 .sidenav-btn:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .sidenav-btn[data-nav="logout"]:hover {

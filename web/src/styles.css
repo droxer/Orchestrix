@@ -15,7 +15,7 @@
      declared after Tailwind's `utilities`. So Relay CSS wins over Tailwind
      utilities by DEFINED layer order — not by being unlayered and not by
      @import source order. Source order *within* the layer is preserved, so
-     token overrides (login's --action, a11y's --focus-ring) resolve exactly
+     token overrides (login's --action, a11y's --focus-outline) resolve exactly
      as before; responsive.css / a11y.css stay last to win intra-layer order.
 
    To let a Tailwind utility win over an app rule (a deliberate per-component

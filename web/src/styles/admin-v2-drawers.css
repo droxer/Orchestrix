@@ -98,6 +98,7 @@
 /* Opt-in for ID/handle subtitles (mono is code, IDs, logs — roles.css). */
 .adm-drawer-sub--mono {
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
 }
 
 .adm-drawer-title-mark {
@@ -373,9 +374,9 @@
 }
 
 .adm-assign-node-input:focus-visible + .adm-assign-node {
-  outline: none;
   border-color: var(--action);
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .adm-assign-node.selected {
@@ -407,6 +408,7 @@
 /* Re-assert the code face the `font` shorthand above resets. */
 .adm-assign-node-id.code {
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
 }
 
 .adm-assign-node-path {
@@ -641,8 +643,8 @@
 }
 
 .adm-profile-segment-input:focus-visible + .adm-profile-segment-btn {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .adm-profile-segment-input:disabled + .adm-profile-segment-btn {

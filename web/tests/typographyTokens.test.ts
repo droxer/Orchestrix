@@ -69,14 +69,66 @@ describe("application typography roles", () => {
     assert.match(roles, /--type-label:\s+500[^;]+var\(--font-sans\);/);
   });
 
-  it("tracks the mono display tier without disturbing --track-tight", () => {
+  it("tracks the display tier and the reading tiers, and nothing by accident", () => {
     const palette = readWebSource("styles/tokens/palette.css");
 
-    // --track-display is a NEW token. --track-tight keeps its value precisely so
-    // its ten non-display consumers (login, atelier, workspace, …) are untouched.
     assert.match(palette, /--track-display:\s*-0\.04em;/);
-    assert.match(palette, /--track-tight:\s*0;/);
+    assert.match(palette, /--track-body:\s*-0\.011em;/);
+    assert.match(palette, /--track-body-sm:\s*-0\.013em;/);
     assert.match(palette, /--track-caps:\s*0\.03em;/);
+
+    // --track-tight was declared 0, so its name promised a tightening it never
+    // applied and its single consumer meant --track-0 all along. A token whose
+    // name contradicts its value is worse than no token.
+    // Strip comments first: palette.css documents the retirement in prose, and
+    // a substring check would read its own explanation as the declaration.
+    const code = palette.replace(/\/\*[\s\S]*?\*\//g, "");
+    assert.doesNotMatch(code, /--track-tight:/, "--track-tight was retired; use --track-0");
+    const styles = path.join(repoRoot, "web", "src", "styles");
+    const stragglers = readdirSync(styles)
+      .filter((f) => f.endsWith(".css"))
+      .filter((f) => /var\(--track-tight\)/.test(readFileSync(path.join(styles, f), "utf8")));
+    assert.deepEqual(stragglers, [], "these still reference the retired --track-tight");
+  });
+
+  it("pairs every type role with a tracking token", () => {
+    // The `font:` shorthand cannot carry letter-spacing, so a role applied as
+    // `font: var(--type-title)` loses its tracking unless the call site
+    // remembers a second declaration — which is how an untracked login headline
+    // shipped once. Pairing the tokens by name is what makes the omission
+    // greppable; Linear ships --title-1 next to --title-1-letter-spacing for
+    // exactly this reason.
+    const roles = readWebSource("styles/tokens/roles.css");
+    const declared = [...roles.matchAll(/--type-([a-z-]+):\s/g)]
+      .map((m) => m[1])
+      .filter((name) => !name.endsWith("-track"));
+    assert.ok(declared.length >= 10, "roles.css lost its --type-* block");
+    for (const role of declared) {
+      assert.match(
+        roles,
+        new RegExp(`--type-${role}-track:\\s*var\\(--track-[a-z0-9-]+\\);`),
+        `--type-${role} has no paired --type-${role}-track`
+      );
+    }
+  });
+
+  it("keeps the monospace column out of the inherited body tracking", () => {
+    // base.css sets --track-body on html+body so every reading surface inherits
+    // it. A monospace face is chosen for its fixed advance, and these are
+    // strings an operator compares character by character — so every rule that
+    // opts into the mono family must opt back out of the tracking.
+    const styles = path.join(repoRoot, "web", "src", "styles");
+    const problems: string[] = [];
+    for (const file of readdirSync(styles).filter((f) => f.endsWith(".css"))) {
+      const source = readFileSync(path.join(styles, file), "utf8");
+      for (const rule of source.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+        const [, , body] = rule;
+        if (!/font-family:\s*var\(--font-mono\)/.test(body)) continue;
+        if (/letter-spacing:/.test(body)) continue;
+        problems.push(`${file}:${source.slice(0, rule.index).split("\n").length}`);
+      }
+    }
+    assert.deepEqual(problems, [], `mono rules inheriting body tracking:\n${problems.join("\n")}`);
   });
 
   it("applies display tracking at every display-tier rule", () => {
@@ -100,7 +152,10 @@ describe("application typography roles", () => {
         // A single decorative glyph has no inter-character spacing to track.
         if (/relay-bleed-mark/.test(selector)) continue;
         const spacing = [...body.matchAll(/letter-spacing:\s*([^;]+);/g)].map((m) => m[1].trim());
-        if (spacing.length !== 1 || spacing[0] !== "var(--track-display)") {
+        // Either the shared value or the role's paired token — both resolve to
+        // --track-display, and the paired form is the one that names its role.
+        const accepted = /^var\(--(?:track-display|type-(?:display|title|heading|number)-track)\)$/;
+        if (spacing.length !== 1 || !accepted.test(spacing[0])) {
           const line = source.slice(0, rule.index).split("\n").length;
           problems.push(`${file}:${line} → [${spacing.join(" | ") || "no letter-spacing"}]`);
         }

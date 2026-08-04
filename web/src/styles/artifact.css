@@ -42,8 +42,8 @@
 }
 
 .artifact-chip-main:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .artifact-chip-icon {
@@ -128,6 +128,7 @@
 /* Diff: per-line add/delete coloring with a sign gutter. */
 .artifact-diff {
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
   line-height: var(--leading-normal);
   overflow-x: auto;
@@ -190,6 +191,7 @@
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
   line-height: var(--leading-normal);
   white-space: pre-wrap;
@@ -286,8 +288,8 @@
 }
 
 .artifact-index-btn:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 /* Expanded list panel — always rendered, parked off-canvas to the left and
@@ -344,8 +346,8 @@
 }
 
 .artifact-index-search input:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .artifact-index-search input::placeholder {
@@ -414,8 +416,8 @@
 }
 
 .artifact-index-row:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .artifact-index-row-icon {
@@ -511,8 +513,8 @@
 }
 
 .artifact-preview-action-btn:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .artifact-preview-body {

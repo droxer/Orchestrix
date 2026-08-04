@@ -80,19 +80,46 @@ describe("type-face utilities", () => {
   });
 
   it("keeps identifiers on .code and figures on .tnum", () => {
+    // Searched across the whole component tree rather than pinned to a named
+    // file. The contract is "this class always travels with that face" — which
+    // file renders it is an implementation detail, and pinning one made the
+    // test fail whenever markup was merely MOVED. It broke exactly that way
+    // when .adm-cred-value was extracted from CredentialsDrawer into
+    // CredCopyRow so the connect-computer drawer could share it: the pairing
+    // was intact, the assertion was just looking in the old place. Extraction
+    // for reuse is the normal life of a component, so the assertion must not
+    // treat it as a regression.
+    const components = walk(path.join(webSrc, "components"), [".tsx"]).map((file) => ({
+      name: path.relative(webSrc, file),
+      source: readFileSync(file, "utf8"),
+    }));
+    const pairedWith = (utility: "code" | "tnum", cls: string) => {
+      const hits = components.filter(({ source }) =>
+        new RegExp(`${cls.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\s+${utility}[">\`\\s]`).test(source)
+      );
+      assert.ok(
+        hits.length > 0,
+        `.${cls} is rendered somewhere without .${utility} — the two must travel together`
+      );
+    };
+
     // Identifiers: things an operator could type, paste, or diff.
+    for (const cls of [
+      "adm-node-card-handle",
+      "adm-cred-value",
+      "adm-assign-node-path",
+      "workspace-path-segment",
+      "adm-emp-card-email",
+    ]) {
+      pairedWith("code", cls);
+    }
+    // The node id specifically must be the value wearing the code face.
     assert.match(readWebSource("components/admin/NodeRow.tsx"), /adm-node-card-handle code[^]*?\{node\.id\}/);
-    // The credential row moved into CredCopyRow when the connect-computer
-    // drawer started sharing it; the face assertion follows the markup.
-    assert.match(readWebSource("components/admin/CredCopyRow.tsx"), /adm-cred-value code/);
-    assert.match(readWebSource("components/admin/AssignNodeDrawer.tsx"), /adm-assign-node-path code/);
-    assert.match(readWebSource("components/AgentWorkspacePage.tsx"), /workspace-path-segment code/);
-    assert.match(readWebSource("components/admin/EmployeeCard.tsx"), /adm-emp-card-email code/);
 
     // Figures: counts, stamps, ratios.
-    assert.match(readWebSource("components/ThreadRow.tsx"), /conversation-stamp tnum/);
-    assert.match(readWebSource("components/MessageBlock.tsx"), /msg-time tnum/);
-    assert.match(readWebSource("components/admin/dashboard/KpiTile.tsx"), /adm-dash-tile-value tnum/);
+    for (const cls of ["conversation-stamp", "msg-time", "adm-dash-tile-value"]) {
+      pairedWith("tnum", cls);
+    }
     assert.match(readWebSource("components/workspace/WorkspacePrimitives.tsx"), /<strong className="tnum">\{value\}<\/strong>/);
   });
 

@@ -92,7 +92,8 @@
 }
 
 .backlog-filter-search-wrap:focus-within {
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .backlog-filter-search {
@@ -145,8 +146,8 @@
 }
 
 .backlog-filter-chip:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .backlog-filter-count {
@@ -183,8 +184,8 @@
 }
 
 .backlog-filter-clear:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
   border-radius: var(--r-1);
 }
 
@@ -1111,7 +1112,8 @@
 
 .task-drawer-assignee:focus-within {
   border-color: var(--ring, var(--action));
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .task-drawer-assignee svg {
@@ -1265,7 +1267,7 @@
 
 .backlog-board-empty-body {
   margin: 0 0 var(--sp-3);
-  max-width: 46ch;
+  max-width: var(--measure);
   font: var(--type-body-sm);
   color: var(--ink-2);
 }

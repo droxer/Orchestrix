@@ -85,6 +85,7 @@
 .team-member-option small {
   color: var(--ink-3);
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
 }
 
 .adm-employees-empty.relay-empty--fill {
@@ -274,6 +275,7 @@
 
 .adm-computer-chip-name {
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
 }
 
 /* A dark machine recedes, matching the node card's offline treatment. */
@@ -294,8 +296,8 @@
 }
 
 .adm-node-chip--button:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .adm-emp-metrics {
@@ -459,8 +461,8 @@
 }
 
 .adm-fleet-chip:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .adm-fleet-chip.active,
@@ -588,6 +590,7 @@
    the `font` shorthand above resets. */
 .adm-node-history-identity span.code {
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
 }
 
 /* Meta truncates so a long employee id can't wrap and break row rhythm.
@@ -900,12 +903,14 @@
 
 .adm-node-profile-sandbox {
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
   color: var(--ink-2);
 }
 
 .adm-node-profile-locality {
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
   color: var(--ink-3);
 }
@@ -1020,6 +1025,7 @@
    shorthand above resets family, so .code needs to be re-asserted. */
 .adm-node-card-name.code {
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
 }
 
 /* Name + presence pill share one line so the online/offline readout sits
@@ -1219,8 +1225,8 @@
 .adm-node-id:hover { color: var(--ink-1); }
 
 .adm-node-id:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
   border-radius: var(--r-1);
 }
 
@@ -1443,6 +1449,7 @@
 
 .adm-agent-inventory-pill {
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
   padding: 1px var(--sp-1-5);
   border-radius: var(--r-1);
@@ -1526,7 +1533,8 @@
 }
 
 .adm-agent-toggle-switch input:focus-visible + .adm-agent-toggle-track {
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .adm-agent-toggle-switch input:disabled + .adm-agent-toggle-track {
@@ -1928,9 +1936,9 @@
 
 .adm-chat-form input:focus-visible,
 .adm-chat-form select:focus-visible {
-  outline: none;
   border-color: var(--action);
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .adm-chat-form input::placeholder {
@@ -2136,9 +2144,9 @@
 }
 
 .adm-chat-rows button:focus-visible {
-  outline: none;
   color: var(--err);
-  box-shadow: var(--focus-ring-danger);
+  outline: var(--focus-outline-danger);
+  outline-offset: var(--focus-offset);
 }
 
 @media (max-width: 1040px) {

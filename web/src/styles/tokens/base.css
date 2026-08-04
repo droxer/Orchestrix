@@ -27,6 +27,14 @@ html {
 
 /* overflow-x: hidden is a last-resort clip — reflow regressions must be
    caught at the 320px floor (WCAG 1.4.10), not papered over here. */
+/* Body tracking is set ONCE, here, and inherited. Reading text wants a little
+   negative tracking at UI sizes — Geist at 14-15px set at 0 reads noticeably
+   looser than the same size tightened, and the display tier was already being
+   tracked while the body it sat above was not. Applying it globally rather
+   than per-role is what makes it affordable: `font: var(--type-body)` cannot
+   carry letter-spacing, so a per-role approach would need a second declaration
+   at every reading call site in the app. Faces that must NOT be tightened —
+   the monospace column, tabular figures — opt back out via --track-0 below. */
 html,
 body {
   min-width: 320px;
@@ -38,6 +46,7 @@ body {
   color: var(--ink-2);
   font-family: var(--font-sans);
   line-height: 1.5;
+  letter-spacing: var(--track-body);
 }
 
 ::selection {
@@ -114,22 +123,23 @@ button:not([data-slot="button"]):not(:disabled):active {
   translate: 0 1px;
 }
 
-/* Focus — single ring contract. Element+pseudo selectors (not :where) so
-   the ring outranks component box-shadows; forced-colors gets a real
-   outline because box-shadow is dropped there. */
+/* Focus — single ring contract, drawn with `outline` so no ancestor's
+   `overflow: hidden` can clip it (see roles.css). Element+pseudo selectors
+   (not :where) so the ring outranks component chrome. forced-colors now only
+   needs to swap in the system colour: the mechanism is already the right one,
+   where it used to have to re-draw a ring box-shadow could not carry. */
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .chat-panel:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-  outline-offset: 0;
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 @media (forced-colors: active) {
@@ -139,9 +149,8 @@ select:focus-visible {
   textarea:focus-visible,
   select:focus-visible,
   .chat-panel:focus-visible {
-    outline: 2px solid CanvasText;
-    outline-offset: 2px;
-    box-shadow: none;
+    outline: var(--focus-w) solid CanvasText;
+    outline-offset: var(--focus-offset);
   }
 }
 
@@ -156,6 +165,9 @@ select:focus-visible {
   font-feature-settings: "tnum" 1;
   font-variant-numeric: tabular-nums;
   font-weight: 500;
+  /* Tabular figures exist to line up in a column; inheriting the body's
+     negative tracking narrows the advance and undoes that alignment. */
+  letter-spacing: var(--track-0);
 }
 
 /* `.code` — the code face for literal strings the operator could type, paste,
@@ -170,6 +182,10 @@ select:focus-visible {
   font-feature-settings: "tnum" 1;
   font-variant-numeric: tabular-nums;
   font-weight: 500;
+  /* A monospace face is chosen for its fixed advance — tightening it is
+     self-defeating, and these are strings an operator may need to compare
+     character by character. */
+  letter-spacing: var(--type-code-track);
 }
 
 .eyebrow {

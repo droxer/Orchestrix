@@ -6,6 +6,13 @@
   /* Info is not a color — neutral notice text. */
   --info: var(--ink-3);
 
+  /* Links. Anchors were reading --action, which is the *button fill* role: the
+     two resolve to the same value today, so the mistake was invisible, but it
+     meant "the colour of a primary button" and "the colour of a link" could
+     never be tuned apart. They are different jobs; give them different names. */
+  --link: var(--ink-1);
+  --link-hover: var(--action-hover);
+
   /* Elevation — flat design: planes are separated by hairlines, not drop
      shadows. shadow-1 (bordered surfaces) carries no lift; shadow-2
      (borderless floating chrome) resolves to a single 1px ring so menus,
@@ -33,20 +40,51 @@
      unfocused field or switch state is still perceivable (WCAG 1.4.11). */
   --control-border: var(--ink-4);
 
-  /* Focus — 2px solid ring (WCAG 1.4.11) + soft halo. */
-  --focus-ring:
-    0 0 0 2px var(--action),
-    0 0 0 5px color-mix(in srgb, var(--action) 22%, transparent);
-  --focus-ring-danger:
-    0 0 0 2px var(--err),
-    0 0 0 5px color-mix(in srgb, var(--err) 22%, transparent);
+  /* Focus — 2px ring at a 2px offset (WCAG 1.4.11), drawn with `outline`.
+
+     OUTLINE, NOT BOX-SHADOW. A box-shadow ring is painted inside the nearest
+     `overflow: hidden` ancestor and gets sliced off by it; this app is built
+     out of scrollers, drawers, and clipped rows, so the old ring silently lost
+     an edge wherever a focusable element sat against the boundary of its
+     container. `outline` is never clipped by an ancestor's overflow, and it is
+     the one ring property forced-colors mode preserves — the media query below
+     used to exist purely to re-draw the ring that box-shadow could not carry
+     there, and now agrees with the default instead of replacing it.
+
+     The offset replaces the old soft halo. A ring sitting flush against the
+     element needed a second translucent layer to separate it from the border;
+     a 2px gap does that job with one declaration and no colour mixing.
+
+     The danger ring cannot differ by COLOUR: --err and --action resolve to the
+     same value in both registers (that is the point of the monochrome status
+     ramp), so the two were previously identical down to the pixel and the
+     danger variant communicated nothing at all. It differs by SHAPE — dashed,
+     the same channel StatusPill uses to mark the bad tone hollow. */
+  --focus-w: 2px;
+  --focus-offset: 2px;
+  --focus-outline: var(--focus-w) solid var(--action);
+  --focus-outline-danger: var(--focus-w) dashed var(--err);
 
   /* Type roles — one mono carries the display tier and technical text; Geist
      carries reading and control text. Display and technical are the same face,
      separated by weight, tracking, and colour: display is 700/600 in --ink-1
-     with --track-display, while --type-code stays 400 untracked in --ink-4.
+     with display tracking, while --type-code stays 400 untracked in --ink-4.
      Mono needs more weight than a sans at the same size to hold its own.
-     Display roles must pair with `letter-spacing: var(--track-display)`. */
+
+     EVERY role ships a paired *-track token. The `font:` shorthand cannot carry
+     letter-spacing, so a role applied as `font: var(--type-title)` silently
+     loses its tracking unless the call site remembers a second declaration —
+     which is exactly how an untracked login headline shipped once. Pairing the
+     tokens by name makes the omission greppable, and typographyTokens.test.ts
+     sweeps every stylesheet to make it fail loudly:
+
+       font: var(--type-title);
+       letter-spacing: var(--type-title-track);
+
+     The display tiers share --track-display; the reading tiers take the body
+     tracks, which base.css already applies globally — the tokens are restated
+     here so a role that overrides `font:` can restore its own tracking without
+     knowing which tier it belongs to. */
   --type-display:      700 var(--fs-6)/1.15 var(--font-display);
   --type-title:        700 var(--fs-title)/1.2  var(--font-display);
   --type-heading:      600 var(--fs-heading)/1.3  var(--font-display);
@@ -55,8 +93,19 @@
   --type-label:        500 var(--fs-2)/1.4  var(--font-sans);
   --type-label-strong: 600 var(--fs-2)/1.4  var(--font-sans);
   --type-micro:        500 var(--fs-1)/1.4  var(--font-sans); /* + uppercase + --track-caps */
-  --type-number:       700 var(--fs-number)/1.4  var(--font-display); /* mono is already tabular; the declaration is kept as a no-op guard */
+  --type-number:       700 var(--fs-title)/1.4  var(--font-display); /* mono is already tabular; the declaration is kept as a no-op guard */
   --type-code:         400 var(--fs-2)/1.5  var(--font-mono);
+
+  --type-display-track:      var(--track-display);
+  --type-title-track:        var(--track-display);
+  --type-heading-track:      var(--track-display);
+  --type-number-track:       var(--track-display);
+  --type-body-track:         var(--track-body);
+  --type-body-sm-track:      var(--track-body-sm);
+  --type-label-track:        var(--track-body-sm);
+  --type-label-strong-track: var(--track-body-sm);
+  --type-micro-track:        var(--track-caps);
+  --type-code-track:         var(--track-0); /* never tighten a monospace column */
 }
 
 /* CJK — reading roles want looser leading. */

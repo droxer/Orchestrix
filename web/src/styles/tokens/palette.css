@@ -31,16 +31,33 @@
    don't split a component's responsive behaviour across two files. */
 
 :root {
-  /* Dark register (default) */
-  --surface-0: #101214; /* canvas */
+  /* Dark register (default)
+
+     The surface ladder is an ELEVATION ladder in this register: 0 < 1 < 3 in
+     perceived lift, with 2 as the fill tier (search, hover, inset wells) that
+     sits between card and drawer. The light register cannot reproduce that —
+     see the note there before assuming 0..3 means "lighter" everywhere.
+
+     Elevation is flat (no drop shadows), so the canvas → card step is the only
+     thing separating a card from the page besides its hairline. It is therefore
+     the WIDEST step in the ladder on purpose (okL 0.05 vs 0.03 for the rest):
+     an evenly-spaced ramp left surface-0 → surface-1 at 1.06:1, which is below
+     the threshold where a borderless card reads as raised at all. */
+  --surface-0: #0b0d0f; /* canvas */
   --surface-1: #16181b; /* cards, panels */
   --surface-2: #1c1f23; /* fills, search, hover */
   --surface-3: #22262b; /* drawers, modals */
 
+  /* Ink — every tier that can carry TEXT clears WCAG 1.4.3 (4.5:1) against the
+     worst plane it can land on, which is --surface-3, not the canvas. ink-4 was
+     #6b727b (3.86:1 on canvas, 3.13:1 on a drawer) while carrying timestamps,
+     token counts, and feed meta — real content, not decoration. Lifting it
+     forced ink-3 up too, or the two tiers would have collapsed into each other.
+     Worst-plane ratios: ink-1 13.8 · ink-2 9.6 · ink-3 6.7 · ink-4 4.6. */
   --ink-1: #f2f4f6; /* headings, emphasis */
   --ink-2: #c9ced4; /* body */
-  --ink-3: #99a0a8; /* secondary labels */
-  --ink-4: #6b727b; /* timestamps, disabled */
+  --ink-3: #a6adb5; /* secondary labels */
+  --ink-4: #878e97; /* timestamps, meta, disabled */
 
   --line-1: #282c31; /* structural hairline */
   --line-2: #1f2226; /* soft hairline */
@@ -55,20 +72,40 @@
   /* Status — a grey brightness hierarchy: loud = bright, calm = dim.
       Dot/border/text only, never fills, never actions.
       Each tone owns a distinct step: err #f2f4f6 > warn #b2b9c1 >
-      info (--ink-3) #99a0a8 > ok #7d848d. Warn/err are AA-safe as small
-      text; ok is the decorative-calm tier. Because err shares its
-      brightness with --action/--ink-1, the bad tone is also encoded by
-      shape (hollow ring) — see StatusPill. */
-  --ok: #7d848d;
+      info (--ink-3) #a6adb5 > ok #8f96a0. Every tone is AA-safe as small
+      text against the worst plane it can land on (--surface-3): err 13.8,
+      warn 7.7, info 6.7, ok 5.1 — the tones render as text often enough
+      (counts, inline state labels) that a decorative-only tier was a
+      liability. ok still lands between info and --ink-4 so the calm end of
+      the hierarchy stays visibly calm. Because err shares its brightness
+      with --action/--ink-1, the bad tone is also encoded by shape (hollow
+      ring) — see StatusPill. */
+  --ok: #8f96a0;
   --warn: #b2b9c1;
   --err: #f2f4f6;
 
-  /* Live — the one colour in Relay. Reserved exclusively for work an agent is
-     doing RIGHT NOW: never an action, never a status, never decoration. Legal
-     only where --t-pulse is used; --t-pulse-calm surfaces stay grey (see
+  /* Live — the one SEMANTIC colour in Relay. Reserved exclusively for work an
+     agent is doing RIGHT NOW: never an action, never a status, never
+     decoration. Legal only where --t-pulse is used; --t-pulse-calm surfaces
+     stay grey (see
      docs/superpowers/specs/2026-07-28-phosphor-identity-design.md §4). A
      screen's colour density is therefore a utilisation readout — a busy
      workforce glows, an idle one is bare.
+
+     "The one colour" is a claim about MEANING, not about pigment, and the
+     distinction matters because the codebase has always had two other sources
+     of hue and a reader who takes the rule literally will file them as bugs:
+
+       1. Identity hues — IdentityMonogram and TaskAssignee derive a per-name
+          hue procedurally (hsl(var(--avatar-hue) …) in profile-image.css and
+          backlog.css, each with a stylelint exemption). These encode *who*,
+          not *what is happening*, they are never read as state, and no fixed
+          token could express them because the hue is computed from the name.
+       2. App icons — favicon.svg and both relay-mark.svg carry the accent,
+          because a grey chevron on a grey square is invisible at 16px.
+
+     Neither is a status, so neither competes with --live for meaning. Any
+     THIRD source of colour is a bug.
      10.94:1 on --surface-0, 10.36:1 on --surface-1. Do not brighten: the
      obvious lighter green #0f8a4e measures 4.14:1 and fails AA.
      Deliberately no --live-wash companion: a wash is a fill, and this colour
@@ -82,19 +119,19 @@
      the same ones the two registers use above — declared once here so no
      component ever hand-copies a hex. Consumers: login.css (--lg-*),
      preferences.css (swatches), workspace.css, artifact.css, a11y.css. */
-  --dark-canvas: #101214;
+  --dark-canvas: #0b0d0f;
   --dark-surface: #16181b;
   --dark-surface-2: #1c1f23;
   --dark-elevated: #22262b;
   --dark-ink: #f2f4f6;
   --dark-ink-strong: #ffffff;
   --dark-body: #c9ced4;
-  --dark-ink-soft: #99a0a8;
+  --dark-ink-soft: #a6adb5;
   --dark-line: color-mix(in srgb, #f2f4f6 14%, transparent);
   --dark-line-soft: color-mix(in srgb, #f2f4f6 8%, transparent);
 
-  --light-canvas: #f7f8f9;
-  --light-surface: #ffffff;
+  --light-canvas: #f1f3f5;
+  --light-surface: #fafbfc;
   --light-ink: #16181b;
 
   /* Document paper — artifact/file previews assume a white page in every
@@ -131,6 +168,22 @@
 
   --control-h: 40px;
 
+  /* Measure — the reading-column cap for prose, descriptions, and empty-state
+     copy. In ch, not px, so the column tracks the font rather than the layout:
+     a line stays ~the same number of words at any root size.
+     Three tiers, because nine call sites had grown seven different values
+     (28/38/46/46/48/50/52/72ch) with nothing to anchor them:
+
+       --measure-tight  captions, empty-state lines, one-line hints
+       --measure        the default — descriptions, summaries, side copy
+       --measure-wide   long-form document body (agent-authored prose)
+
+     Anything under --measure-tight is a layout width, not a measure; give it a
+     px value and a reason. */
+  --measure-tight: 34ch;
+  --measure: 48ch;
+  --measure-wide: 72ch;
+
   /* Shell */
   --sidenav-w: 72px;
   --sidenav-w-open: 228px;
@@ -160,16 +213,21 @@
 
   /* Type sizes — rem so browser font-size preference scales the UI
      (root pinned to 87.5% in base.css; 1rem = 14px at the default). */
+  /* The ladder is 11 / 13 / 14 / 15 / 17 / 20 / 22 / 32. Nothing sits closer
+     than 2px above --fs-4, because steps a single pixel apart cost a token and
+     buy no visible hierarchy — the reader cannot tell 19 from 20, so the two
+     roles that tried (KPI numerals at 19, in-message h1 at 18) read as noise in
+     the scale rather than levels of it. Roles that need to differ inside one
+     size differ by weight and colour instead; that is the same rule the display
+     tier already runs on (see roles.css). */
   --fs-1: 0.7857rem; /* 11px */
   --fs-2: 0.9286rem; /* 13px */
   --fs-3: 1rem;      /* 14px */
   --fs-4: 1.0714rem; /* 15px */
-  --fs-heading: 1.1429rem; /* 16px — section headings */
-  --fs-subhead: 1.2857rem; /* 18px — in-message h1; the one step between a
-                              section heading and a pane title, so a heading
-                              inside agent prose never rivals --fs-title */
-  --fs-number: 1.3571rem;  /* 19px — KPI numerals */
-  --fs-title: 1.4286rem;   /* 20px — conversation / pane titles */
+  --fs-heading: 1.2143rem; /* 17px — section headings, in-message h1. Was 16px,
+                              one step off --fs-4's 15px; 17 is far enough from
+                              body to read as a heading without weight alone. */
+  --fs-title: 1.4286rem;   /* 20px — conversation / pane titles, KPI numerals */
   --fs-5: 1.5714rem; /* 22px */
   --fs-6: 2.2857rem; /* 32px */
 
@@ -179,12 +237,18 @@
   --leading-loose: 1.65;
 
   /* Tracking — a monospace display tier needs real negative tracking to stop
-     titles reading as spaced-out code. --track-display is a NEW token applied
-     only at display-role call sites; --track-tight keeps its existing value and
-     its existing ten non-display consumers, which must not be re-tracked. Caps
-     use a restrained utility value only where uppercase remains meaningful. */
+     titles reading as spaced-out code, and READING text wants a little of it
+     too. --track-body/-sm are applied once, on html+body in base.css, so every
+     sans surface inherits them; the code face opts back out via --track-0
+     because tightening a monospace column defeats the point of the face.
+     Caps use a restrained utility value only where uppercase is meaningful.
+
+     There is deliberately no --track-tight: it was declared 0, so its name
+     promised a tightening it never applied, and its single consumer wanted
+     --track-0 all along. */
   --track-display: -0.04em;
-  --track-tight: 0;
+  --track-body: -0.011em;
+  --track-body-sm: -0.013em;
   --track-0: 0;
   --track-caps: 0.03em;
 
@@ -201,10 +265,13 @@
 
   /* Motion — one ease, two speeds, no overshoot.
      --t-fast: state change under the pointer (hover, press, menu open).
-     --t-slow: entrances that cross real distance (sheets, first paint). */
+     --t-slow: entrances that cross real distance (sheets, first paint).
+     280ms, not 320: past ~300ms an entrance stops reading as responsive and
+     starts reading as a wait, and this is an operator tool where the same
+     panes open dozens of times an hour. */
   --ease: cubic-bezier(0.2, 0, 0, 1);
   --t-fast: 120ms;
-  --t-slow: 320ms;
+  --t-slow: 280ms;
 
   /* Ambient loops — "something is running". Two cadences only, so the same
      liveness reads at the same tempo on every surface.
@@ -213,6 +280,12 @@
      to sit in peripheral vision without pulling focus. */
   --t-pulse: 1.6s;
   --t-pulse-calm: 2.6s;
+
+  /* --t-tick: the mechanical loop — a spinner rotating, a caret blinking. Not
+     a pulse (those breathe to say "an agent is working"); this is a metronome
+     that says "this element is still alive". Was spelled 0.9s and 1s at the
+     two call sites that needed it. */
+  --t-tick: 1s;
 
   /* Draw — content that renders itself over real time rather than changing
      state: a chart stroke arriving, a skeleton shimmer sweeping. Too long to
@@ -232,19 +305,43 @@
   --rise: 8px;
 }
 
-/* Light register — designed alongside dark, not derived from it. */
-html[data-theme="light"] {
-  --surface-0: #f7f8f9;
-  --surface-1: #ffffff;
-  --surface-2: #eef0f2;
-  --surface-3: #ffffff; /* separated by hairline, not lift (flat) */
+/* Light register — designed alongside dark, not derived from it.
 
+   THE LADDER RUNS BOTH WAYS HERE. On a light canvas "raised" means lighter and
+   "inset" means darker, and white is a ceiling you cannot build above — so 0..3
+   is a ladder of DISTINCTNESS, not of lightness:
+
+     surface-0  canvas          #f1f3f5   the page
+     surface-1  cards, panels   #fafbfc   raised — lighter than canvas
+     surface-2  fills, wells    #e9ecef   RECESSED — deliberately darker
+     surface-3  drawers, modals #ffffff   the top plane, pure white
+
+   surface-2 inverting direction between registers is correct: a search field
+   or hover well recedes from white and emerges from black. What was NOT correct
+   was surface-3 === surface-1 (both #ffffff), which left a light-theme dialog
+   as white-on-white over a canvas 1.06:1 away, carried entirely by a 1.26:1
+   hairline. Cards now sit one step below pure white so the top plane has
+   somewhere to go, and the canvas dropped to widen the whole run (0→3 is now
+   1.11:1, was 1.06:1). */
+html[data-theme="light"] {
+  --surface-0: #f1f3f5;
+  --surface-1: #fafbfc;
+  --surface-2: #e9ecef; /* recessed fill — see the note above */
+  --surface-3: #ffffff; /* top plane: the one pure white */
+
+  /* Ink — same AA rule as the dark register, worst plane here is --surface-2
+     (the recessed fill, the one plane that moves toward the ink rather than
+     away from it). Ratios against it: ink-1 15.0 · ink-2 8.6 · ink-3 6.0 ·
+     ink-4 4.6. The steps between tiers are tighter than the dark register's
+     (1.26 at the calm end vs 1.46) and that is structural, not sloppiness:
+     white bounds the light ramp at one end and the AA floor bounds it at the
+     other, leaving four tiers less room to spread than dark has. */
   --ink-1: #16181b;
   --ink-2: #3f444b;
-  --ink-3: #5c636b;
-  --ink-4: #7d848d;
+  --ink-3: #545b63;
+  --ink-4: #636a72;
 
-  --line-1: #e2e5e8;
+  --line-1: #dcdfe3;
   --line-2: #eceef0;
 
   --action: #16181b;
@@ -253,8 +350,9 @@ html[data-theme="light"] {
   --on-action: #ffffff;
 
   /* Light status — loud = dark. Steps mirror the dark register:
-     err #16181b > warn #484f57 > info (--ink-3) #5c636b > ok #6b727b. */
-  --ok: #6b727b;
+     err #16181b > warn #484f57 > info (--ink-3) #545b63 > ok #5a6169.
+     AA against the worst plane here (--surface-2): 15.0 / 7.0 / 5.8 / 5.2. */
+  --ok: #5a6169;
   --warn: #484f57;
   --err: #16181b;
 
@@ -285,9 +383,12 @@ html:lang(zh-TW) {
 html:lang(zh-CN),
 html:lang(zh-TW) {
   /* Display falls back to sans above, so the mono display tracking must be
-     neutralised or Han titles would be crushed together. */
+     neutralised or Han titles would be crushed together. The body tracks go
+     with it: Han glyphs are full-width and already tight: negative tracking
+     closes the gap they rely on to stay separable. */
   --track-display: 0;
-  --track-tight: 0;
+  --track-body: 0;
+  --track-body-sm: 0;
   --track-caps: 0.02em;
   --leading-normal: 1.7;
   --leading-loose: 1.8;

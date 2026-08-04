@@ -332,7 +332,7 @@ html[data-theme="dark"] .rail-node { background: var(--surface-3); }
 
 .route-loading {
   font-family: var(--font-sans);
-  letter-spacing: var(--track-tight);
+  letter-spacing: var(--track-0);
 }
 
 html[data-theme="dark"] .backlog-lane,

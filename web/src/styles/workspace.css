@@ -59,6 +59,7 @@
   background: var(--surface-1);
   color: var(--ink-3);
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
   line-height: 1.35;
 }
@@ -88,7 +89,7 @@
 }
 
 .workspace-page .page-header-subtitle {
-  max-width: 52ch;
+  max-width: var(--measure);
 }
 
 .workspace-page .page-header-toolbar {
@@ -151,8 +152,8 @@
 }
 
 .workspace-page .workspace-page-tab:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .workspace-page .workspace-page-tab[aria-selected="true"],
@@ -663,6 +664,7 @@
   color: var(--ink-3);
   cursor: pointer;
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
   max-width: 160px;
   overflow: hidden;
@@ -816,7 +818,7 @@
 
 .workspace-preview-viewport.is-bleed .agent-prose {
   padding: var(--sp-6) var(--sp-7);
-  max-width: 72ch;
+  max-width: var(--measure-wide);
   margin: 0 auto;
 }
 
@@ -896,6 +898,7 @@
   grid-template-columns: auto minmax(0, 1fr);
   overflow-x: auto;
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
   line-height: 1.55;
 }
@@ -1260,7 +1263,7 @@
 }
 
 .agent-personality-help {
-  max-width: 48ch;
+  max-width: var(--measure);
   color: var(--ink-3);
   font: var(--type-body-sm);
   line-height: 1.5;
@@ -1306,7 +1309,7 @@
 }
 
 .agent-personality-document h1 {
-  font-size: var(--fs-subhead);
+  font-size: var(--fs-heading);
 }
 
 .agent-personality-document h2 {
@@ -1341,6 +1344,7 @@
 
 .agent-personality-document code {
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: 0.92em;
 }
 
@@ -1354,7 +1358,7 @@
 .agent-personality-empty > p,
 .agent-personality-empty > span {
   display: block;
-  max-width: 50ch;
+  max-width: var(--measure);
   margin: 0;
 }
 
@@ -1403,6 +1407,7 @@
 .agent-personality-editor-guide li > span {
   color: var(--ink-4);
   font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
   font-size: var(--fs-1);
   line-height: 1.7;
 }
@@ -1482,8 +1487,8 @@
 }
 
 .agent-personality-editor-toolbar button:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .agent-personality-textarea {
@@ -1594,8 +1599,8 @@
 }
 
 .workspace-dossier-icon-btn:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .workspace-dossier-icon-btn:disabled {
