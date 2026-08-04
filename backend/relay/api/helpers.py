@@ -130,7 +130,19 @@ def daemon_start_env(request: Request, node: dict[str, Any], sandbox_mode: str =
     return env
 
 
-def daemon_start_command(request: Request, node: dict[str, Any], sandbox_mode: str = "boxlite") -> str:
+def daemon_start_command(
+    request: Request,
+    node: dict[str, Any],
+    sandbox_mode: str = "boxlite",
+    *,
+    prompt_for_token: bool = True,
+) -> str:
+    """The shell line that starts this node's daemon. Never carries the token.
+
+    `prompt_for_token=False` is for a node that already enrolled: its machine
+    holds the token on disk (`ensureDaemonNodeToken`), so prompting for a
+    secret the reader was shown once and no longer has would strand them.
+    """
     parts = [
         "relay-daemon",
         "--backend-url",
@@ -147,6 +159,8 @@ def daemon_start_command(request: Request, node: dict[str, Any], sandbox_mode: s
     if node.get("workspacePath"):
         parts.extend(["--workspace", node["workspacePath"]])
     command = " ".join(shlex.quote(part) for part in parts)
+    if not prompt_for_token:
+        return command
     return (
         "read -rsp 'Relay node token: ' RELAY_DAEMON_NODE_TOKEN && echo && "
         f"export RELAY_DAEMON_NODE_TOKEN && {command}"

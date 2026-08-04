@@ -40,6 +40,20 @@ describe("My Computer route shell", () => {
     const config = await read("web/next.config.ts");
     assert.match(config, /source: "\/computer"/);
   });
+
+  it("keeps the connect action reachable on mobile", async () => {
+    // Regression: the route hid its whole .page-header under 820px to kill an
+    // empty grey strip, which took "Connect this computer" with it. The empty
+    // state has its own button, so the loss only appeared once you owned a
+    // computer — exactly when you were adding a second one.
+    const styles = await read("web/src/styles/computer.css");
+    const mobile = styles.slice(styles.indexOf("@media (max-width: 820px)"));
+    assert.doesNotMatch(
+      mobile,
+      /\.computer-page \.page-header\s*\{[^}]*display:\s*none/s,
+      "hiding the header removes the only Connect button on mobile",
+    );
+  });
 });
 
 describe("My Computer record card", () => {
@@ -65,6 +79,49 @@ describe("My Computer record card", () => {
     const card = await read("web/src/components/computer/ComputerCard.tsx");
     assert.match(card, /\{t\("thread\.rename"\)\}/);
     assert.match(card, /\{t\("admin\.v2\.manage_executors"\)\}/);
+  });
+
+  it("offers the counterpart to self-service enrollment", async () => {
+    // Connecting a computer is self-service, so removing one must be too —
+    // otherwise a mistyped workspace leaves a row only an admin can clear.
+    const [card, page] = await Promise.all([
+      read("web/src/components/computer/ComputerCard.tsx"),
+      read("web/src/components/ComputerPage.tsx"),
+    ]);
+    assert.match(card, /\{t\("computer\.disconnect"\)\}/);
+    assert.match(page, /disconnectComputer\(node\.id\)/);
+    assert.match(page, /tone: "danger"/, "removal is confirmed destructively");
+  });
+
+  it("connects a personal computer as direct-run, with no runtime to pick", async () => {
+    // BoxLite is provisioned on admin hardware. Offering "Isolated" here let an
+    // employee ask their own laptop for a sandbox it was never set up to boot,
+    // and the enrollment would hand back a start command for that VM.
+    const [drawer, api] = await Promise.all([
+      read("web/src/components/computer/ConnectComputerDrawer.tsx"),
+      read("web/src/api.ts"),
+    ]);
+    assert.doesNotMatch(drawer, /boxlite/);
+    assert.doesNotMatch(drawer, /connect-computer-sandbox-mode/);
+    const enrollment = api.match(/createLocalDeviceEnrollment\([\s\S]*?\n\}/)?.[0] ?? "";
+    assert.notEqual(enrollment.trim(), "", "the enrollment-call regex stopped matching — refresh it");
+    assert.match(enrollment, /sandboxMode: "none"/);
+  });
+
+  it("keeps poll-derived liveness out of optimistic overrides", async () => {
+    // `online`, `stale`, `activeRuns`, and `queuedCommandCount` are derived per
+    // read and never bump `updatedAt`, so a wholesale override pinned a
+    // renamed computer to the liveness it had when the rename landed.
+    const page = await read("web/src/components/ComputerPage.tsx");
+    const overlay = page.match(/if \(!override \|\| override\.updatedAt < node\.updatedAt\) return node;([\s\S]*?)\n {6}\},/)?.[1] ?? "";
+    assert.notEqual(overlay.trim(), "", "the override regex stopped matching — refresh it");
+    for (const derived of ["online", "stale", "activeRuns", "queuedCommandCount"]) {
+      assert.doesNotMatch(
+        overlay,
+        new RegExp(`override\\.${derived}`),
+        `${derived} comes from the poll, never from the override`,
+      );
+    }
   });
 
   it("spends the --live accent only on work that is running right now", async () => {

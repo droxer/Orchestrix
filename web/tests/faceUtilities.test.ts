@@ -85,8 +85,10 @@ describe("type-face utilities", () => {
     // file renders it is an implementation detail, and pinning one made the
     // test fail whenever markup was merely MOVED. It broke exactly that way
     // when .adm-cred-value was extracted from CredentialsDrawer into
-    // CredCopyRow: the pairing was intact, the assertion was just looking in
-    // the old place.
+    // CredCopyRow so the connect-computer drawer could share it: the pairing
+    // was intact, the assertion was just looking in the old place. Extraction
+    // for reuse is the normal life of a component, so the assertion must not
+    // treat it as a regression.
     const components = walk(path.join(webSrc, "components"), [".tsx"]).map((file) => ({
       name: path.relative(webSrc, file),
       source: readFileSync(file, "utf8"),

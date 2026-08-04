@@ -2066,7 +2066,7 @@ def test_employee_can_create_own_device_enrollment(monkeypatch) -> None:
             json={
                 "displayName": "Travel Laptop",
                 "workspacePath": "/Users/alice/project",
-                "sandboxMode": "boxlite",
+                "sandboxMode": "none",
             },
         )
 
@@ -2077,6 +2077,216 @@ def test_employee_can_create_own_device_enrollment(monkeypatch) -> None:
         assert body["node"]["displayName"] == "Travel Laptop"
         assert body["node"]["workspacePath"] == "/Users/alice/project"
         assert body["nodeToken"] not in body["daemonCommand"]
+        assert body["reused"] is False
+
+
+def _enroll_employee(client: TestClient, employee_id: str) -> None:
+    """Create `employee_id` and leave the client signed in as them."""
+    _login_admin(client)
+    assert (
+        client.post(
+            "/api/v1/admin/employees",
+            json={
+                "employeeId": employee_id,
+                "username": employee_id,
+                "password": "userpass",
+            },
+        ).status_code
+        == 201
+    )
+    assert client.post("/api/v1/auth/logout").status_code == 200
+    assert (
+        client.post(
+            "/api/v1/auth/login",
+            json={"username": employee_id, "password": "userpass"},
+        ).status_code
+        == 200
+    )
+
+
+def test_local_enrollment_defaults_to_direct_execution(monkeypatch) -> None:
+    # A personal computer has one runtime, so an omitted field is unambiguous:
+    # agents run as processes against the installs already on that machine.
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _enroll_employee(client, "alice")
+
+        response = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project"},
+        )
+
+        assert response.status_code == 201
+        body = response.json()
+        assert body["node"]["sandboxMode"] == "none"
+        assert body["daemonEnv"]["RELAY_SANDBOX_MODE"] == "none"
+        assert "--use-local-agent-home" in body["daemonCommand"]
+
+
+def test_local_enrollment_refuses_the_isolated_runtime(monkeypatch) -> None:
+    # BoxLite is provisioned on admin-owned hardware; asking an employee's own
+    # laptop for it must fail loudly rather than be quietly downgraded, or the
+    # start command would contradict what the caller asked for.
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _enroll_employee(client, "alice")
+
+        response = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "boxlite"},
+        )
+
+        assert response.status_code == 400
+        assert "sandboxMode" in response.json()["detail"]
+
+
+def test_local_enrollment_adopts_the_workspace_of_a_pathless_computer(
+    monkeypatch,
+) -> None:
+    # `find_by_employee` treats a node with no workspacePath as matching any
+    # path, so reuse used to hand back a record that never learned where the
+    # employee's work lives.
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _login_admin(client)
+        created = client.post(
+            "/api/v1/admin/daemon-nodes", json={"employeeId": "alice"}
+        )
+        assert created.status_code == 201
+        assert not created.json()["node"].get("workspacePath")
+        _enroll_employee(client, "alice")
+
+        response = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
+        )
+
+        assert response.status_code == 201
+        body = response.json()
+        assert body["reused"] is True
+        assert body["node"]["workspacePath"] == "/Users/alice/project"
+
+
+def test_local_enrollment_returns_a_start_command_without_a_reissued_token(
+    monkeypatch,
+) -> None:
+    # A token is issued once. Re-enrolling a computer whose plaintext token is
+    # no longer recoverable must still hand back the command that starts it —
+    # the command carries no secret, and without it the panel is a dead end.
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _enroll_employee(client, "alice")
+        first = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
+        )
+        assert first.status_code == 201
+        node_id = first.json()["node"]["id"]
+        node_token = first.json()["nodeToken"]
+        # Finish the enrollment: an unfinished one legitimately rotates its
+        # credential, so only a computer that actually registered can reach
+        # the branch where no token can be handed back.
+        app.state.registry.register(
+            {
+                "sandboxId": node_id,
+                "employeeId": "alice",
+                "token": node_token,
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        # Plaintext launch credentials live in memory only; a restart drops
+        # them, which is what makes this branch reachable in production.
+        app.state.registry.plain_node_tokens.pop(node_id, None)
+
+        response = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
+        )
+
+        assert response.status_code == 201
+        body = response.json()
+        assert body["reused"] is True
+        assert body["node"]["id"] == node_id
+        assert body["daemonCommand"]
+        assert node_id in body["daemonCommand"]
+        # No token to prompt for — the daemon reads the one on its own disk.
+        assert "read -rsp" not in body["daemonCommand"]
+
+
+def test_employee_can_disconnect_own_computer(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _enroll_employee(client, "alice")
+        enrolled = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
+        )
+        assert enrolled.status_code == 201
+        node_id = enrolled.json()["node"]["id"]
+
+        response = client.delete(f"/api/v1/daemon-nodes/{node_id}")
+
+        assert response.status_code == 204
+        listed = client.get("/api/v1/daemon-nodes")
+        assert listed.status_code == 200
+        assert all(node["id"] != node_id for node in listed.json()["nodes"])
+
+
+def test_employee_cannot_disconnect_another_employees_computer(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _enroll_employee(client, "alice")
+        enrolled = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
+        )
+        assert enrolled.status_code == 201
+        node_id = enrolled.json()["node"]["id"]
+        _enroll_employee(client, "bob")
+
+        response = client.delete(f"/api/v1/daemon-nodes/{node_id}")
+
+        assert response.status_code == 403
+
+
+def test_employee_cannot_disconnect_an_admin_managed_computer(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _enroll_employee(client, "alice")
+        enrolled = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
+        )
+        assert enrolled.status_code == 201
+        node_id = enrolled.json()["node"]["id"]
+        registry = app.state.registry
+        registry.sandboxes[node_id] = {
+            **registry.sandboxes[node_id],
+            "managedNodeId": "managed-1",
+        }
+
+        response = client.delete(f"/api/v1/daemon-nodes/{node_id}")
+
+        assert response.status_code == 403
+        assert "managed by an admin" in response.json()["detail"]
 
 
 def test_employee_can_manage_own_computer_executors(monkeypatch) -> None:
@@ -2105,7 +2315,7 @@ def test_employee_can_manage_own_computer_executors(monkeypatch) -> None:
         )
         enrolled = client.post(
             "/api/v1/daemon-node-enrollments/local",
-            json={"workspacePath": "/Users/alice/project", "sandboxMode": "boxlite"},
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
         )
         assert enrolled.status_code == 201
         node_id = enrolled.json()["node"]["id"]
@@ -2148,7 +2358,7 @@ def test_employee_cannot_manage_another_employees_computer_executors(
         )
         enrolled = client.post(
             "/api/v1/daemon-node-enrollments/local",
-            json={"workspacePath": "/Users/alice/project", "sandboxMode": "boxlite"},
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
         )
         assert enrolled.status_code == 201
         node_id = enrolled.json()["node"]["id"]
@@ -2194,7 +2404,7 @@ def test_admin_can_manage_any_computers_executors(monkeypatch) -> None:
         )
         enrolled = client.post(
             "/api/v1/daemon-node-enrollments/local",
-            json={"workspacePath": "/Users/alice/project", "sandboxMode": "boxlite"},
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
         )
         assert enrolled.status_code == 201
         node_id = enrolled.json()["node"]["id"]
@@ -2236,7 +2446,7 @@ def test_disabled_agents_endpoint_rejects_invalid_payload(monkeypatch) -> None:
         )
         enrolled = client.post(
             "/api/v1/daemon-node-enrollments/local",
-            json={"workspacePath": "/Users/alice/project", "sandboxMode": "boxlite"},
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
         )
         assert enrolled.status_code == 201
         node_id = enrolled.json()["node"]["id"]

@@ -380,13 +380,16 @@ button.computer-run-open:focus-visible {
 }
 
 @media (max-width: 820px) {
-  /* The mobile topbar already names the route, so responsive.css clips
-     every work route's .page-header-lead. Routes that keep an actions
-     toolbar still have something in that band; this one has neither
-     toolbar nor actions, so what survived was 48px of padding and a
-     hairline — an empty grey strip under the topbar. */
+  /* The mobile topbar already names the route, so responsive.css clips every
+     work route's .page-header-lead and keeps the band for actions. Hiding the
+     whole header here took "Connect this computer" with it — and since the
+     empty state carries its own button, the loss only showed up once you had
+     a computer, i.e. exactly when adding a second one. Drop the padding
+     instead, so the band collapses to its button rather than to a grey strip. */
   .computer-page .page-header {
-    display: none;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
   }
 
   .computer-page-body {

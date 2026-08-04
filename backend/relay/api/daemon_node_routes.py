@@ -4,7 +4,7 @@ import math
 import time
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from loguru import logger
 from starlette.concurrency import run_in_threadpool
 
@@ -16,7 +16,11 @@ from ..services.computer_names import (
     rename_computer_for_actor,
 )
 from ..services.event_notifier import daemon_command_key
-from ..services.node_agents import sync_node_agents
+from ..services.node_agents import (
+    assert_node_agent_runs_drained,
+    remove_node_agents,
+    sync_node_agents,
+)
 from .deps import AppContextDep
 from .helpers import (
     actor_can_access_sandbox,
@@ -36,6 +40,9 @@ router = APIRouter()
 WORKSPACE_EVENT_TYPES = frozenset(
     {"workspace.listing", "workspace.file", "workspace.error"}
 )
+
+# A self-enrolled personal computer is direct-run only; see the enrollment route.
+LOCAL_ENROLLMENT_SANDBOX_MODE = "none"
 
 MAX_COMMAND_POLL_WAIT_SECONDS = 30.0
 MAX_COMMAND_POLL_LIMIT = 50
@@ -219,9 +226,17 @@ async def create_local_device_enrollment(
     request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
     actor = request_actor(request, ctx.auth_store)
+    # Enrolling a machine is a signed-in human action; a chat-service actor
+    # carries no device to connect. Matches the rename route's gate.
+    if not actor.get("user"):
+        raise HTTPException(401, "Authentication required.")
     body = await json_body(request)
     workspace_path = string_field(body, "workspacePath")
-    sandbox_mode = string_field(body, "sandboxMode") or "boxlite"
+    # An employee's own machine runs its agents directly, against the agent
+    # installs already on it. BoxLite isolation belongs to hardware an admin
+    # provisions, so this route offers no runtime choice — but it refuses a
+    # caller that asks for the isolated one rather than silently substituting.
+    sandbox_mode = body.get("sandboxMode", LOCAL_ENROLLMENT_SANDBOX_MODE)
     try:
         display_name = normalize_computer_display_name(body.get("displayName"))
     except ValueError as error:
@@ -230,8 +245,14 @@ async def create_local_device_enrollment(
         raise HTTPException(
             400, "An absolute workspacePath on the employee device is required."
         )
-    if sandbox_mode not in ("boxlite", "none"):
-        raise HTTPException(400, 'sandboxMode must be "boxlite" or "none".')
+    if sandbox_mode != LOCAL_ENROLLMENT_SANDBOX_MODE:
+        raise HTTPException(
+            400, 'sandboxMode must be "none": a personal computer runs agents directly.'
+        )
+    # Provisioning adopts an existing computer for this employee rather than
+    # stacking duplicates, so say which happened — the client cannot infer it,
+    # and "connected" and "already connected" need different instructions.
+    reused = ctx.registry.find_by_employee(actor["employeeId"], workspace_path) is not None
     node = ctx.backend.provision_daemon_node(
         {
             "employeeId": actor["employeeId"],
@@ -241,18 +262,61 @@ async def create_local_device_enrollment(
             "nodeLocation": "employee-device",
         }
     )
+    # A token is issued once. When an already-registered computer is adopted we
+    # cannot reproduce it — but the start command holds no secret, so it is
+    # still the thing the reader needs, pointed at the token on their disk.
+    node_token = node.get("nodeToken")
     response: dict[str, Any] = {
         "node": present_computer(
             ctx, public_sandbox_record(ctx.registry.get(node["id"]) or node)
         ),
         "daemonEnv": daemon_start_env(request, node, sandbox_mode),
+        "daemonCommand": daemon_start_command(
+            request, node, sandbox_mode, prompt_for_token=bool(node_token)
+        ),
+        "reused": reused,
     }
     if node.get("sandboxToken"):
         response["sandboxToken"] = node["sandboxToken"]
-    if node.get("nodeToken"):
-        response["nodeToken"] = node["nodeToken"]
-        response["daemonCommand"] = daemon_start_command(request, node, sandbox_mode)
+    if node_token:
+        response["nodeToken"] = node_token
     return response
+
+
+@router.delete("/daemon-nodes/{sandbox_id}", status_code=204)
+def disconnect_daemon_node(
+    sandbox_id: str, request: Request, ctx: AppContextDep
+) -> Response:
+    """Self-service removal of a computer, scoped by the same ownership seam.
+
+    The counterpart to enrollment: an employee who can connect a machine must
+    be able to take it off the roster, or a mistyped workspace leaves a row
+    only an admin can clear.
+    """
+    actor = request_actor(request, ctx.auth_store)
+    if not actor.get("user"):
+        raise HTTPException(401, "Authentication required.")
+    try:
+        with ctx.registry.dispatch_lock:
+            node = ctx.registry.get(sandbox_id)
+            if not node:
+                raise KeyError(sandbox_id)
+            if not actor_can_access_sandbox(actor, node):
+                raise HTTPException(403, "Daemon node access denied.")
+            # Supervisor-provisioned hardware is torn down through the managed
+            # node lifecycle, not by the employee sitting in front of it.
+            if node.get("managedNodeId"):
+                raise HTTPException(
+                    403, "This computer is managed by an admin and cannot be removed here."
+                )
+            assert_node_agent_runs_drained(ctx, sandbox_id)
+            ctx.registry.delete(sandbox_id)
+            remove_node_agents(ctx, sandbox_id)
+    except KeyError as error:
+        raise HTTPException(404, "Daemon node not found.") from error
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+    return Response(status_code=204)
 
 
 @router.patch("/daemon-nodes/{sandbox_id}/agent-role-overrides")

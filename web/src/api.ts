@@ -319,7 +319,14 @@ export function createControlPanelDaemonNode(
   });
 }
 
-/** Self-service: register the caller's own device as a computer, no admin involved. */
+/** Self-service: take the caller's own computer off the roster. */
+export function disconnectComputer(nodeId: string): Promise<void> {
+  return apiJson<void>(`/daemon-nodes/${encodeURIComponent(nodeId)}`, { method: "DELETE" });
+}
+
+/** Self-service: register the caller's own device as a computer, no admin involved.
+    Always direct-run — the isolated runtime is provisioned on admin hardware,
+    so the mode is stated on the wire rather than left to a server default. */
 export function createLocalDeviceEnrollment(
   input: CreateLocalDeviceEnrollmentInput,
 ): Promise<CreateLocalDeviceEnrollmentResponse> {
@@ -328,7 +335,7 @@ export function createLocalDeviceEnrollment(
     body: {
       workspacePath: input.workspacePath,
       ...(input.displayName ? { displayName: input.displayName } : {}),
-      ...(input.sandboxMode ? { sandboxMode: input.sandboxMode } : {}),
+      sandboxMode: "none",
     },
   });
 }

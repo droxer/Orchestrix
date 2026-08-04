@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TFunction } from "i18next";
 import type { AgentName, ControlPanelDaemonNodeRecord } from "../../types";
 import { AgentMark } from "../AgentMark";
@@ -8,7 +8,7 @@ import { StateMark } from "../StateMark";
 import { NodePresence } from "../admin/NodePresence";
 import { nodeOwnershipIcon } from "../admin/NodeProfileBadges";
 import { Button } from "../ui/button";
-import { ActionApprove, ActionCopy, ActionEdit, AdminManageExecutors } from "../icons";
+import { ActionApprove, ActionCopy, ActionEdit, ActionRemove, AdminManageExecutors } from "../icons";
 import { abbreviateNodeId, formatRunElapsed } from "../../lib/computerNodes";
 import { labelForExecutor } from "../../lib/agentDisplayNames";
 import {
@@ -37,21 +37,29 @@ export function ComputerCard({
   node,
   onRename,
   onManageExecutors,
+  onDisconnect,
   onOpenThread,
   t,
 }: {
   node: ControlPanelDaemonNodeRecord;
   onRename: (node: ControlPanelDaemonNodeRecord) => void;
   onManageExecutors: (node: ControlPanelDaemonNodeRecord) => void;
+  onDisconnect: (node: ControlPanelDaemonNodeRecord) => void;
   onOpenThread?: (sessionId: string) => void;
   t: TFunction;
 }) {
   const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+  }, []);
 
   async function handleCopyId() {
     await copyText(node.id);
     setCopied(true);
-    window.setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
+    if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = window.setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
   }
 
   const named = Boolean(node.displayName?.trim()) && node.displayName !== node.id;
@@ -101,6 +109,13 @@ export function ComputerCard({
           <Button type="button" variant="outline" size="sm" onClick={() => onManageExecutors(node)}>
             <AdminManageExecutors size={14} aria-hidden="true" />
             {t("admin.v2.manage_executors")}
+          </Button>
+          {/* Removal is the counterpart to self-service enrollment, but it is
+              not the action the reader came for — ghost keeps it reachable
+              without competing with rename. */}
+          <Button type="button" variant="ghost" size="sm" onClick={() => onDisconnect(node)}>
+            <ActionRemove size={14} aria-hidden="true" />
+            {t("computer.disconnect")}
           </Button>
         </div>
       </header>
