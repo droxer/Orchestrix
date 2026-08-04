@@ -295,14 +295,31 @@ export interface UnassignControlPanelDaemonNodeResponse {
   node: ControlPanelDaemonNodeRecord;
 }
 
-export interface CreateControlPanelDaemonNodeInput {
+interface CreateControlPanelDaemonNodeCommon {
   employeeId?: string;
   displayName?: string;
-  workspacePath?: string;
-  nodeLocation?: "employee-device";
-  /** Runtime isolation only; management ownership is represented by managedNodeId. */
-  sandboxMode?: "boxlite" | "none";
 }
+
+/** `nodeLocation` and `sandboxMode` are not independent, so they are paired in
+    the type rather than left to each call site: an employee device runs agents
+    as host processes against the installs already on it, and BoxLite isolation
+    belongs to hardware an admin provisions. Both admin drawers had drifted to
+    sending the isolated runtime for a local computer, which the backend now
+    also refuses — this makes it a compile error instead of a start command the
+    employee's laptop cannot execute. */
+export type CreateControlPanelDaemonNodeInput =
+  | (CreateControlPanelDaemonNodeCommon & {
+      nodeLocation: "employee-device";
+      /** Where the agents' work lands on that device; required, and absolute. */
+      workspacePath: string;
+      sandboxMode: "none";
+    })
+  | (CreateControlPanelDaemonNodeCommon & {
+      nodeLocation?: never;
+      workspacePath?: string;
+      /** Runtime isolation only; management ownership is represented by managedNodeId. */
+      sandboxMode?: "boxlite";
+    });
 
 export interface CreateControlPanelDaemonNodeResponse {
   node: ControlPanelDaemonNodeRecord;
