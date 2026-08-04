@@ -98,12 +98,14 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
     >
       {result ? (
         <div className="adm-form">
-          {/* A token is issued once. When the backend adopts a computer that
-              already enrolled it cannot reproduce one — so the panel must stop
-              promising a token and point at the copy the machine already has,
-              rather than leaving the reader holding an id and no next step. */}
+          {/* Two different questions, two different answers. Whether this was a
+              new computer or an adopted one is `reused` — token presence does
+              not answer it, because adopting a computer whose enrollment never
+              finished reissues a token. Whether there is a secret to show is
+              `token`. Reading the first off the second told someone re-running
+              a half-finished connect that they had just connected. */}
           <p className="adm-cred-note">
-            {token ? t("computer.connect_success") : t("computer.connect_success_existing")}
+            {result.reused ? t("computer.connect_success_existing") : t("computer.connect_success")}
           </p>
           <CredCopyRow
             label={t("admin.node_id")}
@@ -132,6 +134,8 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
               onCopy={() => void copy("command", result.daemonCommand!)}
             />
           ) : null}
+          {/* This one is about the secret itself, so it stays keyed on `token`:
+              a reissued token is still shown exactly once. */}
           <p className="adm-cred-note">
             {token ? t("computer.connect_token_once") : t("computer.connect_token_on_device")}
           </p>

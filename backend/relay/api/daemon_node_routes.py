@@ -23,7 +23,9 @@ from ..services.node_agents import (
 )
 from .deps import AppContextDep
 from .helpers import (
+    EMPLOYEE_DEVICE_SANDBOX_MODE,
     actor_can_access_sandbox,
+    assert_employee_device_runtime,
     authorized_sandbox_for_token,
     bearer_token,
     daemon_node_event,
@@ -41,8 +43,9 @@ WORKSPACE_EVENT_TYPES = frozenset(
     {"workspace.listing", "workspace.file", "workspace.error"}
 )
 
-# A self-enrolled personal computer is direct-run only; see the enrollment route.
-LOCAL_ENROLLMENT_SANDBOX_MODE = "none"
+# A self-enrolled personal computer is direct-run only; the rule is shared with
+# the admin create route, so it lives in helpers rather than here.
+LOCAL_ENROLLMENT_SANDBOX_MODE = EMPLOYEE_DEVICE_SANDBOX_MODE
 
 MAX_COMMAND_POLL_WAIT_SECONDS = 30.0
 MAX_COMMAND_POLL_LIMIT = 50
@@ -245,23 +248,28 @@ async def create_local_device_enrollment(
         raise HTTPException(
             400, "An absolute workspacePath on the employee device is required."
         )
-    if sandbox_mode != LOCAL_ENROLLMENT_SANDBOX_MODE:
-        raise HTTPException(
-            400, 'sandboxMode must be "none": a personal computer runs agents directly.'
-        )
+    assert_employee_device_runtime("employee-device", sandbox_mode)
     # Provisioning adopts an existing computer for this employee rather than
     # stacking duplicates, so say which happened — the client cannot infer it,
     # and "connected" and "already connected" need different instructions.
-    reused = ctx.registry.find_by_employee(actor["employeeId"], workspace_path) is not None
-    node = ctx.backend.provision_daemon_node(
-        {
-            "employeeId": actor["employeeId"],
-            **({"displayName": display_name} if display_name else {}),
-            "workspacePath": workspace_path,
-            "sandboxMode": sandbox_mode,
-            "nodeLocation": "employee-device",
-        }
-    )
+    # Adoption can still reissue a token for an unfinished enrollment, so token
+    # presence does not answer this; the probe has to run, and it shares the
+    # provision's (reentrant) lock so a second enrollment cannot land between
+    # the two and report a new computer as adopted.
+    with ctx.registry.dispatch_lock:
+        reused = (
+            ctx.registry.find_by_employee(actor["employeeId"], workspace_path)
+            is not None
+        )
+        node = ctx.backend.provision_daemon_node(
+            {
+                "employeeId": actor["employeeId"],
+                **({"displayName": display_name} if display_name else {}),
+                "workspacePath": workspace_path,
+                "sandboxMode": sandbox_mode,
+                "nodeLocation": "employee-device",
+            }
+        )
     # A token is issued once. When an already-registered computer is adopted we
     # cannot reproduce it — but the start command holds no secret, so it is
     # still the thing the reader needs, pointed at the token on their disk.

@@ -124,11 +124,14 @@ export function AssignNodeDrawer({
           });
           onCreateNodeSuccess({ kind: "managed", result });
         } else {
+          // Direct-run, not isolated — see AddNodeDrawer: a local computer
+          // runs agents as host processes, so the isolated runtime would hand
+          // back a start command for a VM the device cannot boot.
           const result = await createControlPanelDaemonNode({
             employeeId: nextEmployeeId,
             displayName: displayName.trim() || undefined,
             workspacePath: workspacePath.trim(),
-            sandboxMode: "boxlite",
+            sandboxMode: "none",
             nodeLocation: "employee-device",
           });
           onCreateNodeSuccess({ kind: "manual", result });
@@ -414,7 +417,7 @@ export function AssignNodeDrawer({
               disabled={isBusy}
             />
             {!isManaged ? (
-              <Field label={t("workspace_label")}>
+              <Field label={t("nav.workspace_label")}>
                 <input
                   ref={workspacePathRef}
                   name="assign-node-workspace-path"

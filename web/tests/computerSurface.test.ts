@@ -108,6 +108,16 @@ describe("My Computer record card", () => {
     assert.match(enrollment, /sandboxMode: "none"/);
   });
 
+  it("reports adoption from `reused`, not from whether a token came back", async () => {
+    // Adopting a computer whose enrollment never finished reissues its token,
+    // so token presence answers "is there a secret to show", never "was this
+    // already connected". Reading the second off the first told someone
+    // re-running a half-finished connect that they had just connected.
+    const drawer = await read("web/src/components/computer/ConnectComputerDrawer.tsx");
+    assert.match(drawer, /result\.reused \? t\("computer\.connect_success_existing"\)/);
+    assert.match(drawer, /token \? t\("computer\.connect_token_once"\)/);
+  });
+
   it("keeps poll-derived liveness out of optimistic overrides", async () => {
     // `online`, `stale`, `activeRuns`, and `queuedCommandCount` are derived per
     // read and never bump `updatedAt`, so a wholesale override pinned a
@@ -144,5 +154,54 @@ describe("My Computer record card", () => {
       .replace(/^\s*\/\/.*$/gm, "");
     assert.notEqual(idleBranch.trim(), "", "the idle branch regex stopped matching — refresh it");
     assert.doesNotMatch(idleBranch, /live/i, "the idle state must not carry the accent");
+  });
+});
+
+describe("Admin console: adding a local computer", () => {
+  const DRAWERS = [
+    "web/src/components/admin/AddNodeDrawer.tsx",
+    "web/src/components/admin/AssignNodeDrawer.tsx",
+  ];
+
+  it("creates an employee device as direct-run, matching self-service enrollment", async () => {
+    // Regression: both drawers sent `sandboxMode: "boxlite"` alongside
+    // `nodeLocation: "employee-device"`. The backend stores the mode verbatim,
+    // so the admin was handed `--sandbox boxlite` with no
+    // `--use-local-agent-home` and the daemon tried to boot a VM on someone's
+    // laptop — while the drawer's own copy promised agents would "run directly
+    // on this computer".
+    for (const path of DRAWERS) {
+      const source = await read(path);
+      const call = source.match(/createControlPanelDaemonNode\(\{[\s\S]*?\n\s*\}\);/)?.[0] ?? "";
+      assert.notEqual(call.trim(), "", `${path}: the create-call regex stopped matching — refresh it`);
+      assert.match(call, /nodeLocation: "employee-device"/, path);
+      assert.match(call, /sandboxMode: "none"/, path);
+      assert.doesNotMatch(call, /sandboxMode: "boxlite"/, path);
+    }
+  });
+
+  it("pairs nodeLocation with sandboxMode in the type, so the drawers cannot drift again", async () => {
+    // The two fields are not independent. Encoding that in the input type makes
+    // the regression above a compile error rather than a start command the
+    // employee's machine cannot execute.
+    const types = await read("web/src/types.ts");
+    const input = types.match(/export type CreateControlPanelDaemonNodeInput =[\s\S]*?\n\s*\}\);/)?.[0] ?? "";
+    assert.notEqual(input.trim(), "", "the input-type regex stopped matching — refresh it");
+    assert.match(input, /nodeLocation: "employee-device";[\s\S]*?sandboxMode: "none";/);
+    assert.match(input, /nodeLocation\?: never;[\s\S]*?sandboxMode\?: "boxlite";/);
+  });
+
+  it("labels the workspace field with a key that resolves", async () => {
+    // `workspace_label` has no root-level entry — it lives under `nav`, so
+    // i18next echoed the key and the admin read the literal "workspace_label"
+    // above the path input.
+    const locale = JSON.parse(await read("web/src/i18n/locales/en/translation.json"));
+    for (const path of DRAWERS) {
+      const source = await read(path);
+      assert.doesNotMatch(source, /t\("workspace_label"\)/, path);
+      assert.match(source, /t\("nav\.workspace_label"\)/, path);
+    }
+    assert.equal(typeof locale.nav.workspace_label, "string");
+    assert.equal(locale.workspace_label, undefined, "the key was never root-level");
   });
 });

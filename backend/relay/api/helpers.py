@@ -111,6 +111,34 @@ def valid_employee_workspace_path(value: str | None) -> bool:
     )
 
 
+# An employee device runs its agents as host processes against the installs
+# already on it. BoxLite isolation belongs to hardware an admin provisions, so
+# `nodeLocation` and `sandboxMode` are not independent settings.
+EMPLOYEE_DEVICE_SANDBOX_MODE = "none"
+
+
+def assert_employee_device_runtime(
+    node_location: str | None, sandbox_mode: str | None
+) -> None:
+    """Reject an employee-device node asking for the isolated runtime.
+
+    Both the self-service enrollment route and the admin create route land on
+    the same `provision_daemon_node`, which stores `sandboxMode` verbatim — so
+    the pair has to be checked before it becomes a start command. Enforced here
+    rather than per-route: a caller that slips through gets `--sandbox boxlite`
+    with no `--use-local-agent-home`, and the daemon tries to boot a VM on a
+    laptop that was never set up for one.
+    """
+    if node_location != "employee-device":
+        return
+    if sandbox_mode != EMPLOYEE_DEVICE_SANDBOX_MODE:
+        raise HTTPException(
+            400,
+            'sandboxMode must be "none" for an employee-device computer: '
+            "a personal computer runs agents directly.",
+        )
+
+
 def daemon_start_env(request: Request, node: dict[str, Any], sandbox_mode: str = "boxlite") -> dict[str, str]:
     env = {
         "RELAY_BACKEND_URL": backend_base_url(request),

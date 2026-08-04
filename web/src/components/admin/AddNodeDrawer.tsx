@@ -65,8 +65,11 @@ export function AddNodeDrawer({
     [employees, employeeId],
   );
 
+  // Reset on open, not on close: clearing as the drawer is dismissed wipes the
+  // fields while they are still on screen, and leaves stale state visible for a
+  // frame if the drawer is ever remounted open. Matches ConnectComputerDrawer.
   useEffect(() => {
-    if (!open) {
+    if (open) {
       setNodeLocation("managed");
       setDisplayName("");
       setWorkspacePath("");
@@ -109,11 +112,14 @@ export function AddNodeDrawer({
         });
         onSuccess({ kind: "managed", result });
       } else {
+        // Direct-run, not isolated: this is someone's own machine, and the
+        // start command it produces has to match the runtime it can actually
+        // boot. Same rule the self-service enrollment route enforces.
         const result = await createControlPanelDaemonNode({
           employeeId: employeeId || undefined,
           displayName: displayName.trim() || undefined,
           workspacePath: workspacePath.trim(),
-          sandboxMode: "boxlite",
+          sandboxMode: "none",
           nodeLocation: "employee-device",
         });
         onSuccess({ kind: "manual", result });
@@ -171,7 +177,7 @@ export function AddNodeDrawer({
           />
           {!isManaged ? (
             <Field
-              label={t("workspace_label")}
+              label={t("nav.workspace_label")}
               hint={t("admin.v2.workspace_path_hint")}
               error={fieldErrors.workspacePath}
               errorId="add-node-workspace-path-error"

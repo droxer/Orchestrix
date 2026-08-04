@@ -23,6 +23,7 @@ from ..services.node_agents import (
 from ..services.team_membership import remove_agent_from_teams
 from .deps import AppContextDep
 from .helpers import (
+    assert_employee_device_runtime,
     daemon_start_command,
     daemon_start_env,
     employee_record,
@@ -403,6 +404,7 @@ async def create_control_panel_daemon_node(request: Request, ctx: AppContextDep)
         raise HTTPException(
             400, "An absolute workspacePath on the employee device is required."
         )
+    assert_employee_device_runtime(requested_location, sandbox_mode)
     if hasattr(ctx.auth_store, "ensure_employee"):
         if employee_id:
             ctx.auth_store.ensure_employee(employee_id)

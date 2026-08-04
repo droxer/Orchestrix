@@ -2015,6 +2015,40 @@ def test_control_panel_rejects_unknown_sandbox_mode(monkeypatch) -> None:
         assert response.status_code == 400
 
 
+def test_control_panel_refuses_an_isolated_employee_device(monkeypatch) -> None:
+    # `nodeLocation` and `sandboxMode` are not independent: an employee device
+    # runs agents as host processes. Admin creation lands on the same
+    # `provision_daemon_node` as self-service enrollment, which stores the mode
+    # verbatim — so a caller asking for the pair must be refused here rather
+    # than handed `--sandbox boxlite` for a laptop that cannot boot a VM.
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _login_admin(client)
+
+        response = client.post(
+            "/api/v1/admin/daemon-nodes",
+            json={
+                "employeeId": "alice",
+                "workspacePath": "/Users/alice/project",
+                "sandboxMode": "boxlite",
+                "nodeLocation": "employee-device",
+            },
+        )
+
+        assert response.status_code == 400
+        assert "sandboxMode" in response.json()["detail"]
+
+        # The isolated runtime stays available to admin hardware, which is what
+        # `nodeLocation` absent means.
+        managed = client.post(
+            "/api/v1/admin/daemon-nodes",
+            json={"employeeId": "alice", "sandboxMode": "boxlite"},
+        )
+        assert managed.status_code == 201
+
+
 def test_employee_device_node_requires_an_absolute_workspace(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
