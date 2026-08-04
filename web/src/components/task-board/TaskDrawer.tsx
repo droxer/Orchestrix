@@ -194,6 +194,7 @@ function AssignmentSummary({
 }
 
 type TaskDrawerProps = {
+  open: boolean;
   form: TaskBoardFormState;
   logicalAgents: EmployeeAgent[];
   teams?: AgentTeam[];
@@ -205,6 +206,8 @@ type TaskDrawerProps = {
   onChange: (next: TaskBoardFormState) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onDelete?: () => void;
+  /** Fires after the drawer's exit animation completes — release form state here. */
+  onClosed?: () => void;
   /** Read-only context (status, linked thread, recent activity) shown above the form in edit mode. */
   meta?: ReactNode;
 };
@@ -310,6 +313,7 @@ function RoutineFields({ form, onChange }: { form: RoutineTaskFormState; onChang
 }
 
 export function TaskDrawer({
+  open,
   form,
   logicalAgents,
   teams = [],
@@ -321,6 +325,7 @@ export function TaskDrawer({
   onChange,
   onSubmit,
   onDelete,
+  onClosed,
   meta,
 }: TaskDrawerProps) {
   const { t } = useTranslation();
@@ -367,7 +372,7 @@ export function TaskDrawer({
 
   return (
     <Drawer
-      open
+      open={open}
       onClose={() => {
         if (!busy) onClose();
       }}
@@ -375,9 +380,10 @@ export function TaskDrawer({
       subtitle={subtitle}
       subtitleMono={form.variant === "backlog" && Boolean(form.id)}
       width={form.variant === "routine" ? 600 : 560}
-      closeLabel={t("dialog.cancel")}
+      closeLabel={t("admin.v2.close_drawer")}
       ariaLabel={title}
       bodyClassName="adm-drawer-body--column"
+      onClosed={onClosed}
     >
       <form className="adm-form task-board-drawer-form" onSubmit={onSubmit}>
         {meta}

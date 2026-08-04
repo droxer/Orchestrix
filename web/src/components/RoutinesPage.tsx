@@ -408,6 +408,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
   const [view, setView] = useState<RoutineView>(() => parseRoutineView(null));
   const [form, setForm] = useState<RoutineTaskFormState | null>(null);
   const [formBaseline, setFormBaseline] = useState<RoutineTaskFormState | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const formDirty = Boolean(form && formBaseline && !taskBoardFormsEqual(form, formBaseline));
@@ -425,13 +426,24 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
   function openRoutineForm(next: RoutineTaskFormState) {
     setForm(next);
     setFormBaseline(next);
+    setDrawerOpen(true);
+  }
+
+  // The drawer calls this after its exit animation completes — only then is
+  // the form released, so every exit (save, delete, discard) animates out.
+  function releaseRoutineForm() {
+    setForm(null);
+    setFormBaseline(null);
+  }
+
+  function dismissRoutineForm() {
+    setDrawerOpen(false);
   }
 
   async function closeRoutineForm() {
-    if (saving || deleting) return;
+    if (!drawerOpen || saving || deleting) return;
     if (!(await confirmDiscardChanges())) return;
-    setForm(null);
-    setFormBaseline(null);
+    dismissRoutineForm();
   }
 
   function editTask(task: RelayTaskListItem) {
@@ -472,8 +484,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
       };
       if (form.id) await updateTaskMutation.mutateAsync({ taskId: form.id, input: payload });
       else await createTaskMutation.mutateAsync(payload);
-      setForm(null);
-      setFormBaseline(null);
+      dismissRoutineForm();
     } catch {
       // mutation onError surfaces a toast; keep the drawer open for retry.
     } finally {
@@ -494,8 +505,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
     setDeleting(true);
     try {
       await deleteTaskMutation.mutateAsync({ taskId: form.id });
-      setForm(null);
-      setFormBaseline(null);
+      dismissRoutineForm();
       announce({ message: t("routine.toast_deleted"), tone: "success" });
     } catch {
       // mutation onError surfaces a toast; keep the drawer open for retry.
@@ -613,6 +623,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
 
       {form ? (
         <TaskDrawer
+          open={drawerOpen}
           form={form}
           logicalAgents={logicalAgents}
           teams={teams}
@@ -631,6 +642,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
             />
           ) : undefined}
           onClose={() => { void closeRoutineForm(); }}
+          onClosed={releaseRoutineForm}
           onChange={(next) => {
             if (next.variant === "routine") setForm(next);
           }}

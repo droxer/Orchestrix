@@ -464,6 +464,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   const [view, setView] = useState<BacklogView>(() => parseBacklogView(null));
   const [form, setForm] = useState<BacklogTaskFormState | null>(null);
   const [formBaseline, setFormBaseline] = useState<BacklogTaskFormState | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -498,13 +499,24 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   function openTaskForm(next: BacklogTaskFormState) {
     setForm(next);
     setFormBaseline(next);
+    setDrawerOpen(true);
+  }
+
+  // The drawer calls this after its exit animation completes — only then is
+  // the form released, so every exit (save, delete, discard) animates out.
+  function releaseTaskForm() {
+    setForm(null);
+    setFormBaseline(null);
+  }
+
+  function dismissTaskForm() {
+    setDrawerOpen(false);
   }
 
   async function closeTaskForm() {
-    if (saving || deleting) return;
+    if (!drawerOpen || saving || deleting) return;
     if (!(await confirmDiscardChanges())) return;
-    setForm(null);
-    setFormBaseline(null);
+    dismissTaskForm();
   }
 
   function editTask(task: RelayTaskListItem) {
@@ -538,8 +550,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
       };
       if (form.id) await updateTaskMutation.mutateAsync({ taskId: form.id, input: payload });
       else await createTaskMutation.mutateAsync(payload);
-      setForm(null);
-      setFormBaseline(null);
+      dismissTaskForm();
     } catch {
       // mutation onError surfaces a toast; keep the drawer open for retry.
     } finally {
@@ -560,8 +571,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     setDeleting(true);
     try {
       await deleteTaskMutation.mutateAsync({ taskId: form.id });
-      setForm(null);
-      setFormBaseline(null);
+      dismissTaskForm();
       announce({ message: t("backlog.toast_deleted"), tone: "success" });
     } catch {
       // mutation onError surfaces a toast; keep the drawer open for retry.
@@ -825,6 +835,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
 
       {form ? (
         <TaskDrawer
+          open={drawerOpen}
           form={form}
           logicalAgents={logicalAgents}
           teams={teams}
@@ -833,6 +844,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
           title={form.id ? t("backlog.edit_task") : t("backlog.new_task")}
           subtitle={form.id ?? t("backlog.new_task_id")}
           onClose={() => { void closeTaskForm(); }}
+          onClosed={releaseTaskForm}
           onChange={(next) => {
             if (next.variant === "backlog") setForm(next);
           }}

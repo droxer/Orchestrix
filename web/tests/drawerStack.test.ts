@@ -1,15 +1,20 @@
-import { describe, it } from "node:test";
+import { beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   isDrawerTop,
   isDrawerUnderlay,
   registerDrawer,
+  resetDrawerStack,
   subscribeDrawerStack,
 } from "../src/lib/drawerStack.js";
 
 describe("drawerStack", () => {
   const a = Symbol("a");
   const b = Symbol("b");
+
+  beforeEach(() => {
+    resetDrawerStack();
+  });
 
   it("marks lower-layer drawers as underlay when stacked", () => {
     registerDrawer(a, 0, true);
@@ -20,8 +25,6 @@ describe("drawerStack", () => {
 
     registerDrawer(b, 1, false);
     assert.equal(isDrawerUnderlay(a), false);
-
-    registerDrawer(a, 0, false);
   });
 
   it("gives keyboard ownership to the top of the stack only", () => {
@@ -33,9 +36,6 @@ describe("drawerStack", () => {
     assert.equal(isDrawerTop(b), true);
 
     registerDrawer(b, 1, false);
-    assert.equal(isDrawerTop(a), true);
-
-    registerDrawer(a, 0, false);
     assert.equal(isDrawerTop(a), true);
   });
 

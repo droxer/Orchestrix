@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Drawer } from "../ui/Drawer";
 import { CredCopyRow } from "../admin/CredCopyRow";
-import { COPY_FEEDBACK_MS, copyText } from "../admin/helpers";
+import { useCopyFeedback } from "@/hooks/useCopyFeedback";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 
 interface ConnectComputerDrawerProps {
   open: boolean;
@@ -36,9 +37,10 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [result, setResult] = useState<CreateLocalDeviceEnrollmentResponse | null>(null);
-  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const { copiedField, copy } = useCopyFeedback();
   const workspacePathRef = useRef<HTMLInputElement>(null);
-  const copyTimerRef = useRef<number | null>(null);
+  const hasUnsavedChanges = !result && (Boolean(workspacePath.trim()) || Boolean(displayName.trim()));
+  const confirmDiscardChanges = useUnsavedChangesGuard(open && hasUnsavedChanges && !isBusy);
 
   useEffect(() => {
     if (open) {
@@ -48,13 +50,8 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
       setError(null);
       setIsBusy(false);
       setResult(null);
-      setCopiedField(null);
     }
   }, [open]);
-
-  useEffect(() => () => {
-    if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
-  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -81,19 +78,9 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
     }
   }
 
-  async function handleCopy(field: string, value: string) {
-    await copyText(value);
-    setCopiedField(field);
-    if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
-    copyTimerRef.current = window.setTimeout(
-      () => setCopiedField((current) => (current === field ? null : current)),
-      COPY_FEEDBACK_MS,
-    );
-  }
-
-  function requestClose() {
+  async function requestClose() {
     if (isBusy) return;
-    onClose();
+    if (await confirmDiscardChanges()) onClose();
   }
 
   const token = result?.nodeToken ?? result?.sandboxToken;
@@ -101,7 +88,7 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
   return (
     <Drawer
       open={open}
-      onClose={requestClose}
+      onClose={() => { void requestClose(); }}
       title={t("computer.connect_title")}
       subtitle={result ? undefined : t("computer.connect_sub")}
       width={480}
@@ -124,7 +111,7 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
             value={result.node.id}
             copyLabel={t("admin.copy_node_id")}
             copied={copiedField === "node-id"}
-            onCopy={() => void handleCopy("node-id", result.node.id)}
+            onCopy={() => void copy("node-id", result.node.id)}
           />
           {token ? (
             <CredCopyRow
@@ -132,7 +119,7 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
               value={token}
               copyLabel={t("admin.copy_node_token")}
               copied={copiedField === "node-token"}
-              onCopy={() => void handleCopy("node-token", token)}
+              onCopy={() => void copy("node-token", token)}
             />
           ) : null}
           {result.daemonCommand ? (
@@ -142,7 +129,7 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
               value={result.daemonCommand}
               copyLabel={t("admin.copy_daemon_command")}
               copied={copiedField === "command"}
-              onCopy={() => void handleCopy("command", result.daemonCommand!)}
+              onCopy={() => void copy("command", result.daemonCommand!)}
             />
           ) : null}
           <p className="adm-cred-note">
@@ -202,7 +189,7 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
           {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
 
           <div className="adm-form-actions">
-            <Button size="cta" type="button" variant="ghost" onClick={requestClose} disabled={isBusy}>
+            <Button size="cta" type="button" variant="ghost" onClick={() => { void requestClose(); }} disabled={isBusy}>
               {t("admin.v2.cancel")}
             </Button>
             <Button size="cta" type="submit" loading={isBusy}>

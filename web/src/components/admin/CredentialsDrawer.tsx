@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Drawer } from "../ui/Drawer";
 import { CredCopyRow } from "./CredCopyRow";
 import { NodeProfileBadges } from "./NodeProfileBadges";
-import { COPY_FEEDBACK_MS, copyText, resolveNodeCredentials, type StoredNodeToken } from "./helpers";
+import { resolveNodeCredentials, type StoredNodeToken } from "./helpers";
 import { canUseLocalControlPanel } from "../../lib/controlPanel";
+import { useCopyFeedback } from "@/hooks/useCopyFeedback";
 
 interface CredentialsDrawerProps {
   open: boolean;
@@ -23,14 +24,9 @@ interface CredentialsDrawerProps {
 export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign, onDelete }: CredentialsDrawerProps) {
   const { t } = useTranslation();
   const { confirm } = useDialogs();
-  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const { copiedField, copy } = useCopyFeedback();
   const [actionPending, setActionPending] = useState<"unassign" | "delete" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const copyTimerRef = useRef<number | null>(null);
-
-  useEffect(() => () => {
-    if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
-  }, []);
 
   async function runAction(kind: "unassign" | "delete", handler: () => Promise<void>) {
     setActionPending(kind);
@@ -67,16 +63,6 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
     });
     if (!ok) return;
     await runAction("delete", () => onDelete(node));
-  }
-
-  async function handleCopy(field: string, value: string) {
-    await copyText(value);
-    setCopiedField(field);
-    if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
-    copyTimerRef.current = window.setTimeout(
-      () => setCopiedField((current) => (current === field ? null : current)),
-      COPY_FEEDBACK_MS,
-    );
   }
 
   if (!node) {
@@ -140,7 +126,7 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
           value={node.id}
           copyLabel={t("admin.copy_node_id")}
           copied={copiedField === "node-id"}
-          onCopy={() => void handleCopy("node-id", node.id)}
+          onCopy={() => void copy("node-id", node.id)}
         />
         {hasCredentials ? (
           <>
@@ -150,7 +136,7 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
                 value={token}
                 copyLabel={t("admin.copy_node_token")}
                 copied={copiedField === "node-token"}
-                onCopy={() => void handleCopy("node-token", token)}
+                onCopy={() => void copy("node-token", token)}
               />
             ) : null}
             {daemonCommand ? (
@@ -160,7 +146,7 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
                 value={daemonCommand}
                 copyLabel={t("admin.copy_daemon_command")}
                 copied={copiedField === "command"}
-                onCopy={() => void handleCopy("command", daemonCommand)}
+                onCopy={() => void copy("command", daemonCommand)}
               />
             ) : null}
             {credentialsNote ? (

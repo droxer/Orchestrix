@@ -27,6 +27,9 @@ export interface DrawerProps {
   bodyClassName?: string;
   /** Stacking order — higher = on top. Used when multiple drawers open at once. */
   layer?: number;
+  /** Called once the exit animation completes and the panel has left the DOM.
+   *  Lets parents defer unmounting form state until the close has fully played. */
+  onClosed?: () => void;
 }
 
 export function Drawer({
@@ -42,6 +45,7 @@ export function Drawer({
   ariaLabel,
   bodyClassName,
   layer = 0,
+  onClosed,
 }: DrawerProps) {
   const drawerId = useRef(Symbol("drawer")).current;
   const titleId = useId();
@@ -60,6 +64,13 @@ export function Drawer({
 
   const panelRef = useModalDrawer<HTMLElement>(onClose, visible, top && !closing);
 
+  // Hold onClosed in a ref so a fresh inline arrow from the caller doesn't
+  // restart the exit timer on every render.
+  const onClosedRef = useRef(onClosed);
+  useEffect(() => {
+    onClosedRef.current = onClosed;
+  });
+
   useEffect(() => {
     if (open) {
       setVisible(true);
@@ -71,6 +82,7 @@ export function Drawer({
     const timer = window.setTimeout(() => {
       setVisible(false);
       setClosing(false);
+      onClosedRef.current?.();
     }, readAnimationDurationMs(panelRef.current, FALLBACK_CLOSE_MS));
     return () => window.clearTimeout(timer);
   }, [open, visible, panelRef]);

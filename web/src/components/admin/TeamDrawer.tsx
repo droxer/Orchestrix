@@ -142,8 +142,8 @@ export function TeamDrawer({
   }
 
   return (
-    <Drawer open={open} onClose={() => { void requestClose(); }} title={team ? t("teams.edit") : t("teams.add")} subtitle={t("teams.drawer_subtitle")} width={500} closeLabel={t("dialog.cancel")} bodyClassName="adm-drawer-body--column">
-      <form className="adm-form team-drawer-form" onSubmit={(event) => void submit(event)}>
+    <Drawer open={open} onClose={() => { void requestClose(); }} title={team ? t("teams.edit") : t("teams.add")} subtitle={t("teams.drawer_subtitle")} width={500} closeLabel={t("admin.v2.close_drawer")} ariaLabel={team ? t("teams.edit") : t("teams.add")} bodyClassName="adm-drawer-body--column">
+      <form className="adm-form team-drawer-form" onSubmit={(event) => void submit(event)} noValidate>
         <Field label={t("teams.name")}>
           <Input
             ref={nameRef}

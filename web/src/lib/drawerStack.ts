@@ -33,3 +33,9 @@ export function isDrawerTop(id: symbol): boolean {
   if (entries.length === 0) return true;
   return entries[entries.length - 1].id === id;
 }
+
+/** Reset all drawer state — exported for test teardown. */
+export function resetDrawerStack(): void {
+  entries = [];
+  notify();
+}
