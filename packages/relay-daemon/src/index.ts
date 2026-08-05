@@ -23,7 +23,25 @@ import { diffGeneratedFiles, snapshotGeneratedFiles } from "./generated-files.js
 import { agentWorkspaceSubpath, ensureAgentWorkspaceDir } from "./agent-workspace.js";
 import { discoverAgentInventory } from "./agent-inventory.js";
 import { defaultExecutionManager } from "./execution.js";
-import { hasHostKimiCodeAuth, prepareHostAgentSkills, prepareHostKimiCodeHome } from "./box.js";
+import { ensureLocalDevboxOci, hasHostKimiCodeAuth, prepareHostAgentSkills, prepareHostKimiCodeHome } from "./box.js";
+
+async function verifyBoxlitePrerequisites(sandboxId: string): Promise<void> {
+  try {
+    await import("@boxlite-ai/boxlite");
+  } catch {
+    console.error(`Relay daemon requires @boxlite-ai/boxlite to run in boxlite sandbox mode.`);
+    console.error(`Run: npm install`);
+    process.exit(1);
+  }
+  try {
+    ensureLocalDevboxOci((text) => console.log(`  ${text.trimEnd()}`));
+  } catch (error) {
+    console.error(`Failed to prepare BoxLite devbox image for sandbox ${sandboxId}:`);
+    console.error(error instanceof Error ? error.message : String(error));
+    console.error(`Run: make devbox-oci`);
+    process.exit(1);
+  }
+}
 import {
   AGENT_NAMES,
   getAgent,
@@ -179,6 +197,9 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     ?? positiveIntEnv("RELAY_DAEMON_LIVENESS_HEARTBEAT_MS");
   const inventoryDiscoveryTimeoutMs = options.inventoryDiscoveryTimeoutMs ?? positiveIntEnv("RELAY_DAEMON_INVENTORY_TIMEOUT_MS") ?? 10_000;
   const environment = options.environment ?? createExecutionEnvironment(sandboxMode, sandboxId, workspacePath, logger);
+  if (sandboxMode === "boxlite") {
+    await verifyBoxlitePrerequisites(sandboxId);
+  }
   const threadWorkspaces = new ThreadWorkspaceManager(workspacePath, environment.sandboxMode);
   let health: DaemonHealthState | undefined;
   const setHealth = (next: DaemonHealthState, fields: DaemonLogFields = {}): void => {
@@ -392,10 +413,8 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
         // Capability re-registration refreshes agent inventory independently
         // of the lightweight liveness heartbeat.
         if (Date.now() - lastRegisteredAt >= registrationRefreshIntervalMs) {
-          if (sandboxMode === "none") {
-            agentHealth = await discoverDaemonAgentHealth(environment, logger, sandboxId, runtimeSignal);
-            agentInventory = await discoverAgentInventory(environment.execStream, runtimeSignal, inventoryDiscoveryTimeoutMs);
-          }
+          agentHealth = await discoverDaemonAgentHealth(environment, logger, sandboxId, runtimeSignal);
+          agentInventory = await discoverAgentInventory(environment.execStream, runtimeSignal, inventoryDiscoveryTimeoutMs);
           updateHeartbeatSettings(await register());
           lastRegisteredAt = Date.now();
         }
