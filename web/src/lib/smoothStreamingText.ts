@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+// Pure reveal arithmetic for streamed agent text. The React hooks that drive it
+// live in hooks/useSmoothStreamingText.ts; keeping this module free of runtime
+// imports lets the node test build consume it directly.
 
 const MIN_CHARS_PER_SECOND = 80;
 const MAX_CHARS_PER_SECOND = 1_200;
 const CATCH_UP_SECONDS = 0.22;
 const MAX_FRAME_SECONDS = 0.05;
 const MAX_INITIAL_REVEAL_CHARS = 120;
-const STREAM_ANNOUNCEMENT_DELAY_MS = 600;
 
 const graphemeSegmenter = typeof Intl !== "undefined" && typeof Intl.Segmenter === "function"
   ? new Intl.Segmenter(undefined, { granularity: "grapheme" })
@@ -94,118 +95,4 @@ export function advanceStreamingText(
   );
   const nextLength = graphemeBoundary(targetText, requestedLength, "after");
   return targetText.slice(0, nextLength);
-}
-
-function usePrefersReducedMotion(): boolean {
-  const [reducedMotion, setReducedMotion] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReducedMotion(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-
-  return reducedMotion;
-}
-
-/**
- * Smooth irregular SSE chunks without restarting the RAF loop for each target
- * update. The loop reads the latest refs, so continuous streams still advance.
- */
-export function useSmoothStreamingText(text: string, streaming: boolean): string {
-  const reducedMotion = usePrefersReducedMotion();
-  const [visibleText, setVisibleText] = useState(() => initialStreamingText(text, streaming, false));
-  const visibleRef = useRef(visibleText);
-  const targetRef = useRef(text);
-  const streamingRef = useRef(streaming);
-  const reducedMotionRef = useRef(reducedMotion);
-  const frameRef = useRef<number | undefined>(undefined);
-  const previousTimeRef = useRef<number | undefined>(undefined);
-  const advanceRef = useRef<(time: number) => void>(() => undefined);
-  const scheduleRef = useRef<() => void>(() => undefined);
-
-  targetRef.current = text;
-  streamingRef.current = streaming;
-  reducedMotionRef.current = reducedMotion;
-
-  const commitVisibleText = (next: string) => {
-    if (next === visibleRef.current) return;
-    visibleRef.current = next;
-    setVisibleText(next);
-  };
-
-  scheduleRef.current = () => {
-    if (frameRef.current !== undefined) return;
-    frameRef.current = window.requestAnimationFrame((time) => advanceRef.current(time));
-  };
-
-  advanceRef.current = (time: number) => {
-    frameRef.current = undefined;
-    const reconciled = reconcileStreamingText(
-      visibleRef.current,
-      targetRef.current,
-      streamingRef.current,
-      reducedMotionRef.current,
-    );
-    commitVisibleText(reconciled);
-    if (
-      !streamingRef.current
-      || reducedMotionRef.current
-      || reconciled.length >= targetRef.current.length
-    ) {
-      previousTimeRef.current = undefined;
-      return;
-    }
-
-    const elapsed = previousTimeRef.current === undefined ? 16 : time - previousTimeRef.current;
-    previousTimeRef.current = time;
-    const next = advanceStreamingText(reconciled, targetRef.current, elapsed);
-    commitVisibleText(next);
-    if (next.length < targetRef.current.length) scheduleRef.current();
-    else previousTimeRef.current = undefined;
-  };
-
-  useEffect(() => {
-    const reconciled = reconcileStreamingText(
-      visibleRef.current,
-      text,
-      streaming,
-      reducedMotion,
-    );
-    commitVisibleText(reconciled);
-    if (!streaming || reducedMotion || reconciled.length >= text.length) {
-      if (frameRef.current !== undefined) window.cancelAnimationFrame(frameRef.current);
-      frameRef.current = undefined;
-      previousTimeRef.current = undefined;
-      return;
-    }
-    scheduleRef.current();
-  }, [reducedMotion, streaming, text]);
-
-  useEffect(() => () => {
-    if (frameRef.current !== undefined) window.cancelAnimationFrame(frameRef.current);
-  }, []);
-
-  return streaming
-    ? reconcileStreamingText(visibleText, text, streaming, reducedMotion)
-    : text;
-}
-
-/** Debounce screen-reader announcements independently from visual RAF updates. */
-export function useDebouncedStreamingAnnouncement(text: string, streaming: boolean): string {
-  const [announcement, setAnnouncement] = useState("");
-
-  useEffect(() => {
-    if (!streaming) {
-      setAnnouncement("");
-      return;
-    }
-    const timeout = window.setTimeout(() => setAnnouncement(text), STREAM_ANNOUNCEMENT_DELAY_MS);
-    return () => window.clearTimeout(timeout);
-  }, [streaming, text]);
-
-  return streaming ? announcement : "";
 }

@@ -4,6 +4,7 @@ import type { RelaySession } from "../types";
 import { applySessionEventUnchecked } from "../lib/sessionEvents";
 import { mergeSessionEventsIntoSessions } from "../lib/sessionEventMerge";
 import { isTerminalSessionStatus, lastSessionEventId, sessionEventsUrl } from "../lib/sessionEventStream";
+import { browserFrameSchedulerHost, createFrameScheduler } from "../lib/frameScheduler";
 
 const SESSIONS_KEY = ["relay", "sessions"] as const;
 
@@ -35,10 +36,11 @@ export function useSessionEvents(sessionId: string | undefined, enabled: boolean
     const seen = new Set(cached?.events.map((event) => event.id) ?? []);
     const queued = new Set<string>();
     let pending: RelayEvent[] = [];
-    let frame: number | undefined;
+    // Frame-aligned when the page paints, timer-backed when it does not — a
+    // backgrounded or occluded tab must still commit streamed output.
+    const scheduler = createFrameScheduler(browserFrameSchedulerHost());
 
     const flush = () => {
-      frame = undefined;
       const events = pending;
       pending = [];
       queryClient.setQueryData<RelaySession[]>(SESSIONS_KEY, (sessions) => {
@@ -62,9 +64,7 @@ export function useSessionEvents(sessionId: string | undefined, enabled: boolean
         queued.add(event.id);
         pending.push(event);
       }
-      if (pending.length > 0 && frame === undefined) {
-        frame = window.requestAnimationFrame(flush);
-      }
+      if (pending.length > 0) scheduler.request(flush);
     };
 
     source.onmessage = (message) => {
@@ -123,7 +123,7 @@ export function useSessionEvents(sessionId: string | undefined, enabled: boolean
 
     return () => {
       source.close();
-      if (frame !== undefined) window.cancelAnimationFrame(frame);
+      scheduler.cancel();
     };
   }, [sessionId, enabled, queryClient]);
 }
