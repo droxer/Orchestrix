@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TFunction } from "i18next";
 
-import { AgentStreamAccumulator, displayAgentSegments, displayAgentStreamSegments, emptyAgentStreamSegments, hasStreamingTextCaret, hasTerminalOutcome, parseAgentStderr, parseAgentStream, userVisibleAgentSegments, agentMessagePlainText, type AgentSegment } from "../src/lib/agentStream.js";
+import { AgentStreamAccumulator, displayAgentSegments, previewReasoning, displayAgentStreamSegments, emptyAgentStreamSegments, hasStreamingTextCaret, hasTerminalOutcome, parseAgentStderr, parseAgentStream, userVisibleAgentSegments, agentMessagePlainText, type AgentSegment } from "../src/lib/agentStream.js";
 
 describe("agent stream parsing", () => {
   it("filters Codex stdin notice from stderr", () => {
@@ -192,6 +192,79 @@ describe("agent stream parsing", () => {
     assert.deepEqual(parseAgentStream("pi", raw), [
       { kind: "text", text: "Checking files." },
       { kind: "tool", name: "read", target: "src/app.ts" },
+    ]);
+  });
+
+  it("does not render a Pi text block from the accumulated snapshot before its deltas stream", () => {
+    // `text_start` already carries the opening characters of the block in the
+    // accumulated message. Rendering that snapshot emits a truncated segment
+    // that the completed block then repeats in full.
+    const partial = { role: "assistant", content: [{ type: "text", text: "I checked the" }] };
+    const whole = { role: "assistant", content: [{ type: "text", text: "I checked the project." }] };
+    const raw = [
+      JSON.stringify({ type: "turn_start" }),
+      JSON.stringify({
+        type: "message_update",
+        message: partial,
+        assistantMessageEvent: { type: "text_start", contentIndex: 0 },
+      }),
+      JSON.stringify({
+        type: "message_update",
+        message: partial,
+        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "I checked the" },
+      }),
+      JSON.stringify({
+        type: "message_update",
+        message: whole,
+        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: " project." },
+      }),
+      JSON.stringify({
+        type: "message_update",
+        message: whole,
+        assistantMessageEvent: { type: "text_end", contentIndex: 0, content: "I checked the project." },
+      }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("pi", raw), [
+      { kind: "text", text: "I checked the project." },
+    ]);
+  });
+
+  it("renders streamed Pi text once when later toolcall frames carry the same accumulated message", () => {
+    // Pi attaches the accumulated assistant message to every `message_update`,
+    // including the toolcall frames that follow a completed text block. Each of
+    // those carries the reply the deltas already rendered, so the parser must
+    // recognise it as text it has emitted rather than push another copy.
+    const accumulated = {
+      role: "assistant",
+      content: [{ type: "text", text: "Checked the project." }],
+    };
+    const raw = [
+      JSON.stringify({ type: "turn_start" }),
+      JSON.stringify({
+        type: "message_update",
+        message: accumulated,
+        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "Checked " },
+      }),
+      JSON.stringify({
+        type: "message_update",
+        message: accumulated,
+        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "the project." },
+      }),
+      JSON.stringify({
+        type: "message_update",
+        message: accumulated,
+        assistantMessageEvent: { type: "toolcall_start", contentIndex: 1 },
+      }),
+      JSON.stringify({
+        type: "message_update",
+        message: accumulated,
+        assistantMessageEvent: { type: "toolcall_delta", contentIndex: 1, delta: "{\"path\":" },
+      }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("pi", raw), [
+      { kind: "text", text: "Checked the project." },
     ]);
   });
 
@@ -443,25 +516,88 @@ describe("agent stream parsing", () => {
     ]);
   });
 
-  it("keeps tool and command lines in the settled transcript", () => {
+  it("leaves short reasoning unclamped", () => {
+    const lines = ["Checking the config.", "It looks fine."];
+
+    assert.deepEqual(previewReasoning(lines), { preview: lines, clamped: false });
+  });
+
+  it("clamps reasoning that runs past the line budget", () => {
+    const lines = Array.from({ length: 12 }, (_, index) => `step ${index}`);
+
+    const { preview, clamped } = previewReasoning(lines);
+
+    assert.equal(clamped, true);
+    assert.equal(preview.length, 8);
+    assert.deepEqual(preview, lines.slice(0, 8));
+  });
+
+  it("clamps reasoning that runs past the character budget before the line budget", () => {
+    const lines = [1, 2, 3].map((n) => `${n}`.repeat(400));
+
+    const { preview, clamped } = previewReasoning(lines);
+
+    // The first line fits; the second would blow the budget, so it is withheld
+    // whole rather than cut mid-sentence.
+    assert.equal(clamped, true);
+    assert.equal(preview.length, 1);
+  });
+
+  it("bounds a single unbroken reasoning line", () => {
+    // CJK reasoning carries no spaces to wrap on, so one line can be the whole
+    // block. Cutting it is the only way to bound the preview.
+    const lines = ["推".repeat(2000)];
+
+    const { preview, clamped } = previewReasoning(lines);
+
+    assert.equal(clamped, true);
+    assert.equal(preview.length, 1);
+    assert.equal(preview[0].length, 600);
+  });
+
+  it("never cuts a reasoning line between the halves of a surrogate pair", () => {
+    const lines = [`${"a".repeat(599)}${"\u{1F9E0}".repeat(20)}`];
+
+    const { preview } = previewReasoning(lines);
+
+    assert.equal(preview[0].length, 599);
+    assert.ok(!preview[0].includes("\uD83E"));
+  });
+
+  it("keeps tool, command and reasoning lines in the transcript", () => {
     const segments: AgentSegment[] = [
       { kind: "text", text: "Planning." },
       { kind: "tool", name: "Read", target: "src/app.ts" },
       { kind: "command", command: "npm test" },
-      { kind: "thinking", text: "hidden reasoning" },
+      { kind: "thinking", text: "weighing the options" },
     ];
 
-    assert.deepEqual(displayAgentSegments(segments, true), [
-      { kind: "text", text: "Planning." },
-      { kind: "tool", name: "Read", target: "src/app.ts" },
-      { kind: "command", command: "npm test" },
-    ]);
-    // Settling must not erase the tool log — only internal reasoning drops.
-    assert.deepEqual(displayAgentSegments(segments, false), [
-      { kind: "text", text: "Planning." },
-      { kind: "tool", name: "Read", target: "src/app.ts" },
-      { kind: "command", command: "npm test" },
-    ]);
+    // Reasoning is part of the rendered transcript: a run can spend minutes
+    // thinking before it writes a word, and hiding it left those stretches
+    // blank. Settling must not erase the tool log or the reasoning either.
+    assert.deepEqual(displayAgentSegments(segments, true), segments);
+    assert.deepEqual(displayAgentSegments(segments, false), segments);
+  });
+
+  it("keeps reasoning out of the copied plain text", () => {
+    // Rendering reasoning is a transcript decision; the copy affordance stays
+    // the agent's prose answer.
+    const t = (key: string) => key;
+    const raw = [
+      JSON.stringify({ type: "turn_start" }),
+      JSON.stringify({
+        type: "message_update",
+        message: { role: "assistant", content: [] },
+        assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: "weighing the options" },
+      }),
+      JSON.stringify({
+        type: "message_update",
+        message: { role: "assistant", content: [{ type: "text", text: "Done." }] },
+        assistantMessageEvent: { type: "text_delta", contentIndex: 1, delta: "Done." },
+      }),
+    ].join("\n");
+
+    assert.equal(agentMessagePlainText("pi", raw, "", t as TFunction, true), "Done.");
   });
 
   it("detects when the streaming caret should attach to text", () => {

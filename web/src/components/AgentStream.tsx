@@ -1,5 +1,5 @@
 import { StreamCheck, StreamError, StreamInfo, StreamWarn } from "./icons";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { CodexCollaborationEvent } from "relay-core";
 
@@ -10,6 +10,7 @@ import {
   emptyAgentStreamSegments,
   hasTerminalOutcome,
   parseAgentStderr,
+  previewReasoning,
   type AgentSegment,
 } from "../lib/agentStream";
 import { Markdown, MarkdownContent } from "./Markdown";
@@ -103,20 +104,24 @@ export function AgentStream({ agent, stdout, stderr, streaming, collaborations }
     <div className={`agent-stream ${streaming ? "streaming" : ""}`}>
       <SubagentTree nodes={collaborationNodes} />
       {keyedSegments(segments).map(({ key, segment }, index) => (
-        <SegmentView key={key} segment={segment} live={index === liveTextIndex} />
+        <SegmentView key={key} segment={segment} live={index === liveTextIndex} streaming={streaming} />
       ))}
       {showActivity ? <StreamActivity label={workingLabel} /> : null}
     </div>
   );
 }
 
-function SegmentView({ segment, live = false }: { segment: AgentSegment; live?: boolean }) {
+function SegmentView({
+  segment,
+  live = false,
+  streaming = false,
+}: { segment: AgentSegment; live?: boolean; streaming?: boolean }) {
   const { t } = useTranslation();
   if (segment.kind === "text") {
     return <TextSegment text={segment.text} live={live} />;
   }
   if (segment.kind === "thinking") {
-    return null;
+    return <ThinkingSegment text={segment.text} streaming={streaming} />;
   }
   if (segment.kind === "tool") {
     // A tool call is a single inline `⏺` mono line — the tool name plus the
@@ -155,6 +160,46 @@ function SegmentView({ segment, live = false }: { segment: AgentSegment; live?: 
     );
   }
   return <pre className="agent-raw">{segment.text}</pre>;
+}
+
+// Reasoning is a `○` marker plus dim italic body (design-system.md agent-turn).
+// It is verbatim model output rather than prose to reflow — its own line breaks
+// carry the structure (enumerations, steps) — so every line becomes a paragraph
+// instead of collapsing into one run-on block. That also keeps the live caret,
+// which the stylesheet hangs off the body's last `p`, tracking the end of the
+// reasoning.
+//
+// A settled block is clamped to a medium preview so a long deliberation cannot
+// bury the answer. A live one never is: clamping cuts the bottom, which is
+// exactly where a streaming block is growing.
+function ThinkingSegment({ text, streaming }: { text: string; streaming: boolean }) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const lines = useMemo(() => text.split(/\n+/).filter((line) => line.trim()), [text]);
+  const { preview, clamped } = useMemo(() => previewReasoning(lines), [lines]);
+  const showAll = streaming || expanded || !clamped;
+  const shown = showAll ? lines : preview;
+
+  return (
+    <div className="agent-thinking">
+      <span className="agent-thinking-marker" aria-hidden="true">○</span>
+      <div className="agent-thinking-body">
+        {shown.map((line, index) => (
+          <p key={`thinking-${index}`}>{line}</p>
+        ))}
+        {clamped && !streaming ? (
+          <button
+            type="button"
+            className="agent-thinking-toggle"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((open) => !open)}
+          >
+            {t(expanded ? "agent_stream.reasoning_collapse" : "agent_stream.reasoning_expand")}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 function TextSegment({ text, live }: { text: string; live: boolean }) {

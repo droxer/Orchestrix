@@ -333,8 +333,8 @@
   text-transform: uppercase;
 }
 
-/* Reasoning tier kept for diagnostic/debug renderers. The main chat transcript
-   filters reasoning out before it reaches this view. */
+/* Reasoning tier — `○` marker plus a dim italic body, one step quieter than
+   the answer so it reads as context rather than the reply. */
 .agent-thinking {
   display: flex;
   align-items: baseline;
@@ -367,6 +367,33 @@
 
 .agent-thinking-body p:last-child {
   margin-bottom: 0;
+}
+
+/* Reveals the rest of a clamped reasoning block. Sits inside the reasoning
+   tier's own colour so it reads as part of the aside, not as an action on the
+   answer. */
+.agent-thinking-toggle {
+  margin-top: var(--sp-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: var(--fs-2);
+  font-style: normal;
+  cursor: pointer;
+}
+
+.agent-thinking-toggle:hover {
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.agent-thinking-toggle:focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: 2px;
+  border-radius: var(--r-1);
 }
 
 /* Tool / command lines — inline `⏺` mono lines, not bordered chips. A run of

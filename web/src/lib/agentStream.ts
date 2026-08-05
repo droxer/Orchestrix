@@ -152,16 +152,63 @@ export function userVisibleAgentSegments(segments: AgentSegment[]): AgentSegment
   );
 }
 
+// A settled turn can carry thousands of characters of reasoning — one recorded
+// Claude run produced 14187 with no prose at all — which would bury the answer
+// it was reasoning towards. Reasoning therefore renders as a medium preview
+// with the remainder one click away. The budget is deliberately generous enough
+// to read a whole short reasoning block without expanding.
+const REASONING_PREVIEW_LINES = 8;
+const REASONING_PREVIEW_CHARS = 600;
+
+/** Split reasoning into a medium preview plus whether anything was withheld. */
+export function previewReasoning(lines: string[]): { preview: string[]; clamped: boolean } {
+  const preview: string[] = [];
+  let budget = REASONING_PREVIEW_CHARS;
+  for (const line of lines) {
+    if (preview.length >= REASONING_PREVIEW_LINES) break;
+    if (preview.length > 0 && line.length > budget) break;
+    if (line.length > budget) {
+      // A single unbroken line (common in CJK reasoning, which carries no
+      // spaces to wrap on) must still be bounded, so cut it — never between the
+      // halves of a surrogate pair.
+      preview.push(line.slice(0, surrogateSafeLength(line, budget)));
+      budget = 0;
+      break;
+    }
+    preview.push(line);
+    budget -= line.length;
+  }
+  if (preview.length === 0) return { preview: lines, clamped: false };
+  const clamped = preview.length < lines.length
+    || preview[preview.length - 1] !== lines[preview.length - 1];
+  return { preview, clamped };
+}
+
+function surrogateSafeLength(text: string, length: number): number {
+  if (length <= 0 || length >= text.length) return length;
+  const previous = text.charCodeAt(length - 1);
+  return previous >= 0xd800 && previous <= 0xdbff ? length - 1 : length;
+}
+
 /**
- * While a run is live, surface tool/command lines so long silent stretches
- * still read as activity. After settle they stay too — the settled transcript
- * keeps the tool log instead of collapsing to prose only.
+ * The transcript keeps everything the agent did, live and after settle: tool
+ * and command lines so long silent stretches read as activity, and reasoning
+ * because a run can spend minutes thinking before it writes a word — hiding it
+ * left exactly those stretches blank, and a run that crashed before answering
+ * rendered nothing at all.
+ *
+ * `userVisibleAgentSegments` stays prose-only: it decides the raw fallback and
+ * drives the copy affordance, neither of which wants reasoning.
  */
 export function displayAgentSegments(segments: AgentSegment[], streaming: boolean): AgentSegment[] {
-  if (streaming) return segments.filter((segment) => segment.kind !== "thinking");
+  if (streaming) return segments;
   const visible = new Set(userVisibleAgentSegments(segments));
   return segments.filter(
-    (segment) => segment.kind === "tool" || segment.kind === "command" || visible.has(segment),
+    (segment) =>
+      segment.kind === "tool"
+      || segment.kind === "command"
+      || segment.kind === "thinking"
+      || visible.has(segment),
   );
 }
 
@@ -801,11 +848,22 @@ function parsePi(raw: string): AgentSegment[] {
       upsertSegmentById(out, toolSegmentById, tool.id, segment);
       continue;
     }
-    const assistantText = piAssistantText(event).trimEnd();
+    // Pi hangs the accumulated assistant message off every `message_update`,
+    // so that snapshot always restates what the streaming branches above own:
+    // `text_start` carries the opening characters the deltas have not sent yet,
+    // and the `toolcall_*` frames that follow a reply repeat it in full. Both
+    // rendered as extra segments — a truncated one before the block streamed
+    // and one more copy of the whole reply per trailing frame. Only the
+    // non-streaming frame shapes may fall back to the snapshot. Tool frames
+    // keep their own recovery above for replies that never streamed at all.
+    const assistantText = event.type === "message_update" ? "" : piAssistantText(event).trimEnd();
     if (assistantText) {
       textBuffer.flush(out, "text");
       thinkingBuffer.flush(out, "thinking");
-      if (sawAssistantTextInTurn && (event.type === "message_end" || event.type === "turn_end")) continue;
+      // Gate on whether the turn has rendered text at all, matching the
+      // `text_end` and tool branches above, rather than enumerating the
+      // end-of-turn event types.
+      if (sawAssistantTextInTurn) continue;
       sawAssistantTextInTurn = true;
       out.push({ kind: "text", text: assistantText });
       continue;
