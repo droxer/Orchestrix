@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TFunction } from "i18next";
 
-import { AgentStreamAccumulator, displayAgentSegments, previewReasoning, displayAgentStreamSegments, emptyAgentStreamSegments, hasStreamingTextCaret, hasTerminalOutcome, parseAgentStderr, parseAgentStream, userVisibleAgentSegments, agentMessagePlainText, type AgentSegment } from "../src/lib/agentStream.js";
+import { AgentStreamAccumulator, displayAgentSegments, reasoningDisplay, displayAgentStreamSegments, emptyAgentStreamSegments, hasStreamingTextCaret, hasTerminalOutcome, parseAgentStderr, parseAgentStream, userVisibleAgentSegments, agentMessagePlainText, type AgentSegment } from "../src/lib/agentStream.js";
 
 describe("agent stream parsing", () => {
   it("filters Codex stdin notice from stderr", () => {
@@ -516,52 +516,33 @@ describe("agent stream parsing", () => {
     ]);
   });
 
-  it("leaves short reasoning unclamped", () => {
+  it("collapses settled reasoning to its expand toggle", () => {
     const lines = ["Checking the config.", "It looks fine."];
 
-    assert.deepEqual(previewReasoning(lines), { preview: lines, clamped: false });
+    assert.deepEqual(reasoningDisplay(lines, { live: false, expanded: false }), {
+      lines: [],
+      toggle: "expand",
+    });
   });
 
-  it("clamps reasoning that runs past the line budget", () => {
+  it("shows every reasoning line once the reader expands it", () => {
     const lines = Array.from({ length: 12 }, (_, index) => `step ${index}`);
 
-    const { preview, clamped } = previewReasoning(lines);
-
-    assert.equal(clamped, true);
-    assert.equal(preview.length, 8);
-    assert.deepEqual(preview, lines.slice(0, 8));
+    assert.deepEqual(reasoningDisplay(lines, { live: false, expanded: true }), {
+      lines,
+      toggle: "collapse",
+    });
   });
 
-  it("clamps reasoning that runs past the character budget before the line budget", () => {
-    const lines = [1, 2, 3].map((n) => `${n}`.repeat(400));
+  it("keeps live reasoning open and untoggleable", () => {
+    // A run can spend minutes reasoning before it writes a word — collapsing
+    // the block still being written would leave the turn visibly blank.
+    const lines = ["Weighing the options."];
 
-    const { preview, clamped } = previewReasoning(lines);
-
-    // The first line fits; the second would blow the budget, so it is withheld
-    // whole rather than cut mid-sentence.
-    assert.equal(clamped, true);
-    assert.equal(preview.length, 1);
-  });
-
-  it("bounds a single unbroken reasoning line", () => {
-    // CJK reasoning carries no spaces to wrap on, so one line can be the whole
-    // block. Cutting it is the only way to bound the preview.
-    const lines = ["推".repeat(2000)];
-
-    const { preview, clamped } = previewReasoning(lines);
-
-    assert.equal(clamped, true);
-    assert.equal(preview.length, 1);
-    assert.equal(preview[0].length, 600);
-  });
-
-  it("never cuts a reasoning line between the halves of a surrogate pair", () => {
-    const lines = [`${"a".repeat(599)}${"\u{1F9E0}".repeat(20)}`];
-
-    const { preview } = previewReasoning(lines);
-
-    assert.equal(preview[0].length, 599);
-    assert.ok(!preview[0].includes("\uD83E"));
+    assert.deepEqual(reasoningDisplay(lines, { live: true, expanded: false }), {
+      lines,
+      toggle: null,
+    });
   });
 
   it("keeps tool, command and reasoning lines in the transcript", () => {
