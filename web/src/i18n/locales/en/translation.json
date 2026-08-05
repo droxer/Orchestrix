@@ -1054,6 +1054,7 @@
     "retry": "Retry"
   },
   "nodes": {
+    "agent_presence_title": "{{agent}}: {{presence}}",
     "agent_status_title": "{{agent}}: {{status}}",
     "presence_online": "Online",
     "presence_offline": "Offline",

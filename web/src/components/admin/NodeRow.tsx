@@ -1,38 +1,19 @@
 "use client";
 
 import type { TFunction } from "i18next";
-import type { AgentName, ControlPanelDaemonNodeRecord } from "../../types";
-import { AgentMark } from "../AgentMark";
+import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { useNodeDelete } from "../../hooks/useNodeDelete";
 import {
-  agentStatusTone,
   isNodeOnline,
   nodeOwnershipProfile,
   statusTone,
-  visibleNodeAgentNames,
   visualStatus,
   type StoredNodeTokenMap,
 } from "./helpers";
 import { NodeActions } from "./NodeActions";
 import { NodeProfileBadges, nodeOwnershipIcon } from "./NodeProfileBadges";
 import { NodePresence } from "./NodePresence";
-
-function isAgentDisabled(node: ControlPanelDaemonNodeRecord, agent: AgentName): boolean {
-  return Boolean(node.disabledAgents?.includes(agent));
-}
-
-function agentTitle(node: ControlPanelDaemonNodeRecord, agent: AgentName, t: TFunction): string {
-  const agentStatus = node.agents[agent] ?? "unknown";
-  const statusLabel = t(`status.${agentStatus}`, { defaultValue: agentStatus });
-  const detail = node.agentDetails?.[agent];
-  const parts = [
-    t("nodes.agent_status_title", { agent, status: statusLabel }),
-    detail?.version,
-    detail?.detail,
-    isAgentDisabled(node, agent) ? t("admin.v2.agent_disabled") : null,
-  ].filter(Boolean);
-  return parts.join(" · ");
-}
+import { NodeRuntimeMarks } from "./NodeRuntimeMarks";
 
 interface NodeRowProps {
   node: ControlPanelDaemonNodeRecord;
@@ -102,28 +83,7 @@ export function NodeRow({ node, storedTokens, colocated, onReveal, onRename, onM
         aria-label={t("admin.v2.node_runtimes")}
         title={t("admin.v2.node_runtimes")}
       >
-        {visibleNodeAgentNames(node).length === 0 ? (
-          <span className="adm-agents-empty">{t("admin.v2.node_hosted_agents_empty")}</span>
-        ) : (
-          <span className="adm-node-runtimes-marks">
-            {visibleNodeAgentNames(node).map((name) => {
-              const agentTone = agentStatusTone(node.agents[name] ?? "unknown");
-              const disabled = isAgentDisabled(node, name);
-              return (
-                <span
-                  key={name}
-                  className={`adm-runtime-mark tone-${agentTone}${disabled ? " is-disabled" : ""}`}
-                  data-agent={name}
-                  title={agentTitle(node, name, t)}
-                  translate="no"
-                >
-                  <i className="adm-agent-dot" aria-hidden="true" />
-                  <AgentMark agent={name} size={14} className="adm-agent-chip-mark" />
-                </span>
-              );
-            })}
-          </span>
-        )}
+        <NodeRuntimeMarks node={node} t={t} />
       </div>
 
       <div className="adm-node-row-actions" role="cell">

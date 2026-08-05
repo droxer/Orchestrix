@@ -1289,6 +1289,37 @@
   opacity: 0.4;
 }
 
+/* ---- Agent presence on a computer ---------------------------------------
+   Same shape language as the machine's own presence dot, one level down:
+   FILLED = this agent can take work right now, HOLLOW = it cannot. The hue
+   then says why — ink for "the computer is dark or it never reported",
+   warn/err for a runtime that is itself unhappy on a live machine. Shape
+   carries the distinction because brightness alone does not survive 6px
+   (see the binary-by-design note above), and the label in `aria-label`
+   carries it for readers who get no shape at all. */
+.adm-runtime-mark[data-presence="offline"] .adm-agent-dot,
+.adm-runtime-mark[data-presence="disabled"] .adm-agent-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.25px var(--ink-4);
+}
+
+.adm-runtime-mark[data-presence="offline"].tone-warn .adm-agent-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.25px var(--warn);
+}
+
+.adm-runtime-mark[data-presence="offline"].tone-bad .adm-agent-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.25px var(--err);
+}
+
+/* On a dark machine the whole runtime row recedes with the avatar — its
+   agents are a memory of what was installed, not an offer of capacity. */
+.adm-node-card[data-online="false"] .adm-node-runtimes,
+.adm-node-row[data-online="false"] .adm-node-row-agents {
+  opacity: 0.55;
+}
+
 /* An agent-less node would otherwise leave a bare one-line string floating in
    a tall card; give the empty state a quiet dashed placeholder so the card
    reads as intentionally empty rather than unfinished. */
@@ -1351,6 +1382,13 @@
   box-shadow: inset 0 0 0 1.25px var(--err);
 }
 .adm-agent-chip.tone-neutral .adm-agent-dot { background: var(--ink-4); }
+
+/* ...and an agent whose computer is dark reads hollow for the same reason,
+   even though its last report said ready. */
+.adm-agent-chip[data-presence="offline"].tone-good .adm-agent-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.25px var(--ink-4);
+}
 
 /* Official vendor glyph — identity, alongside the name label. Same
    flex/opacity treatment as .chat-active-agent-mark. */

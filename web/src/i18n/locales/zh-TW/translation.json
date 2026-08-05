@@ -1052,6 +1052,7 @@
     "retry": "重試"
   },
   "nodes": {
+    "agent_presence_title": "{{agent}}：{{presence}}",
     "agent_status_title": "{{agent}}：{{status}}",
     "presence_online": "在線",
     "presence_offline": "離線",

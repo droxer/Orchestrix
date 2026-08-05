@@ -14,7 +14,7 @@ import { useDialogs } from "@/components/ui/DialogProvider";
 import { Button } from "@/components/ui/button";
 import { AgentMark } from "../AgentMark";
 import { Drawer } from "../ui/Drawer";
-import { agentStatusTone } from "./helpers";
+import { agentStatusTone, nodeAgentPresence } from "./helpers";
 import { NodeProfileBadges } from "./NodeProfileBadges";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 
@@ -153,6 +153,9 @@ export function ManageExecutorsDrawer({ open, onClose, node, onUpdated, onSave }
           const agentStatus = node.agents[agent] ?? "unknown";
           const tone = agentStatusTone(agentStatus);
           const isEnabled = !disabled.has(agent);
+          // Same rule as the node surfaces: a dark computer hosts no online
+          // agents, so the chip must not keep advertising the last "ready".
+          const presence = nodeAgentPresence(node, agent);
           const inventory = node.agentInventory?.[agent];
           const skills = inventory?.skills ?? [];
           const mcpServers = inventory?.mcpServers ?? [];
@@ -167,7 +170,12 @@ export function ManageExecutorsDrawer({ open, onClose, node, onUpdated, onSave }
                     <AgentMark agent={agent} size={14} className="adm-agent-toggle-mark" />
                     {agent}
                   </span>
-                  <span className={`adm-agent-chip tone-${tone}`}>{t(`status.${agentStatus}`, { defaultValue: agentStatus })}</span>
+                  <span className={`adm-agent-chip tone-${tone}`} data-presence={presence}>
+                    <i className="adm-agent-dot" aria-hidden="true" />
+                    {presence === "offline" && agentStatus === "ready"
+                      ? t("nodes.presence_offline")
+                      : t(`status.${agentStatus}`, { defaultValue: agentStatus })}
+                  </span>
                 </div>
                 <label className="adm-agent-toggle-switch">
                   <input
