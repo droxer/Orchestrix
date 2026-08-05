@@ -344,7 +344,8 @@ async def delete_control_panel_daemon_node(node_id: str, request: Request, ctx: 
             node = ctx.registry.get(node_id)
             if not node:
                 raise KeyError(node_id)
-            assert_node_agent_runs_drained(ctx, node_id)
+            if not node.get("retiredAt"):
+                assert_node_agent_runs_drained(ctx, node_id)
             if node.get("managedNodeId"):
                 ctx.managed_node_store.update_node(
                     node["managedNodeId"], {"desiredState": "deleted"}
@@ -365,6 +366,8 @@ def control_panel_nodes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     observed = []
     for node in ctx.registry.control_panel_nodes():
+        if node.get("retiredAt"):
+            continue
         managed_node = (
             ctx.managed_node_store.get_node(node["managedNodeId"])
             if node.get("managedNodeId")

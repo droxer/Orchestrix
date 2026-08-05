@@ -4072,7 +4072,7 @@ def test_node_monitoring_and_selection_use_grouped_store_queries() -> None:
 
         assert len(registry.monitor_nodes()) == 2
 
-        assert daemon_store.active_run_calls == [None]
+        assert daemon_store.active_run_calls == [None, None]
         assert daemon_store.queued_count_calls == 0
         assert daemon_store.queued_counts_calls == 1
 
@@ -4128,7 +4128,7 @@ def test_backend_dispatch_loads_active_runs_once_for_all_assignments() -> None:
                 },
             )
 
-            assert daemon_store.active_run_calls == [None]
+            assert daemon_store.active_run_calls == [None, None]
 
     asyncio.run(run_flow())
 

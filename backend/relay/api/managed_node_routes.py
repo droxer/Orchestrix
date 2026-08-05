@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
+from loguru import logger
 
 from ..security.auth import require_admin_session
 from ..services.computer_names import normalize_computer_display_name
@@ -120,8 +122,12 @@ async def delete_managed_node(
                     for runtime in ctx.registry.control_panel_nodes()
                     if runtime.get("managedNodeId") == node_id
                 ]
+                if not orphaned_runtime_ids:
+                    return Response(status_code=204)
                 for runtime_id in orphaned_runtime_ids:
-                    assert_node_agent_runs_drained(ctx, runtime_id)
+                    runtime = ctx.registry.get(runtime_id)
+                    if not runtime or not runtime.get("retiredAt"):
+                        assert_node_agent_runs_drained(ctx, runtime_id)
                 for runtime_id in orphaned_runtime_ids:
                     remove_node_agents(ctx, runtime_id)
                     ctx.registry.delete(runtime_id)
@@ -129,15 +135,34 @@ async def delete_managed_node(
             daemon_node_id = existing.get("activeDaemonNodeId")
             if daemon_node_id:
                 assert_node_agent_runs_drained(ctx, daemon_node_id)
-            node = ctx.managed_node_store.update_node(
-                node_id, {"desiredState": "deleted"}
-            )
-            _fence_active_runtime(ctx, node)
-            daemon_node_id = node.get("activeDaemonNodeId")
-            removed_agents = (
-                remove_node_agents(ctx, daemon_node_id) if daemon_node_id else []
-            )
-        return {"node": node, "removedAgents": removed_agents}
+            try:
+                node = ctx.managed_node_store.update_node(
+                    node_id, {"desiredState": "deleted"}
+                )
+            except KeyError:
+                node = None
+            if node:
+                _fence_active_runtime(ctx, node)
+                daemon_node_id = node.get("activeDaemonNodeId")
+                removed_agents = (
+                    remove_node_agents(ctx, daemon_node_id) if daemon_node_id else []
+                )
+                return {"node": node, "removedAgents": removed_agents}
+            orphaned_runtime_ids = [
+                runtime["id"]
+                for runtime in ctx.registry.control_panel_nodes()
+                if runtime.get("managedNodeId") == node_id
+            ]
+            if not orphaned_runtime_ids:
+                return Response(status_code=204)
+            for runtime_id in orphaned_runtime_ids:
+                runtime = ctx.registry.get(runtime_id)
+                if not runtime or not runtime.get("retiredAt"):
+                    assert_node_agent_runs_drained(ctx, runtime_id)
+            for runtime_id in orphaned_runtime_ids:
+                remove_node_agents(ctx, runtime_id)
+                ctx.registry.delete(runtime_id)
+            return Response(status_code=204)
     except (KeyError, ValueError) as error:
         raise _admin_error(error) from error
 
@@ -275,6 +300,8 @@ async def enroll_managed_daemon(request: Request, ctx: AppContextDep) -> dict[st
     if scheme.lower() != "enrollment" or not credential:
         raise HTTPException(401, "Enrollment credential is required.")
     body = await json_body(request)
+    managed_node: dict[str, Any] | None = None
+    attempt: dict[str, Any] | None = None
     try:
         managed_node, attempt = ctx.managed_node_store.consume_enrollment_grant(
             credential
@@ -300,3 +327,11 @@ async def enroll_managed_daemon(request: Request, ctx: AppContextDep) -> dict[st
         raise HTTPException(401, str(error)) from error
     except (KeyError, ValueError) as error:
         raise HTTPException(409, str(error)) from error
+    except (OSError, json.JSONDecodeError) as error:
+        logger.error(
+            "Managed daemon enrollment I/O error",
+            managed_node_id=managed_node.get("id") if managed_node else None,
+            attempt_id=attempt.get("id") if attempt else None,
+            error=str(error),
+        )
+        raise HTTPException(500, "Enrollment processing failed.") from error

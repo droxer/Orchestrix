@@ -15,6 +15,9 @@ export interface ManagedNodeReconcilerOptions {
   recoveryGraceMs?: number;
   retryBaseMs?: number;
   retryMaxMs?: number;
+  /** Max time a managed node can sit in "deleting" phase before the
+   *  reconciler forces cleanup without waiting for runs to drain. */
+  deletionDeadlineMs?: number;
   now?: () => number;
   logger?: SupervisorLogger;
 }
@@ -66,6 +69,8 @@ function provisioningRetryAt(
   return latest;
 }
 
+const DEFAULT_DELETION_DEADLINE_MS = 10 * 60_000;
+
 export class ManagedNodeReconciler {
   private readonly backend: ManagedNodeBackend;
   private readonly providers: Map<string, ManagedNodeProvider>;
@@ -74,6 +79,7 @@ export class ManagedNodeReconciler {
   private readonly recoveryGraceMs: number;
   private readonly retryBaseMs: number;
   private readonly retryMaxMs: number;
+  private readonly deletionDeadlineMs: number;
   private readonly now: () => number;
   private readonly logger?: SupervisorLogger;
   private readonly instances = new Map<string, { provider: ManagedNodeProvider; instance: ProviderInstance }>();
@@ -86,6 +92,7 @@ export class ManagedNodeReconciler {
     this.recoveryGraceMs = options.recoveryGraceMs ?? 60_000;
     this.retryBaseMs = options.retryBaseMs ?? DEFAULT_RETRY_BASE_MS;
     this.retryMaxMs = options.retryMaxMs ?? DEFAULT_RETRY_MAX_MS;
+    this.deletionDeadlineMs = options.deletionDeadlineMs ?? DEFAULT_DELETION_DEADLINE_MS;
     this.now = options.now ?? Date.now;
     this.logger = options.logger;
   }
@@ -137,11 +144,20 @@ export class ManagedNodeReconciler {
           skipped += 1;
           continue;
         }
-        if (node.activeDaemonNodeId) {
+        const deletionAgeMs = this.now() - Date.parse(node.updatedAt);
+        const forceDelete = node.desiredState === "deleted" && deletionAgeMs > this.deletionDeadlineMs;
+        if (node.activeDaemonNodeId && !forceDelete) {
           if (!await this.retireRuntimeWhenDrained(node)) {
             skipped += 1;
             continue;
           }
+        }
+        if (forceDelete) {
+          this.logger?.warn("managed node deletion deadline exceeded, forcing cleanup", {
+            nodeId: node.id,
+            deletionAgeMs,
+            deadlineMs: this.deletionDeadlineMs,
+          });
         }
         const attempts = await this.backend.listProvisioningAttempts(node.id);
         const instanceId = [...attempts].reverse().find((attempt) => attempt.providerInstanceId)?.providerInstanceId;

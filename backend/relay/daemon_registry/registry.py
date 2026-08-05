@@ -895,11 +895,24 @@ class DaemonNodeRegistry:
     def delete(self, sandbox_id: str) -> None:
         sandbox = self.sandboxes.get(sandbox_id)
         if not sandbox:
-            raise KeyError(sandbox_id)
+            return
         active_runs = self.daemon_store.list_active_runs(sandbox_id)
         if active_runs:
             raise ValueError(
                 "Daemon node has active runs; cancel them before deleting."
+            )
+        active_run_requests = [
+            request
+            for request in self.daemon_store.list_active_run_requests()
+            if request.get("nodeId") == sandbox_id
+            or any(
+                assignment.get("daemonNodeId") == sandbox_id
+                for assignment in request.get("assignments") or []
+            )
+        ]
+        if active_run_requests:
+            raise ValueError(
+                "Daemon node has active agent work. Wait for its runs to finish before deleting it."
             )
         self.daemon_store.delete_node(sandbox_id)
         self.sandboxes.pop(sandbox_id, None)
@@ -929,6 +942,19 @@ class DaemonNodeRegistry:
         if self.daemon_store.list_active_runs(sandbox_id):
             raise ValueError(
                 "Daemon node has active runs; cancel them before deleting."
+            )
+        active_run_requests = [
+            request
+            for request in self.daemon_store.list_active_run_requests()
+            if request.get("nodeId") == sandbox_id
+            or any(
+                assignment.get("daemonNodeId") == sandbox_id
+                for assignment in request.get("assignments") or []
+            )
+        ]
+        if active_run_requests:
+            raise ValueError(
+                "Daemon node has active agent work. Wait for its runs to finish before deleting it."
             )
         deleted_at = now_iso()
         updated = {
@@ -1271,6 +1297,13 @@ class DaemonNodeRegistry:
     ) -> list[dict[str, Any]]:
         self._assert_authorized(sandbox_id, token)
         self._mark_seen(sandbox_id)
+        sandbox = self.sandboxes.get(sandbox_id)
+        if sandbox and sandbox.get("retiredAt"):
+            if renew_known_active:
+                self._renew_known_active_command_leases(
+                    sandbox_id, lease_seconds=lease_seconds
+                )
+            return []
         if renew_known_active:
             self._renew_known_active_command_leases(
                 sandbox_id, lease_seconds=lease_seconds
@@ -1695,6 +1728,52 @@ class DaemonNodeRegistry:
         with self.dispatch_lock:
             self._reap_stale_runs_unlocked(force=force)
 
+    def _reap_orphaned_runs_unlocked(self) -> None:
+        """Fail individual run records on retired or deleted nodes.
+
+        When a node is fenced or removed while runs are still active, the
+        corresponding run-request records may have already been cleaned up,
+        but individual run records can linger and block the node from being
+        fully deleted via `registry.delete`. This method marks those orphaned
+        runs as failed so the deletion can proceed.
+        """
+        orphaned: list[dict[str, Any]] = []
+        for run in self.daemon_store.list_active_runs():
+            node = self.sandboxes.get(run["nodeId"])
+            if node and not node.get("retiredAt"):
+                continue
+            orphaned.append(run)
+        for run in orphaned:
+            command_id = run.get("commandId")
+            if not command_id:
+                continue
+            try:
+                self.daemon_store.mark_command_failed(
+                    run["nodeId"],
+                    {
+                        "type": "run.failed",
+                        "commandId": command_id,
+                        "runId": run["runId"],
+                        "sessionId": run.get("sessionId", ""),
+                        "agent": run.get("agent", "unknown"),
+                        "mode": run.get("mode", "action"),
+                        "error": "Runtime node was retired or deleted while the run was active.",
+                    },
+                )
+                logger.info(
+                    "Reaped orphaned run on retired node",
+                    run_id=run["runId"],
+                    command_id=command_id,
+                    node_id=run["nodeId"],
+                )
+            except Exception as error:
+                logger.warning(
+                    "Failed reaping orphaned run",
+                    run_id=run["runId"],
+                    node_id=run["nodeId"],
+                    error=str(error),
+                )
+
     def _reap_stale_runs_unlocked(self, *, force: bool) -> None:
         monotonic_now = time.monotonic()
         if not force and monotonic_now - self._last_reap_at < max(
@@ -1704,6 +1783,7 @@ class DaemonNodeRegistry:
             return
         self._last_reap_at = monotonic_now
         self._maybe_prune_terminal_records(monotonic_now)
+        self._reap_orphaned_runs_unlocked()
         for request in self.daemon_store.list_active_run_requests():
             if request.get("status") == "finalizing":
                 terminal_event = (request.get("state") or {}).get(

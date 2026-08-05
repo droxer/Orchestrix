@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { useMutationError } from "../hooks/useMutationError";
 import { Button } from "@/components/ui/button";
 import { ActionAddPerson, AdminNode, NavRefresh } from "./icons";
-import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, deleteManagedNode, getAuthStatus, getMe, listManagedNodes, permanentlyDeleteManagedNode, recoverManagedNode, unassignControlPanelDaemonNode, updateComputerDisplayName, updateControlPanelDaemonNodeDisabledAgents, updateManagedNodeDisplayName } from "../api";
+import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, deleteManagedNode, getAuthStatus, getMe, listManagedNodes, permanentlyDeleteManagedNode, recoverManagedNode, RelayApiError, unassignControlPanelDaemonNode, updateComputerDisplayName, updateControlPanelDaemonNodeDisabledAgents, updateManagedNodeDisplayName } from "../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
   ControlPanelDaemonNodeRecord,
@@ -222,13 +222,24 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
 
   async function handleDeleteNode(node: ControlPanelDaemonNodeRecord) {
     try {
-      if (node.managedNodeId) await deleteManagedNode(node.managedNodeId);
-      else await deleteControlPanelDaemonNode(node.id);
+      if (node.managedNodeId) {
+        try {
+          await deleteManagedNode(node.managedNodeId);
+        } catch (error) {
+          if (error instanceof RelayApiError && error.status === 404) {
+            await deleteControlPanelDaemonNode(node.id);
+          } else {
+            throw error;
+          }
+        }
+      } else {
+        await deleteControlPanelDaemonNode(node.id);
+      }
       mergeNodes((prev) => ({
         ...prev,
         nodes: prev.nodes.filter((current) => (
           node.managedNodeId
-            ? current.managedNodeId !== node.managedNodeId
+            ? current.managedNodeId !== node.managedNodeId && current.id !== node.id
             : current.id !== node.id
         )),
       }));
