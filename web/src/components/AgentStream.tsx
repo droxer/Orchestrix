@@ -10,7 +10,7 @@ import {
   emptyAgentStreamSegments,
   hasTerminalOutcome,
   parseAgentStderr,
-  previewReasoning,
+  reasoningDisplay,
   type AgentSegment,
 } from "../lib/agentStream";
 import { Markdown, MarkdownContent } from "./Markdown";
@@ -104,7 +104,13 @@ export function AgentStream({ agent, stdout, stderr, streaming, collaborations }
     <div className={`agent-stream ${streaming ? "streaming" : ""}`}>
       <SubagentTree nodes={collaborationNodes} />
       {keyedSegments(segments).map(({ key, segment }, index) => (
-        <SegmentView key={key} segment={segment} live={index === liveTextIndex} streaming={streaming} />
+        <SegmentView
+          key={key}
+          segment={segment}
+          live={index === liveTextIndex}
+          streaming={streaming}
+          last={index === segments.length - 1}
+        />
       ))}
       {showActivity ? <StreamActivity label={workingLabel} /> : null}
     </div>
@@ -115,13 +121,16 @@ function SegmentView({
   segment,
   live = false,
   streaming = false,
-}: { segment: AgentSegment; live?: boolean; streaming?: boolean }) {
+  last = false,
+}: { segment: AgentSegment; live?: boolean; streaming?: boolean; last?: boolean }) {
   const { t } = useTranslation();
   if (segment.kind === "text") {
     return <TextSegment text={segment.text} live={live} />;
   }
   if (segment.kind === "thinking") {
-    return <ThinkingSegment text={segment.text} streaming={streaming} />;
+    // Only the trailing block of a running stream is still being written; every
+    // earlier one has settled and collapses like any finished reasoning.
+    return <ThinkingSegment text={segment.text} live={streaming && last} />;
   }
   if (segment.kind === "tool") {
     // A tool call is a single inline `⏺` mono line — the tool name plus the
@@ -169,32 +178,30 @@ function SegmentView({
 // which the stylesheet hangs off the body's last `p`, tracking the end of the
 // reasoning.
 //
-// A settled block is clamped to a medium preview so a long deliberation cannot
-// bury the answer. A live one never is: clamping cuts the bottom, which is
-// exactly where a streaming block is growing.
-function ThinkingSegment({ text, streaming }: { text: string; streaming: boolean }) {
+// A settled block is collapsed to its toggle alone so a long deliberation
+// cannot bury the answer; the reader opens it deliberately. A live block stays
+// open — it is where the turn's only visible progress is happening.
+function ThinkingSegment({ text, live }: { text: string; live: boolean }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const lines = useMemo(() => text.split(/\n+/).filter((line) => line.trim()), [text]);
-  const { preview, clamped } = useMemo(() => previewReasoning(lines), [lines]);
-  const showAll = streaming || expanded || !clamped;
-  const shown = showAll ? lines : preview;
+  const { lines: shown, toggle } = reasoningDisplay(lines, { live, expanded });
 
   return (
-    <div className="agent-thinking">
+    <div className={`agent-thinking ${shown.length === 0 ? "is-collapsed" : ""}`}>
       <span className="agent-thinking-marker" aria-hidden="true">○</span>
       <div className="agent-thinking-body">
         {shown.map((line, index) => (
           <p key={`thinking-${index}`}>{line}</p>
         ))}
-        {clamped && !streaming ? (
+        {toggle ? (
           <button
             type="button"
             className="agent-thinking-toggle"
-            aria-expanded={expanded}
+            aria-expanded={toggle === "collapse"}
             onClick={() => setExpanded((open) => !open)}
           >
-            {t(expanded ? "agent_stream.reasoning_collapse" : "agent_stream.reasoning_expand")}
+            {t(toggle === "collapse" ? "agent_stream.reasoning_collapse" : "agent_stream.reasoning_expand")}
           </button>
         ) : null}
       </div>

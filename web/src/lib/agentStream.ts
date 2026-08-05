@@ -154,40 +154,26 @@ export function userVisibleAgentSegments(segments: AgentSegment[]): AgentSegment
 
 // A settled turn can carry thousands of characters of reasoning — one recorded
 // Claude run produced 14187 with no prose at all — which would bury the answer
-// it was reasoning towards. Reasoning therefore renders as a medium preview
-// with the remainder one click away. The budget is deliberately generous enough
-// to read a whole short reasoning block without expanding.
-const REASONING_PREVIEW_LINES = 8;
-const REASONING_PREVIEW_CHARS = 600;
+// it was reasoning towards. Settled reasoning therefore collapses to a single
+// toggle line and only opens on an explicit click.
+//
+// Live reasoning is the exception: while the block is the one still growing it
+// stays open, because a run can spend minutes reasoning before it writes a word
+// and collapsing that leaves the turn blank. It closes on its own once the run
+// settles and `live` goes false.
+export type ReasoningDisplay = {
+  lines: string[];
+  toggle: "expand" | "collapse" | null;
+};
 
-/** Split reasoning into a medium preview plus whether anything was withheld. */
-export function previewReasoning(lines: string[]): { preview: string[]; clamped: boolean } {
-  const preview: string[] = [];
-  let budget = REASONING_PREVIEW_CHARS;
-  for (const line of lines) {
-    if (preview.length >= REASONING_PREVIEW_LINES) break;
-    if (preview.length > 0 && line.length > budget) break;
-    if (line.length > budget) {
-      // A single unbroken line (common in CJK reasoning, which carries no
-      // spaces to wrap on) must still be bounded, so cut it — never between the
-      // halves of a surrogate pair.
-      preview.push(line.slice(0, surrogateSafeLength(line, budget)));
-      budget = 0;
-      break;
-    }
-    preview.push(line);
-    budget -= line.length;
-  }
-  if (preview.length === 0) return { preview: lines, clamped: false };
-  const clamped = preview.length < lines.length
-    || preview[preview.length - 1] !== lines[preview.length - 1];
-  return { preview, clamped };
-}
-
-function surrogateSafeLength(text: string, length: number): number {
-  if (length <= 0 || length >= text.length) return length;
-  const previous = text.charCodeAt(length - 1);
-  return previous >= 0xd800 && previous <= 0xdbff ? length - 1 : length;
+/** Decide which reasoning lines render, and which toggle (if any) sits below. */
+export function reasoningDisplay(
+  lines: string[],
+  { live, expanded }: { live: boolean; expanded: boolean },
+): ReasoningDisplay {
+  if (live) return { lines, toggle: null };
+  if (expanded) return { lines, toggle: "collapse" };
+  return { lines: [], toggle: "expand" };
 }
 
 /**
