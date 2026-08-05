@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import time
 from tempfile import TemporaryDirectory
+from typing import Any
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -3720,3 +3721,111 @@ def test_cancel_recovers_a_session_whose_run_request_is_stuck_finalizing(
 
         assert cancel.status_code == 202
         assert cancel.json()["status"] == "cancelled"
+
+
+def _employee_device_registration(
+    sandbox_id: str = "sbx_device", *, token: str = "node_token"
+) -> dict[str, Any]:
+    return {
+        "sandboxId": sandbox_id,
+        "employeeId": "alice",
+        "token": token,
+        "protocolVersion": 1,
+        "supportedAgents": ["codex"],
+        "workspaceId": "machine-1",
+        "workspacePath": "/Users/alice/project",
+        "status": "ready",
+    }
+
+
+def test_deleting_a_node_survives_the_running_daemon_reregistering(monkeypatch) -> None:
+    # Deleting a node used to drop the row outright, so the daemon still
+    # running on that machine re-registered seconds later and the node
+    # reappeared in the control panel.
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+        app.state.registry.register(_employee_device_registration())
+
+        deleted = client.delete("/api/v1/admin/daemon-nodes/sbx_device")
+        assert deleted.status_code == 204
+        assert client.get("/api/v1/admin/daemon-nodes").json()["nodes"] == []
+
+        again = client.post(
+            "/api/v1/daemon-node-registrations", json=_employee_device_registration()
+        )
+
+        assert again.status_code == 410
+        assert client.get("/api/v1/admin/daemon-nodes").json()["nodes"] == []
+
+
+def test_deleted_node_registration_is_rejected_after_a_daemon_restart(
+    monkeypatch,
+) -> None:
+    # A restarted daemon comes back with a fresh sandboxId, so the tombstone
+    # has to match on the Computer (workspaceId), not just the node id.
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+        app.state.registry.register(_employee_device_registration())
+        assert client.delete("/api/v1/admin/daemon-nodes/sbx_device").status_code == 204
+
+        restarted = client.post(
+            "/api/v1/daemon-node-registrations",
+            json=_employee_device_registration("sbx_device_restarted"),
+        )
+
+        assert restarted.status_code == 410
+        assert client.get("/api/v1/admin/daemon-nodes").json()["nodes"] == []
+
+
+def test_deleted_node_command_poll_is_terminal(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+        app.state.registry.register(_employee_device_registration())
+        assert client.delete("/api/v1/admin/daemon-nodes/sbx_device").status_code == 204
+
+        polled = client.get(
+            "/api/v1/daemon-nodes/sbx_device/commands",
+            headers={"Authorization": "Bearer node_token"},
+        )
+
+        assert polled.status_code == 410
+
+
+def test_deleted_computer_can_be_enrolled_again(monkeypatch) -> None:
+    # Deletion must not brick the machine: provisioning a fresh node record
+    # lets the same Computer come back.
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+        app.state.registry.register(_employee_device_registration())
+        assert client.delete("/api/v1/admin/daemon-nodes/sbx_device").status_code == 204
+
+        created = client.post(
+            "/api/v1/admin/daemon-nodes", json={"employeeId": "alice"}
+        )
+        assert created.status_code == 201
+        node = created.json()["node"]
+        registered = client.post(
+            "/api/v1/daemon-node-registrations",
+            json=_employee_device_registration(
+                node["id"], token=created.json()["nodeToken"]
+            ),
+        )
+
+        assert registered.status_code == 200
+        assert [item["id"] for item in client.get("/api/v1/admin/daemon-nodes").json()["nodes"]] == [node["id"]]

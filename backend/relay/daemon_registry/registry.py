@@ -131,6 +131,13 @@ DAEMON_NODE_CAPABILITIES = frozenset(
     }
 )
 DAEMON_SANDBOX_MODES = frozenset({"none", "boxlite"})
+# Status of a node an admin deleted. The row survives as a tombstone so a
+# daemon that is still running cannot resurrect the node by re-registering.
+DAEMON_NODE_DELETED_STATUS = "deleted"
+
+
+class DeletedDaemonNodeError(Exception):
+    """Raised when a daemon tries to register a node that was deleted."""
 
 
 def public_sandbox_record(sandbox: dict[str, Any]) -> dict[str, Any]:
@@ -373,6 +380,23 @@ class DaemonNodeRegistry:
             )
         now = now_iso()
         existing = self.sandboxes.get(payload["sandboxId"])
+        # A deleted node must stay deleted. Without this the daemon that was
+        # still running on the machine simply re-registers itself seconds after
+        # an admin deletes it, and the node reappears in the control panel.
+        # Re-enrolling the same machine is still possible: the admin provisions
+        # a fresh record first, and registration then finds a live `existing`.
+        if not self._live_node(payload["sandboxId"]):
+            tombstone = self._deleted_tombstone(payload)
+            if tombstone:
+                logger.warning(
+                    "Rejected registration for a deleted daemon node",
+                    sandbox_id=payload["sandboxId"],
+                    tombstone_id=tombstone["id"],
+                )
+                raise DeletedDaemonNodeError(
+                    f"Daemon node {payload['sandboxId']} was deleted in the control panel. "
+                    "Stop this daemon, or re-enroll the machine from the control panel."
+                )
         if (
             existing and existing.get("nodeTokenHash")
         ) and not daemon_node_token_matches(existing, payload["token"]):
@@ -528,6 +552,35 @@ class DaemonNodeRegistry:
         )
         return sandbox
 
+    def _live_node(self, sandbox_id: str) -> dict[str, Any] | None:
+        """The node row for `sandbox_id`, unless it is a deletion tombstone."""
+        node = self.sandboxes.get(sandbox_id)
+        if not node or node.get("status") == DAEMON_NODE_DELETED_STATUS:
+            return None
+        return node
+
+    def _deleted_tombstone(self, payload: dict[str, Any]) -> dict[str, Any] | None:
+        """A deletion tombstone matching the Computer this payload comes from.
+
+        Matches on the node id and, for employee devices, on the workspace
+        identity -- a restarted daemon comes back with a fresh sandboxId but
+        the same machine, and deleting a node has to survive that restart.
+        """
+        by_id = self.sandboxes.get(payload["sandboxId"])
+        if by_id and by_id.get("status") == DAEMON_NODE_DELETED_STATUS:
+            return by_id
+        workspace_id = payload.get("workspaceId")
+        if not workspace_id:
+            return None
+        for node in self.sandboxes.values():
+            if (
+                node.get("status") == DAEMON_NODE_DELETED_STATUS
+                and not node.get("managedNodeId")
+                and node.get("workspaceId") == workspace_id
+            ):
+                return node
+        return None
+
     def _superseded_incarnations(self, sandbox: dict[str, Any]) -> list[dict[str, Any]]:
         """Live node rows describing the same Computer as `sandbox`.
 
@@ -608,7 +661,9 @@ class DaemonNodeRegistry:
     def get(self, sandbox_id: str) -> dict[str, Any] | None:
         if sandbox_id not in self.sandboxes:
             self._refresh_persisted_liveness(sandbox_id)
-        return self.sandboxes.get(sandbox_id)
+        # A deletion tombstone is bookkeeping, not a node: callers that look a
+        # node up to act on it must see it as gone.
+        return self._live_node(sandbox_id)
 
     def list_ready(self) -> list[dict[str, Any]]:
         self._refresh_persisted_liveness()
@@ -654,6 +709,8 @@ class DaemonNodeRegistry:
                 item, active_runs_by_node.get(item["id"], [])
             ),
         ):
+            if sandbox.get("status") == DAEMON_NODE_DELETED_STATUS:
+                continue
             liveness = self._liveness(sandbox)
             nodes.append(
                 {
@@ -858,6 +915,46 @@ class DaemonNodeRegistry:
                     self.clear_run_output(command["runId"])
         logger.info("Daemon node deleted", sandbox_id=sandbox_id)
 
+    def retire_deleted(self, sandbox_id: str) -> dict[str, Any]:
+        """Delete a node from the control panel, leaving a tombstone behind.
+
+        `delete` drops the row entirely, which lets a daemon that is still
+        running on the machine re-register and resurrect the node. The
+        tombstone keeps the deletion durable; `_deleted_tombstone` rejects the
+        re-registration and the daemon shuts itself down.
+        """
+        sandbox = self._live_node(sandbox_id)
+        if not sandbox:
+            raise KeyError(sandbox_id)
+        if self.daemon_store.list_active_runs(sandbox_id):
+            raise ValueError(
+                "Daemon node has active runs; cancel them before deleting."
+            )
+        deleted_at = now_iso()
+        updated = {
+            **sandbox,
+            "retiredAt": deleted_at,
+            "status": DAEMON_NODE_DELETED_STATUS,
+            "updatedAt": deleted_at,
+        }
+        self.sandboxes[sandbox_id] = updated
+        self.daemon_store.mark_node_seen(
+            sandbox_id,
+            {"retiredAt": deleted_at, "status": DAEMON_NODE_DELETED_STATUS},
+        )
+        self.plain_node_tokens.pop(sandbox_id, None)
+        self._last_seen_persisted_at.pop(sandbox_id, None)
+        for command_id, command in list(self.active_commands.items()):
+            if (
+                command.get("sandboxId") == sandbox_id
+                or command.get("nodeId") == sandbox_id
+            ):
+                self.active_commands.pop(command_id, None)
+                if command.get("runId"):
+                    self.clear_run_output(command["runId"])
+        logger.info("Daemon node deleted", sandbox_id=sandbox_id)
+        return updated
+
     def provision_pending(
         self,
         employee_id: str | None = None,
@@ -1012,6 +1109,7 @@ class DaemonNodeRegistry:
             sandbox
             for sandbox in self.sandboxes.values()
             if sandbox.get("employeeId") == employee_id
+            and sandbox.get("status") != DAEMON_NODE_DELETED_STATUS
             and (
                 not workspace_path
                 or not sandbox.get("workspacePath")
@@ -2458,6 +2556,10 @@ class DaemonNodeRegistry:
         if not daemon_node_token_matches(sandbox, token):
             logger.warning("Unauthorized daemon node request", sandbox_id=sandbox_id)
             raise PermissionError("Unauthorized daemon node request.")
+        if sandbox.get("status") == DAEMON_NODE_DELETED_STATUS:
+            raise DeletedDaemonNodeError(
+                f"Daemon node {sandbox_id} was deleted in the control panel."
+            )
 
     def _should_persist_seen(self, sandbox_id: str) -> bool:
         """Rate-limit durable heartbeat writes under the node dispatch scope."""
@@ -2514,7 +2616,11 @@ class DaemonNodeRegistry:
         for sandbox in nodes:
             node_location = infer_node_location(sandbox)
             waiting_status = (
-                "stopped"
+                # A deletion tombstone stays deleted across backend restarts,
+                # or the daemon on that machine resurrects the node.
+                DAEMON_NODE_DELETED_STATUS
+                if sandbox.get("status") == DAEMON_NODE_DELETED_STATUS
+                else "stopped"
                 if sandbox.get("retiredAt")
                 else "running"
                 if sandbox["id"] in active_node_ids

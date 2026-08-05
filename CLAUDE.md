@@ -45,6 +45,7 @@ Relay splits into a **backend** (control plane) and **daemons** (execution plane
 - The per-employee token lives at `<workspace>/.relay/daemon-nodes/<employee>.token` (created by whichever side starts first via `ensureDaemonNodeToken`); `RELAY_DAEMON_TOKEN` overrides it (`RELAY_DAEMON_NODE_TOKEN` is the accepted legacy name). The backend stores only a SHA-256 hash; a fresh provision returns the plaintext exactly once.
 - Re-registering a sandbox with a different token is rejected (401) — registration cannot rotate or hijack tokens.
 - An authorized command poll revives a `stopped`/`failed` daemon record to `ready` (covers backend restarts); provisioning by employee prefers the live daemon over offline placeholders.
+- Deleting a non-managed node leaves a tombstone (`status: "deleted"` + `retiredAt`) instead of dropping the row — `registry.retire_deleted`. Registrations, polls, heartbeats, and events from a deleted node answer `410`, matched by node id and by workspace identity so a daemon restart cannot resurrect it; the daemon shuts down on `410`. Re-enrolling the machine works because provisioning a fresh record gives registration a live row to land on.
 - Wire routes (`/daemon-nodes/...`) and on-disk paths keep the historical `daemon-node` names for compatibility.
 
 ### Key invariants

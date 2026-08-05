@@ -10,6 +10,7 @@ from starlette.concurrency import run_in_threadpool
 
 from ..core.models import DaemonNodeRegistration
 from ..daemon_registry import public_sandbox_record
+from ..daemon_registry.registry import DeletedDaemonNodeError
 from ..services.computer_names import (
     normalize_computer_display_name,
     present_computer,
@@ -318,7 +319,7 @@ def disconnect_daemon_node(
                     403, "This computer is managed by an admin and cannot be removed here."
                 )
             assert_node_agent_runs_drained(ctx, sandbox_id)
-            ctx.registry.delete(sandbox_id)
+            ctx.registry.retire_deleted(sandbox_id)
             remove_node_agents(ctx, sandbox_id)
     except KeyError as error:
         raise HTTPException(404, "Daemon node not found.") from error
@@ -418,6 +419,13 @@ async def register_daemon_node(request: Request, ctx: AppContextDep) -> dict[str
             status=sandbox.get("status"),
         )
         return {**sandbox, "heartbeat": ctx.registry.heartbeat_settings()}
+    except DeletedDaemonNodeError as error:
+        logger.info(
+            "Daemon node registration rejected: node was deleted",
+            sandbox_id=body.get("sandboxId"),
+        )
+        # 410 is terminal on purpose -- the daemon stops instead of retrying.
+        raise HTTPException(410, str(error))
     except PermissionError as error:
         logger.warning(
             "Daemon node registration denied",
@@ -448,6 +456,8 @@ async def daemon_heartbeat(
                 heartbeat_command_leases(body),
             )
         }
+    except DeletedDaemonNodeError as error:
+        raise HTTPException(410, str(error))
     except PermissionError as error:
         logger.warning(
             "Daemon node heartbeat unauthorized",
@@ -532,6 +542,8 @@ async def daemon_commands(
             command_count=len(commands),
         )
         return {"commands": commands}
+    except DeletedDaemonNodeError as error:
+        raise HTTPException(410, str(error))
     except PermissionError as error:
         logger.warning(
             "Daemon node commands unauthorized", sandbox_id=sandbox_id, error=str(error)
@@ -562,6 +574,8 @@ async def daemon_events(
             run_id=event["runId"],
         )
         return {"ok": True}
+    except DeletedDaemonNodeError as error:
+        raise HTTPException(410, str(error))
     except PermissionError as error:
         logger.warning(
             "Daemon node event unauthorized", sandbox_id=sandbox_id, error=str(error)
