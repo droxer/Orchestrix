@@ -516,25 +516,40 @@ describe("agent stream parsing", () => {
     ]);
   });
 
-  it("keeps tool and command lines in the settled transcript", () => {
+  it("keeps tool, command and reasoning lines in the transcript", () => {
     const segments: AgentSegment[] = [
       { kind: "text", text: "Planning." },
       { kind: "tool", name: "Read", target: "src/app.ts" },
       { kind: "command", command: "npm test" },
-      { kind: "thinking", text: "hidden reasoning" },
+      { kind: "thinking", text: "weighing the options" },
     ];
 
-    assert.deepEqual(displayAgentSegments(segments, true), [
-      { kind: "text", text: "Planning." },
-      { kind: "tool", name: "Read", target: "src/app.ts" },
-      { kind: "command", command: "npm test" },
-    ]);
-    // Settling must not erase the tool log — only internal reasoning drops.
-    assert.deepEqual(displayAgentSegments(segments, false), [
-      { kind: "text", text: "Planning." },
-      { kind: "tool", name: "Read", target: "src/app.ts" },
-      { kind: "command", command: "npm test" },
-    ]);
+    // Reasoning is part of the rendered transcript: a run can spend minutes
+    // thinking before it writes a word, and hiding it left those stretches
+    // blank. Settling must not erase the tool log or the reasoning either.
+    assert.deepEqual(displayAgentSegments(segments, true), segments);
+    assert.deepEqual(displayAgentSegments(segments, false), segments);
+  });
+
+  it("keeps reasoning out of the copied plain text", () => {
+    // Rendering reasoning is a transcript decision; the copy affordance stays
+    // the agent's prose answer.
+    const t = (key: string) => key;
+    const raw = [
+      JSON.stringify({ type: "turn_start" }),
+      JSON.stringify({
+        type: "message_update",
+        message: { role: "assistant", content: [] },
+        assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: "weighing the options" },
+      }),
+      JSON.stringify({
+        type: "message_update",
+        message: { role: "assistant", content: [{ type: "text", text: "Done." }] },
+        assistantMessageEvent: { type: "text_delta", contentIndex: 1, delta: "Done." },
+      }),
+    ].join("\n");
+
+    assert.equal(agentMessagePlainText("pi", raw, "", t as TFunction, true), "Done.");
   });
 
   it("detects when the streaming caret should attach to text", () => {

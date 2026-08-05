@@ -116,7 +116,23 @@ function SegmentView({ segment, live = false }: { segment: AgentSegment; live?: 
     return <TextSegment text={segment.text} live={live} />;
   }
   if (segment.kind === "thinking") {
-    return null;
+    // Reasoning is a `○` marker plus dim italic body (design-system.md
+    // agent-turn). Reasoning is verbatim model output rather than prose to
+    // reflow — its own line breaks carry the structure (enumerations, steps),
+    // so every line becomes a paragraph instead of collapsing into one run-on
+    // block. That also keeps the live caret, which the stylesheet hangs off the
+    // body's last `p`, tracking the end of the reasoning.
+    const lines = segment.text.split(/\n+/).filter((line) => line.trim());
+    return (
+      <div className="agent-thinking">
+        <span className="agent-thinking-marker" aria-hidden="true">○</span>
+        <div className="agent-thinking-body">
+          {lines.map((line, index) => (
+            <p key={`thinking-${index}`}>{line}</p>
+          ))}
+        </div>
+      </div>
+    );
   }
   if (segment.kind === "tool") {
     // A tool call is a single inline `⏺` mono line — the tool name plus the

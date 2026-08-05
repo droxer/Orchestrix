@@ -153,15 +153,24 @@ export function userVisibleAgentSegments(segments: AgentSegment[]): AgentSegment
 }
 
 /**
- * While a run is live, surface tool/command lines so long silent stretches
- * still read as activity. After settle they stay too — the settled transcript
- * keeps the tool log instead of collapsing to prose only.
+ * The transcript keeps everything the agent did, live and after settle: tool
+ * and command lines so long silent stretches read as activity, and reasoning
+ * because a run can spend minutes thinking before it writes a word — hiding it
+ * left exactly those stretches blank, and a run that crashed before answering
+ * rendered nothing at all.
+ *
+ * `userVisibleAgentSegments` stays prose-only: it decides the raw fallback and
+ * drives the copy affordance, neither of which wants reasoning.
  */
 export function displayAgentSegments(segments: AgentSegment[], streaming: boolean): AgentSegment[] {
-  if (streaming) return segments.filter((segment) => segment.kind !== "thinking");
+  if (streaming) return segments;
   const visible = new Set(userVisibleAgentSegments(segments));
   return segments.filter(
-    (segment) => segment.kind === "tool" || segment.kind === "command" || visible.has(segment),
+    (segment) =>
+      segment.kind === "tool"
+      || segment.kind === "command"
+      || segment.kind === "thinking"
+      || visible.has(segment),
   );
 }
 
