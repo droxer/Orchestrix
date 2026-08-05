@@ -351,7 +351,7 @@ async def delete_control_panel_daemon_node(node_id: str, request: Request, ctx: 
                 )
                 ctx.registry.fence_managed_node(node_id)
             else:
-                ctx.registry.delete(node_id)
+                ctx.registry.retire_deleted(node_id)
             remove_node_agents(ctx, node_id)
     except KeyError as error:
         raise HTTPException(404, "Daemon node not found.") from error

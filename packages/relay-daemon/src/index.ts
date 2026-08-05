@@ -198,6 +198,9 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     : shutdownController.signal;
   let stopping = false;
   let shutdownPromise: Promise<void> | undefined;
+  // Set when the backend answers 410: the node was deleted in the control
+  // panel, so this daemon stops instead of re-registering itself back in.
+  let nodeDeleted = false;
   if (runtimeSignal.aborted) {
     setHealth("stopping", { signal: "external" });
     await environment.close();
@@ -270,15 +273,19 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
         Promise.allSettled([...activeRuns.values()].map((active) => active.promise)),
         delay(shutdownGraceMs),
       ]);
-      await postJson(
-        fetchFn,
-        relayApiUrl(backendUrl, "/daemon-node-registrations"),
-        buildRegistration(undefined, "stopped"),
-        undefined,
-        AbortSignal.timeout(SHUTDOWN_REGISTRATION_TIMEOUT_MS),
-      ).catch((error: unknown) => {
-        logger.warn("daemon stopped registration failed", { sandboxId, error: error instanceof Error ? error.message : String(error) });
-      });
+      // A deleted node has no record to mark stopped, and the backend rejects
+      // the registration anyway. Skip it rather than log a bogus failure.
+      if (!nodeDeleted) {
+        await postJson(
+          fetchFn,
+          relayApiUrl(backendUrl, "/daemon-node-registrations"),
+          buildRegistration(undefined, "stopped"),
+          undefined,
+          AbortSignal.timeout(SHUTDOWN_REGISTRATION_TIMEOUT_MS),
+        ).catch((error: unknown) => {
+          logger.warn("daemon stopped registration failed", { sandboxId, error: error instanceof Error ? error.message : String(error) });
+        });
+      }
       await environment.close();
       setHealth("stopped");
       if (exitProcess) process.exit(0);
@@ -540,6 +547,14 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     }
     await shutdownPromise;
   } catch (error) {
+    if (error instanceof DaemonHttpError && error.status === 410) {
+      nodeDeleted = true;
+      logger.info("daemon node deleted; stopping", { sandboxId, error: error.message });
+      console.log(`Relay daemon stopping: node ${sandboxId} was deleted in the control panel.`);
+      shutdown("external", false);
+      await shutdownPromise;
+      return;
+    }
     if ((error instanceof DaemonStoppedError || runtimeSignal.aborted || stopping) && shutdownPromise) {
       await shutdownPromise;
       return;
