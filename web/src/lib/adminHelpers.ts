@@ -133,6 +133,31 @@ export function agentStatusTone(agentStatus: string, options?: { disabled?: bool
   return "neutral";
 }
 
+export type NodeAgentPresence = "online" | "offline" | "disabled";
+
+/**
+ * Whether one executor on a computer can take work right now.
+ *
+ * Readiness alone is not presence: the daemon's last report keeps saying
+ * "ready" after the machine goes dark, so a runtime dot read as available on a
+ * computer that could not accept a single dispatch. Presence folds the
+ * machine's liveness into the agent's own state — a dark computer has no
+ * online agents, whatever it last reported.
+ */
+export function nodeAgentPresence(
+  node: ControlPanelDaemonNodeRecord,
+  agent: AgentName,
+): NodeAgentPresence {
+  if (node.disabledAgents?.includes(agent)) return "disabled";
+  if (!isNodeOnline(node)) return "offline";
+  return (node.agents?.[agent] ?? "unknown") === "ready" ? "online" : "offline";
+}
+
+export function nodeAgentPresenceLabel(presence: NodeAgentPresence, t: TFunction): string {
+  if (presence === "disabled") return t("admin.v2.agent_disabled");
+  return presence === "online" ? t("nodes.presence_online") : t("nodes.presence_offline");
+}
+
 export function formatRelativeTime(value: string | undefined, t: TFunction): string {
   if (!value) return t("admin.time.never");
   const deltaMs = Date.now() - new Date(value).getTime();

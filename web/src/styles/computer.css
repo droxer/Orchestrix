@@ -302,6 +302,30 @@ button.computer-run-open:focus-visible {
   opacity: 0.5;
 }
 
+/* Presence, same shape rule as the fleet marks: filled = this runtime can
+   take work now, hollow = it cannot. On a computer that has gone dark every
+   row goes hollow and dims, so "my machine is off" reads as one fact rather
+   than four rows still claiming to be ready. */
+.computer-runtime-row[data-presence="offline"] .adm-agent-dot,
+.computer-runtime-row[data-presence="disabled"] .adm-agent-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.25px var(--ink-4);
+}
+
+.computer-runtime-row[data-presence="offline"].tone-warn .adm-agent-dot {
+  box-shadow: inset 0 0 0 1.25px var(--warn);
+}
+
+/* A runtime that failed keeps its loud ring: "not available" and "broken"
+   are different problems and the reader fixes them differently. */
+.computer-runtime-row[data-presence="offline"].tone-bad .adm-agent-dot {
+  box-shadow: inset 0 0 0 1.25px var(--err);
+}
+
+.computer-card[data-online="false"] .computer-runtime-row {
+  opacity: 0.6;
+}
+
 .computer-runtime-mark {
   color: var(--ink-3);
 }

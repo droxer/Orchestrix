@@ -10,6 +10,7 @@ import {
   isStale,
   matchesEmployeeQuickFilter,
   matchesNodeQuickFilter,
+  nodeAgentPresence,
   stableNodeOrder,
   statusTone,
   truncateId,
@@ -33,6 +34,7 @@ function node(input: Partial<ControlPanelDaemonNodeRecord> & { id: string }): Co
     queuedCommandCount: input.queuedCommandCount ?? 0,
     activeRuns: input.activeRuns ?? [],
     agents: input.agents ?? { claude: "ready", pi: "ready", codex: "ready", kimi: "ready" },
+    disabledAgents: input.disabledAgents,
   } as ControlPanelDaemonNodeRecord;
 }
 
@@ -80,6 +82,37 @@ describe("isStale + visualStatus", () => {
     const n = node({ id: "a", lastSeenAt: new Date().toISOString() });
     assert.equal(isStale(n), false);
     assert.equal(visualStatus(n), "ready");
+  });
+});
+
+describe("nodeAgentPresence", () => {
+  it("is online only when the computer is live and the executor reported ready", () => {
+    const live = node({ id: "a", agents: { claude: "ready", codex: "unknown", pi: "failed", kimi: "ready" } });
+    assert.equal(nodeAgentPresence(live, "claude"), "online");
+    assert.equal(nodeAgentPresence(live, "codex"), "offline");
+    assert.equal(nodeAgentPresence(live, "pi"), "offline");
+  });
+
+  it("takes every agent offline when the computer is dark, whatever it last reported", () => {
+    const dark = node({ id: "a", online: false, agents: { claude: "ready", codex: "ready", pi: "ready", kimi: "ready" } });
+    assert.equal(nodeAgentPresence(dark, "claude"), "offline");
+
+    const stale = node({
+      id: "b",
+      lastSeenAt: new Date(Date.now() - 20_000).toISOString(),
+      agents: { claude: "ready", codex: "ready", pi: "ready", kimi: "ready" },
+    });
+    assert.equal(nodeAgentPresence(stale, "claude"), "offline");
+  });
+
+  it("reports a disabled executor as disabled rather than offline", () => {
+    const live = node({ id: "a", disabledAgents: ["codex"] });
+    assert.equal(nodeAgentPresence(live, "codex"), "disabled");
+
+    // Disabled outranks liveness so the operator's own choice stays legible
+    // on a machine that happens to be off.
+    const dark = node({ id: "b", online: false, disabledAgents: ["codex"] });
+    assert.equal(nodeAgentPresence(dark, "codex"), "disabled");
   });
 });
 

@@ -16,6 +16,8 @@ import {
   agentStatusTone,
   copyText,
   formatRelativeTime,
+  isNodeOnline,
+  nodeAgentPresence,
   nodeOwnershipProfile,
   nodeSandboxProfile,
   statusTone,
@@ -75,7 +77,9 @@ export function ComputerCard({
   const showStatus = status !== "ready" && status !== "stale" && status !== "running";
 
   return (
-    <article className="computer-card" data-online={node.online ? "true" : "false"}>
+    // Stale-aware, matching the presence pill: a daemon that stopped
+    // heartbeating is dark even though its record still says `online`.
+    <article className="computer-card" data-online={isNodeOnline(node) ? "true" : "false"}>
       <header className="computer-card-hero">
         <span className="computer-card-avatar" data-ownership={ownership} translate="no">
           <OwnershipMark size={20} aria-hidden="true" />
@@ -229,20 +233,34 @@ function RuntimeRow({
   agent: AgentName;
   t: TFunction;
 }) {
+  const nodeOnline = isNodeOnline(node);
   const disabled = Boolean(node.disabledAgents?.includes(agent));
   const agentStatus = node.agents[agent] ?? "unknown";
   const version = node.agentDetails?.[agent]?.version;
   const tone = agentStatusTone(agentStatus, { disabled });
+  const presence = nodeAgentPresence(node, agent);
   // "Unknown" is accurate and unhelpful on a runtime the reader is trying to
-  // use; say what it means instead.
+  // use; say what it means instead. And on a computer that has gone dark, the
+  // daemon's last "ready" is a memory, not an offer — the row says Offline
+  // rather than repeating a readiness the machine can no longer honour.
   const stateLabel = disabled
     ? t("admin.v2.agent_disabled")
-    : agentStatus === "unknown"
-      ? t("computer.runtime_no_signal")
-      : t(`status.${agentStatus}`, { defaultValue: agentStatus });
+    : agentStatus === "failed"
+      // A broken runtime outlives the machine being off — it is still what
+      // the reader has to fix when they power it back on.
+      ? t("status.failed", { defaultValue: "failed" })
+      : !nodeOnline
+        ? t("nodes.presence_offline")
+        : agentStatus === "unknown"
+          ? t("computer.runtime_no_signal")
+          : t(`status.${agentStatus}`, { defaultValue: agentStatus });
 
   return (
-    <li className={`computer-runtime-row tone-${tone}${disabled ? " is-disabled" : ""}`} data-agent={agent}>
+    <li
+      className={`computer-runtime-row tone-${tone}${disabled ? " is-disabled" : ""}`}
+      data-agent={agent}
+      data-presence={presence}
+    >
       <i className="adm-agent-dot" aria-hidden="true" />
       <AgentMark agent={agent} size={14} className="computer-runtime-mark" />
       <span className="computer-runtime-name" translate="no">{labelForExecutor(agent)}</span>

@@ -1053,6 +1053,7 @@
     "retry": "重试"
   },
   "nodes": {
+    "agent_presence_title": "{{agent}}：{{presence}}",
     "agent_status_title": "{{agent}}：{{status}}",
     "presence_online": "在线",
     "presence_offline": "离线",
