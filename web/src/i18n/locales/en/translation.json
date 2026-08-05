@@ -1031,7 +1031,9 @@
       "notFound": "not found"
     },
     "stderr_omitted_one": "… {{count}} earlier stderr line",
-    "stderr_omitted_other": "… {{count}} earlier stderr lines"
+    "stderr_omitted_other": "… {{count}} earlier stderr lines",
+    "reasoning_expand": "Show full reasoning",
+    "reasoning_collapse": "Show less"
   },
   "message": {
     "user_label": "You",

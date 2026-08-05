@@ -152,6 +152,44 @@ export function userVisibleAgentSegments(segments: AgentSegment[]): AgentSegment
   );
 }
 
+// A settled turn can carry thousands of characters of reasoning — one recorded
+// Claude run produced 14187 with no prose at all — which would bury the answer
+// it was reasoning towards. Reasoning therefore renders as a medium preview
+// with the remainder one click away. The budget is deliberately generous enough
+// to read a whole short reasoning block without expanding.
+const REASONING_PREVIEW_LINES = 8;
+const REASONING_PREVIEW_CHARS = 600;
+
+/** Split reasoning into a medium preview plus whether anything was withheld. */
+export function previewReasoning(lines: string[]): { preview: string[]; clamped: boolean } {
+  const preview: string[] = [];
+  let budget = REASONING_PREVIEW_CHARS;
+  for (const line of lines) {
+    if (preview.length >= REASONING_PREVIEW_LINES) break;
+    if (preview.length > 0 && line.length > budget) break;
+    if (line.length > budget) {
+      // A single unbroken line (common in CJK reasoning, which carries no
+      // spaces to wrap on) must still be bounded, so cut it — never between the
+      // halves of a surrogate pair.
+      preview.push(line.slice(0, surrogateSafeLength(line, budget)));
+      budget = 0;
+      break;
+    }
+    preview.push(line);
+    budget -= line.length;
+  }
+  if (preview.length === 0) return { preview: lines, clamped: false };
+  const clamped = preview.length < lines.length
+    || preview[preview.length - 1] !== lines[preview.length - 1];
+  return { preview, clamped };
+}
+
+function surrogateSafeLength(text: string, length: number): number {
+  if (length <= 0 || length >= text.length) return length;
+  const previous = text.charCodeAt(length - 1);
+  return previous >= 0xd800 && previous <= 0xdbff ? length - 1 : length;
+}
+
 /**
  * The transcript keeps everything the agent did, live and after settle: tool
  * and command lines so long silent stretches read as activity, and reasoning
