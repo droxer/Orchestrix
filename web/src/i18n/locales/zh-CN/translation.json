@@ -1030,7 +1030,9 @@
       "shutdown": "已关闭",
       "notFound": "未找到"
     },
-    "stderr_omitted_other": "… 已省略前面 {{count}} 行 stderr"
+    "stderr_omitted_other": "… 已省略前面 {{count}} 行 stderr",
+    "reasoning_expand": "展开完整推理",
+    "reasoning_collapse": "收起"
   },
   "message": {
     "user_label": "你",
