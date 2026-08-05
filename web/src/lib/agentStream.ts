@@ -801,11 +801,22 @@ function parsePi(raw: string): AgentSegment[] {
       upsertSegmentById(out, toolSegmentById, tool.id, segment);
       continue;
     }
-    const assistantText = piAssistantText(event).trimEnd();
+    // Pi hangs the accumulated assistant message off every `message_update`,
+    // so that snapshot always restates what the streaming branches above own:
+    // `text_start` carries the opening characters the deltas have not sent yet,
+    // and the `toolcall_*` frames that follow a reply repeat it in full. Both
+    // rendered as extra segments — a truncated one before the block streamed
+    // and one more copy of the whole reply per trailing frame. Only the
+    // non-streaming frame shapes may fall back to the snapshot. Tool frames
+    // keep their own recovery above for replies that never streamed at all.
+    const assistantText = event.type === "message_update" ? "" : piAssistantText(event).trimEnd();
     if (assistantText) {
       textBuffer.flush(out, "text");
       thinkingBuffer.flush(out, "thinking");
-      if (sawAssistantTextInTurn && (event.type === "message_end" || event.type === "turn_end")) continue;
+      // Gate on whether the turn has rendered text at all, matching the
+      // `text_end` and tool branches above, rather than enumerating the
+      // end-of-turn event types.
+      if (sawAssistantTextInTurn) continue;
       sawAssistantTextInTurn = true;
       out.push({ kind: "text", text: assistantText });
       continue;

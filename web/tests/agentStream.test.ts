@@ -195,6 +195,79 @@ describe("agent stream parsing", () => {
     ]);
   });
 
+  it("does not render a Pi text block from the accumulated snapshot before its deltas stream", () => {
+    // `text_start` already carries the opening characters of the block in the
+    // accumulated message. Rendering that snapshot emits a truncated segment
+    // that the completed block then repeats in full.
+    const partial = { role: "assistant", content: [{ type: "text", text: "I checked the" }] };
+    const whole = { role: "assistant", content: [{ type: "text", text: "I checked the project." }] };
+    const raw = [
+      JSON.stringify({ type: "turn_start" }),
+      JSON.stringify({
+        type: "message_update",
+        message: partial,
+        assistantMessageEvent: { type: "text_start", contentIndex: 0 },
+      }),
+      JSON.stringify({
+        type: "message_update",
+        message: partial,
+        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "I checked the" },
+      }),
+      JSON.stringify({
+        type: "message_update",
+        message: whole,
+        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: " project." },
+      }),
+      JSON.stringify({
+        type: "message_update",
+        message: whole,
+        assistantMessageEvent: { type: "text_end", contentIndex: 0, content: "I checked the project." },
+      }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("pi", raw), [
+      { kind: "text", text: "I checked the project." },
+    ]);
+  });
+
+  it("renders streamed Pi text once when later toolcall frames carry the same accumulated message", () => {
+    // Pi attaches the accumulated assistant message to every `message_update`,
+    // including the toolcall frames that follow a completed text block. Each of
+    // those carries the reply the deltas already rendered, so the parser must
+    // recognise it as text it has emitted rather than push another copy.
+    const accumulated = {
+      role: "assistant",
+      content: [{ type: "text", text: "Checked the project." }],
+    };
+    const raw = [
+      JSON.stringify({ type: "turn_start" }),
+      JSON.stringify({
+        type: "message_update",
+        message: accumulated,
+        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "Checked " },
+      }),
+      JSON.stringify({
+        type: "message_update",
+        message: accumulated,
+        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "the project." },
+      }),
+      JSON.stringify({
+        type: "message_update",
+        message: accumulated,
+        assistantMessageEvent: { type: "toolcall_start", contentIndex: 1 },
+      }),
+      JSON.stringify({
+        type: "message_update",
+        message: accumulated,
+        assistantMessageEvent: { type: "toolcall_delta", contentIndex: 1, delta: "{\"path\":" },
+      }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("pi", raw), [
+      { kind: "text", text: "Checked the project." },
+    ]);
+  });
+
   it("keeps reused Pi tool ids distinct across turns", () => {
     const toolEvent = (name: string) => JSON.stringify({
       type: "message_update",
