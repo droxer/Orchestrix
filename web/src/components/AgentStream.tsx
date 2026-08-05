@@ -15,7 +15,7 @@ import {
 import { Markdown, MarkdownContent } from "./Markdown";
 import { buildCollaborationTree } from "../lib/collaborationTree";
 import { SubagentTree } from "./SubagentTree";
-import { useDebouncedStreamingAnnouncement, useSmoothStreamingText } from "../lib/smoothStreamingText";
+import { useDebouncedStreamingAnnouncement, useSmoothStreamingText } from "../hooks/useSmoothStreamingText";
 import { splitStreamingMarkdown } from "../lib/streamingMarkdown";
 
 function StreamActivity({ label }: { label: string }) {
