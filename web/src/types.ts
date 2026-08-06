@@ -263,8 +263,35 @@ export interface EmployeeRecord {
   email?: string;
   departmentId?: string;
   departmentName?: string;
+  /** Pinned personal-computer limit; null/undefined means it follows the org default. */
+  maxLocalComputers?: number | null;
+  /** The override when there is one, the org default otherwise. Resolved server-side. */
+  effectiveMaxLocalComputers?: number;
+  /** Live personal computers the employee currently owns. */
+  localComputerCount?: number;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface OrgSettings {
+  maxLocalComputersPerEmployee: number;
+  updatedAt?: string | null;
+}
+
+export interface OrgSettingsResponse {
+  settings: OrgSettings;
+  capabilities?: {
+    /** False when the auth store cannot hold employee edits (name, email, limit). */
+    employeeEdits?: boolean;
+  };
+}
+
+export interface UpdateControlPanelEmployeeInput {
+  employeeId: string;
+  displayName?: string;
+  email?: string;
+  /** `null` clears the override so the employee follows the org default again. */
+  maxLocalComputers?: number | null;
 }
 
 export interface ControlPanelEmployeesResponse {
@@ -278,6 +305,7 @@ export interface CreateControlPanelEmployeeInput {
   nodeId?: string;
   email?: string;
   displayName?: string;
+  maxLocalComputers?: number | null;
 }
 
 export interface CreateControlPanelEmployeeResponse {

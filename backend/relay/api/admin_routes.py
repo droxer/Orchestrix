@@ -10,7 +10,15 @@ from fastapi import APIRouter, HTTPException, Request, Response
 
 from ..core.models import AGENT_NAMES
 from ..daemon_registry import public_sandbox_record
+from ..persistence.org_settings_store import (
+    OrgSettingsValidationError,
+    normalize_max_local_computers,
+)
 from ..security.auth import require_admin_session
+from ..services.computer_limits import (
+    assert_local_computer_allowed,
+    decorate_employee_limits,
+)
 from ..services.computer_names import normalize_computer_display_name, present_computer
 from ..services.employee_lifecycle import (
     soft_delete_employee as soft_delete_employee_cascade,
@@ -97,6 +105,38 @@ def _managed_node_placeholder(node: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+@router.get("/admin/settings")
+def get_org_settings(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    require_admin_session(request, ctx.auth_store)
+    return {
+        "settings": ctx.org_settings_store.get_settings(),
+        # Editing an employee — display name, email, or their own computer
+        # limit — writes the employees table, which only the database auth
+        # store has. Reported so the admin UI can leave those controls out
+        # instead of offering an edit that would come back a 400.
+        "capabilities": {
+            "employeeEdits": hasattr(ctx.auth_store, "update_employee"),
+        },
+    }
+
+
+@router.put("/admin/settings")
+async def update_org_settings(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    require_admin_session(request, ctx.auth_store)
+    body = await json_body(request)
+    if "maxLocalComputersPerEmployee" not in body:
+        raise HTTPException(400, "maxLocalComputersPerEmployee is required.")
+    try:
+        settings = ctx.org_settings_store.update_settings(
+            max_local_computers_per_employee=normalize_max_local_computers(
+                body["maxLocalComputersPerEmployee"]
+            )
+        )
+    except OrgSettingsValidationError as error:
+        raise HTTPException(400, str(error)) from error
+    return {"settings": settings}
+
+
 @router.get("/admin/users")
 async def list_users(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
@@ -156,7 +196,9 @@ async def create_department(request: Request, ctx: AppContextDep) -> dict[str, A
 def list_employees(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     if hasattr(ctx.auth_store, "list_employees"):
-        return {"employees": ctx.auth_store.list_employees()}
+        return {
+            "employees": decorate_employee_limits(ctx, ctx.auth_store.list_employees())
+        }
     deleted_ids = ctx.auth_store.deleted_employee_ids() if hasattr(ctx.auth_store, "deleted_employee_ids") else set()
     employees = []
     seen = set()
@@ -172,7 +214,7 @@ def list_employees(request: Request, ctx: AppContextDep) -> dict[str, Any]:
             "createdAt": user.get("createdAt"),
             "updatedAt": user.get("createdAt"),
         })
-    return {"employees": employees}
+    return {"employees": decorate_employee_limits(ctx, employees)}
 
 
 @router.delete("/admin/employees/{employee_id}", status_code=200)
@@ -188,6 +230,42 @@ async def soft_delete_employee(employee_id: str, request: Request, ctx: AppConte
         raise HTTPException(409, str(error)) from error
 
 
+@router.patch("/admin/employees/{employee_id}")
+async def update_employee(
+    employee_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    require_admin_session(request, ctx.auth_store)
+    if not hasattr(ctx.auth_store, "update_employee"):
+        raise HTTPException(
+            400, "Editing an employee requires the database auth store."
+        )
+    body = await json_body(request)
+    patch: dict[str, Any] = {}
+    if "displayName" in body:
+        patch["display_name"] = string_field(body, "displayName")
+    if "email" in body:
+        patch["email"] = string_field(body, "email")
+    if "maxLocalComputers" in body:
+        # An explicit null is the "inherit the org default" instruction, which
+        # is a different edit from leaving the field alone.
+        if body["maxLocalComputers"] is None:
+            patch["clear_max_local_computers"] = True
+        else:
+            try:
+                patch["max_local_computers"] = normalize_max_local_computers(
+                    body["maxLocalComputers"]
+                )
+            except OrgSettingsValidationError as error:
+                raise HTTPException(400, str(error)) from error
+    try:
+        employee = ctx.auth_store.update_employee(employee_id, **patch)
+    except KeyError as error:
+        raise HTTPException(404, "Employee not found.") from error
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+    return {"employee": decorate_employee_limits(ctx, [employee])[0]}
+
+
 @router.post("/admin/employees", status_code=201)
 async def create_employee(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
@@ -198,6 +276,12 @@ async def create_employee(request: Request, ctx: AppContextDep) -> dict[str, Any
     node_id = string_field(body, "nodeId") or None
     email = string_field(body, "email") or None
     display_name = string_field(body, "displayName") or username or employee_id
+    max_local_computers: int | None = None
+    if body.get("maxLocalComputers") is not None:
+        try:
+            max_local_computers = normalize_max_local_computers(body["maxLocalComputers"])
+        except OrgSettingsValidationError as error:
+            raise HTTPException(400, str(error)) from error
     if not employee_id:
         raise HTTPException(400, "employeeId is required.")
     if not username:
@@ -228,9 +312,19 @@ async def create_employee(request: Request, ctx: AppContextDep) -> dict[str, Any
         raise HTTPException(status, message) from error
     if hasattr(ctx.auth_store, "ensure_employee"):
         employee = ctx.auth_store.ensure_employee(
-            user.get("employeeId") or employee_id, display_name=display_name, email=email
+            user.get("employeeId") or employee_id,
+            display_name=display_name,
+            email=email,
+            max_local_computers=max_local_computers,
         )
     else:
+        # The file auth store keeps no employee row, so an override has nowhere
+        # to live. Say so rather than accepting a limit that would be dropped.
+        if max_local_computers is not None:
+            raise HTTPException(
+                400,
+                "Per-employee computer limits require the database auth store.",
+            )
         employee = {
             "id": employee_id,
             "displayName": display_name,
@@ -238,6 +332,7 @@ async def create_employee(request: Request, ctx: AppContextDep) -> dict[str, Any
             "createdAt": user.get("createdAt"),
             "updatedAt": user.get("createdAt"),
         }
+    employee = decorate_employee_limits(ctx, [employee])[0]
     public_node: dict[str, Any] | None = None
     if node_id:
         try:
@@ -411,13 +506,25 @@ async def create_control_panel_daemon_node(request: Request, ctx: AppContextDep)
     if hasattr(ctx.auth_store, "ensure_employee"):
         if employee_id:
             ctx.auth_store.ensure_employee(employee_id)
-    node = ctx.backend.provision_daemon_node({
+    provision_payload = {
         **({"employeeId": employee_id} if employee_id else {}),
         **({"displayName": display_name} if display_name else {}),
         "workspacePath": workspace_path,
         "sandboxMode": sandbox_mode,
         **({"nodeLocation": "employee-device"} if requested_location else {}),
-    })
+    }
+    if requested_location == "employee-device" and employee_id:
+        # Admin-provisioned hardware is unbounded; a personal computer is not,
+        # and this route creates one just as self-enrollment does. Check and
+        # provision share the (reentrant) lock so two concurrent creates cannot
+        # both pass a limit with one slot left. Adopting a workspace the
+        # employee already enrolled is not a new computer, so it is exempt.
+        with ctx.registry.dispatch_lock:
+            if not ctx.registry.find_by_employee(employee_id, workspace_path):
+                assert_local_computer_allowed(ctx, employee_id)
+            node = ctx.backend.provision_daemon_node(provision_payload)
+    else:
+        node = ctx.backend.provision_daemon_node(provision_payload)
     effective_sandbox_mode = node.get("sandboxMode") if node.get("sandboxMode") in ("boxlite", "none") else sandbox_mode
     public_node = _public_control_panel_node(ctx, node)
     response = {

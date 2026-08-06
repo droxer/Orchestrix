@@ -214,6 +214,7 @@ export const AdminLocked = withStandardStroke(LockKeyhole, "AdminLocked");
 export const AdminChannel = withStandardStroke(MessageSquare, "AdminChannel");
 export const AdminVerified = withStandardStroke(ShieldCheck, "AdminVerified");
 export const AdminInbox = withStandardStroke(Inbox, "AdminInbox");
+export const AdminSettings = withStandardStroke(Settings, "AdminSettings");
 
 // Dashboard activity feed markers.
 export const ActivitySuccess = withStandardStroke(CheckCircle2, "ActivitySuccess");

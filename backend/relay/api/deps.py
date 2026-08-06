@@ -13,6 +13,7 @@ from ..persistence.protocols import (
     ChatStore,
     DaemonStore,
     ManagedNodeStore,
+    OrgSettingsStore,
     ProfileImageStore,
     SessionStore,
     TaskStore,
@@ -36,6 +37,7 @@ class AppContext:
     team_store: TeamStore
     agent_placement_store: AgentPlacementStore
     profile_image_store: ProfileImageStore
+    org_settings_store: OrgSettingsStore
     workspace_query_broker: WorkspaceQueryBroker
     control_plane_notifier: KeyedEventNotifier
 
@@ -54,6 +56,7 @@ def app_context(request: Request) -> AppContext:
         team_store=request.app.state.team_store,
         agent_placement_store=request.app.state.agent_placement_store,
         profile_image_store=request.app.state.profile_image_store,
+        org_settings_store=request.app.state.org_settings_store,
         workspace_query_broker=request.app.state.workspace_query_broker,
         control_plane_notifier=request.app.state.control_plane_notifier,
     )

@@ -12,6 +12,11 @@ import { Drawer } from "../ui/Drawer";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  MAX_LOCAL_COMPUTERS_CEILING,
+  MIN_LOCAL_COMPUTERS,
+  parseLimitInput,
+} from "../../lib/computerLimits";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import {
   Select,
@@ -25,6 +30,11 @@ interface AddEmployeeDrawerProps {
   open: boolean;
   onClose: () => void;
   unassignedNodes: ControlPanelDaemonNodeRecord[];
+  /** The org default, shown as the placeholder for an unset limit. */
+  defaultMaxLocalComputers?: number;
+  /** False when the auth store cannot store a per-employee limit; the field
+      is left out entirely rather than offered and then refused. */
+  allowLimitOverride?: boolean;
   onSuccess: (result: CreateControlPanelEmployeeResponse) => void;
 }
 
@@ -32,6 +42,8 @@ export function AddEmployeeDrawer({
   open,
   onClose,
   unassignedNodes,
+  defaultMaxLocalComputers,
+  allowLimitOverride = true,
   onSuccess,
 }: AddEmployeeDrawerProps) {
   const { t } = useTranslation();
@@ -42,11 +54,13 @@ export function AddEmployeeDrawer({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [selectedNodeId, setSelectedNodeId] = useState("");
+  const [maxLocalComputers, setMaxLocalComputers] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{
     employeeId?: string;
     username?: string;
     password?: string;
+    maxLocalComputers?: string;
   }>({});
   const [isBusy, setIsBusy] = useState(false);
   const employeeIdRef = useRef<HTMLInputElement>(null);
@@ -58,7 +72,8 @@ export function AddEmployeeDrawer({
     || email.trim()
     || username.trim()
     || password
-    || selectedNodeId,
+    || selectedNodeId
+    || maxLocalComputers.trim(),
   );
   const confirmDiscardChanges = useUnsavedChangesGuard(open && hasUnsavedChanges && !isBusy);
 
@@ -73,13 +88,14 @@ export function AddEmployeeDrawer({
       setUsername("");
       setPassword("");
       setSelectedNodeId("");
+      setMaxLocalComputers("");
       setError(null);
       setFieldErrors({});
       setIsBusy(false);
     }
   }, [open]);
 
-  function clearFieldError(field: "employeeId" | "username" | "password") {
+  function clearFieldError(field: "employeeId" | "username" | "password" | "maxLocalComputers") {
     setFieldErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
   }
 
@@ -90,6 +106,14 @@ export function AddEmployeeDrawer({
     if (!nextEmployeeId) nextFieldErrors.employeeId = t("admin.employee_required");
     if (!username.trim()) nextFieldErrors.username = t("admin.username_required");
     if (!password) nextFieldErrors.password = t("admin.password_required");
+    // An empty limit is not an error — it means "follow the org default".
+    const parsedLimit = parseLimitInput(maxLocalComputers);
+    if (parsedLimit === undefined) {
+      nextFieldErrors.maxLocalComputers = t("admin.v2.settings_limit_invalid", {
+        min: MIN_LOCAL_COMPUTERS,
+        max: MAX_LOCAL_COMPUTERS_CEILING,
+      });
+    }
     setFieldErrors(nextFieldErrors);
     const firstInvalid = nextFieldErrors.employeeId
       ? employeeIdRef
@@ -102,6 +126,7 @@ export function AddEmployeeDrawer({
       firstInvalid.current?.focus();
       return;
     }
+    if (nextFieldErrors.maxLocalComputers) return;
 
     setIsBusy(true);
     setError(null);
@@ -113,6 +138,7 @@ export function AddEmployeeDrawer({
         nodeId: selectedNodeId || undefined,
         email: email.trim() || undefined,
         displayName: displayName.trim() || undefined,
+        ...(parsedLimit !== null ? { maxLocalComputers: parsedLimit } : {}),
       });
       onSuccess(result);
     } catch (err) {
@@ -207,6 +233,37 @@ export function AddEmployeeDrawer({
               placeholder={t("admin.v2.placeholder_email")}
             />
           </Field>
+
+          {allowLimitOverride ? (
+          <Field
+            label={t("admin.v2.emp_limit_label")}
+            optional={t("admin.v2.optional")}
+            hint={t("admin.v2.emp_limit_hint")}
+            error={fieldErrors.maxLocalComputers}
+            errorId="add-emp-limit-error"
+          >
+            <Input
+              name="max-local-computers"
+              type="number"
+              inputMode="numeric"
+              min={MIN_LOCAL_COMPUTERS}
+              max={MAX_LOCAL_COMPUTERS_CEILING}
+              step={1}
+              value={maxLocalComputers}
+              onChange={(event) => {
+                setMaxLocalComputers(event.target.value);
+                clearFieldError("maxLocalComputers");
+              }}
+              placeholder={
+                defaultMaxLocalComputers !== undefined
+                  ? t("admin.v2.emp_limit_placeholder", { count: defaultMaxLocalComputers })
+                  : undefined
+              }
+              aria-invalid={Boolean(fieldErrors.maxLocalComputers) || undefined}
+              aria-describedby={fieldErrors.maxLocalComputers ? "add-emp-limit-error" : undefined}
+            />
+          </Field>
+          ) : null}
         </section>
 
         <section className="adm-provision-section" aria-labelledby="adm-emp-credentials">

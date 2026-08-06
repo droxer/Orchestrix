@@ -15,6 +15,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     Table,
     Text,
     delete,
@@ -345,6 +346,10 @@ class DatabaseUserAuthStore:
             ForeignKey("departments.id", ondelete="SET NULL"),
             nullable=True,
         ),
+        # Empty means "inherit the org-wide default" rather than "no
+        # computers": a global change has to move every employee who was never
+        # pinned to a number of their own.
+        Column("max_local_computers", Integer, nullable=True),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
         Column("deleted_at", DateTime(timezone=True), nullable=True),
@@ -415,6 +420,7 @@ class DatabaseUserAuthStore:
         display_name: str | None = None,
         department_id: str | None = None,
         department_name: str | None = None,
+        max_local_computers: int | None = None,
     ) -> dict[str, Any]:
         username = username.strip().lower()
         if not username:
@@ -451,6 +457,7 @@ class DatabaseUserAuthStore:
                     email=email,
                     department_id=department_id,
                     department_name=department_name,
+                    max_local_computers=max_local_computers,
                 )
                 user["employeeId"] = employee["id"]
                 conn.execute(
@@ -524,6 +531,7 @@ class DatabaseUserAuthStore:
         email: str | None = None,
         department_id: str | None = None,
         department_name: str | None = None,
+        max_local_computers: int | None = None,
     ) -> dict[str, Any]:
         employee_id = employee_id.strip()
         if not employee_id:
@@ -536,7 +544,70 @@ class DatabaseUserAuthStore:
                 email=email,
                 department_id=department_id,
                 department_name=department_name,
+                max_local_computers=max_local_computers,
             )
+
+    def update_employee(
+        self,
+        employee_id: str,
+        *,
+        display_name: str | None = None,
+        email: str | None = None,
+        max_local_computers: int | None = None,
+        clear_max_local_computers: bool = False,
+    ) -> dict[str, Any]:
+        """Patch an employee's profile. Absent arguments leave a field alone.
+
+        `max_local_computers=None` therefore cannot mean "clear the override" —
+        that is what `clear_max_local_computers` is for, since clearing is a
+        distinct intent ("inherit the org default") from leaving it untouched.
+        """
+        employee_id = (employee_id or "").strip()
+        if not employee_id:
+            raise ValueError("employeeId is required.")
+        if clear_max_local_computers and max_local_computers is not None:
+            raise ValueError(
+                "maxLocalComputers cannot be both cleared and set."
+            )
+        now = datetime.now(timezone.utc)
+        patch: dict[str, Any] = {}
+        if display_name is not None:
+            display_name = display_name.strip()
+            if not display_name:
+                raise ValueError("displayName cannot be empty.")
+            patch["display_name"] = display_name
+        if email is not None:
+            patch["email"] = email.strip() or None
+        if clear_max_local_computers:
+            patch["max_local_computers"] = None
+        elif max_local_computers is not None:
+            patch["max_local_computers"] = max_local_computers
+        with store_transaction(self.engine) as conn:
+            row = (
+                conn.execute(
+                    select(self.employees).where(self.employees.c.id == employee_id)
+                )
+                .mappings()
+                .first()
+            )
+            if not row or row.get("deleted_at"):
+                raise KeyError(employee_id)
+            if not patch:
+                return row_to_employee(row)
+            conn.execute(
+                update(self.employees)
+                .where(self.employees.c.id == row["id"])
+                .values(**patch, updated_at=now)
+            )
+            updated = (
+                conn.execute(
+                    select(self.employees).where(self.employees.c.id == row["id"])
+                )
+                .mappings()
+                .first()
+            )
+        logger.info("Employee updated", employee_id=employee_id)
+        return row_to_employee(updated)
 
     def list_employees(self) -> list[dict[str, Any]]:
         with store_transaction(self.engine) as conn:
@@ -805,6 +876,7 @@ class DatabaseUserAuthStore:
         email: str | None = None,
         department_id: str | None = None,
         department_name: str | None = None,
+        max_local_computers: int | None = None,
     ) -> dict[str, Any]:
         now = datetime.now(timezone.utc)
         department_id = department_id.strip() if department_id else None
@@ -832,6 +904,8 @@ class DatabaseUserAuthStore:
                 patch["email"] = email
             if department_pk:
                 patch["department_id"] = department_pk
+            if max_local_computers is not None:
+                patch["max_local_computers"] = max_local_computers
             if len(patch) > 1:
                 conn.execute(
                     update(self.employees)
@@ -843,6 +917,11 @@ class DatabaseUserAuthStore:
                     **({"displayName": display_name} if display_name else {}),
                     **({"email": email} if email else {}),
                     **({"departmentId": department_pk} if department_pk else {}),
+                    **(
+                        {"maxLocalComputers": max_local_computers}
+                        if max_local_computers is not None
+                        else {}
+                    ),
                     "updatedAt": _format_iso(now),
                 }
             return row_to_employee(row)
@@ -852,6 +931,7 @@ class DatabaseUserAuthStore:
             "displayName": display_name or employee_id,
             "email": email,
             "departmentId": department_pk,
+            "maxLocalComputers": max_local_computers,
             "createdAt": _format_iso(now),
             "updatedAt": _format_iso(now),
         }
@@ -913,6 +993,7 @@ def employee_to_row(
         "display_name": employee["displayName"],
         "email": employee.get("email"),
         "department_id": department_pk,
+        "max_local_computers": employee.get("maxLocalComputers"),
         "created_at": _parse_iso(employee["createdAt"]),
         "updated_at": _parse_iso(employee["updatedAt"]),
     }
@@ -946,11 +1027,13 @@ def row_to_department(row: Any) -> dict[str, Any]:
 
 
 def row_to_employee(row: Any) -> dict[str, Any]:
+    limit = row["max_local_computers"]
     return {
         "id": str(row["id"]),
         "displayName": row["display_name"],
         "email": row["email"],
         "departmentId": str(row["department_id"]) if row["department_id"] else None,
+        "maxLocalComputers": int(limit) if limit is not None else None,
         "createdAt": _format_iso(row["created_at"]),
         "updatedAt": _format_iso(row["updated_at"]),
     }

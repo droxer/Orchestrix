@@ -186,6 +186,31 @@ export interface EmployeeNodeSummary {
   runningCount: number;
   failedCount: number;
   nodes: ControlPanelDaemonNodeRecord[];
+  /** Pinned personal-computer limit, or null when the org default applies. */
+  maxLocalComputers: number | null;
+  /** The limit actually in force — the override when pinned, the org default otherwise. */
+  effectiveMaxLocalComputers?: number;
+  /** Live personal computers the employee owns, counted from their nodes. */
+  localComputerCount: number;
+}
+
+/** Employees who own more personal computers than their limit now allows.
+
+    Lowering a limit never disconnects a computer, so this state is reachable
+    and worth surfacing: the employee keeps working but cannot add another. */
+export function isOverLocalComputerLimit(
+  member: Pick<EmployeeNodeSummary, "localComputerCount" | "effectiveMaxLocalComputers">,
+): boolean {
+  if (member.effectiveMaxLocalComputers === undefined) return false;
+  return member.localComputerCount > member.effectiveMaxLocalComputers;
+}
+
+/** "2/3" when a limit is known, otherwise just the count. */
+export function localComputerUsageLabel(
+  member: Pick<EmployeeNodeSummary, "localComputerCount" | "effectiveMaxLocalComputers">,
+): string {
+  if (member.effectiveMaxLocalComputers === undefined) return String(member.localComputerCount);
+  return `${member.localComputerCount}/${member.effectiveMaxLocalComputers}`;
 }
 
 export type EmployeeQuickFilter = "all" | "running" | "ready" | "idle" | "failed" | "unassigned";
@@ -253,6 +278,11 @@ export function buildEmployeeSummaries(
     const readyCount = employeeNodes.filter((node) => visualStatus(node) === "ready").length;
     const runningCount = employeeNodes.filter((node) => visualStatus(node) === "running").length;
     const failedCount = employeeNodes.filter((node) => matchesNodeQuickFilter(node, "failed")).length;
+    // Counted from the nodes on screen rather than the server's tally so the
+    // ratio stays consistent with the computers listed beside it.
+    const localComputerCount = employeeNodes.filter(
+      (node) => nodeOwnershipProfile(node) === "local",
+    ).length;
     return {
       id,
       displayName: employee?.displayName || id,
@@ -264,6 +294,9 @@ export function buildEmployeeSummaries(
       runningCount,
       failedCount,
       nodes: employeeNodes,
+      maxLocalComputers: employee?.maxLocalComputers ?? null,
+      effectiveMaxLocalComputers: employee?.effectiveMaxLocalComputers,
+      localComputerCount,
     };
   });
 }

@@ -53,6 +53,7 @@ from .persistence.agent_placement_store import (
     reconcile_single_active_placement,
 )
 from .persistence.agent_store import DatabaseAgentStore, LocalAgentStore
+from .persistence.org_settings_store import DatabaseOrgSettingsStore
 from .persistence.profile_image_store import LocalProfileImageStore
 from .persistence.stores import (
     DEFAULT_RELAY_DATA_DIR,
@@ -124,6 +125,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     team_store = team_store_from_env(root_dir)
     agent_placement_store = agent_placement_store_from_env(root_dir)
     profile_image_store = LocalProfileImageStore(root_dir)
+    org_settings_store = org_settings_store_from_env(root_dir)
     control_plane_notifier = KeyedEventNotifier()
     notification_bridge = database_notification_bridge(
         session_store, control_plane_notifier
@@ -209,6 +211,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     )
     app.state.agent_placement_store = agent_placement_store
     app.state.profile_image_store = profile_image_store
+    app.state.org_settings_store = org_settings_store
     app.state.workspace_query_broker = WorkspaceQueryBroker()
     app.state.control_plane_notifier = control_plane_notifier
     app.state.notification_bridge = notification_bridge
@@ -284,6 +287,15 @@ def agent_store_from_env(root_dir: Path) -> Any:
     if not use_postgres_storage():
         return LocalAgentStore(root_dir)
     return DatabaseAgentStore(database_url_from_env(setting="RELAY_STORAGE=postgres"))
+
+
+def org_settings_store_from_env(root_dir: Path) -> Any:
+    # Database-only, like sessions and tasks: a database engine always exists,
+    # so a file-backed twin would only be a second code path to keep in sync.
+    database_url = database_url_from_env(setting="database-only settings storage")
+    return DatabaseOrgSettingsStore(
+        database_url, create_schema=database_url.startswith("sqlite")
+    )
 
 
 def team_store_from_env(root_dir: Path) -> Any:
