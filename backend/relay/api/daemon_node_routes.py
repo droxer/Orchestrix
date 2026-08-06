@@ -11,6 +11,7 @@ from starlette.concurrency import run_in_threadpool
 from ..core.models import DaemonNodeRegistration
 from ..daemon_registry import public_sandbox_record
 from ..daemon_registry.registry import DeletedDaemonNodeError
+from ..services.computer_limits import assert_local_computer_allowed
 from ..services.computer_names import (
     normalize_computer_display_name,
     present_computer,
@@ -262,6 +263,11 @@ async def create_local_device_enrollment(
             ctx.registry.find_by_employee(actor["employeeId"], workspace_path)
             is not None
         )
+        # Only a genuinely new computer consumes a slot. An employee at their
+        # limit must still be able to re-enroll a machine they already have,
+        # or they could never restart their own daemon.
+        if not reused:
+            assert_local_computer_allowed(ctx, actor["employeeId"])
         node = ctx.backend.provision_daemon_node(
             {
                 "employeeId": actor["employeeId"],

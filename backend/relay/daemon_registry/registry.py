@@ -751,6 +751,22 @@ class DaemonNodeRegistry:
                 node["nodeToken"] = plain
         return nodes
 
+    def count_employee_device_nodes(self, employee_id: str) -> int:
+        """Live personal computers owned by an employee.
+
+        Deleted nodes are excluded: a tombstone is a computer the employee no
+        longer has, so it must not consume a slot in their limit.
+        """
+        self._refresh_persisted_liveness()
+        return sum(
+            1
+            for sandbox in self.sandboxes.values()
+            if sandbox.get("employeeId") == employee_id
+            and sandbox.get("status") != DAEMON_NODE_DELETED_STATUS
+            and not sandbox.get("retiredAt")
+            and infer_node_location(sandbox) == "employee-device"
+        )
+
     def assign_employee(self, sandbox_id: str, employee_id: str) -> dict[str, Any]:
         sandbox = self.sandboxes.get(sandbox_id)
         if not sandbox:

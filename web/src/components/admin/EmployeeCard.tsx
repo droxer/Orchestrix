@@ -2,14 +2,20 @@
 
 import type { TFunction } from "i18next";
 import { Button } from "../ui/button";
-import { AdminDelete, AdminEmployees } from "../icons";
-import { employeeSummaryStatus, type EmployeeNodeSummary } from "./helpers";
+import { ActionEdit, AdminDelete, AdminEmployees } from "../icons";
+import {
+  employeeSummaryStatus,
+  isOverLocalComputerLimit,
+  localComputerUsageLabel,
+  type EmployeeNodeSummary,
+} from "./helpers";
 import { EmployeeComputers } from "./EmployeeComputers";
 
 interface EmployeeCardProps {
   member: EmployeeNodeSummary;
   highlight: boolean;
   onDelete?: (employeeId: string) => void;
+  onEdit?: (employeeId: string) => void;
   deletePending: boolean;
   t: TFunction;
 }
@@ -18,6 +24,7 @@ export function EmployeeCard({
   member,
   highlight,
   onDelete,
+  onEdit,
   deletePending,
   t,
 }: EmployeeCardProps) {
@@ -78,9 +85,36 @@ export function EmployeeCard({
             <span className="adm-emp-metric-label">{t("admin.v2.col_ready")}</span>
             <span className="tnum tone-muted">{member.readyCount}/{member.nodeCount}</span>
           </span>
+          <span className="adm-emp-card-metric">
+            <span className="adm-emp-metric-label">{t("admin.v2.col_local_limit")}</span>
+            <span className={`tnum ${isOverLocalComputerLimit(member) ? "" : "tone-muted"}`}>
+              {localComputerUsageLabel(member)}
+            </span>
+            {/* The palette is monochrome, so a colour cannot say "over" — the
+                pill carries a word, like every other state on this card. */}
+            {isOverLocalComputerLimit(member) ? (
+              <span className="adm-status-pill tone-bad" title={t("admin.v2.emp_limit_over")}>
+                <i className="adm-status-dot" aria-hidden="true" />
+                {t("admin.v2.emp_limit_over_short")}
+              </span>
+            ) : null}
+          </span>
         </div>
-        {onDelete ? (
+        {onDelete || onEdit ? (
           <div className="adm-node-card-actions">
+            {onEdit ? (
+              <Button
+                variant="ghost"
+                type="button"
+                className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn"
+                onClick={() => onEdit(member.id)}
+                aria-label={t("admin.v2.edit_employee_action")}
+                title={t("admin.v2.edit_employee_action")}
+              >
+                <ActionEdit size={14} aria-hidden="true" />
+              </Button>
+            ) : null}
+            {onDelete ? (
             <Button
               variant="ghost"
               type="button"
@@ -92,6 +126,7 @@ export function EmployeeCard({
             >
               <AdminDelete size={14} aria-hidden="true" />
             </Button>
+            ) : null}
           </div>
         ) : null}
       </footer>

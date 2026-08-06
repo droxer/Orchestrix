@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { ActionSearch, AdminDelete, AdminEmployees, ICON_STROKE_LARGE } from "../icons";
+import { ActionEdit, ActionSearch, AdminDelete, AdminEmployees, ICON_STROKE_LARGE } from "../icons";
 import { Button } from "@/components/ui/button";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
@@ -11,6 +11,8 @@ import type { ControlPanelDaemonNodeRecord } from "../../types";
 import {
   buildEmployeeSummaries,
   employeeEmptyStateTranslationKey,
+  isOverLocalComputerLimit,
+  localComputerUsageLabel,
   employeeSummaryStatus,
   matchesEmployeeQuickFilter,
   type EmployeeQuickFilter,
@@ -26,6 +28,7 @@ interface EmployeesViewProps {
   onLayoutChange: (next: AdminLayout) => void;
   onAddEmployee: () => void;
   onDeleteEmployee?: (employee: import("../../types").EmployeeRecord) => Promise<void>;
+  onEditEmployee?: (employee: import("../../types").EmployeeRecord) => void;
   highlightedEmployeeId: string | null;
 }
 
@@ -53,6 +56,7 @@ export function EmployeesView({
   onLayoutChange,
   onAddEmployee,
   onDeleteEmployee,
+  onEditEmployee,
   highlightedEmployeeId,
 }: EmployeesViewProps) {
   const { t } = useTranslation();
@@ -190,6 +194,10 @@ export function EmployeesView({
               member={member}
               highlight={highlightedEmployeeId === member.id}
               onDelete={onDeleteEmployee ? (id) => void handleDeleteEmployee(id) : undefined}
+              onEdit={onEditEmployee ? (id) => {
+                const employee = employeesById.get(id);
+                if (employee) onEditEmployee(employee);
+              } : undefined}
               deletePending={pendingDelete !== null}
               t={t}
             />
@@ -200,6 +208,7 @@ export function EmployeesView({
           <div className="adm-emp-cols" role="row">
             <span className="adm-col-label" role="columnheader">{t("admin.col_employee")}</span>
             <span className="adm-col-label" role="columnheader">{t("admin.v2.col_computers")}</span>
+            <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_local_limit")}</span>
             <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_metrics")}</span>
             <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_actions")}</span>
           </div>
@@ -231,6 +240,20 @@ export function EmployeesView({
                   <div className="adm-emp-nodes" role="cell">
                     <EmployeeComputers nodes={member.nodes} t={t} />
                   </div>
+                  <div className="adm-emp-metrics" role="cell">
+                    <div className="adm-emp-metric">
+                      <span className="adm-emp-metric-label">{t("admin.v2.col_local_limit")}</span>
+                      <span className={`adm-emp-ratio tnum ${isOverLocalComputerLimit(member) ? "" : "tone-muted"}`}>
+                        {localComputerUsageLabel(member)}
+                      </span>
+                      {isOverLocalComputerLimit(member) ? (
+                        <span className="adm-status-pill tone-bad" title={t("admin.v2.emp_limit_over")}>
+                          <i className="adm-status-dot" aria-hidden="true" />
+                          {t("admin.v2.emp_limit_over_short")}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
                   <div
                     className="adm-emp-metrics"
                     role="cell"
@@ -254,6 +277,20 @@ export function EmployeesView({
                     </div>
                   </div>
                   <div className="adm-emp-actions" role="cell">
+                    {onEditEmployee ? (
+                      <Button variant="ghost"
+                        type="button"
+                        className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn"
+                        onClick={() => {
+                          const employee = employeesById.get(member.id);
+                          if (employee) onEditEmployee(employee);
+                        }}
+                        aria-label={t("admin.v2.edit_employee_action")}
+                        title={t("admin.v2.edit_employee_action")}
+                      >
+                        <ActionEdit size={14} aria-hidden="true" />
+                      </Button>
+                    ) : null}
                     {onDeleteEmployee ? (
                       <Button variant="ghost"
                         type="button"

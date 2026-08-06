@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { useMutationError } from "../hooks/useMutationError";
 import { Button } from "@/components/ui/button";
 import { ActionAddPerson, AdminNode, NavRefresh } from "./icons";
-import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, deleteManagedNode, getAuthStatus, getMe, listManagedNodes, permanentlyDeleteManagedNode, recoverManagedNode, RelayApiError, unassignControlPanelDaemonNode, updateComputerDisplayName, updateControlPanelDaemonNodeDisabledAgents, updateManagedNodeDisplayName } from "../api";
+import { getOrgSettings, deleteControlPanelDaemonNode, deleteControlPanelEmployee, deleteManagedNode, getAuthStatus, getMe, listManagedNodes, permanentlyDeleteManagedNode, recoverManagedNode, RelayApiError, unassignControlPanelDaemonNode, updateComputerDisplayName, updateControlPanelDaemonNodeDisabledAgents, updateManagedNodeDisplayName } from "../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
   ControlPanelDaemonNodeRecord,
@@ -30,6 +30,8 @@ import { AdminViewToggle, type AdminView } from "./admin/AdminViewToggle";
 import { AddEmployeeDrawer } from "./admin/AddEmployeeDrawer";
 import { AddNodeDrawer, type AddNodeDrawerSuccess } from "./admin/AddNodeDrawer";
 import { EmployeesView } from "./admin/EmployeesView";
+import { EditEmployeeDrawer } from "./admin/EditEmployeeDrawer";
+import { SettingsView } from "./admin/SettingsView";
 import type { AdminLayout } from "./admin/AdminLayoutToggle";
 import { useAdminNodes } from "../hooks/useAdminNodes";
 import { useRelayStore } from "../lib/store";
@@ -74,9 +76,21 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
     refetchInterval: CONTROL_PANEL_POLL_MS,
   });
   const managedNodes = managedNodesQuery.data?.nodes ?? [];
+  // The org default is what an employee without an override follows, so the
+  // employee forms show it as their placeholder.
+  const orgSettingsQuery = useQuery({
+    queryKey: ["admin", "settings"],
+    queryFn: ({ signal }) => getOrgSettings(signal),
+    enabled: Boolean(admin),
+  });
+  const defaultMaxLocalComputers = orgSettingsQuery.data?.settings.maxLocalComputersPerEmployee;
+  // Absent while the query is in flight; only a definite false hides the
+  // controls, so a slow answer does not flash them away.
+  const canEditEmployees = orgSettingsQuery.data?.capabilities?.employeeEdits !== false;
   const [manualRefreshPending, setManualRefreshPending] = useState(false);
   const setAdminView = useRelayStore((state) => state.setAdminView);
   const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
+  const [editEmployeeId, setEditEmployeeId] = useState<string | null>(null);
   const [addNodeOpen, setAddNodeOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ employeeId?: string } | null>(null);
   const [credentialsNodeId, setCredentialsNodeId] = useState<string | null>(null);
@@ -284,6 +298,14 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
       reportMutationError("Failed to delete employee", error, t("errors.admin_delete_employee"));
       throw error;
     }
+  }
+
+  function handleEditEmployeeSuccess(employee: EmployeeRecord) {
+    mergeNodes((prev) => ({
+      ...prev,
+      employees: prev.employees.map((item) => (item.id === employee.id ? employee : item)),
+    }));
+    setEditEmployeeId(null);
   }
 
   function handleAddEmployeeSuccess(result: CreateControlPanelEmployeeResponse) {
@@ -494,8 +516,11 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
                   onLayoutChange={setLayout}
                   onAddEmployee={() => setAddEmployeeOpen(true)}
                   onDeleteEmployee={handleDeleteEmployee}
+                  onEditEmployee={canEditEmployees ? (employee) => setEditEmployeeId(employee.id) : undefined}
                   highlightedEmployeeId={highlightedEmployeeId}
                 />
+              ) : view === "settings" ? (
+                <SettingsView />
               ) : (
                 <>
                   <NodesView
@@ -525,7 +550,16 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
         open={addEmployeeOpen}
         onClose={() => setAddEmployeeOpen(false)}
         unassignedNodes={unassignedNodes}
+        defaultMaxLocalComputers={canEditEmployees ? defaultMaxLocalComputers : undefined}
+        allowLimitOverride={canEditEmployees}
         onSuccess={handleAddEmployeeSuccess}
+      />
+      <EditEmployeeDrawer
+        open={editEmployeeId !== null}
+        onClose={() => setEditEmployeeId(null)}
+        employee={employees.find((employee) => employee.id === editEmployeeId) ?? null}
+        defaultMaxLocalComputers={defaultMaxLocalComputers}
+        onSuccess={handleEditEmployeeSuccess}
       />
       <AddNodeDrawer
         open={addNodeOpen}

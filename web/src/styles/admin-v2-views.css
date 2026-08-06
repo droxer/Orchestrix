@@ -134,7 +134,8 @@
 .adm-emp-cols,
 .adm-emp-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1.2fr) minmax(0, 2fr) auto auto;
+  /* identity / computers / limit / activity / actions */
+  grid-template-columns: minmax(220px, 1.2fr) minmax(0, 2fr) auto auto auto;
   gap: var(--sp-6);
 }
 
@@ -671,7 +672,12 @@
 .adm-emp-card-metrics {
   display: flex;
   align-items: center;
-  gap: var(--sp-6);
+  /* Three metrics plus the action buttons no longer fit one line at the
+     card's narrowest, so let them wrap instead of overflowing the footer. */
+  flex-wrap: wrap;
+  min-width: 0;
+  column-gap: var(--sp-5);
+  row-gap: var(--sp-2);
   font-feature-settings: "tnum" 1;
 }
 
@@ -690,9 +696,9 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Employee cards carry only the delete action — collapse the fixed 5-slot
-   node grid (an unslotted button would auto-place into column 1 and leave
-   four empty 28px tracks) and pin the button to the footer edge. */
+/* Employee cards carry only edit + delete — collapse the fixed 5-slot node
+   grid (an unslotted button would auto-place into column 1 and leave empty
+   28px tracks) and pin the buttons to the footer edge. */
 .adm-emp-card .adm-node-card-actions {
   display: flex;
   margin-left: auto;
@@ -2213,4 +2219,49 @@
   .adm-chat-stage {
     padding: var(--sp-4);
   }
+}
+
+/* ── Settings view ───────────────────────────────────────────────────── */
+
+/* One form on an otherwise empty page: hold it to a reading measure rather
+   than letting the field stretch the full console width. */
+.adm-settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  max-width: 460px;
+  padding: var(--sp-6);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+}
+
+.adm-settings-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.adm-settings-title {
+  margin: 0;
+  font: var(--type-title);
+  letter-spacing: var(--track-display);
+  color: var(--ink-1);
+}
+
+.adm-settings-sub {
+  margin: 0;
+  font-size: var(--fs-3);
+  color: var(--ink-3);
+}
+
+.adm-settings-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.adm-settings-saved {
+  font-size: var(--fs-2);
+  color: var(--ink-3);
 }

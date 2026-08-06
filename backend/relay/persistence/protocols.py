@@ -227,6 +227,13 @@ class ManagedNodeStore(Protocol):
     def update_node(self, node_id: str, patch: dict[str, Any]) -> dict[str, Any]: ...
 
 
+class OrgSettingsStore(Protocol):
+    def get_settings(self) -> dict[str, Any]: ...
+    def update_settings(
+        self, *, max_local_computers_per_employee: int
+    ) -> dict[str, Any]: ...
+
+
 class ProfileImageStore(Protocol):
     def read(self, kind: str, entity_id: str) -> tuple[bytes, str] | None: ...
     def save(

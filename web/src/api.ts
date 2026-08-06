@@ -28,6 +28,9 @@ import type {
   DaemonNodesResponse,
   EmployeeAgentsResponse,
   EmployeeAgent,
+  EmployeeRecord,
+  OrgSettingsResponse,
+  UpdateControlPanelEmployeeInput,
   AgentTeam,
   AgentTeamsResponse,
   TeamMutationInput,
@@ -291,7 +294,42 @@ export function createControlPanelEmployee(
       ...(input.nodeId ? { nodeId: input.nodeId } : {}),
       ...(input.email ? { email: input.email } : {}),
       ...(input.displayName ? { displayName: input.displayName } : {}),
+      ...(input.maxLocalComputers != null ? { maxLocalComputers: input.maxLocalComputers } : {}),
     },
+  });
+}
+
+/** Patch an employee's profile. Only the keys present in `input` are sent, so
+    an omitted field is left alone; `maxLocalComputers: null` clears the
+    override rather than meaning "no computers". */
+export function updateControlPanelEmployee(
+  input: UpdateControlPanelEmployeeInput,
+): Promise<{ employee: EmployeeRecord }> {
+  return apiJson<{ employee: EmployeeRecord }>(
+    `/admin/employees/${encodeURIComponent(input.employeeId)}`,
+    {
+      method: "PATCH",
+      body: {
+        ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
+        ...(input.email !== undefined ? { email: input.email } : {}),
+        ...(input.maxLocalComputers !== undefined
+          ? { maxLocalComputers: input.maxLocalComputers }
+          : {}),
+      },
+    },
+  );
+}
+
+export function getOrgSettings(signal?: AbortSignal): Promise<OrgSettingsResponse> {
+  return apiJson<OrgSettingsResponse>("/admin/settings", { signal });
+}
+
+export function updateOrgSettings(
+  maxLocalComputersPerEmployee: number,
+): Promise<OrgSettingsResponse> {
+  return apiJson<OrgSettingsResponse>("/admin/settings", {
+    method: "PUT",
+    body: { maxLocalComputersPerEmployee },
   });
 }
 
