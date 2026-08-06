@@ -76,12 +76,6 @@
   background: var(--surface-2);
 }
 
-/* Native checkboxes default to vendor blue; keep them on the ink action
-   token like the stream toolbar's inputs. */
-.team-member-option input[type="checkbox"] {
-  accent-color: var(--action);
-}
-
 .team-member-option small {
   color: var(--ink-3);
   font-family: var(--font-mono);
@@ -1525,6 +1519,8 @@
   opacity: 0.8;
 }
 
+/* The toggle itself is the shared Switch primitive (data-checked track +
+   thumb); this wrapper only owns layout and the enabled/disabled caption. */
 .adm-agent-toggle-switch {
   position: relative;
   display: inline-flex;
@@ -1537,62 +1533,13 @@
   user-select: none;
 }
 
-.adm-agent-toggle-switch input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: 0;
-  opacity: 0;
-}
-
-.adm-agent-toggle-track {
-  position: relative;
-  width: 34px;
-  height: 18px;
-  flex: none;
-  border-radius: var(--r-full);
-  background: var(--line-1);
-  transition: background var(--t-fast) var(--ease);
-}
-
-.adm-agent-toggle-track::after {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: var(--r-full);
-  background: var(--surface-0);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink-1) 14%, transparent);
-  transition: transform var(--t-fast) var(--ease);
-}
-
-.adm-agent-toggle-switch input:checked + .adm-agent-toggle-track {
-  background: var(--action);
-}
-
-.adm-agent-toggle-switch input:checked + .adm-agent-toggle-track::after {
-  transform: translateX(16px);
-}
-
-.adm-agent-toggle-switch input:focus-visible + .adm-agent-toggle-track {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
-
-.adm-agent-toggle-switch input:disabled + .adm-agent-toggle-track {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
 .adm-agent-toggle-label {
   min-width: 4.5rem;
   font: var(--type-label-strong);
   color: var(--ink-2);
 }
 
-.adm-agent-toggle-switch input:not(:checked) ~ .adm-agent-toggle-label {
+.adm-agent-toggle-switch:has([data-slot="switch"]:not([data-checked])) .adm-agent-toggle-label {
   color: var(--ink-3);
 }
 
@@ -1934,12 +1881,6 @@
   gap: var(--sp-3);
 }
 
-.adm-chat-field-opt {
-  margin-left: var(--sp-2);
-  color: var(--ink-4);
-  font-weight: 500;
-}
-
 .adm-chat-form {
   display: flex;
   flex-direction: column;
@@ -1951,43 +1892,9 @@
   padding-top: 0;
 }
 
-.adm-chat-form label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  color: var(--ink-3);
-  font: var(--type-label-strong);
-}
-
-.adm-chat-form input,
-.adm-chat-form select {
-  width: 100%;
-  min-width: 0;
-  height: var(--control-h);
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-0);
-  color: var(--ink-1);
-  padding: 0 var(--sp-3);
-  font: inherit;
-  transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
-}
-
-.adm-chat-form input:hover,
-.adm-chat-form select:hover {
-  border-color: var(--ink-4);
-}
-
-.adm-chat-form input:focus-visible,
-.adm-chat-form select:focus-visible {
-  border-color: var(--action);
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
-
-.adm-chat-form input::placeholder {
-  color: var(--ink-3);
-}
+/* Fields inside chat forms are Field/Input/Select primitives now — their
+   label, control, hint, and error styling comes from the shared components,
+   not from descendant rules here. */
 
 .adm-chat-integration-list {
   display: flex;
@@ -2094,7 +2001,6 @@
 }
 
 .adm-chat-callback small,
-.adm-chat-form label small,
 .adm-chat-form > small {
   color: var(--ink-3);
   font-size: var(--fs-2);

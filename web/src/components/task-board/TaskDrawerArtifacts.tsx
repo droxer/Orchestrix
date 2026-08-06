@@ -6,7 +6,7 @@ import { listTaskArtifacts } from "../../api";
 import { artifactRawHref } from "../../lib/artifactPreview";
 import { useArtifactViewer } from "../ArtifactViewerProvider";
 import type { ArtifactIndexItem } from "../../types";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 
 function taskArtifactDate(value: string | undefined, locale: string): string {
   if (!value) return "";

@@ -8,7 +8,7 @@ import type {
   ControlPanelDaemonNodeRecord,
   CreateControlPanelEmployeeResponse,
 } from "../../types";
-import { Drawer } from "../ui/Drawer";
+import { Drawer } from "@/components/ui/Drawer";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -161,9 +161,8 @@ export function AddEmployeeDrawer({
       title={t("admin.v2.add_employee_title")}
       subtitle={t("admin.v2.add_employee_sub")}
       closeLabel={t("admin.v2.close_drawer")}
-      ariaLabel={t("admin.v2.add_employee_title")}
       bodyClassName="adm-drawer-body--column"
-      width={460}
+      width="form"
     >
       <form className="adm-form adm-provision-form" onSubmit={(event) => void handleSubmit(event)} noValidate>
         <section className="adm-provision-section" aria-labelledby="adm-emp-identity">

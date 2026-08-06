@@ -13,9 +13,18 @@ import {
 } from "../icons";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { RelayEmptyState } from "../RelayEmptyState";
-import { Drawer } from "../ui/Drawer";
+import { Drawer } from "@/components/ui/Drawer";
 import {
   activateChatIntegration,
   addChatAllowedConversation,
@@ -163,13 +172,15 @@ function ChannelCreateForm({
       }}
       noValidate
     >
-      <label>
-        <span>{t("admin.v2.chat_provider")}</span>
+      <Field label={t("admin.v2.chat_provider")} wrapper="div">
         <span className="adm-chat-provider-static">Telegram</span>
-      </label>
-      <label>
-        <span>{t("admin.v2.chat_display_name")}</span>
-        <input
+      </Field>
+      <Field
+        label={t("admin.v2.chat_display_name")}
+        error={fieldErrors.displayName}
+        errorId={`${idPrefix}-display-name-error`}
+      >
+        <Input
           ref={displayNameRef}
           name={`${idPrefix}-display-name`}
           autoComplete="organization"
@@ -179,18 +190,9 @@ function ChannelCreateForm({
           aria-invalid={Boolean(fieldErrors.displayName) || undefined}
           aria-describedby={fieldErrors.displayName ? `${idPrefix}-display-name-error` : undefined}
         />
-        {fieldErrors.displayName ? (
-          <span id={`${idPrefix}-display-name-error`} className="text-sm text-danger" role="alert">
-            {fieldErrors.displayName}
-          </span>
-        ) : null}
-      </label>
-      <label>
-        <span>
-          {t("admin.v2.chat_tenant")}
-          <span className="adm-chat-field-opt">{t("admin.v2.optional")}</span>
-        </span>
-        <input
+      </Field>
+      <Field label={t("admin.v2.chat_tenant")} optional={t("admin.v2.optional")}>
+        <Input
           name={`${idPrefix}-tenant-id`}
           autoComplete="off"
           spellCheck={false}
@@ -198,10 +200,14 @@ function ChannelCreateForm({
           onChange={(event) => onTenantIdChange(event.target.value)}
           placeholder={`${t("admin.v2.optional")}…`}
         />
-      </label>
-      <label>
-        <span>{t("admin.v2.chat_public_url")}</span>
-        <input
+      </Field>
+      <Field
+        label={t("admin.v2.chat_public_url")}
+        hint={t("admin.v2.chat_public_url_help")}
+        error={fieldErrors.publicBaseUrl}
+        errorId={`${idPrefix}-public-base-url-error`}
+      >
+        <Input
           ref={publicBaseUrlRef}
           name={`${idPrefix}-public-base-url`}
           type="url"
@@ -213,17 +219,15 @@ function ChannelCreateForm({
           aria-invalid={Boolean(fieldErrors.publicBaseUrl) || undefined}
           aria-describedby={fieldErrors.publicBaseUrl ? `${idPrefix}-public-base-url-error` : undefined}
         />
-        {fieldErrors.publicBaseUrl ? (
-          <span id={`${idPrefix}-public-base-url-error`} className="text-sm text-danger" role="alert">
-            {fieldErrors.publicBaseUrl}
-          </span>
-        ) : null}
-        <small>{t("admin.v2.chat_public_url_help")}</small>
-      </label>
+      </Field>
       {TELEGRAM_CREDENTIAL_FIELDS.map((field) => (
-        <label key={field.key}>
-          <span>{t(field.labelKey)}</span>
-          <input
+        <Field
+          key={field.key}
+          label={t(field.labelKey)}
+          error={fieldErrors.credential}
+          errorId={`${idPrefix}-${field.key}-error`}
+        >
+          <Input
             ref={credentialRef}
             name={`${idPrefix}-${field.key}`}
             autoComplete={field.secret ? "new-password" : "off"}
@@ -235,12 +239,7 @@ function ChannelCreateForm({
             aria-invalid={Boolean(fieldErrors.credential) || undefined}
             aria-describedby={fieldErrors.credential ? `${idPrefix}-${field.key}-error` : undefined}
           />
-          {fieldErrors.credential ? (
-            <span id={`${idPrefix}-${field.key}-error`} className="text-sm text-danger" role="alert">
-              {fieldErrors.credential}
-            </span>
-          ) : null}
-        </label>
+        </Field>
       ))}
       <small>{t("admin.v2.chat_telegram_secret_generated")}</small>
       <Button type="submit" loading={busy} loadingLabel={t("admin.creating")}>
@@ -784,9 +783,8 @@ export function ChannelsView({
               <ChannelSection title={t("admin.v2.chat_connection_title")} step="1">
                 <div className="adm-chat-form compact adm-chat-connection-form">
                   {selected.provider === "telegram" ? (
-                    <label>
-                      <span>{t("admin.v2.chat_public_url")}</span>
-                      <input
+                    <Field label={t("admin.v2.chat_public_url")}>
+                      <Input
                         name="chat-edit-public-base-url"
                         type="url"
                         autoComplete="url"
@@ -794,12 +792,11 @@ export function ChannelsView({
                         value={editPublicBaseUrl}
                         onChange={(event) => setEditPublicBaseUrl(event.target.value)}
                       />
-                    </label>
+                    </Field>
                   ) : null}
                   {TELEGRAM_CREDENTIAL_FIELDS.map((field) => (
-                    <label key={field.key}>
-                      <span>{t(field.labelKey)}</span>
-                      <input
+                    <Field key={field.key} label={t(field.labelKey)}>
+                      <Input
                         name={`chat-edit-${field.key}`}
                         autoComplete={field.secret ? "new-password" : "off"}
                         spellCheck={false}
@@ -810,7 +807,7 @@ export function ChannelsView({
                         }
                         placeholder={field.secret ? t("admin.v2.chat_secret_unchanged") : undefined}
                       />
-                    </label>
+                    </Field>
                   ))}
                   <div className="adm-chat-section-actions">
                     <Button
@@ -867,7 +864,7 @@ export function ChannelsView({
               <div className="adm-chat-split">
                 <ChannelSection title={t("admin.v2.chat_links_title")} step="3">
                   <div className="adm-chat-form compact">
-                    <input
+                    <Input
                       name="chat-external-user-id"
                       autoComplete="off"
                       spellCheck={false}
@@ -878,7 +875,7 @@ export function ChannelsView({
                       }
                       placeholder={`${t("admin.v2.chat_external_user")}…`}
                     />
-                    <input
+                    <Input
                       name="chat-employee-id"
                       autoComplete="off"
                       spellCheck={false}
@@ -893,22 +890,33 @@ export function ChannelsView({
                       }
                       placeholder={`${t("admin.v2.placeholder_employee_id")}…`}
                     />
-                    <select
+                    <Select
                       name="chat-default-agent-id"
-                      aria-label={t("admin.v2.chat_agent_placeholder")}
-                      value={identityForm.defaultAgentId}
-                      onChange={(event) =>
-                        setIdentityForm((prev) => ({ ...prev, defaultAgentId: event.target.value }))
+                      value={identityForm.defaultAgentId || null}
+                      onValueChange={(value) =>
+                        setIdentityForm((prev) => ({ ...prev, defaultAgentId: value ?? "" }))
                       }
                     >
-                      <option value="">{t("admin.v2.chat_agent_placeholder")}</option>
-                      {identityAgentOptions
-                        .map((agent) => (
-                          <option key={agent.id} value={agent.id}>
+                      <SelectTrigger
+                        className="w-full"
+                        aria-label={t("admin.v2.chat_agent_placeholder")}
+                      >
+                        <SelectValue placeholder={t("admin.v2.chat_agent_placeholder")}>
+                          {(value: string | null) => {
+                            if (!value) return t("admin.v2.chat_agent_placeholder");
+                            const agent = identityAgentOptions.find((a) => a.id === value);
+                            return agent ? `${agent.displayName} · ${agent.executorKind}` : value;
+                          }}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {identityAgentOptions.map((agent) => (
+                          <SelectItem key={agent.id} value={agent.id}>
                             {agent.displayName} · {agent.executorKind}
-                          </option>
+                          </SelectItem>
                         ))}
-                    </select>
+                      </SelectContent>
+                    </Select>
                     <Button
                       type="button"
                       variant="secondary"
@@ -940,7 +948,7 @@ export function ChannelsView({
 
                 <ChannelSection title={t("admin.v2.chat_allow_title")} step="4">
                   <div className="adm-chat-form compact">
-                    <input
+                    <Input
                       name="chat-conversation-id"
                       autoComplete="off"
                       spellCheck={false}
@@ -951,7 +959,7 @@ export function ChannelsView({
                       }
                       placeholder={`${t("admin.v2.chat_conversation_id")}…`}
                     />
-                    <input
+                    <Input
                       name="chat-thread-id"
                       autoComplete="off"
                       spellCheck={false}
@@ -962,7 +970,7 @@ export function ChannelsView({
                       }
                       placeholder={`${t("admin.v2.chat_thread_optional")}…`}
                     />
-                    <input
+                    <Input
                       name="chat-conversation-label"
                       autoComplete="off"
                       aria-label={t("admin.v2.chat_label")}
@@ -1020,9 +1028,8 @@ export function ChannelsView({
         title={t("admin.v2.chat_new_title")}
         subtitle={t("admin.v2.chat_new_sub")}
         closeLabel={t("admin.v2.close_drawer")}
-        ariaLabel={t("admin.v2.chat_new_title")}
         bodyClassName="adm-drawer-body--column"
-        width={440}
+        width="form"
       >
         <ChannelCreateForm {...createFormProps} idPrefix="chat-drawer" />
       </Drawer>

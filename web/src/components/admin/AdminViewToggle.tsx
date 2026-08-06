@@ -2,7 +2,7 @@
 
 import { useTranslation } from "react-i18next";
 import type { AdminPageView } from "../../lib/store";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 import { AdminDashboard, AdminEmployees, AdminNode, AdminSettings } from "../icons";
 
 export type AdminView = AdminPageView;

@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { agentLabel } from "../../lib/plan";
 import { compactDate, compactDueDate } from "../../lib/workspaceFormat";
 import type { WorkspaceBriefResponse, WorkspaceBriefSession, WorkspaceBriefTask } from "../../types";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 
 /* Shared workspace inspection primitives — the empty/loading/metric/activity
    building blocks used by both AgentWorkspacePage and TeamWorkspacePage. Kept

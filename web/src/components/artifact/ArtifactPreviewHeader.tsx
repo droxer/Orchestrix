@@ -2,8 +2,8 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { RelayArtifact } from "relay-core";
 import { artifactRawHref } from "../../lib/artifactPreview";
-import { Button } from "../ui/button";
-import { useDialogs } from "../ui/DialogProvider";
+import { Button } from "@/components/ui/button";
+import { useDialogs } from "@/components/ui/DialogProvider";
 
 function sanitizeFilename(title: string): string {
   const cleaned = title.replace(/[/\\:*?"<>|]/g, " ").replace(/\s+/g, " ").trim();

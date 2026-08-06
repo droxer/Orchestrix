@@ -104,7 +104,9 @@
   gap: var(--sp-2);
 }
 
-.login-field-label {
+/* Field primitive renders the label text as a plain <span> inside the
+   <label> wrapper; keep the screen's mono-caps label skin on it. */
+.login-field > span:first-child {
   font-family: var(--font-mono);
   font-size: var(--fs-2);
   letter-spacing: var(--track-caps);

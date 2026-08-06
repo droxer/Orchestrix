@@ -2,7 +2,7 @@
 
 import { useTranslation } from "react-i18next";
 import { StreamAttachment } from "./icons";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
 
 export function ArtifactNavButton({ artifactCount, onOpenArtifacts, className = "icon-button" }: {
   artifactCount: number;

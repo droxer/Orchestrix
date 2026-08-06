@@ -36,7 +36,7 @@ import type { AdminLayout } from "./admin/AdminLayoutToggle";
 import { useAdminNodes } from "../hooks/useAdminNodes";
 import { useRelayStore } from "../lib/store";
 import { CONTROL_PANEL_POLL_MS } from "../lib/controlPanelQueries";
-import { useDialogs } from "./ui/DialogProvider";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import {
   HIGHLIGHT_PULSE_MS,
   persistStoredNodeTokenMap,

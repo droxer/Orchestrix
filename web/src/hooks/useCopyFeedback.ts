@@ -10,7 +10,13 @@ export function useCopyFeedback() {
   }, []);
 
   async function copy(field: string, value: string) {
-    await copyText(value);
+    try {
+      await copyText(value);
+    } catch {
+      // Clipboard write denied (permissions, focus) — leave the button in its
+      // uncopied state instead of claiming success.
+      return;
+    }
     setCopiedField(field);
     if (timerRef.current !== null) window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(

@@ -2,7 +2,7 @@
 
 import type { TFunction } from "i18next";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 import { ActionEdit, ActionKey, AdminDelete, AdminManageExecutors } from "../icons";
 
 interface NodeActionsProps {

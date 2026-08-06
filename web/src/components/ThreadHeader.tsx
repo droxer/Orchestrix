@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import type { RelaySession } from "../types";
 import { NavThreads } from "./icons";
 import { ArtifactNavButton } from "./ArtifactNavButton";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
 
 export function ThreadHeader({ activeSession, artifactCount, onOpenArtifacts, onBackToThreads }: {
   activeSession: RelaySession | undefined;

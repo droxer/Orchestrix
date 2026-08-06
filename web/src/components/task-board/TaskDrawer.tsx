@@ -31,7 +31,7 @@ import {
   type RoutineTaskFormState,
   type TaskBoardFormState,
 } from "../../lib/taskBoardForm";
-import { Drawer } from "../ui/Drawer";
+import { Drawer } from "@/components/ui/Drawer";
 import { TaskDrawerArtifacts } from "./TaskDrawerArtifacts";
 import { AgentMark } from "../AgentMark";
 import { AgentStateBadge } from "../AgentStateBadge";
@@ -381,7 +381,6 @@ export function TaskDrawer({
       subtitleMono={form.variant === "backlog" && Boolean(form.id)}
       width={form.variant === "routine" ? 600 : 560}
       closeLabel={t("admin.v2.close_drawer")}
-      ariaLabel={title}
       bodyClassName="adm-drawer-body--column"
       onClosed={onClosed}
     >

@@ -10,6 +10,17 @@ import { isDrawerTop, isDrawerUnderlay, registerDrawer, subscribeDrawerStack } f
 /** Fallback exit duration when the panel's animation duration can't be read. */
 const FALLBACK_CLOSE_MS = 150;
 
+/** Named panel widths — call sites pick a role, not a pixel count, so drawer
+ *  sizing stays consistent across the app. `form` for single-column edit
+ *  forms, `detail` for read/inspect panels, `wide` for preview panes. */
+const DRAWER_WIDTHS = {
+  form: 460,
+  detail: 520,
+  wide: 900,
+} as const;
+
+export type DrawerWidth = keyof typeof DRAWER_WIDTHS;
+
 export interface DrawerProps {
   open: boolean;
   onClose: () => void;
@@ -18,9 +29,11 @@ export interface DrawerProps {
   /** Render the subtitle in the mono face — for ID/handle subtitles. */
   subtitleMono?: boolean;
   kicker?: ReactNode;
-  width?: number;
+  /** Named width role, or an explicit pixel width for one-off layouts. */
+  width?: DrawerWidth | number;
   children: ReactNode;
   closeLabel: string;
+  /** Accessible name override. Defaults to `title` when it is a string. */
   ariaLabel?: string;
   /** Extra class on the scroll body — e.g. to opt into a flex-column layout
    *  so a form footer can anchor to the bottom of the panel. */
@@ -39,7 +52,7 @@ export function Drawer({
   subtitle,
   subtitleMono = false,
   kicker,
-  width = 520,
+  width = "detail",
   children,
   closeLabel,
   ariaLabel,
@@ -104,6 +117,9 @@ export function Drawer({
 
   if (!visible || typeof document === "undefined") return null;
 
+  const resolvedWidth = typeof width === "number" ? width : DRAWER_WIDTHS[width];
+  const resolvedAriaLabel = ariaLabel ?? (typeof title === "string" ? title : undefined);
+
   const backdropClass = [
     "overlay-backdrop",
     "adm-drawer-backdrop",
@@ -130,12 +146,12 @@ export function Drawer({
         aria-modal={underlay || closing ? undefined : true}
         aria-hidden={underlay || closing || undefined}
         inert={underlay || closing || undefined}
-        aria-label={ariaLabel}
-        aria-labelledby={ariaLabel ? undefined : titleId}
+        aria-label={resolvedAriaLabel}
+        aria-labelledby={resolvedAriaLabel ? undefined : titleId}
         aria-describedby={subtitle ? subtitleId : undefined}
         tabIndex={-1}
         className={panelClass}
-        style={{ "--adm-drawer-w": `${width}px` } as React.CSSProperties}
+        style={{ "--adm-drawer-w": `${resolvedWidth}px` } as React.CSSProperties}
       >
         <header className="adm-drawer-head">
           <div className="adm-drawer-head-text">

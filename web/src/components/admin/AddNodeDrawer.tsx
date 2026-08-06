@@ -8,7 +8,7 @@ import type {
   CreateManagedNodeResponse,
   EmployeeRecord,
 } from "../../types";
-import { Drawer } from "../ui/Drawer";
+import { Drawer } from "@/components/ui/Drawer";
 import { RunModeField, type RunLocation } from "./RunModeField";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -144,9 +144,8 @@ export function AddNodeDrawer({
       title={t("admin.v2.add_node_title")}
       subtitle={t(isManaged ? "admin.v2.add_node_sub_managed" : "admin.v2.add_node_sub_local")}
       closeLabel={t("admin.v2.close_drawer")}
-      ariaLabel={t("admin.v2.add_node_title")}
       bodyClassName="adm-drawer-body--column"
-      width={460}
+      width="form"
     >
       <form className="adm-form adm-provision-form" onSubmit={(event) => void handleSubmit(event)} noValidate>
         <section className="adm-provision-section" aria-labelledby={profileHeadingId}>

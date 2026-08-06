@@ -10,11 +10,12 @@ import type {
   EmployeeRecord,
 } from "../../types";
 import type { AddNodeDrawerSuccess } from "./AddNodeDrawer";
-import { Drawer } from "../ui/Drawer";
+import { Drawer } from "@/components/ui/Drawer";
 import { RunModeField, type RunLocation } from "./RunModeField";
 import { initialsOf, statusTone, visualStatus } from "./helpers";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { NodeProfileBadges } from "./NodeProfileBadges";
 import { NodePresence } from "./NodePresence";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
@@ -173,9 +174,8 @@ export function AssignNodeDrawer({
       onClose={() => { void requestClose(); }}
       title={t("admin.v2.assign_title")}
       subtitle={t("admin.v2.assign_sub")}
-      width={520}
+      width="detail"
       closeLabel={t("admin.v2.close_drawer")}
-      ariaLabel={t("admin.v2.assign_title")}
       bodyClassName="adm-drawer-body--column"
     >
       <form
@@ -395,8 +395,8 @@ export function AssignNodeDrawer({
         {creatingNode ? (
           <fieldset className="adm-form-section">
             <legend className="adm-form-legend">{t("admin.v2.section_node")}</legend>
-            <Field label={t("admin.v2.computer_name")}>
-              <input
+            <Field label={t("admin.v2.computer_name")} hint={t("admin.v2.computer_name_hint")}>
+              <Input
                 name="assign-node-display-name"
                 autoComplete="off"
                 value={displayName}
@@ -406,7 +406,6 @@ export function AssignNodeDrawer({
                 disabled={isBusy}
               />
             </Field>
-            <p className="adm-form-hint">{t("admin.v2.computer_name_hint")}</p>
             <RunModeField
               value={nodeLocation}
               onChange={(location) => {
@@ -417,8 +416,12 @@ export function AssignNodeDrawer({
               disabled={isBusy}
             />
             {!isManaged ? (
-              <Field label={t("nav.workspace_label")}>
-                <input
+              <Field
+                label={t("nav.workspace_label")}
+                error={fieldErrors.workspacePath}
+                errorId="assign-node-workspace-path-error"
+              >
+                <Input
                   ref={workspacePathRef}
                   name="assign-node-workspace-path"
                   autoComplete="off"
@@ -432,11 +435,6 @@ export function AssignNodeDrawer({
                   aria-invalid={Boolean(fieldErrors.workspacePath) || undefined}
                   aria-describedby={fieldErrors.workspacePath ? "assign-node-workspace-path-error" : undefined}
                 />
-                {fieldErrors.workspacePath ? (
-                  <span id="assign-node-workspace-path-error" className="text-sm text-danger" role="alert">
-                    {fieldErrors.workspacePath}
-                  </span>
-                ) : null}
               </Field>
             ) : null}
             <p className="adm-form-hint">

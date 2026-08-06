@@ -605,6 +605,12 @@ export interface CurrentUser {
   displayName?: string;
   theme?: Theme;
   language?: Language;
+  /** Pinned local-computer limit; null/undefined means it follows the org default. */
+  maxLocalComputers?: number | null;
+  /** Resolved local-computer limit for this user, decorated by /auth/me. */
+  effectiveMaxLocalComputers?: number;
+  /** Live local computers this user owns, decorated by /auth/me. */
+  localComputerCount?: number;
 }
 
 export type ChatProvider = "discord" | "telegram" | "lark";

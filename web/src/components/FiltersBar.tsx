@@ -2,15 +2,15 @@
 
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
-import { ActionSearch } from "./icons";
+} from "@/components/ui/select";
+import { SearchInput } from "@/components/ui/search-input";
 
 interface FiltersBarProps {
   ariaLabel: string;
@@ -40,20 +40,16 @@ export function FiltersBar({
   return (
     <div className="backlog-filter-bar" role="group" aria-label={ariaLabel}>
       <div className="backlog-filter-primary">
-        <div className="backlog-filter-search-wrap">
-          <ActionSearch size={15} aria-hidden="true" />
-          <input
-            className="backlog-filter-search"
-            name={searchName}
-            type="search"
-            autoComplete="off"
-            spellCheck={false}
-            value={query}
-            placeholder={searchLabel}
-            aria-label={searchLabel}
-            onChange={(event) => onQueryChange(event.target.value)}
-          />
-        </div>
+        <SearchInput
+          className="backlog-filter-search-wrap"
+          inputClassName="backlog-filter-search"
+          iconSize={15}
+          label={searchLabel}
+          name={searchName}
+          value={query}
+          placeholder={searchLabel}
+          onChange={(event) => onQueryChange(event.target.value)}
+        />
         <div className="backlog-filter-actions">
           <Button variant="ghost"
             type="button"

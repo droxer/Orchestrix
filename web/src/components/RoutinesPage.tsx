@@ -25,7 +25,7 @@ import { TaskDrawer } from "./task-board/TaskDrawer";
 import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
 import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
-import { Button, buttonVariants } from "./ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { FiltersBar, FilterSelect } from "./FiltersBar";
 import { hrefForRoute } from "../lib/appRoute";
 

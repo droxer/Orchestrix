@@ -1,10 +1,11 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionCompose, ActionSearch } from "./icons";
+import { ActionCompose } from "./icons";
 import { ThreadRow, type ThreadItem } from "./ThreadRow";
 import { groupThreads } from "../lib/threadGroups";
 import type { RelaySession } from "../types";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
+import { SearchInput } from "@/components/ui/search-input";
 
 // The logged-in employee's own threads. Each row is a session; the list
 // is owner-scoped by the backend, so it only ever shows the current employee's
@@ -58,18 +59,14 @@ export function ThreadListPanel({
           <ActionCompose size={16} />
         </Button>
       </div>
-      <form className="relay-search conversation-search" onSubmit={(e) => e.preventDefault()}>
-        <ActionSearch size={16} />
-        <input
-          aria-label={t("thread.search_label")}
-          name="thread-search"
-          autoComplete="off"
-          spellCheck={false}
-          placeholder={t("thread.search_placeholder")}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </form>
+      <SearchInput
+        className="relay-search conversation-search"
+        label={t("thread.search_label")}
+        name="thread-search"
+        placeholder={t("thread.search_placeholder")}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
       <section className="conversation-list" aria-label={t("nav.threads")}>
         {sections.map((section) =>
           section.items.length > 0 ? (

@@ -3,10 +3,11 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { ActionEdit, ActionSearch, AdminDelete, AdminEmployees, ICON_STROKE_LARGE } from "../icons";
+import { ActionEdit, AdminDelete, AdminEmployees, ICON_STROKE_LARGE } from "../icons";
 import { Button } from "@/components/ui/button";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
+import { SearchInput } from "@/components/ui/search-input";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import {
   buildEmployeeSummaries,
@@ -165,20 +166,15 @@ export function EmployeesView({
         <AdminLayoutToggle layout={layout} onChange={onLayoutChange} />
       </div>
 
-      <div className="relay-search adm-search">
-        <ActionSearch size={16} aria-hidden="true" />
-        <input
-          className="adm-search-input"
-          name="admin-employees-search"
-          type="search"
-          autoComplete="off"
-          spellCheck={false}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder={t("admin.v2.search_employees_placeholder")}
-          aria-label={t("admin.v2.search_employees_placeholder")}
-        />
-      </div>
+      <SearchInput
+        className="relay-search adm-search"
+        inputClassName="adm-search-input"
+        label={t("admin.v2.search_employees_placeholder")}
+        name="admin-employees-search"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder={t("admin.v2.search_employees_placeholder")}
+      />
 
       {deleteError ? (
         <p className="adm-view-error" role="alert">{t("admin.v2.action_failed", { message: deleteError })}</p>

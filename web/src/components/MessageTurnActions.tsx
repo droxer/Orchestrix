@@ -3,8 +3,8 @@ import { useTranslation } from "react-i18next";
 import { ActionCopy, ActionRetry, CheckIcon } from "./icons";
 import type { AgentName, AgentTaskMode } from "../types";
 import { agentMessagePlainText } from "../lib/agentStream";
-import { Button } from "./ui/button";
-import { useDialogs } from "./ui/DialogProvider";
+import { Button } from "@/components/ui/button";
+import { useDialogs } from "@/components/ui/DialogProvider";
 
 type MessageTurnActionsProps = {
   agent: AgentName;

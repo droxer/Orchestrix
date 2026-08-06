@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { updateControlPanelEmployee } from "../../api";
 import type { EmployeeRecord } from "../../types";
-import { Drawer } from "../ui/Drawer";
+import { Drawer } from "@/components/ui/Drawer";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -112,9 +112,8 @@ export function EditEmployeeDrawer({
       title={t("admin.v2.edit_employee_title")}
       subtitle={employee ? `@${employee.id}` : undefined}
       closeLabel={t("admin.v2.close_drawer")}
-      ariaLabel={t("admin.v2.edit_employee_title")}
       bodyClassName="adm-drawer-body--column"
-      width={460}
+      width="form"
     >
       <form className="adm-form adm-provision-form" onSubmit={(event) => void handleSubmit(event)} noValidate>
         <section className="adm-provision-section" aria-labelledby="adm-edit-emp-identity">

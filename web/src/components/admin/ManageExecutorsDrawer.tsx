@@ -12,8 +12,9 @@ import { AGENT_NAMES } from "../../types";
 import type { AgentName, ControlPanelDaemonNodeRecord } from "../../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { AgentMark } from "../AgentMark";
-import { Drawer } from "../ui/Drawer";
+import { Drawer } from "@/components/ui/Drawer";
 import { agentStatusTone, nodeAgentPresence } from "./helpers";
 import { NodeProfileBadges } from "./NodeProfileBadges";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
@@ -115,7 +116,6 @@ export function ManageExecutorsDrawer({ open, onClose, node, onUpdated, onSave }
         onClose={onClose}
         title={t("admin.v2.manage_executors_title")}
         closeLabel={t("admin.v2.close_drawer")}
-        ariaLabel={t("admin.v2.manage_executors_title")}
         layer={1}
       >
         <p className="adm-cred-empty">{t("admin.v2.no_node_selected")}</p>
@@ -134,9 +134,8 @@ export function ManageExecutorsDrawer({ open, onClose, node, onUpdated, onSave }
         </span>
       }
       closeLabel={t("admin.v2.close_drawer")}
-      ariaLabel={t("admin.v2.manage_executors_title")}
       layer={1}
-      width={520}
+      width="detail"
       bodyClassName="adm-drawer-body--column"
     >
       <div className="adm-form">
@@ -178,11 +177,10 @@ export function ManageExecutorsDrawer({ open, onClose, node, onUpdated, onSave }
                   </span>
                 </div>
                 <label className="adm-agent-toggle-switch">
-                  <input
+                  <Switch
                     name={`node-${node.id}-${agent}-enabled`}
-                    type="checkbox"
                     checked={isEnabled}
-                    onChange={() => toggle(agent)}
+                    onCheckedChange={() => toggle(agent)}
                     disabled={saving}
                     aria-label={
                       isEnabled
@@ -190,7 +188,6 @@ export function ManageExecutorsDrawer({ open, onClose, node, onUpdated, onSave }
                         : t("admin.v2.enable_agent", { agent })
                     }
                   />
-                  <span className="adm-agent-toggle-track" aria-hidden="true" />
                   <span className="adm-agent-toggle-label">
                     {isEnabled ? t("admin.v2.agent_enabled") : t("admin.v2.agent_disabled")}
                   </span>

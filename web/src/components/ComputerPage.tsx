@@ -11,11 +11,11 @@ import type {
 } from "../types";
 import { nodesAssignedToEmployee } from "../lib/computerNodes";
 import { useMutationError } from "../hooks/useMutationError";
-import { useDialogs } from "./ui/DialogProvider";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import { ComputerCard } from "./computer/ComputerCard";
 import { ConnectComputerDrawer } from "./computer/ConnectComputerDrawer";
 import { ManageExecutorsDrawer } from "./admin/ManageExecutorsDrawer";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
 import { ActionAdd, AdminNode } from "./icons";
@@ -70,6 +70,39 @@ export function ComputerPage({
     return [...newlyConnected, ...merged].filter((node) => !removed.has(node.id));
   }, [nodes, currentUser.employeeId, overrides, removedIds]);
   const manageExecutorsNode = myNodes.find((node) => node.id === manageExecutorsNodeId) ?? null;
+
+  // Gate the connect CTA on the caller's resolved local-computer limit. The
+  // backend stays the authority (a new enrollment that races the poll still
+  // gets a 409), but the button should say so before the round trip. The
+  // count comes from the roster on screen — not the /auth/me snapshot — so a
+  // connect or disconnect in this session moves it immediately.
+  const computerLimit = currentUser.effectiveMaxLocalComputers;
+  const computersUsed = myNodes.length;
+  const atLimit = computerLimit !== undefined && computersUsed >= computerLimit;
+  const limitHint = atLimit
+    ? t("computer.limit_reached", { used: computersUsed, limit: computerLimit })
+    : null;
+
+  const connectCta = (size: "default" | "sm") => (
+    <div className="computer-connect-cta">
+      <Button
+        type="button"
+        size={size}
+        onClick={() => setConnectDrawerOpen(true)}
+        disabled={atLimit}
+        title={limitHint ?? undefined}
+      >
+        <ActionAdd size={14} aria-hidden="true" />
+        {t("computer.connect_button")}
+        {computerLimit !== undefined ? (
+          <span className="computer-connect-usage tnum">
+            {computersUsed}/{computerLimit}
+          </span>
+        ) : null}
+      </Button>
+      {limitHint ? <p className="computer-connect-limit">{limitHint}</p> : null}
+    </div>
+  );
 
   function handleNodeUpdated(updated: ControlPanelDaemonNodeRecord) {
     setOverrides((prev) => ({ ...prev, [updated.id]: updated }));
@@ -134,12 +167,7 @@ export function ComputerPage({
         count={t("computer.count", { count: myNodes.length })}
         titleVariant="display"
         layout="stacked"
-        actions={
-          <Button type="button" size="sm" onClick={() => setConnectDrawerOpen(true)}>
-            <ActionAdd size={14} aria-hidden="true" />
-            {t("computer.connect_button")}
-          </Button>
-        }
+        actions={connectCta("sm")}
       />
       {/* The shell clips its children, so the roster needs its own scroll
           container — see computer.css. */}
@@ -149,12 +177,7 @@ export function ComputerPage({
             title={t("computer.empty_title")}
             body={t("computer.empty_body")}
             illustration={<AdminNode size={40} aria-hidden="true" />}
-            actions={
-              <Button type="button" onClick={() => setConnectDrawerOpen(true)}>
-                <ActionAdd size={14} aria-hidden="true" />
-                {t("computer.connect_button")}
-              </Button>
-            }
+            actions={connectCta("default")}
           />
         ) : (
           <ul className="computer-list">

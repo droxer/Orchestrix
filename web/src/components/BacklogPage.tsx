@@ -25,9 +25,9 @@ import { useEdgeAutoScroll } from "../hooks/useEdgeAutoScroll";
 import { useTouchTaskDrag } from "../hooks/useTouchTaskDrag";
 import { laneStatusAtPoint, type DragPoint } from "../lib/touchDrag";
 import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
 import { FiltersBar, FilterSelect } from "./FiltersBar";
-import { Input } from "./ui/input";
+import { Input } from "@/components/ui/input";
 import { StateMark, type StateShape } from "./StateMark";
 
 /**

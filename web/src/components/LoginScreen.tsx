@@ -5,7 +5,9 @@ import { useTranslation } from "react-i18next";
 import { login, RelayApiError } from "../api";
 import type { CurrentUser } from "../types";
 import { RelayMark } from "./RelayMark";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 
 interface LoginScreenProps {
   onAuthenticated: (user: CurrentUser) => void;
@@ -55,9 +57,8 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
         </div>
 
         <form className="login-form" onSubmit={(event) => void handleLogin(event)}>
-          <label className="login-field">
-            <span className="login-field-label">{t("login.username")}</span>
-            <input
+          <Field className="login-field" label={t("login.username")}>
+            <Input
               className="login-input"
               name="username"
               value={username}
@@ -70,10 +71,9 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? "login-error" : undefined}
             />
-          </label>
-          <label className="login-field">
-            <span className="login-field-label">{t("login.password")}</span>
-            <input
+          </Field>
+          <Field className="login-field" label={t("login.password")}>
+            <Input
               className="login-input"
               name="password"
               type="password"
@@ -84,7 +84,7 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? "login-error" : undefined}
             />
-          </label>
+          </Field>
 
           {error && (
             <p className="login-error" id="login-error" role="alert">

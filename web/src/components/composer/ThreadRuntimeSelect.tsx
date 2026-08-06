@@ -8,7 +8,7 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-} from "../ui/select";
+} from "@/components/ui/select";
 
 function runtimeLabel(node: DaemonNodeMonitorRecord): string {
   const displayName = "displayName" in node && typeof node.displayName === "string"

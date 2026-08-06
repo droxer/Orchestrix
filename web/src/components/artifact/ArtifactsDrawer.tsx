@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { RelayArtifact } from "relay-core";
-import { Drawer } from "../ui/Drawer";
+import { Drawer } from "@/components/ui/Drawer";
 import { ArtifactBody } from "./ArtifactBody";
 import { ArtifactIndexStrip } from "./ArtifactIndexStrip";
 import { ArtifactPreviewHeader } from "./ArtifactPreviewHeader";
@@ -53,9 +53,8 @@ export function ArtifactsDrawer({
     <Drawer
       open={open}
       onClose={onClose}
-      width={900}
+      width="wide"
       closeLabel={t("sheet.close")}
-      ariaLabel={t("artifact.drawer_title")}
       title={t("artifact.drawer_title")}
       subtitle={subtitle}
       bodyClassName="artifact-library-drawer-body"

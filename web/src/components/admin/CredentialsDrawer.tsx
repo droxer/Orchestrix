@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { Button } from "@/components/ui/button";
-import { Drawer } from "../ui/Drawer";
+import { Drawer } from "@/components/ui/Drawer";
 import { CredCopyRow } from "./CredCopyRow";
 import { NodeProfileBadges } from "./NodeProfileBadges";
 import { resolveNodeCredentials, type StoredNodeToken } from "./helpers";
@@ -72,9 +72,8 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
         onClose={onClose}
         title={t("admin.v2.credentials_title")}
         closeLabel={t("admin.v2.close_drawer")}
-        ariaLabel={t("admin.v2.credentials_title")}
         layer={1}
-        width={520}
+        width="detail"
       >
         <p className="adm-cred-empty">{t("admin.v2.no_node_selected")}</p>
       </Drawer>
@@ -107,9 +106,8 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
         </span>
       }
       closeLabel={t("admin.v2.close_drawer")}
-      ariaLabel={t("admin.v2.credentials_title")}
       layer={1}
-      width={520}
+      width="detail"
       bodyClassName={hasDangerZone ? "adm-drawer-body--column" : undefined}
     >
       <div className={hasDangerZone ? "adm-form" : undefined}>

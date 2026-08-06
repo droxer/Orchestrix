@@ -23,15 +23,16 @@ import { AgentStateBadge } from "./AgentStateBadge";
 import { PageHeader } from "./PageHeader";
 import { IdentityMonogram } from "./IdentityMonogram";
 import { TeamMark } from "./TeamMark";
+import { TeamMemberOption } from "./TeamMemberOption";
 import { ProfileImage, ProfileImagePicker } from "./ProfileImagePicker";
 import { ActivitiesSkeleton, WorkspaceActivities, WorkspaceEmpty, WorkspaceError } from "./workspace/WorkspacePrimitives";
 import { WorkspaceFilesBrowser } from "./AgentWorkspacePage";
-import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
-import { useDialogs } from "./ui/DialogProvider";
-import { Input } from "./ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { useDialogs } from "@/components/ui/DialogProvider";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type TeamPageTab = "profile" | "workspace" | "activities";
 
@@ -283,20 +284,16 @@ function TeamProfile({
                     const incompatible = !selected
                       && !canAddAgentToNodeScopedTeam(agent, selectedAgents);
                     return (
-                      <label
+                      <TeamMemberOption
                         key={agent.id}
-                        className="team-member-option"
-                        title={incompatible ? t("teams.node_scope_required") : undefined}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          onChange={() => toggleMember(agent.id)}
-                          disabled={busy || incompatible}
-                        />
-                        <span>{agent.displayName}</span>
-                        <small>{agentLabel(agent.executorKind)}</small>
-                      </label>
+                        agentId={agent.id}
+                        displayName={agent.displayName}
+                        executorKind={agent.executorKind}
+                        selected={selected}
+                        incompatible={incompatible}
+                        disabled={busy}
+                        onToggle={toggleMember}
+                      />
                     );
                   })}
                 </div>

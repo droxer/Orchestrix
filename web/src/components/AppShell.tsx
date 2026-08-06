@@ -10,7 +10,7 @@ import { ArtifactNavButton } from "./ArtifactNavButton";
 import type { AppRoute, MobileView } from "@/lib/viewTypes";
 import type { CurrentUser } from "@/types";
 import { useRelayStore } from "@/lib/store";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
 
 const WORK_ROUTE_LABEL_KEYS: Record<Exclude<AppRoute, "main">, string> = {
   backlog: "nav.backlog",

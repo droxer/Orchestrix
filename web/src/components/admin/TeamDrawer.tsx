@@ -10,12 +10,13 @@ import {
   teamMutationInput,
 } from "../../lib/teamForm";
 import type { AgentTeam } from "../../types";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
-import { Input } from "../ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
-import { useDialogs } from "../ui/DialogProvider";
-import { Drawer } from "../ui/Drawer";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useDialogs } from "@/components/ui/DialogProvider";
+import { Drawer } from "@/components/ui/Drawer";
+import { TeamMemberOption } from "../TeamMemberOption";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 
 export function TeamDrawer({
@@ -36,11 +37,14 @@ export function TeamDrawer({
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [leadId, setLeadId] = useState("");
   const [validationError, setValidationError] = useState<
-    "members" | "lead" | "unplaced" | "different-nodes" | null
+    "name" | "members" | "lead" | "unplaced" | "different-nodes" | null
   >(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const membersRef = useRef<HTMLFieldSetElement>(null);
   const leadRef = useRef<HTMLButtonElement>(null);
+  const membersError = validationError === "members"
+    || validationError === "unplaced"
+    || validationError === "different-nodes";
 
   useEffect(() => {
     setName(team?.name ?? "");
@@ -90,6 +94,7 @@ export function TeamDrawer({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!name.trim()) {
+      setValidationError("name");
       nameRef.current?.focus();
       return;
     }
@@ -142,9 +147,21 @@ export function TeamDrawer({
   }
 
   return (
-    <Drawer open={open} onClose={() => { void requestClose(); }} title={team ? t("teams.edit") : t("teams.add")} subtitle={t("teams.drawer_subtitle")} width={500} closeLabel={t("admin.v2.close_drawer")} ariaLabel={team ? t("teams.edit") : t("teams.add")} bodyClassName="adm-drawer-body--column">
+    <Drawer
+      open={open}
+      onClose={() => { void requestClose(); }}
+      title={team ? t("teams.edit") : t("teams.add")}
+      subtitle={t("teams.drawer_subtitle")}
+      width="form"
+      closeLabel={t("admin.v2.close_drawer")}
+      bodyClassName="adm-drawer-body--column"
+    >
       <form className="adm-form team-drawer-form" onSubmit={(event) => void submit(event)} noValidate>
-        <Field label={t("teams.name")}>
+        <Field
+          label={t("teams.name")}
+          error={validationError === "name" ? t("teams.name_required") : undefined}
+          errorId="team-name-error"
+        >
           <Input
             ref={nameRef}
             data-modal-initial-focus
@@ -152,15 +169,20 @@ export function TeamDrawer({
             autoComplete="off"
             value={name}
             required
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => {
+              setName(event.target.value);
+              if (validationError === "name") setValidationError(null);
+            }}
+            aria-invalid={validationError === "name" || undefined}
+            aria-describedby={validationError === "name" ? "team-name-error" : undefined}
           />
         </Field>
         <fieldset
           ref={membersRef}
           className="team-member-fieldset"
           tabIndex={-1}
-          aria-invalid={validationError && validationError !== "lead" ? true : undefined}
-          aria-describedby={validationError && validationError !== "lead" ? "team-members-error" : undefined}
+          aria-invalid={membersError || undefined}
+          aria-describedby={membersError ? "team-members-error" : undefined}
         >
           <legend>{t("teams.members")}</legend>
           <div className="team-member-options">
@@ -169,25 +191,20 @@ export function TeamDrawer({
               const incompatible = !selected
                 && !canAddAgentToNodeScopedTeam(agent, selectedAgents);
               return (
-                <label
+                <TeamMemberOption
                   key={agent.id}
-                  className="team-member-option"
-                  title={incompatible ? t("teams.node_scope_required") : undefined}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selected}
-                    disabled={incompatible}
-                    onChange={() => toggleMember(agent.id)}
-                  />
-                  <span>{agent.displayName}</span>
-                  <small>{agent.executorKind}</small>
-                </label>
+                  agentId={agent.id}
+                  displayName={agent.displayName}
+                  executorKind={agent.executorKind}
+                  selected={selected}
+                  incompatible={incompatible}
+                  onToggle={toggleMember}
+                />
               );
             })}
           </div>
           {agents.length === 0 ? <span className="adm-form-hint">{t("teams.no_agents")}</span> : null}
-          {validationError && validationError !== "lead" ? (
+          {membersError ? (
             <span id="team-members-error" className="text-sm text-danger" role="alert">
               {validationError === "members"
                 ? t("teams.members_required")
@@ -197,7 +214,12 @@ export function TeamDrawer({
             </span>
           ) : null}
         </fieldset>
-        <Field label={t("teams.lead")}>
+        <Field
+          label={t("teams.lead")}
+          wrapper="div"
+          error={validationError === "lead" ? t("teams.lead_required") : undefined}
+          errorId="team-lead-error"
+        >
           <Select value={leadId} disabled={memberIds.length === 0} onValueChange={(value) => {
             if (value) setLeadId(value);
             setValidationError(null);
@@ -216,7 +238,6 @@ export function TeamDrawer({
               {agents.filter((agent) => memberIds.includes(agent.id)).map((agent) => <SelectItem key={agent.id} value={agent.id}>{agent.displayName}</SelectItem>)}
             </SelectContent>
           </Select>
-          {validationError === "lead" ? <span id="team-lead-error" className="text-sm text-danger" role="alert">{t("teams.lead_required")}</span> : null}
         </Field>
         <div className="adm-form-actions">
           {team ? <Button size="cta" type="button" variant="destructive" className="adm-form-actions-leading" onClick={() => void remove()} disabled={busy} loading={deleteTeamMutation.isPending}>{t("teams.delete")}</Button> : null}

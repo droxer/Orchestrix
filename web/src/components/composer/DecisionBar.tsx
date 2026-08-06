@@ -3,17 +3,17 @@ import { useTranslation } from "react-i18next";
 import type { AgentTaskMode, EmployeeAgent } from "../../types";
 import { isEmployeeAgentRoutable } from "../../lib/agentDisplayNames";
 import { ActionApprove, ActionHandoff, ActionRoute } from "../icons";
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../ui/select";
-import { useDialogs } from "../ui/DialogProvider";
+} from "@/components/ui/select";
+import { useDialogs } from "@/components/ui/DialogProvider";
 
 type DecisionAction = "approve" | "reject" | "rerun" | "mark_done" | "handoff";
 

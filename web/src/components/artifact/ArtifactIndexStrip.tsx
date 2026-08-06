@@ -13,7 +13,8 @@ import {
   ArtifactTest,
 } from "../icons";
 import { filterArtifacts } from "../../lib/artifactFilters";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
+import { SearchInput } from "@/components/ui/search-input";
 export { filterArtifacts } from "../../lib/artifactFilters";
 
 function ArtifactKindIcon({ kind, size }: { kind: RelayArtifact["kind"]; size: number }) {
@@ -106,18 +107,14 @@ export function ArtifactIndexStrip({
 
       {/* Expanded: full list panel */}
       <div className="artifact-index-panel">
-        <div className="artifact-index-search">
-          <ActionSearch size={14} />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("artifact.search_placeholder")}
-            aria-label={t("artifact.search_label")}
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </div>
+        <SearchInput
+          className="artifact-index-search"
+          iconSize={14}
+          label={t("artifact.search_label")}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("artifact.search_placeholder")}
+        />
         {kinds.length > 1 ? (
           <div className="artifact-index-filters">
             <Button variant="ghost"

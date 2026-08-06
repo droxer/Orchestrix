@@ -6,7 +6,8 @@ import type { TFunction } from "i18next";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
 import { Button } from "@/components/ui/button";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
-import { AdminNode, ActionSearch, ICON_STROKE_LARGE } from "../icons";
+import { AdminNode, ICON_STROKE_LARGE } from "../icons";
+import { SearchInput } from "@/components/ui/search-input";
 import { canUseLocalControlPanel } from "../../lib/controlPanel";
 import {
   matchesNodeQuickFilter,
@@ -109,20 +110,15 @@ export function NodesView({ nodes, storedTokens, layout, onLayoutChange, onRevea
         <AdminLayoutToggle layout={layout} onChange={onLayoutChange} />
       </div>
 
-      <div className="relay-search adm-search">
-        <ActionSearch size={16} aria-hidden="true" />
-        <input
-          className="adm-search-input"
-          name="admin-nodes-search"
-          type="search"
-          autoComplete="off"
-          spellCheck={false}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder={t("admin.v2.search_nodes_placeholder")}
-          aria-label={t("admin.v2.search_nodes_placeholder")}
-        />
-      </div>
+      <SearchInput
+        className="relay-search adm-search"
+        inputClassName="adm-search-input"
+        label={t("admin.v2.search_nodes_placeholder")}
+        name="admin-nodes-search"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder={t("admin.v2.search_nodes_placeholder")}
+      />
 
       {filtered.length === 0 ? (
         <RelayEmptyState

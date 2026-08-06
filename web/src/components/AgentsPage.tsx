@@ -1,18 +1,19 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import type { AgentName, CurrentUser, EmployeeAgent, LogicalAgentAvailability } from "../types";
-import { ActionSearch } from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { StatusPill } from "./StatusPill";
 import { AgentWorkspacePage, type WorkspacePageTab } from "./AgentWorkspacePage";
 import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
-import { Badge } from "./ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { FilterSelect } from "./FiltersBar";
+import { SearchInput } from "@/components/ui/search-input";
 import { describeAgentPlacements } from "../lib/agentPlacements";
 import { OWNERSHIP_ICON } from "./AgentPlacementBadge";
 
@@ -72,20 +73,16 @@ function RosterFilterBar({
 
   return (
     <div className="agents-roster-filter" role="group" aria-label={t("agents_page.filters")}>
-      <div className="agents-roster-search-wrap">
-        <ActionSearch size={14} aria-hidden="true" />
-        <input
-          className="agents-roster-search"
-          name="agents-query"
-          type="search"
-          autoComplete="off"
-          spellCheck={false}
-          value={query}
-          placeholder={t("agents_page.search_placeholder")}
-          aria-label={t("agents_page.search_label")}
-          onChange={(event) => onQueryChange(event.target.value)}
-        />
-      </div>
+      <SearchInput
+        className="agents-roster-search-wrap"
+        inputClassName="agents-roster-search"
+        iconSize={14}
+        label={t("agents_page.search_label")}
+        name="agents-query"
+        value={query}
+        placeholder={t("agents_page.search_placeholder")}
+        onChange={(event) => onQueryChange(event.target.value)}
+      />
       <FilterSelect
         className="agents-roster-select"
         name="agents-availability-filter"
@@ -188,6 +185,7 @@ export function AgentsPage({
   onOpenThread,
 }: AgentsPageProps) {
   const { t } = useTranslation();
+  const { confirm } = useDialogs();
   const { agents, isFetching } = useEmployeeAgents(currentUser.employeeId);
   const descriptors = useMemo(() => agentDescriptors(t), [t]);
   const [query, setQuery] = useUrlSearchState("q", "", (value) => value ?? "", (value) => value || null);
@@ -233,6 +231,29 @@ export function AgentsPage({
 
   const loading = isFetching && agents.length === 0;
 
+  // The detail pane remounts per agent (key={workspaceAgent.id}), so an
+  // in-flight profile draft cannot survive a roster switch — hold the
+  // selection here until the owner confirms the discard.
+  const profileDirtyRef = useRef(false);
+  const handleProfileDirtyChange = useCallback((dirty: boolean) => {
+    profileDirtyRef.current = dirty;
+  }, []);
+  const handleSelectAgent = useCallback(async (agent: EmployeeAgent) => {
+    if (agent.id === workspaceAgent?.id) return;
+    if (profileDirtyRef.current) {
+      const ok = await confirm({
+        title: t("unsaved.title"),
+        message: t("unsaved.message"),
+        confirmLabel: t("unsaved.confirm"),
+        cancelLabel: t("dialog.cancel"),
+        tone: "danger",
+      });
+      if (!ok) return;
+      profileDirtyRef.current = false;
+    }
+    onOpenWorkspace(agent);
+  }, [confirm, onOpenWorkspace, t, workspaceAgent?.id]);
+
   return (
     <section
       id="agents-panel"
@@ -277,7 +298,7 @@ export function AgentsPage({
                 key={agent.id}
                 agent={agent}
                 selected={workspaceAgent?.id === agent.id}
-                onSelect={onOpenWorkspace}
+                onSelect={(agent) => void handleSelectAgent(agent)}
               />
             ))}
           </ul>
@@ -293,6 +314,7 @@ export function AgentsPage({
             onRefresh={onRefresh}
             onOpenThread={onOpenThread}
             canEditMeta
+            onProfileDirtyChange={handleProfileDirtyChange}
           />
         ) : (
           <RelayEmptyState

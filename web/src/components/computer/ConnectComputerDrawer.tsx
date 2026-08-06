@@ -6,7 +6,8 @@ import { createLocalDeviceEnrollment } from "../../api";
 import type { CreateLocalDeviceEnrollmentResponse } from "../../types";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
-import { Drawer } from "../ui/Drawer";
+import { Input } from "@/components/ui/input";
+import { Drawer } from "@/components/ui/Drawer";
 import { CredCopyRow } from "../admin/CredCopyRow";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
@@ -89,11 +90,11 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
     <Drawer
       open={open}
       onClose={() => { void requestClose(); }}
+      kicker={t("computer.title")}
       title={t("computer.connect_title")}
-      subtitle={result ? undefined : t("computer.connect_sub")}
-      width={480}
+      subtitle={result ? t("computer.connect_success_sub") : t("computer.connect_sub")}
+      width="form"
       closeLabel={t("admin.v2.close_drawer")}
-      ariaLabel={t("computer.connect_title")}
       bodyClassName="adm-drawer-body--column"
     >
       {result ? (
@@ -149,7 +150,7 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
         <form className="adm-form" onSubmit={(event) => void handleSubmit(event)} noValidate>
           <fieldset className="adm-form-section">
             <Field label={t("computer.connect_name_label")}>
-              <input
+              <Input
                 name="connect-computer-display-name"
                 autoComplete="off"
                 value={displayName}
@@ -159,11 +160,12 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
                 disabled={isBusy}
               />
             </Field>
-            {/* `workspace_label` lives under `nav`, so the bare key resolved to
-                nothing and the field rendered the literal "workspace_label".
-                This is the same word the card's Details row already uses. */}
-            <Field label={t("computer.fact_workspace")}>
-              <input
+            <Field
+              label={t("nav.workspace_label")}
+              error={fieldError ?? undefined}
+              errorId="connect-computer-workspace-path-error"
+            >
+              <Input
                 ref={workspacePathRef}
                 name="connect-computer-workspace-path"
                 autoComplete="off"
@@ -172,17 +174,12 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
                   setWorkspacePath(event.target.value);
                   if (fieldError) setFieldError(null);
                 }}
-                placeholder="/Users/alice/project"
+                placeholder={workspacePathPlaceholder()}
                 disabled={isBusy}
                 aria-invalid={Boolean(fieldError) || undefined}
                 aria-describedby={fieldError ? "connect-computer-workspace-path-error" : undefined}
                 data-modal-initial-focus
               />
-              {fieldError ? (
-                <span id="connect-computer-workspace-path-error" className="text-sm text-danger" role="alert">
-                  {fieldError}
-                </span>
-              ) : null}
             </Field>
             {/* Stated, not chosen: the employee should know their agents run
                 as plain processes against the installs already on this
@@ -208,4 +205,11 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
 
 function isAbsolutePath(value: string): boolean {
   return value.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(value);
+}
+
+function workspacePathPlaceholder(): string {
+  if (typeof navigator !== "undefined" && /Win/i.test(navigator.platform)) {
+    return "C:\\Users\\alice\\project";
+  }
+  return "/Users/alice/project";
 }

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
-import { ActionApprove, ActionEdit, ActionRemove, ActionToggle, AdminDelete } from "./icons";
+import { ActionApprove, ActionEdit, ActionRemove, ActionToggle, AdminDelete, ChevronDownIcon } from "./icons";
 import {
   deleteAgentPlacement,
   deleteAgentProfileImage,
@@ -39,6 +39,8 @@ export interface AgentProfilePanelProps {
   variant?: "admin" | "workspace";
   onAgentUpdated?: (agent: EmployeeAgent) => void;
   onAgentDeleted?: (agentId: string) => void;
+  /** Reports unsaved rename/personality drafts so parents can guard navigation. */
+  onDirtyChange?: (dirty: boolean) => void;
   /** Shown in admin drawer when the caller can navigate to the workspace page. */
   onOpenWorkspace?: (agent: EmployeeAgent) => void;
 }
@@ -68,6 +70,7 @@ export function AgentProfilePanel({
   variant = "admin",
   onAgentUpdated,
   onAgentDeleted,
+  onDirtyChange,
   onOpenWorkspace,
 }: AgentProfilePanelProps) {
   const { t } = useTranslation();
@@ -88,6 +91,19 @@ export function AgentProfilePanel({
   const dirtyDraftRef = useRef(false);
   dirtyDraftRef.current = dirtyDraft;
   useUnsavedChangesGuard(dirtyDraft && !saving);
+
+  useEffect(() => {
+    onDirtyChange?.(dirtyDraft);
+  }, [dirtyDraft, onDirtyChange]);
+
+  const renameEditButtonRef = useRef<HTMLButtonElement>(null);
+  const renameActiveRef = useRef(false);
+  useEffect(() => {
+    if (renameActiveRef.current && !renaming) {
+      renameEditButtonRef.current?.focus();
+    }
+    renameActiveRef.current = renaming;
+  }, [renaming]);
 
   const previousAgentIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -113,7 +129,9 @@ export function AgentProfilePanel({
       confirmLabel: t("unsaved.confirm"),
       cancelLabel: t("dialog.cancel"),
       tone: "danger",
-    }).then(() => resetEditingState());
+    }).then((ok) => {
+      if (ok) resetEditingState();
+    });
   }, [agent.id, confirm, t]);
 
   async function patchAgent(patch: Parameters<typeof updateEmployeeAgent>[1]) {
@@ -290,7 +308,7 @@ export function AgentProfilePanel({
   }
 
   const owner = employees.find((employee) => employee.id === agent.employeeId);
-  const ownerLabel = owner?.displayName || agent.employeeId;
+  const ownerDisplay = owner ? owner.displayName : `@${agent.employeeId}`;
   const placementDescriptions = describeAgentPlacements(agent.placements);
   const isWorkspace = variant === "workspace";
 
@@ -316,6 +334,7 @@ export function AgentProfilePanel({
                   aria-label={t("admin.v2.agent_name")}
                   autoComplete="off"
                   autoFocus
+                  maxLength={64}
                   value={nameDraft}
                   onChange={(event) => setNameDraft(event.target.value)}
                   onKeyDown={(event) => {
@@ -324,7 +343,7 @@ export function AgentProfilePanel({
                   }}
                   disabled={saving}
                 />
-                <div className="adm-cred-inline-actions">
+                <div className="workspace-dossier-rename-actions">
                   <Button
                     type="button"
                     variant="ghost"
@@ -349,6 +368,7 @@ export function AgentProfilePanel({
                 <h2 className="workspace-dossier-name-value" translate="no">{agent.displayName}</h2>
                 {canEditProfile ? (
                   <DossierIconButton
+                    ref={renameEditButtonRef}
                     onClick={startRename}
                     aria-label={t("admin.v2.edit_agent")}
                     title={t("admin.v2.edit_agent")}
@@ -377,7 +397,10 @@ export function AgentProfilePanel({
         />
 
         <details className="workspace-dossier-details">
-          <summary>{t("workspace.profile_details")}</summary>
+          <summary>
+            <ChevronDownIcon size={13} aria-hidden="true" className="workspace-dossier-details-chevron" />
+            {t("workspace.profile_details")}
+          </summary>
           <div className="workspace-dossier-details-body">
             <span className="workspace-dossier-role">
               <label htmlFor="agent-default-role">{t("admin.v2.agent_role_label")}:</label>{" "}
@@ -401,8 +424,8 @@ export function AgentProfilePanel({
                   : t("admin.v2.agent_role_none")
               )}
             </span>
-            <span translate="no">@{agent.employeeId} · {agent.id}</span>
-            <span>{t("admin.v2.agent_owner_label")}: @{ownerLabel}</span>
+            <span className="code" translate="no" title={agent.id}>{truncateId(agent.id)}</span>
+            <span>{t("admin.v2.agent_owner_label")}: {ownerDisplay}</span>
             <span>
               {t("admin.v2.agent_meta_version", { version: agent.version })}
               {" · "}
@@ -493,13 +516,13 @@ export function AgentProfilePanel({
         <span className="adm-cred-label">{t("admin.v2.agent_name")}</span>
         {renaming ? (
           <div className="adm-cred-value-line">
-            <input
-              className="adm-search-input"
+            <Input
               name="agent-display-name"
               type="text"
               aria-label={t("admin.v2.agent_name")}
               autoComplete="off"
               autoFocus
+              maxLength={64}
               value={nameDraft}
               onChange={(event) => setNameDraft(event.target.value)}
               onKeyDown={(event) => {
@@ -566,7 +589,7 @@ export function AgentProfilePanel({
 
       <div className="adm-cred-row">
         <span className="adm-cred-label">{t("admin.v2.agent_owner_label")}</span>
-        <span className="adm-cred-value code" translate="no">@{ownerLabel}</span>
+        <span className="adm-cred-value code" translate="no">{ownerDisplay}</span>
       </div>
 
       <div className="adm-cred-row">

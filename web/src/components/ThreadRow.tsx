@@ -2,7 +2,7 @@ import { ActionEdit, ActionRemove, NodeOffline } from "./icons";
 import { useTranslation } from "react-i18next";
 import type { RelaySession } from "../types";
 import { canDeleteThread, threadLabel, type ThreadItem } from "../lib/threads";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
 
 export type { ThreadItem };
 

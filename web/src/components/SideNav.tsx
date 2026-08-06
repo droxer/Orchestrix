@@ -7,7 +7,7 @@ import {
   NavRoutine, NavSidebarCollapse, NavSidebarExpand,
 } from "./icons";
 import { RelayMark } from "./RelayMark";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
 import type { AppRoute } from "../lib/viewTypes";
 
 // Left rail: brand, collapse toggle, route nav, settings/logout. Owns its own

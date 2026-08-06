@@ -18,7 +18,7 @@ import { useArtifactBody } from "../lib/useArtifactBody";
 import { summarizeArtifact } from "../lib/artifactStats";
 import { useArtifactViewer } from "./ArtifactViewerProvider";
 import type { DerivedMessage } from "../lib/projectMessages";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
 export { isGroupedContinuation, projectMessages } from "../lib/projectMessages";
 export type { DerivedMessage } from "../lib/projectMessages";
 

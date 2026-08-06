@@ -25,7 +25,7 @@ import {
   WorkspaceLoading,
 } from "./workspace/WorkspacePrimitives";
 import { PageHeader } from "./PageHeader";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
 import { CodeView, isHtmlFile, isMarkdownFile, isRenderableFile, languageForFile } from "./CodeView";
 import { Markdown } from "./Markdown";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
@@ -34,7 +34,7 @@ import { ProfileImage } from "./ProfileImagePicker";
 import { agentAvailabilityTone } from "../lib/adminHelpers";
 import { describeAgentPlacements } from "../lib/agentPlacements";
 import { AgentPlacementBadge } from "./AgentPlacementBadge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export type WorkspacePageTab = "profile" | "workspace" | "activities";
 
@@ -46,6 +46,8 @@ interface AgentWorkspacePageProps {
   onRefresh: () => Promise<void>;
   onOpenThread: (sessionId: string) => void;
   canEditMeta?: boolean;
+  /** Bubbles the profile tab's unsaved-draft state up to the agent switcher. */
+  onProfileDirtyChange?: (dirty: boolean) => void;
 }
 
 type FileSelection = { path: string; name: string };
@@ -363,6 +365,7 @@ export function AgentWorkspacePage({
   onRefresh,
   onOpenThread,
   canEditMeta = false,
+  onProfileDirtyChange,
 }: AgentWorkspacePageProps) {
   const { t } = useTranslation();
   const [pageTab, setPageTab] = useUrlSearchState("tab", "activities" as WorkspacePageTab, parsePageTab, (value) => value === "activities" ? null : value, "push");
@@ -513,6 +516,7 @@ export function AgentWorkspacePage({
             agent={agent}
             canEditMeta={canEditMeta}
             variant="workspace"
+            onDirtyChange={onProfileDirtyChange}
           />
         </div>
       ) : pageTab === "activities" ? (

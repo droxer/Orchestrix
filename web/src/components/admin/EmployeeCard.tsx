@@ -1,7 +1,7 @@
 "use client";
 
 import type { TFunction } from "i18next";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 import { ActionEdit, AdminDelete, AdminEmployees } from "../icons";
 import {
   employeeSummaryStatus,

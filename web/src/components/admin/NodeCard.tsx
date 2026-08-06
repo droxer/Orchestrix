@@ -15,7 +15,7 @@ import { NodeActions } from "./NodeActions";
 import { NodeProfileBadges, nodeOwnershipIcon } from "./NodeProfileBadges";
 import { NodePresence } from "./NodePresence";
 import { NodeRuntimeMarks } from "./NodeRuntimeMarks";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 import { ActionApprove, ActionCopy } from "../icons";
 import { isNodeOnline, nodeOwnershipProfile } from "../../lib/adminHelpers";
 

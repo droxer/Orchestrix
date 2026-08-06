@@ -7,7 +7,7 @@ import { AgentMark } from "../AgentMark";
 import { StateMark } from "../StateMark";
 import { NodePresence } from "../admin/NodePresence";
 import { nodeOwnershipIcon } from "../admin/NodeProfileBadges";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 import { ActionApprove, ActionCopy, ActionEdit, ActionRemove, AdminManageExecutors } from "../icons";
 import { abbreviateNodeId, formatRunElapsed } from "../../lib/computerNodes";
 import { labelForExecutor } from "../../lib/agentDisplayNames";
