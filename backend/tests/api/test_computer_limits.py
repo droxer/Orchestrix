@@ -420,3 +420,85 @@ def test_saving_one_setting_leaves_the_other_alone(
         assert (
             client.put("/api/v1/admin/settings", json={}).status_code == 400
         )
+
+
+def test_auth_me_carries_the_caller_limit_and_usage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Self-service surfaces gate their connect action on /auth/me, so the
+    session payload must carry the resolved limit and live usage — an
+    admin-only endpoint cannot serve the employee's own page."""
+    with _client(monkeypatch, database_auth=False) as client:
+        _set_global_limit(client, 2)
+        _create_employee(client, "alice")
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        _login(client, "alice")
+
+        me = client.get("/api/v1/auth/me").json()["user"]
+        assert me["effectiveMaxLocalComputers"] == 2
+        assert me["localComputerCount"] == 0
+
+        assert _enroll(client, "/Users/alice/one").status_code == 201
+        me = client.get("/api/v1/auth/me").json()["user"]
+        assert me["localComputerCount"] == 1
+
+
+def test_auth_me_reflects_the_employee_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _client(monkeypatch, database_auth=True) as client:
+        _set_global_limit(client, 5)
+        _create_employee(client, "alice", maxLocalComputers=1)
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        _login(client, "alice")
+
+        me = client.get("/api/v1/auth/me").json()["user"]
+        assert me["maxLocalComputers"] == 1
+        assert me["effectiveMaxLocalComputers"] == 1
+
+
+def test_auth_me_omits_limits_for_users_without_an_employee(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A user with no employee link cannot enroll a computer at all, so their
+    # payload stays bare rather than implying a limit of zero.
+    with _client(monkeypatch, database_auth=False) as client:
+        me = client.get("/api/v1/auth/me").json()["user"]
+        assert "effectiveMaxLocalComputers" not in me
+        assert "localComputerCount" not in me
+
+
+def test_preferences_response_keeps_the_limit_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The client replaces its session user with the preferences response, so
+    # an undecorated payload here silently ungates the connect CTA until the
+    # next reload.
+    with _client(monkeypatch, database_auth=False) as client:
+        _set_global_limit(client, 2)
+        _create_employee(client, "alice")
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        _login(client, "alice")
+
+        response = client.patch("/api/v1/auth/preferences", json={"theme": "dark"})
+        assert response.status_code == 200
+        user = response.json()["user"]
+        assert user["effectiveMaxLocalComputers"] == 2
+        assert user["localComputerCount"] == 0
+
+
+def test_login_response_carries_the_limit_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # LoginScreen seeds the session user straight from the login response —
+    # there is no /auth/me round trip before the My Computer page can render.
+    with _client(monkeypatch, database_auth=False) as client:
+        _set_global_limit(client, 4)
+        _create_employee(client, "alice")
+        assert client.post("/api/v1/auth/logout").status_code == 200
+
+        response = client.post(
+            "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
+        )
+        assert response.status_code == 200
+        assert response.json()["user"]["effectiveMaxLocalComputers"] == 4

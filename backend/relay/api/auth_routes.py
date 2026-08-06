@@ -11,6 +11,7 @@ from ..security.auth import (
     user_session_cookie_attrs,
     user_session_token_from_request,
 )
+from ..services.computer_limits import decorate_user_limits
 from .deps import AppContextDep
 from .helpers import json_body, string_field
 
@@ -25,7 +26,10 @@ async def auth_status(ctx: AppContextDep) -> dict[str, Any]:
 @router.get("/auth/me")
 async def auth_me(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     user = require_user_session(request, ctx.auth_store)
-    return {"authenticated": True, "user": ctx.auth_store._public_user(user)}
+    return {
+        "authenticated": True,
+        "user": decorate_user_limits(ctx, ctx.auth_store._public_user(user)),
+    }
 
 
 @router.patch("/auth/preferences")
@@ -44,7 +48,10 @@ async def update_auth_preferences(request: Request, ctx: AppContextDep) -> dict[
         )
     except ValueError as error:
         raise HTTPException(400, str(error)) from error
-    return {"user": updated}
+    # The client replaces its session user with this response, so it must
+    # carry the same decorated fields as /auth/me and /auth/login — dropping
+    # them here would ungate the connect-computer CTA until the next reload.
+    return {"user": decorate_user_limits(ctx, updated)}
 
 
 @router.post("/auth/bootstrap")
@@ -79,7 +86,7 @@ async def auth_login(request: Request, response: Response, ctx: AppContextDep) -
         secure=request.url.scheme == "https",
     )
     response.set_cookie(value=session["token"], **attrs)
-    return {"user": ctx.auth_store._public_user(user)}
+    return {"user": decorate_user_limits(ctx, ctx.auth_store._public_user(user))}
 
 
 @router.post("/auth/logout")

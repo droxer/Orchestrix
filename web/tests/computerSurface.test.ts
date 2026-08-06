@@ -157,6 +157,39 @@ describe("My Computer record card", () => {
   });
 });
 
+describe("My Computer: connect CTA respects the local-computer limit", () => {
+  it("gates the connect button on the resolved limit from the session user", async () => {
+    // The backend refuses a new enrollment at the limit (409), but a button
+    // that only fails after a drawer of form-filling reads as broken, not
+    // limited — the CTA must say so before the round trip.
+    const page = await read("web/src/components/ComputerPage.tsx");
+    assert.match(page, /currentUser\.effectiveMaxLocalComputers/);
+    assert.match(page, /disabled=\{atLimit\}/);
+    assert.match(page, /t\("computer\.limit_reached"/);
+  });
+
+  it("shows live usage against the limit on the button itself", async () => {
+    // The count comes from the roster on screen, not the /auth/me snapshot,
+    // so a connect or disconnect this session moves it immediately.
+    const page = await read("web/src/components/ComputerPage.tsx");
+    assert.match(page, /\{computersUsed\}\/\{computerLimit\}/);
+    assert.match(page, /const computersUsed = myNodes\.length/);
+  });
+
+  it("ships the limit copy and the session fields it depends on", async () => {
+    const [localeRaw, types] = await Promise.all([
+      read("web/src/i18n/locales/en/translation.json"),
+      read("web/src/types.ts"),
+    ]);
+    const locale = JSON.parse(localeRaw);
+    assert.equal(typeof locale.computer.limit_reached, "string");
+    const currentUser = types.match(/export interface CurrentUser \{[\s\S]*?\n\}/)?.[0] ?? "";
+    assert.notEqual(currentUser, "", "the CurrentUser regex stopped matching — refresh it");
+    assert.match(currentUser, /effectiveMaxLocalComputers\?: number/);
+    assert.match(currentUser, /localComputerCount\?: number/);
+  });
+});
+
 describe("Admin console: adding a local computer", () => {
   const DRAWERS = [
     "web/src/components/admin/AddNodeDrawer.tsx",

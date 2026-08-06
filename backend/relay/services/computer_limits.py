@@ -51,6 +51,25 @@ def count_local_computers(ctx: Any, employee_id: str) -> int:
     return ctx.registry.count_employee_device_nodes(employee_id)
 
 
+def decorate_user_limits(ctx: Any, user: dict[str, Any]) -> dict[str, Any]:
+    """Attach the caller's own computer limit and usage to a session user.
+
+    Same resolution rule as `decorate_employee_limits`, but for the signed-in
+    user's `/auth/me` payload so self-service surfaces (My Computer) can gate
+    their connect action without an admin-only endpoint. A user with no
+    employee link cannot enroll a computer, so their payload stays bare.
+    """
+    employee_id = user.get("employeeId") or ""
+    if not employee_id:
+        return user
+    return {
+        **user,
+        "maxLocalComputers": employee_override(ctx, employee_id),
+        "effectiveMaxLocalComputers": effective_max_local_computers(ctx, employee_id),
+        "localComputerCount": count_local_computers(ctx, employee_id),
+    }
+
+
 def decorate_employee_limits(
     ctx: Any, employees: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:

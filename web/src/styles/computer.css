@@ -36,6 +36,40 @@
   margin-top: var(--sp-8);
 }
 
+/* ---- connect CTA ------------------------------------------------------- */
+
+/* The connect button carries its own usage readout (2/3) and, at the limit,
+    a reason line — the roster count is the denominator's context, so the
+    explanation belongs to the action rather than the page subtitle. */
+.computer-connect-cta {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.computer-connect-usage {
+  margin-left: var(--sp-1);
+  opacity: 0.7;
+}
+
+.computer-connect-limit {
+  max-width: 22rem;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-2);
+  text-align: right;
+}
+
+/* The empty state centers its content, so its CTA copy centers too. */
+.relay-empty .computer-connect-cta {
+  align-items: center;
+}
+
+.relay-empty .computer-connect-limit {
+  text-align: center;
+}
+
 /* One or two machines, not a fleet: a stack of records rather than an
    auto-fill tile grid, capped so a 2560px display doesn't stretch a
    three-fact list across the whole canvas. */
