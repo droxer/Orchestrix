@@ -3,21 +3,24 @@
 import { useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { deleteTeamProfileImage, getWorkspaceBrief, updateTeamProfileImage } from "../api";
+import { deleteTeamProfileImage, getWorkspaceBrief, listDaemonNodes, updateTeamProfileImage } from "../api";
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { useRelayMutations } from "../hooks/useRelayMutations";
 import { TEAMS_QUERY_KEY } from "../hooks/useTeams";
+import { NODES_QUERY_KEY } from "../hooks/useRelayData";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { agentLabel } from "../lib/plan";
 import { teamReady } from "../lib/taskAssignment";
 import {
+  activePlacementNodeId,
   canAddAgentToNodeScopedTeam,
   nodeScopedTeamIssue,
   teamMutationInput,
 } from "../lib/teamForm";
 import { teamWorkspaceAgentId } from "../lib/teamWorkspace";
-import type { AgentTeam } from "../types";
+import { placeableTeamComputers } from "../lib/teamPlacement";
+import type { AgentTeam, DaemonNodeMonitorRecord } from "../types";
 import { ActionEdit, AdminDelete, NavRefresh } from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { PageHeader } from "./PageHeader";
@@ -55,7 +58,7 @@ function TeamProfile({
   const { t } = useTranslation();
   const { confirm } = useDialogs();
   const queryClient = useQueryClient();
-  const { updateTeamMutation, deleteTeamMutation } = useRelayMutations();
+  const { updateTeamMutation, moveTeamMutation, deleteTeamMutation } = useRelayMutations();
   const { agents: employeeAgents } = useEmployeeAgents(employeeId);
   const agents = useMemo(
     () => employeeAgents.filter((agent) => !agent.deletedAt),
@@ -66,6 +69,12 @@ function TeamProfile({
   const [memberIds, setMemberIds] = useState<string[]>(team.memberAgentIds);
   const [leadId, setLeadId] = useState(team.leadAgentId ?? "");
   const [imageSaving, setImageSaving] = useState(false);
+  const [moveTarget, setMoveTarget] = useState<string | null>(null);
+  // Shares App's node poll through the same cache key rather than adding a timer.
+  const { data: nodes = [] } = useQuery<DaemonNodeMonitorRecord[]>({
+    queryKey: NODES_QUERY_KEY,
+    queryFn: async ({ signal }) => (await listDaemonNodes(undefined, signal)).nodes ?? [],
+  });
   const [validationError, setValidationError] = useState<
     "members" | "lead" | "unplaced" | "different-nodes" | null
   >(null);
@@ -77,12 +86,38 @@ function TeamProfile({
     () => agents.filter((agent) => memberIds.includes(agent.id)),
     [agents, memberIds],
   );
-  const busy = updateTeamMutation.isPending || deleteTeamMutation.isPending || imageSaving;
+  const busy = updateTeamMutation.isPending || deleteTeamMutation.isPending
+    || moveTeamMutation.isPending || imageSaving;
+  // Every member shares one computer, so any member's placement names it.
+  const teamNodeId = useMemo(() => {
+    const member = agents.find((agent) => team.memberAgentIds.includes(agent.id));
+    return member ? activePlacementNodeId(member) : null;
+  }, [agents, team.memberAgentIds]);
+  const teamComputers = useMemo(
+    () => placeableTeamComputers(nodes, employeeId ?? ""),
+    [nodes, employeeId],
+  );
+  const teamComputer = nodes.find((node) => node.id === teamNodeId) ?? null;
   const draftDirty = name.trim() !== team.name.trim()
     || leadId !== (team.leadAgentId ?? "")
     || memberIds.length !== team.memberAgentIds.length
     || memberIds.some((id) => !team.memberAgentIds.includes(id));
   const confirmDiscardChanges = useUnsavedChangesGuard(editing && draftDirty && !busy);
+
+  async function moveToComputer() {
+    if (!moveTarget || moveTarget === teamNodeId) return;
+    try {
+      const { team: moved } = await moveTeamMutation.mutateAsync({
+        teamId: team.id,
+        daemonNodeId: moveTarget,
+      });
+      applyTeamUpdate(moved);
+      setMoveTarget(null);
+    } catch {
+      // The shared mutation error handler already announced the failure, and
+      // a refused move left every member on its original computer.
+    }
+  }
 
   function applyTeamUpdate(updated: AgentTeam) {
     queryClient.setQueriesData<{ teams: AgentTeam[] }>(
@@ -375,6 +410,43 @@ function TeamProfile({
             </>
           ) : null}
         </form>
+
+        <section className="adm-drawer-section" aria-labelledby="team-profile-computer-title">
+          <p id="team-profile-computer-title" className="workspace-dossier-section-title">
+            {t("teams.computer_title")}
+          </p>
+          <p className="adm-form-hint">{t("teams.computer_hint")}</p>
+          <div className="team-profile-inline-actions">
+            <Select
+              value={moveTarget ?? teamNodeId}
+              disabled={busy || teamComputers.length === 0}
+              onValueChange={(value) => { if (value) setMoveTarget(value); }}
+            >
+              <SelectTrigger className="w-full" aria-label={t("teams.computer_choose")}>
+                <SelectValue>
+                  {(value: string) => nodes.find((node) => node.id === value)?.displayName
+                    ?? teamComputer?.displayName
+                    ?? value
+                    ?? t("teams.computer_unknown")}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {teamComputers.map((node) => (
+                  <SelectItem key={node.id} value={node.id}>{node.displayName || node.id}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              onClick={() => void moveToComputer()}
+              disabled={busy || !moveTarget || moveTarget === teamNodeId}
+              loading={moveTeamMutation.isPending}
+              loadingLabel={t("teams.computer_moving")}
+            >
+              {t("teams.computer_move")}
+            </Button>
+          </div>
+        </section>
 
         <section className="adm-drawer-section" aria-labelledby="team-profile-danger-title">
           <p id="team-profile-danger-title" className="workspace-dossier-section-title">

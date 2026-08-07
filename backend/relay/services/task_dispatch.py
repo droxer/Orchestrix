@@ -173,6 +173,7 @@ def implicit_group_assignments_for_task(
                 agent_store=ctx.agent_store,
                 placement_store=ctx.agent_placement_store,
                 daemon_nodes=daemon_nodes,
+                team_store=ctx.team_store,
             )
         except AgentRoutingError:
             continue
@@ -321,6 +322,7 @@ class TaskDispatcher:
                     agent_store=self.ctx.agent_store,
                     placement_store=self.ctx.agent_placement_store,
                     daemon_nodes=self.ctx.registry.monitor_nodes(),
+                    team_store=self.ctx.team_store,
                 )
             except AgentRoutingError as error:
                 if not self.record_pending:

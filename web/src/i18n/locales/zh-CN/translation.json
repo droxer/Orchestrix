@@ -45,7 +45,8 @@
     "delete_team": "无法删除团队。请检查连接后重试。",
     "team_unavailable": "智能体团队当前不可用。",
     "team_lead_not_member": "团队负责人必须是团队成员。",
-    "task_agent_and_team_conflict": "智能体和团队只能选择一个。"
+    "task_agent_and_team_conflict": "智能体和团队只能选择一个。",
+    "move_team": "无法迁移团队。每位成员都仍在原来的电脑上。"
   },
   "skip_to_thread": "跳至对话",
   "skip_to_content": "跳至内容",
@@ -373,7 +374,13 @@
     "select_title": "选择一个团队",
     "select_body": "选择团队以查看其档案、工作区和活动。",
     "empty_title": "暂无团队",
-    "empty_body": "将智能体组成有负责人的命名团队，以便重复派发任务。"
+    "empty_body": "将智能体组成有负责人的命名团队，以便重复派发任务。",
+    "computer_title": "电脑",
+    "computer_hint": "一个团队在同一台电脑上协作。迁移团队会一并迁移所有成员。",
+    "computer_choose": "为该团队选择电脑",
+    "computer_move": "迁移团队",
+    "computer_moving": "迁移中",
+    "computer_unknown": "无电脑"
   },
   "computer": {
     "title": "我的电脑",
@@ -922,7 +929,8 @@
       "edit_employee_action": "编辑员工",
       "edit_employee_name_required": "请填写显示名称。",
       "emp_limit_over_short": "超出上限",
-      "emp_limit_in_use_other": "当前已连接 {{count}} 台本地电脑"
+      "emp_limit_in_use_other": "当前已连接 {{count}} 台本地电脑",
+      "placement_locked_by_team": "属于团队（{{teams}}）——请整体迁移该团队。"
     },
     "signing_in": "登录中…"
   },

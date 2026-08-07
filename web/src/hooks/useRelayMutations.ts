@@ -8,8 +8,8 @@ import {
   createTask,
   createTeam,
   deleteSession,
-  deleteTeam,
   deleteTask,
+  deleteTeam,
   RelayApiError,
   recordDecision,
   renameSession,
@@ -18,12 +18,14 @@ import {
   startTask,
   updateTask,
   updateTeam,
+  moveTeamToComputer,
 } from "../api";
 import type { AgentRunInput, AgentTaskMode, CreateTaskInput, RelaySession, RelayTask, RelayTaskSummary, RunInput, TaskMutationInput, TeamMutationInput } from "../types";
 import { NODES_QUERY_KEY, RELAY_QUERY_KEY, SESSIONS_QUERY_KEY, TASKS_QUERY_KEY } from "./useRelayData";
 import { useMutationError } from "./useMutationError";
 import { useDialogs } from "../components/ui/DialogProvider";
 import { TEAMS_QUERY_KEY } from "./useTeams";
+import { EMPLOYEE_AGENTS_QUERY_KEY } from "./useEmployeeAgents";
 import { mergeSessionSnapshotIntoSessions } from "../lib/sessionPollMerge";
 import { applySessionEventUnchecked } from "../lib/sessionEvents";
 import { mergeTaskSummaryIntoTasks, taskSummaryFromTask } from "../lib/taskSummary";
@@ -230,6 +232,17 @@ export function useRelayMutations() {
     onError: onRelayError("Failed to update team", "errors.save_team"),
   });
 
+  const moveTeamMutation = useMutation({
+    mutationFn: ({ teamId, daemonNodeId }: { teamId: string; daemonNodeId: string }) =>
+      moveTeamToComputer(teamId, daemonNodeId),
+    onSuccess: () => {
+      void invalidateTeams();
+      // Every member's placement moved, so agent rosters are stale too.
+      void queryClient.invalidateQueries({ queryKey: [EMPLOYEE_AGENTS_QUERY_KEY] });
+    },
+    onError: onRelayError("Failed to move team", "errors.move_team"),
+  });
+
   const deleteTeamMutation = useMutation({
     mutationFn: (teamId: string) => deleteTeam(teamId),
     onSuccess: () => {
@@ -253,6 +266,7 @@ export function useRelayMutations() {
     startTaskMutation,
     createTeamMutation,
     updateTeamMutation,
+    moveTeamMutation,
     deleteTeamMutation,
     invalidateRelay,
   };

@@ -45,7 +45,8 @@
     "delete_team": "無法刪除團隊。請檢查連線後重試。",
     "team_unavailable": "智能體團隊目前無法使用。",
     "team_lead_not_member": "團隊負責人必須是團隊成員。",
-    "task_agent_and_team_conflict": "智能體與團隊只能選擇一個。"
+    "task_agent_and_team_conflict": "智能體與團隊只能選擇一個。",
+    "move_team": "無法遷移團隊。每位成員都仍在原本的電腦上。"
   },
   "skip_to_thread": "跳至對話",
   "skip_to_content": "跳至內容",
@@ -373,7 +374,13 @@
     "select_title": "選擇一個團隊",
     "select_body": "選擇團隊以查看其檔案、工作區和活動。",
     "empty_title": "尚無團隊",
-    "empty_body": "將智能體組成有負責人的命名團隊，以便重複派發任務。"
+    "empty_body": "將智能體組成有負責人的命名團隊，以便重複派發任務。",
+    "computer_title": "電腦",
+    "computer_hint": "一個團隊在同一台電腦上協作。遷移團隊會一併遷移所有成員。",
+    "computer_choose": "為此團隊選擇電腦",
+    "computer_move": "遷移團隊",
+    "computer_moving": "遷移中",
+    "computer_unknown": "無電腦"
   },
   "computer": {
     "title": "我的電腦",
@@ -922,7 +929,8 @@
       "edit_employee_action": "編輯員工",
       "edit_employee_name_required": "請填寫顯示名稱。",
       "emp_limit_over_short": "超出上限",
-      "emp_limit_in_use_other": "目前已連接 {{count}} 台本地電腦"
+      "emp_limit_in_use_other": "目前已連接 {{count}} 台本地電腦",
+      "placement_locked_by_team": "屬於團隊（{{teams}}）——請整體遷移該團隊。"
     },
     "signing_in": "登入中…"
   },

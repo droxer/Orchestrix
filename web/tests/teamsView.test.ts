@@ -9,6 +9,7 @@ import {
   nodeScopedTeamIssue,
   teamMutationInput,
 } from "../src/lib/teamForm.js";
+import { blocksPlacementRemoval, teamsBlockingPlacementChange } from "../src/lib/teamPlacement.js";
 import { selectedTeamForWorkspace, teamWorkspaceAgentId } from "../src/lib/teamWorkspace.js";
 
 describe("Agent team management", () => {
@@ -101,6 +102,21 @@ describe("Agent team management", () => {
     assert.equal(nodeScopedTeamIssue([lead, unplaced], ["agent_lead", "agent_unplaced"]), "unplaced");
     assert.equal(nodeScopedTeamIssue([lead, remote], ["agent_lead", "agent_remote"]), "different-nodes");
     assert.equal(nodeScopedTeamIssue([lead, colocated], ["agent_lead", "agent_support"]), null);
+  });
+
+  it("blocks giving up a placement that a team still depends on", () => {
+    const teams = [
+      { name: "Delivery", memberAgentIds: ["agent_lead", "agent_support"] },
+      { name: "Solo crew", memberAgentIds: ["agent_solo"] },
+    ];
+
+    assert.equal(blocksPlacementRemoval({ id: "agent_support" }, teams), true);
+    assert.equal(blocksPlacementRemoval({ id: "agent_solo" }, teams), false);
+    assert.equal(blocksPlacementRemoval({ id: "agent_loner" }, teams), false);
+    assert.deepEqual(
+      teamsBlockingPlacementChange({ id: "agent_lead" }, teams).map((team) => team.name),
+      ["Delivery"],
+    );
   });
 
   it("keeps the employee as assignee when a team executes the task", () => {

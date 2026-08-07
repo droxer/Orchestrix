@@ -14,6 +14,8 @@ interface PlacementListProps {
   onRemove: (placement: AgentPlacement) => void;
   /** Overrides the default node-missing check (`ownership === "pending"`). */
   nodeMissingFor?: (description: AgentPlacementDescription) => boolean;
+  /** Set when a team depends on this computer: disables remove and explains why. */
+  removeBlockedReason?: string;
 }
 
 export function PlacementList({
@@ -22,6 +24,7 @@ export function PlacementList({
   pendingPlacementId,
   onRemove,
   nodeMissingFor,
+  removeBlockedReason,
 }: PlacementListProps) {
   const { t } = useTranslation();
 
@@ -55,9 +58,9 @@ export function PlacementList({
                 type="button"
                 className="adm-placement-remove"
                 onClick={() => onRemove(placement)}
-                disabled={pendingPlacementId !== null}
+                disabled={pendingPlacementId !== null || Boolean(removeBlockedReason)}
                 aria-label={t("admin.v2.remove_placement")}
-                title={t("admin.v2.remove_placement")}
+                title={removeBlockedReason || t("admin.v2.remove_placement")}
               >
                 <AdminDelete size={13} aria-hidden="true" />
               </Button>
