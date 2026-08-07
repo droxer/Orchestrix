@@ -7,7 +7,7 @@ import { compactDate, compactDueDate } from "../../lib/workspaceFormat";
 import type { WorkspaceBriefResponse, WorkspaceBriefSession, WorkspaceBriefTask } from "../../types";
 import { Button } from "@/components/ui/button";
 
-/* Shared workspace inspection primitives — the empty/loading/metric/activity
+/* Shared workspace inspection primitives — the empty/loading/activity
    building blocks used by both AgentWorkspacePage and TeamWorkspacePage. Kept
    here so the two surfaces don't drift (they previously each declared their
    own). */
@@ -58,44 +58,13 @@ export function WorkspaceLoading({ label }: { label: string }) {
   );
 }
 
-/** One cell of the metric strip. `live` adds the grey presence dot on the
- *  calm cadence (the workspace metric strip stays grey per the --live scope
- *  rule); `zero` dims an empty count. */
-export function MetricItem({
-  label,
-  value,
-  live = false,
-  zero = false,
-}: {
-  label: string;
-  value: number;
-  live?: boolean;
-  zero?: boolean;
-}) {
-  const classes = [
-    "workspace-metric-item",
-    live ? "is-live" : "",
-    zero ? "is-zero" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-  return (
-    <div className={classes}>
-      <strong className="tnum">{value}</strong>
-      <span>{label}</span>
-    </div>
-  );
-}
-
 /** Tabpanel-aware skeleton for the activities tab while the brief loads. */
 export function ActivitiesSkeleton({
   panelId,
   labelledBy,
-  metricCount = 4,
 }: {
   panelId: string;
   labelledBy: string;
-  metricCount?: number;
 }) {
   const { t } = useTranslation();
   return (
@@ -107,11 +76,6 @@ export function ActivitiesSkeleton({
       aria-busy="true"
     >
       <span className="sr-only" role="status">{t("workspace.loading")}</span>
-      <div className="workspace-metric-strip">
-        {Array.from({ length: metricCount }, (_, index) => (
-          <div key={index} className="workspace-skeleton workspace-skeleton-metric" />
-        ))}
-      </div>
       <div className="workspace-activity-sections">
         {Array.from({ length: 2 }, (_, index) => (
           <div key={index} className="workspace-activity-section workspace-skeleton-pane">
@@ -206,9 +170,9 @@ function sessionStatusLabel(
   return t(`thread.statuses.${status}`, { defaultValue: status });
 }
 
-/** The activities tabpanel: metric strip (runs/tasks/threads + a caller-
- *  supplied status pill) followed by active-run, thread, and task sections.
- *  Shared verbatim by the agent and team workspace pages. */
+/** The activities tabpanel: active-run, thread, and task sections, each
+ *  header carrying its own count. Shared verbatim by the agent and team
+ *  workspace pages. */
 export function WorkspaceActivities({
   brief,
   statusPill,
@@ -219,9 +183,9 @@ export function WorkspaceActivities({
   emptyPulse = false,
 }: {
   brief?: WorkspaceBriefResponse;
-  /** Optional status chip rendered as a trailing metric cell (e.g. team
-   *  readiness). Omit when the caller already shows status elsewhere
-   *  (the agent page's header strip covers this for agents). */
+  /** Optional status chip (e.g. team readiness) for callers with nowhere
+   *  else to put it. Omit when the caller already shows status elsewhere —
+   *  the agent page's RecordBand covers this for agents. */
   statusPill?: ReactNode;
   onOpenThread: (sessionId: string) => void;
   panelId: string;
@@ -230,7 +194,6 @@ export function WorkspaceActivities({
   emptyPulse?: boolean;
 }) {
   const { t, i18n } = useTranslation();
-  const metrics = brief?.metrics;
   const activeRuns = brief?.activeRuns ?? [];
   const sessions = brief?.sessions ?? [];
   const tasks = brief?.tasks ?? [];
@@ -243,18 +206,16 @@ export function WorkspaceActivities({
       id={panelId}
       aria-labelledby={labelledBy}
     >
-      <div className="workspace-metric-strip" role="group" aria-label={t("workspace.metrics")}>
-        <MetricItem
-          label={t("workspace.metric_runs")}
-          value={metrics?.activeRunCount ?? 0}
-          live={(metrics?.activeRunCount ?? 0) > 0}
-        />
-        <MetricItem label={t("workspace.metric_tasks")} value={metrics?.activeTaskCount ?? 0} zero={(metrics?.activeTaskCount ?? 0) === 0} />
-        <MetricItem label={t("workspace.metric_sessions")} value={metrics?.sessionCount ?? 0} zero={(metrics?.sessionCount ?? 0) === 0} />
-        {statusPill ? (
+      {/* The metric strip used to print active-runs / tasks / threads in the
+          loudest numerals on the page, directly above three section headers
+          carrying those same three counts. Counts now live only in the section
+          headers; the strip survives solely for a caller-supplied status chip
+          that has nowhere else to go. */}
+      {statusPill ? (
+        <div className="workspace-metric-strip" role="group" aria-label={t("workspace.metrics")}>
           <div className="workspace-metric-item workspace-metric-item--status">{statusPill}</div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       <div className="workspace-activity-sections">
         {activeRuns.length ? (

@@ -230,11 +230,14 @@ html[data-theme="dark"] .rail-node { background: var(--surface-3); }
 /* agents-roster-row, adm-emp-row, and adm-dept-group are deliberately NOT
    in this group — they own flat-list-row designs (bottom hairline, dept
    headers, no enclosing card) in agents.css / admin-v2-views.css.
-   agents-detail is also excluded: it is a full split pane, not a card. */
+   agents-detail is also excluded: it is a full split pane, not a card.
+   So are workspace-pane and workspace-profile-panel, for the same reason —
+   they are the tab bodies of the agent/team record surface, which runs
+   flush edge to edge. Carded, they floated as drawer-tier plates that
+   stopped at content height, so one record rendered in a different
+   container idiom on each of its three tabs. */
 .backlog-lane,
 .backlog-task,
-.workspace-pane,
-.workspace-profile-panel,
 .adm-chat-panel,
 .adm-chat-stage {
   border: 1px solid var(--line-1);
@@ -336,9 +339,7 @@ html[data-theme="dark"] .rail-node { background: var(--surface-3); }
 }
 
 html[data-theme="dark"] .backlog-lane,
-html[data-theme="dark"] .backlog-task,
-html[data-theme="dark"] .workspace-pane,
-html[data-theme="dark"] .workspace-profile-panel {
+html[data-theme="dark"] .backlog-task {
   background: var(--surface-3);
 }
 

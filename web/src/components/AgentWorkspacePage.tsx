@@ -31,9 +31,11 @@ import { Markdown } from "./Markdown";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { AgentProfilePanel } from "./AgentProfilePanel";
 import { ProfileImage } from "./ProfileImagePicker";
-import { agentAvailabilityTone } from "../lib/adminHelpers";
+import { truncateId } from "../lib/adminHelpers";
 import { describeAgentPlacements } from "../lib/agentPlacements";
 import { AgentPlacementBadge } from "./AgentPlacementBadge";
+import { RecordBand, type RecordFact } from "./workspace/RecordBand";
+import { StatusPill } from "./StatusPill";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export type WorkspacePageTab = "profile" | "workspace" | "activities";
@@ -204,7 +206,10 @@ export function WorkspaceFilesBrowser({
   });
   const contentQuery = useQuery({
     queryKey: ["agent-workspace-file", agentId, teamId, selectedThreadId, fileScope, selectedPath, refreshVersion],
-    enabled: Boolean(agentId && selectedThreadId && selectedPath),
+    // Mirrors the listing's gate exactly. It used to require a thread in every
+    // scope, so an agent with no threads could browse its personal home but got
+    // a permanently blank preview on every file it opened.
+    enabled: Boolean(agentId && selectedPath && (fileScope !== "shared" || selectedThreadId)),
     queryFn: ({ signal }) => readAgentWorkspaceFile({
       agentId,
       threadId: selectedThreadId,
@@ -231,6 +236,11 @@ export function WorkspaceFilesBrowser({
     setSelectedKey("");
   }
 
+  function threadLabel(threadId: string): string {
+    const thread = threads.find((candidate) => candidate.id === threadId);
+    return thread?.title?.trim() || thread?.taskGoal?.trim() || threadId;
+  }
+
   function switchThread(next: string | null): void {
     if (!next || next === selectedThreadId) return;
     setRequestedThreadId(next);
@@ -246,28 +256,13 @@ export function WorkspaceFilesBrowser({
     <div className={`workspace-panes${selected ? "" : " is-browse-only"}`}>
       <section className="workspace-pane workspace-pane-browse" aria-label={t("workspace.tab_files")}>
         <div className="workspace-tabpanel-files">
-          {threads.length ? (
-            <div className="workspace-scope-toggle">
-              <span className="workspace-scope-hint">{t("workspace.thread_label")}</span>
-              <Select value={selectedThreadId} onValueChange={switchThread}>
-                <SelectTrigger aria-label={t("workspace.thread_label")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {threads.map((thread) => (
-                    <SelectItem key={thread.id} value={thread.id}>
-                      {thread.title || thread.taskGoal || thread.id}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : null}
-          {!fixedScope && fileScope === "personal" && homeStatus.kind === "snapshot-banner" ? (
-            <SnapshotBanner onDismiss={() => setSnapshotBannerDismissed(true)} />
-          ) : null}
-          {!fixedScope ? (
-            <div className="workspace-scope-toggle">
+          {/* One toolbar, not four stacked strips. Scope, location, thread, and
+              source are what you need before opening a file, so they share one
+              line. The thread picker stays in BOTH scopes: it is what selects
+              the live computer, and without it even a personal home falls back
+              to the snapshot view — which the source chip beside it reports. */}
+          <div className="workspace-files-bar">
+            {!fixedScope ? (
               <span className="workspace-scope-options" role="radiogroup" aria-label={t("workspace.scope_label")}>
                 {(["personal", "shared"] as const).map((scopeOption) => (
                   <Button
@@ -279,37 +274,52 @@ export function WorkspaceFilesBrowser({
                     role="radio"
                     data-active={fileScope === scopeOption ? "true" : "false"}
                     aria-checked={fileScope === scopeOption}
+                    title={scopeOption === "personal" ? t("workspace.scope_personal_hint") : t("workspace.scope_shared_hint")}
                     onClick={() => switchFileScope(scopeOption)}
                   >
                     {scopeOption === "personal" ? t("workspace.scope_personal") : t("workspace.scope_shared")}
                   </Button>
                 ))}
               </span>
-              <span className="workspace-scope-hint">
-                {fileScope === "shared" ? t("workspace.scope_shared_hint") : t("workspace.scope_personal_hint")}
-              </span>
-            </div>
-          ) : (
-            <div className="workspace-scope-toggle" aria-label={t("workspace.scope_label")}>
-              <span className="workspace-scope-hint">{t("workspace.scope_shared_hint")}</span>
-            </div>
-          )}
-          <div className="workspace-files-bar">
+            ) : null}
             <WorkspacePathBreadcrumb path={filePath} onNavigate={openDirectory} />
-            {homeStatus.kind === "live" ? (
-              <span className="workspace-home-status">
-                <span className="workspace-status-pip tone-good" aria-hidden="true" />
-                {t("workspace.source_live")}
-                {homeStatus.nodeId ? <span className="workspace-home-node code">{homeStatus.nodeId}</span> : null}
-              </span>
-            ) : null}
-            {homeStatus.kind === "snapshot-chip" ? (
-              <span className="workspace-home-status">
-                <span className="workspace-status-pip tone-warn" aria-hidden="true" />
-                {t("workspace.source_snapshot")}
-              </span>
-            ) : null}
+            <div className="workspace-files-bar-end">
+              {threads.length ? (
+                <Select value={selectedThreadId} onValueChange={switchThread}>
+                  <SelectTrigger className="workspace-thread-select" aria-label={t("workspace.thread_label")}>
+                    {/* The label is passed explicitly: the items only register
+                        with Radix once the popover has been opened, so a bare
+                        <SelectValue /> printed the raw session id until the
+                        first interaction. */}
+                    <SelectValue>{threadLabel(selectedThreadId)}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {threads.map((thread) => (
+                      <SelectItem key={thread.id} value={thread.id}>
+                        {threadLabel(thread.id)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : null}
+              {homeStatus.kind === "live" ? (
+                <span className="workspace-home-status" title={homeStatus.nodeId || undefined}>
+                  <span className="workspace-status-pip tone-good" aria-hidden="true" />
+                  {t("workspace.source_live")}
+                  {homeStatus.nodeId ? <span className="workspace-home-node code">{homeStatus.nodeId}</span> : null}
+                </span>
+              ) : null}
+              {homeStatus.kind === "snapshot-chip" ? (
+                <span className="workspace-home-status">
+                  <span className="workspace-status-pip tone-warn" aria-hidden="true" />
+                  {t("workspace.source_snapshot")}
+                </span>
+              ) : null}
+            </div>
           </div>
+          {!fixedScope && fileScope === "personal" && homeStatus.kind === "snapshot-banner" ? (
+            <SnapshotBanner onDismiss={() => setSnapshotBannerDismissed(true)} />
+          ) : null}
           <FilesPane
             data={fileQuery.data}
             error={fileQuery.error}
@@ -420,6 +430,51 @@ export function AgentWorkspacePage({
     return undefined;
   }
 
+  /* The band is the record's read-only spine, identical on all three tabs.
+     Everything here used to live somewhere else and disagree with itself:
+     runtime + computer + status were a cramped chip strip in the header,
+     owner + id sat inside a collapsed <details> on the profile tab only.
+     Nothing in a tab panel may print these again. */
+  const bandFacts: RecordFact[] = [
+    {
+      key: "runtime",
+      label: t("admin.v2.agent_runtime"),
+      value: (
+        <span className="record-band-inline" translate="no">
+          <AgentMark agent={agent.executorKind} size={13} />
+          {agentLabel(agent.executorKind)}
+        </span>
+      ),
+    },
+    {
+      key: "computer",
+      label: t("workspace.band_computer"),
+      value: primaryPlacement ? (
+        <AgentPlacementBadge description={primaryPlacement} showSandbox />
+      ) : (
+        <span className="record-band-value--empty">{t("admin.v2.no_runtime_placement")}</span>
+      ),
+    },
+    {
+      key: "availability",
+      label: t("admin.v2.agent_availability_label"),
+      value: <StatusPill value={agent.availability} />,
+    },
+    {
+      key: "owner",
+      label: t("admin.v2.agent_owner_label"),
+      value: `@${agent.employeeId}`,
+      technical: true,
+    },
+    {
+      key: "id",
+      label: t("workspace.band_id"),
+      value: truncateId(agent.id),
+      technical: true,
+      title: agent.id,
+    },
+  ];
+
   return (
     <section
       id="agent-workspace-panel"
@@ -470,41 +525,25 @@ export function AgentWorkspacePage({
           </div>
         )}
         actions={(
-          <>
-            <div className="workspace-header-strip">
-              <span
-                className="workspace-header-chip"
-                translate="no"
-              >
-                <span className="sr-only">{t("admin.v2.agent_runtime")}: </span>
-                <AgentMark agent={agent.executorKind} size={13} />
-                <span className="workspace-header-chip-name">{agentLabel(agent.executorKind)}</span>
-              </span>
-              {primaryPlacement ? (
-                <AgentPlacementBadge description={primaryPlacement} showSandbox />
-              ) : (
-                <span className="workspace-header-chip workspace-header-chip--empty">
-                  {t("admin.v2.no_runtime_placement")}
-                </span>
-              )}
-              <span className={`workspace-status-pill tone-${agentAvailabilityTone(agent.availability)}`}>
-                {t(`admin.v2.placement_status.${agent.availability}`, { defaultValue: agent.availability })}
-              </span>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              aria-label={t("nav.refresh")}
-              disabled={isRefreshing || (pageTab === "activities" && query.isFetching)}
-              onClick={() => void refreshWorkspace()}
-            >
-              <NavRefresh size={16} className={isRefreshing || (pageTab === "activities" && query.isFetching) ? "spin" : undefined} />
-            </Button>
-          </>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label={t("nav.refresh")}
+            disabled={isRefreshing || (pageTab === "activities" && query.isFetching)}
+            onClick={() => void refreshWorkspace()}
+          >
+            <NavRefresh size={16} className={isRefreshing || (pageTab === "activities" && query.isFetching) ? "spin" : undefined} />
+          </Button>
         )}
       />
 
+      <RecordBand facts={bandFacts} label={t("workspace.band_label")} />
+
+      {/* One body shell for all three tabs. It carries the container query the
+          profile grid reads: the pane's width depends on whether the roster is
+          showing, so viewport width is not a usable proxy. */}
+      <div className="workspace-body">
       {pageTab === "profile" ? (
         <div
           className="workspace-profile"
@@ -521,7 +560,7 @@ export function AgentWorkspacePage({
         </div>
       ) : pageTab === "activities" ? (
         activitiesLoading ? (
-          <ActivitiesSkeleton panelId="workspace-page-panel-activities" labelledBy="workspace-page-tab-activities" metricCount={3} />
+          <ActivitiesSkeleton panelId="workspace-page-panel-activities" labelledBy="workspace-page-tab-activities" />
         ) : activitiesError ? (
           <WorkspaceError
             message={activitiesError}
@@ -554,6 +593,7 @@ export function AgentWorkspacePage({
           />
         </div>
       ) : null}
+      </div>
     </section>
   );
 }

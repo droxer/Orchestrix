@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
-import { ActionApprove, ActionEdit, ActionRemove, ActionToggle, AdminDelete, ChevronDownIcon } from "./icons";
+import { ActionApprove, ActionEdit, ActionRemove, ActionToggle, AdminDelete } from "./icons";
 import {
   deleteAgentPlacement,
   deleteAgentProfileImage,
@@ -22,7 +22,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ADMIN_AGENTS_KEY } from "../lib/adminHelpers";
 import { EMPLOYEE_AGENTS_QUERY_KEY } from "../hooks/useEmployeeAgents";
-import { formatRelativeTime, truncateId, agentAvailabilityTone } from "./admin/helpers";
+import { formatRelativeTime, agentAvailabilityTone } from "./admin/helpers";
 import { IdentityMonogram } from "./IdentityMonogram";
 import { AgentPersonalityEditor } from "./AgentPersonalityEditor";
 import { PlacementList } from "./PlacementList";
@@ -320,19 +320,44 @@ export function AgentProfilePanel({
   const isWorkspace = variant === "workspace";
 
   if (isWorkspace) {
+    /* The profile tab carries only what you can CHANGE about the record —
+       portrait, name, role, instructions. Runtime, computer, availability,
+       owner, and id are printed once by the RecordBand above every tab, so
+       restating them here (as the old hero and the collapsed "Details"
+       disclosure both did) would put the same facts on screen twice. */
     return (
       <div className="workspace-profile-panel workspace-profile-dossier">
-        <header className="workspace-dossier-hero">
-          <ProfileImagePicker
-            imageUrl={agent.profileImageUrl}
-            name={agent.displayName}
-            fallback={<IdentityMonogram name={agent.displayName} size={22} />}
+        <div className="workspace-dossier-doc">
+          <AgentPersonalityEditor
+            value={agent.instructions ?? ""}
+            draft={personalityDraft}
+            editing={editingPersonality}
             editable={canEditProfile}
-            disabled={saving}
-            onUpload={handleImageUpload}
-            onRemove={handleImageRemove}
+            saving={saving}
+            onStartEdit={startEditPersonality}
+            onDraftChange={setPersonalityDraft}
+            onCancel={() => setEditingPersonality(false)}
+            onSave={() => void handlePersonalitySave()}
           />
-          <div className="workspace-dossier-identity">
+        </div>
+
+        <aside className="workspace-dossier-rail" aria-label={t("workspace.identity_label")}>
+          <div className="workspace-dossier-portrait">
+            <ProfileImagePicker
+              imageUrl={agent.profileImageUrl}
+              name={agent.displayName}
+              fallback={<IdentityMonogram name={agent.displayName} size={22} />}
+              editable={canEditProfile}
+              disabled={saving}
+              onUpload={handleImageUpload}
+              onRemove={handleImageRemove}
+            />
+          </div>
+
+          <div className="workspace-dossier-field">
+            <span className="workspace-dossier-field-label" id="agent-name-label">
+              {t("admin.v2.agent_name")}
+            </span>
             {renaming ? (
               <div className="workspace-dossier-rename">
                 <Input
@@ -372,7 +397,7 @@ export function AgentProfilePanel({
               </div>
             ) : (
               <div className="workspace-dossier-name-row">
-                <h2 className="workspace-dossier-name-value" translate="no">{agent.displayName}</h2>
+                <span className="workspace-dossier-name-value" translate="no">{agent.displayName}</span>
                 {canEditProfile ? (
                   <DossierIconButton
                     ref={renameEditButtonRef}
@@ -385,130 +410,115 @@ export function AgentProfilePanel({
                 ) : null}
               </div>
             )}
-            <div className="workspace-dossier-meta">
-              <span translate="no">@{agent.employeeId}</span>
-            </div>
           </div>
-        </header>
 
-        <AgentPersonalityEditor
-          value={agent.instructions ?? ""}
-          draft={personalityDraft}
-          editing={editingPersonality}
-          editable={canEditProfile}
-          saving={saving}
-          onStartEdit={startEditPersonality}
-          onDraftChange={setPersonalityDraft}
-          onCancel={() => setEditingPersonality(false)}
-          onSave={() => void handlePersonalitySave()}
-        />
-
-        <details className="workspace-dossier-details">
-          <summary>
-            <ChevronDownIcon size={13} aria-hidden="true" className="workspace-dossier-details-chevron" />
-            {t("workspace.profile_details")}
-          </summary>
-          <div className="workspace-dossier-details-body">
-            <span className="workspace-dossier-role">
-              <label htmlFor="agent-default-role">{t("admin.v2.agent_role_label")}:</label>{" "}
-              {canEditProfile ? (
-                <select
-                  id="agent-default-role"
-                  value={agent.defaultRole ?? ""}
-                  disabled={saving}
-                  onChange={(event) => void handleRoleChange(event.target.value)}
-                >
-                  <option value="">{t("admin.v2.agent_role_none")}</option>
-                  {AGENT_ROLE_OPTIONS.map((role) => (
-                    <option key={role} value={role}>
-                      {t(`admin.v2.agent_role.${role}`, { defaultValue: role })}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                agent.defaultRole
+          <div className="workspace-dossier-field">
+            <label className="workspace-dossier-field-label" htmlFor="agent-default-role">
+              {t("admin.v2.agent_role_label")}
+            </label>
+            {canEditProfile ? (
+              <select
+                id="agent-default-role"
+                className="workspace-dossier-role-select"
+                value={agent.defaultRole ?? ""}
+                disabled={saving}
+                onChange={(event) => void handleRoleChange(event.target.value)}
+              >
+                <option value="">{t("admin.v2.agent_role_none")}</option>
+                {AGENT_ROLE_OPTIONS.map((role) => (
+                  <option key={role} value={role}>
+                    {t(`admin.v2.agent_role.${role}`, { defaultValue: role })}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="workspace-dossier-field-value">
+                {agent.defaultRole
                   ? t(`admin.v2.agent_role.${agent.defaultRole}`, { defaultValue: agent.defaultRole })
-                  : t("admin.v2.agent_role_none")
-              )}
-            </span>
-            <span className="code" translate="no" title={agent.id}>{truncateId(agent.id)}</span>
-            <span>{t("admin.v2.agent_owner_label")}: {ownerDisplay}</span>
-            <span>
-              {t("admin.v2.agent_meta_version", { version: agent.version })}
-              {" · "}
-              {t("admin.v2.agent_meta_created", { time: formatRelativeTime(agent.createdAt, t) })}
-              {" · "}
-              {t("admin.v2.agent_meta_updated", { time: formatRelativeTime(agent.updatedAt, t) })}
-            </span>
+                  : t("admin.v2.agent_role_none")}
+              </span>
+            )}
           </div>
-        </details>
 
-        {canEditProfile && error ? (
-          <p className="adm-form-error" role="alert">{t("admin.v2.action_failed", { message: error })}</p>
-        ) : null}
+          <p className="workspace-dossier-stamp">
+            {t("admin.v2.agent_meta_version", { version: agent.version })}
+            {" · "}
+            {t("admin.v2.agent_meta_created", { time: formatRelativeTime(agent.createdAt, t) })}
+            {" · "}
+            {t("admin.v2.agent_meta_updated", { time: formatRelativeTime(agent.updatedAt, t) })}
+          </p>
 
+          {canEditProfile && error ? (
+            <p className="adm-form-error" role="alert">{t("admin.v2.action_failed", { message: error })}</p>
+          ) : null}
+        </aside>
+
+        {/* Management lives below the two columns and spans both — it acts on
+            the whole record, not on the document or the identity rail. */}
         {canManage || onOpenWorkspace ? (
-          <div className="adm-drawer-section-actions">
+          <div className="workspace-dossier-admin">
+            <div className="adm-drawer-section-actions">
+              {canManage ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleToggleEnabled()}
+                  disabled={saving}
+                >
+                  <ActionToggle size={14} aria-hidden="true" />
+                  {agent.enabled ? t("admin.v2.agent_disable_action") : t("admin.v2.agent_enable_action")}
+                </Button>
+              ) : null}
+              {onOpenWorkspace ? (
+                <a
+                  data-slot="link-button"
+                  href={pathForAppState({ route: "agents", mobileView: "chat", sessionId: null, agentWorkspaceId: agent.id })}
+                  className={buttonVariants({ variant: "outline" })}
+                  onClick={(event) => {
+                    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
+                    event.preventDefault();
+                    onOpenWorkspace(agent);
+                  }}
+                >
+                  {t("agents_page.open_workspace")}
+                </a>
+              ) : null}
+            </div>
+
             {canManage ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void handleToggleEnabled()}
-                disabled={saving}
-              >
-                <ActionToggle size={14} aria-hidden="true" />
-                {agent.enabled ? t("admin.v2.agent_disable_action") : t("admin.v2.agent_enable_action")}
-              </Button>
-            ) : null}
-            {onOpenWorkspace ? (
-              <a
-                data-slot="link-button"
-                href={pathForAppState({ route: "agents", mobileView: "chat", sessionId: null, agentWorkspaceId: agent.id })}
-                className={buttonVariants({ variant: "outline" })}
-                onClick={(event) => {
-                  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
-                  event.preventDefault();
-                  onOpenWorkspace(agent);
-                }}
-              >
-                {t("agents_page.open_workspace")}
-              </a>
+              <>
+                <div className="adm-drawer-section">
+                  <p className="workspace-dossier-section-title">{t("admin.v2.agent_placements_title")}</p>
+                  {placementDescriptions.length === 0 ? (
+                    <p className="adm-cred-empty">{t("admin.v2.no_runtime_placement")}</p>
+                  ) : (
+                    <PlacementList
+                      descriptions={placementDescriptions}
+                      canManage={canManage}
+                      pendingPlacementId={pendingPlacementId}
+                      onRemove={(placement) => void handleRemovePlacement(placement)}
+                      nodeMissingFor={(description) => nodes.length > 0
+                        && !nodes.some((node) => node.id === description.placement.daemonNodeId)}
+                      removeBlockedReason={removeBlockedReason}
+                    />
+                  )}
+                </div>
+
+                <div className="adm-drawer-section">
+                  <p className="workspace-dossier-section-title">{t("admin.v2.danger_zone")}</p>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => void handleDeleteAgent()}
+                    disabled={saving}
+                  >
+                    <AdminDelete size={14} aria-hidden="true" />
+                    {t("admin.v2.delete_agent")}
+                  </Button>
+                </div>
+              </>
             ) : null}
           </div>
-        ) : null}
-
-        {canManage ? (
-          <>
-            <div className="adm-drawer-section">
-              <p className="workspace-dossier-section-title">{t("admin.v2.agent_placements_title")}</p>
-              {placementDescriptions.length === 0 ? (
-                <p className="adm-cred-empty">{t("admin.v2.no_runtime_placement")}</p>
-              ) : (
-                <PlacementList
-                  descriptions={placementDescriptions}
-                  canManage={canManage}
-                  pendingPlacementId={pendingPlacementId}
-                  onRemove={(placement) => void handleRemovePlacement(placement)}
-                  nodeMissingFor={(description) => nodes.length > 0
-                    && !nodes.some((node) => node.id === description.placement.daemonNodeId)}
-                  removeBlockedReason={removeBlockedReason}
-                />
-              )}
-            </div>
-
-            <div className="adm-drawer-section">
-              <p className="workspace-dossier-section-title">{t("admin.v2.danger_zone")}</p>
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={() => void handleDeleteAgent()}
-                disabled={saving}
-              >
-                <AdminDelete size={14} aria-hidden="true" />
-                {t("admin.v2.delete_agent")}
-              </Button>
-            </div>
-          </>
         ) : null}
       </div>
     );
