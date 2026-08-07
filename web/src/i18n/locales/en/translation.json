@@ -45,7 +45,8 @@
     "delete_team": "Couldn't delete the team. Check the connection and try again.",
     "team_unavailable": "The agent team is not currently available.",
     "team_lead_not_member": "The team lead must be one of its members.",
-    "task_agent_and_team_conflict": "Choose either an agent or a team, not both."
+    "task_agent_and_team_conflict": "Choose either an agent or a team, not both.",
+    "move_team": "Couldn't move the team. Every member stayed on its current computer."
   },
   "skip_to_thread": "Skip to thread",
   "skip_to_content": "Skip to content",
@@ -373,7 +374,13 @@
     "select_title": "Select a team",
     "select_body": "Choose a team to inspect its profile, workspace, and activity.",
     "empty_title": "No teams yet",
-    "empty_body": "Group agents under a named lead for repeatable task dispatch."
+    "empty_body": "Group agents under a named lead for repeatable task dispatch.",
+    "computer_title": "Computer",
+    "computer_hint": "A team works together on one computer. Moving the team moves every member.",
+    "computer_choose": "Choose a computer for this team",
+    "computer_move": "Move team",
+    "computer_moving": "Moving",
+    "computer_unknown": "No computer"
   },
   "computer": {
     "title": "My Computer",
@@ -923,7 +930,8 @@
       "edit_employee_name_required": "A display name is required.",
       "emp_limit_over_short": "Over limit",
       "emp_limit_in_use_one": "{{count}} local computer connected now",
-      "emp_limit_in_use_other": "{{count}} local computers connected now"
+      "emp_limit_in_use_other": "{{count}} local computers connected now",
+      "placement_locked_by_team": "On a team ({{teams}}) — move the whole team instead."
     },
     "signing_in": "Signing in…"
   },

@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from ..persistence.team_store import TeamValidationError, validate_team_payload
 from ..security.auth import require_admin_session
+from ..services.team_placement import TeamPlacementError, move_team
 from .agent_routes import _agent_with_placements, _employee_exists
 from .deps import AppContextDep
 from .helpers import (
@@ -20,6 +21,22 @@ router = APIRouter()
 def _team_error(error: ValueError) -> HTTPException:
     code = error.code if isinstance(error, TeamValidationError) else str(error)
     return HTTPException(409 if code == "team_name_taken" else 400, code)
+
+
+def _move_team_to_computer(ctx: AppContextDep, team: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    daemon_node_id = string_field(body, "daemonNodeId")
+    if not daemon_node_id:
+        raise HTTPException(400, "daemonNodeId is required.")
+    node = ctx.registry.get(daemon_node_id)
+    if not node:
+        raise HTTPException(404, "Daemon node not found.")
+    try:
+        move_team(
+            ctx.team_store, ctx.agent_placement_store, ctx.agent_store, team, node
+        )
+    except TeamPlacementError as error:
+        raise HTTPException(409, error.code) from error
+    return {"team": _team_view(ctx, _active_team(ctx, team["id"]))}
 
 
 def _active_team(ctx: AppContextDep, team_id: str) -> dict[str, Any]:
@@ -118,6 +135,15 @@ async def update_team(
     return {"team": _team_view(ctx, team)}
 
 
+@router.post("/teams/{team_id}/computer")
+async def move_team_to_computer(
+    team_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    actor = request_actor(request, ctx.auth_store)
+    team = _owned_team(ctx, team_id, actor["employeeId"])
+    return _move_team_to_computer(ctx, team, await json_body(request))
+
+
 @router.delete("/teams/{team_id}", status_code=200)
 async def delete_team(
     team_id: str, request: Request, ctx: AppContextDep
@@ -207,6 +233,15 @@ async def update_control_panel_team(
     except ValueError as error:
         raise _team_error(error) from error
     return {"team": _team_view(ctx, team)}
+
+
+@router.post("/admin/teams/{team_id}/computer")
+async def move_control_panel_team_to_computer(
+    team_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    require_admin_session(request, ctx.auth_store)
+    team = _active_team(ctx, team_id)
+    return _move_team_to_computer(ctx, team, await json_body(request))
 
 
 @router.delete("/admin/teams/{team_id}", status_code=200)

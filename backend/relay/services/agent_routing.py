@@ -9,6 +9,7 @@ from ..daemon_registry.scheduling import (
 )
 from ..persistence.agent_placement_store import create_node_placement, placement_status
 from ..persistence.agent_store import compatibility_computer_id
+from .team_placement import teams_blocking_placement_change
 
 
 class AgentRoutingError(ValueError):
@@ -147,6 +148,7 @@ def resolve_agent_assignments(
     session: dict[str, Any] | None = None,
     required_node_id: str | None = None,
     daemon_store: Any | None = None,
+    team_store: Any | None = None,
 ) -> list[dict[str, Any]]:
     nodes = {node["id"]: node for node in daemon_nodes}
     resolved: list[dict[str, Any]] = []
@@ -205,7 +207,7 @@ def resolve_agent_assignments(
                 f"Agent {agent['displayName']} uses {agent['executorKind']}, not {requested_kind}.",
             )
         placements = _agent_placements_with_managed_capacity(
-            agent, placement_store, nodes
+            agent, placement_store, nodes, team_store
         )
         candidates = []
         rejection_reasons: set[str] = set()
@@ -283,7 +285,10 @@ def resolve_agent_assignments(
 
 
 def _agent_placements_with_managed_capacity(
-    agent: dict[str, Any], placement_store: Any, nodes: dict[str, dict[str, Any]]
+    agent: dict[str, Any],
+    placement_store: Any,
+    nodes: dict[str, dict[str, Any]],
+    team_store: Any = None,
 ) -> list[dict[str, Any]]:
     placements = placement_store.list_placements(agent_id=agent["id"])
     if any(
@@ -307,6 +312,13 @@ def _agent_placements_with_managed_capacity(
         # routing. Administrators can place the agent explicitly instead.
         return placements
     required_managed_node_id = next(iter(managed_node_ids), None)
+    if required_managed_node_id is None and teams_blocking_placement_change(
+        team_store, agent
+    ):
+        # Without a stable Computer identity to hold the borrow in place, taking
+        # managed capacity would move this agent off its team's computer for
+        # good — as a side effect of a dispatch that is about to fail anyway.
+        return placements
     own_computer_id = compatibility_computer_id(agent)
     if own_computer_id is not None and own_computer_id != required_managed_node_id:
         # This agent stands in for one specific Computer. Borrowing managed
