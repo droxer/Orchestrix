@@ -1214,39 +1214,6 @@
 
 /* ---- profile dossier (workspace variant) ---------------------------- */
 
-.workspace-dossier-hero {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-4);
-  padding-bottom: var(--sp-5);
-  border-bottom: 1px solid var(--line-2);
-}
-
-/* Team-profile hero slots — the agent hero uses the identity stack above. */
-.workspace-dossier-blurb {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  color: var(--ink-2);
-  font: var(--type-body-sm);
-  line-height: 1.55;
-  text-wrap: pretty;
-}
-
-.workspace-dossier-status {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--sp-3);
-  margin-left: auto;
-}
-
-.workspace-dossier-runtime {
-  color: var(--ink-3);
-  font: var(--type-label);
-}
-
 .workspace-dossier-name-row {
   display: flex;
   align-items: center;
@@ -1649,19 +1616,6 @@
   }
 }
 
-.workspace-dossier-instructions-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-3);
-}
-
-.workspace-dossier-instructions-head h2 {
-  margin: 0;
-  color: var(--ink-1);
-  font: var(--type-label-strong);
-}
-
 .workspace-dossier-icon-btn {
   display: inline-flex;
   align-items: center;
@@ -1695,12 +1649,6 @@
 .workspace-dossier-icon-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.workspace-dossier-name {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
 }
 
 /* The agent/team name is display-tier — mono, tracked, ink-1 — the same

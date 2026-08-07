@@ -315,6 +315,8 @@
     "band_label": "智慧體檔案",
     "band_computer": "電腦",
     "band_id": "智慧體 ID",
+    "band_team_label": "團隊檔案",
+    "band_team_id": "團隊 ID",
     "identity_label": "身分"
   },
   "profile_image": {
@@ -365,11 +367,6 @@
     "no_agents": "你沒有可加入的智能體。",
     "no_workspace": "為團隊新增成員後即可瀏覽其共享工作區。",
     "profile_title": "{{name}} 團隊檔案",
-    "profile_sub_one": "{{count}} 個智能體由一名負責人協作調度。",
-    "profile_sub_other": "{{count}} 個智能體由一名負責人協作調度。",
-    "profile_blurb": "由一名派發負責人協調的智能體團隊，共享任務並彙整工作紀錄。",
-    "ready_members_one": "{{count}} 名成員中 {{ready}} 名就緒",
-    "ready_members_other": "{{count}} 名成員中 {{ready}} 名就緒",
     "sections": "團隊分區",
     "select_title": "選擇一個團隊",
     "select_body": "選擇團隊以查看其檔案、工作區和活動。",

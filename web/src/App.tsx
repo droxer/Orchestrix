@@ -1008,8 +1008,6 @@ export function App() {
         ) : route === "teams" ? (
           <TeamsPage
             currentUser={user}
-            isRefreshing={isRefreshing}
-            onRefresh={() => refresh()}
             onOpenThread={openThread}
             teamId={teamWorkspaceId}
             onSelectTeam={navigateToTeamWorkspace}
@@ -1017,8 +1015,6 @@ export function App() {
         ) : route === "agents" ? (
           <AgentsPage
             currentUser={user}
-            isRefreshing={isRefreshing}
-            onRefresh={() => refresh()}
             workspaceAgent={workspaceAgent}
             isDetailRoute={agentWorkspaceId !== null}
             onOpenWorkspace={openAgentWorkspace}

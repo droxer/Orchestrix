@@ -40,8 +40,8 @@ describe("Agent team management", () => {
     assert.match(agentWorkspaceSource, /threadId: selectedThreadId/);
     assert.doesNotMatch(teamWorkspaceSource, /getTeamArtifacts|TeamArtifacts/);
     assert.match(teamWorkspaceSource, /getWorkspaceBrief\(\{ teamId: team\.id \}/);
-    assert.match(agentWorkspaceSource, /pageTab !== "profile" \? query\.refetch\(\)/);
-    assert.match(teamWorkspaceSource, /pageTab !== "profile" \? briefQuery\.refetch\(\)/);
+    assert.doesNotMatch(agentWorkspaceSource, /nav\.refresh|NavRefresh/);
+    assert.doesNotMatch(teamWorkspaceSource, /nav\.refresh|NavRefresh/);
     assert.match(teamsSource, /actions=\{teamId \? null :/);
     assert.match(teamsSource, /open=\{!teamId && addTeam\}/);
     assert.match(agentsSource, /isDetailRoute \? null : \(/);

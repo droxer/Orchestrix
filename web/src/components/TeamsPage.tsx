@@ -28,15 +28,11 @@ import {
 
 export function TeamsPage({
   currentUser,
-  isRefreshing,
-  onRefresh,
   onOpenThread,
   teamId,
   onSelectTeam,
 }: {
   currentUser: CurrentUser;
-  isRefreshing: boolean;
-  onRefresh: () => Promise<void>;
   onOpenThread: (sessionId: string) => void;
   teamId: string | null;
   onSelectTeam: (teamId: string | null) => void;
@@ -135,8 +131,6 @@ export function TeamsPage({
             key={selectedTeam.id}
             team={selectedTeam}
             employeeId={currentUser.employeeId}
-            isRefreshing={isRefreshing}
-            onRefresh={onRefresh}
             onOpenThread={onOpenThread}
             onDeleted={() => onSelectTeam(null)}
           />

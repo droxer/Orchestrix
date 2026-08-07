@@ -11,7 +11,7 @@ import { NODES_QUERY_KEY } from "../hooks/useRelayData";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { agentLabel } from "../lib/plan";
-import { teamReady } from "../lib/taskAssignment";
+import { teamAvailability, teamReady } from "../lib/taskAssignment";
 import {
   activePlacementNodeId,
   canAddAgentToNodeScopedTeam,
@@ -21,7 +21,7 @@ import {
 import { teamWorkspaceAgentId } from "../lib/teamWorkspace";
 import { placeableTeamComputers } from "../lib/teamPlacement";
 import type { AgentTeam, DaemonNodeMonitorRecord } from "../types";
-import { ActionEdit, AdminDelete, NavRefresh } from "./icons";
+import { ActionEdit, AdminDelete } from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { PageHeader } from "./PageHeader";
 import { IdentityMonogram } from "./IdentityMonogram";
@@ -30,6 +30,10 @@ import { TeamMemberOption } from "./TeamMemberOption";
 import { ProfileImage, ProfileImagePicker } from "./ProfileImagePicker";
 import { ActivitiesSkeleton, WorkspaceActivities, WorkspaceEmpty, WorkspaceError } from "./workspace/WorkspacePrimitives";
 import { WorkspaceFilesBrowser } from "./AgentWorkspacePage";
+import { RecordBand, type RecordFact } from "./workspace/RecordBand";
+import { StatusPill } from "./StatusPill";
+import { truncateId } from "../lib/adminHelpers";
+import { formatRelativeTime } from "./admin/helpers";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -65,7 +69,8 @@ function TeamProfile({
     [employeeAgents],
   );
   const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(team.name);
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState(team.name);
   const [memberIds, setMemberIds] = useState<string[]>(team.memberAgentIds);
   const [leadId, setLeadId] = useState(team.leadAgentId ?? "");
   const [imageSaving, setImageSaving] = useState(false);
@@ -78,10 +83,8 @@ function TeamProfile({
   const [validationError, setValidationError] = useState<
     "members" | "lead" | "unplaced" | "different-nodes" | null
   >(null);
-  const nameRef = useRef<HTMLInputElement>(null);
   const membersRef = useRef<HTMLFieldSetElement>(null);
   const leadRef = useRef<HTMLButtonElement>(null);
-  const readyMembers = team.members.filter((member) => member.enabled && member.availability === "ready").length;
   const selectedAgents = useMemo(
     () => agents.filter((agent) => memberIds.includes(agent.id)),
     [agents, memberIds],
@@ -98,8 +101,7 @@ function TeamProfile({
     [nodes, employeeId],
   );
   const teamComputer = nodes.find((node) => node.id === teamNodeId) ?? null;
-  const draftDirty = name.trim() !== team.name.trim()
-    || leadId !== (team.leadAgentId ?? "")
+  const draftDirty = leadId !== (team.leadAgentId ?? "")
     || memberIds.length !== team.memberAgentIds.length
     || memberIds.some((id) => !team.memberAgentIds.includes(id));
   const confirmDiscardChanges = useUnsavedChangesGuard(editing && draftDirty && !busy);
@@ -149,10 +151,37 @@ function TeamProfile({
   }
 
   function resetDraft() {
-    setName(team.name);
     setMemberIds(team.memberAgentIds);
     setLeadId(team.leadAgentId ?? "");
     setValidationError(null);
+  }
+
+  function startRename() {
+    setNameDraft(team.name);
+    setRenaming(true);
+  }
+
+  async function saveRename() {
+    const next = nameDraft.trim();
+    if (!next) return;
+    if (next === team.name.trim()) {
+      setRenaming(false);
+      return;
+    }
+    try {
+      await updateTeamMutation.mutateAsync({
+        teamId: team.id,
+        input: teamMutationInput({
+          name: next,
+          memberAgentIds: team.memberAgentIds,
+          leadAgentId: team.leadAgentId ?? "",
+          enabled: team.enabled,
+        }),
+      });
+      setRenaming(false);
+    } catch {
+      // The shared mutation handler announces the error and keeps the draft open.
+    }
   }
 
   function startEditing() {
@@ -182,10 +211,6 @@ function TeamProfile({
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!name.trim()) {
-      nameRef.current?.focus();
-      return;
-    }
     if (memberIds.length === 0) {
       setValidationError("members");
       membersRef.current?.focus();
@@ -207,7 +232,7 @@ function TeamProfile({
       await updateTeamMutation.mutateAsync({
         teamId: team.id,
         input: teamMutationInput({
-          name,
+          name: team.name,
           memberAgentIds: memberIds,
           leadAgentId: leadId,
           enabled: team.enabled,
@@ -236,227 +261,266 @@ function TeamProfile({
 
   return (
     <div className="workspace-profile" role="tabpanel" id="team-page-panel-profile" aria-labelledby="team-page-tab-profile">
-      <div className="workspace-profile-panel workspace-profile-dossier team-profile-dossier">
-        <header className="workspace-dossier-hero">
-          <ProfileImagePicker
-            imageUrl={team.profileImageUrl}
-            name={team.name}
-            fallback={<IdentityMonogram name={team.name} size={22} />}
-            editable
-            disabled={busy}
-            onUpload={uploadImage}
-            onRemove={removeImage}
-          />
-          <p className="workspace-dossier-blurb">{t("teams.profile_blurb")}</p>
-          <div className="workspace-dossier-status">
-            <span
-              className={`workspace-status-pip tone-${team.enabled ? "good" : "neutral"}`}
-              role="img"
-              aria-label={team.enabled ? t("teams.enabled") : t("teams.disabled")}
-              title={team.enabled ? t("teams.enabled") : t("teams.disabled")}
-            />
-            <span className="workspace-dossier-runtime tnum">
-              {t("teams.ready_members", { ready: readyMembers, count: team.members.length })}
-            </span>
-          </div>
-        </header>
+      {/* Same dossier grammar as the agent record: a document column holding
+          the thing you can change (the roster), an identity rail beside it,
+          and record-wide management below both. Facts that only name the
+          record (status, member count, id) live in the RecordBand above. */}
+      <div className="workspace-profile-panel workspace-profile-dossier">
+        <div className="workspace-dossier-doc">
+          <form className="team-profile-inline-form" onSubmit={(event) => void save(event)}>
+            <section aria-labelledby="team-profile-members">
+              <div className="team-profile-section-head">
+                <h2 id="team-profile-members" className="workspace-dossier-section-title">{t("teams.members")}</h2>
+                <span className="team-profile-section-head-side">
+                  <span className="tnum">{editing ? memberIds.length : team.members.length}</span>
+                  {!editing ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="workspace-dossier-icon-btn"
+                      aria-label={t("teams.edit")}
+                      title={t("teams.edit")}
+                      onClick={startEditing}
+                    >
+                      <ActionEdit size={14} aria-hidden="true" />
+                    </Button>
+                  ) : null}
+                </span>
+              </div>
+              {editing ? (
+                <fieldset
+                  ref={membersRef}
+                  className="team-profile-member-fieldset"
+                  aria-label={t("teams.members")}
+                  tabIndex={-1}
+                  aria-invalid={validationError && validationError !== "lead" ? true : undefined}
+                  aria-describedby={validationError && validationError !== "lead" ? "team-profile-members-error" : undefined}
+                >
+                  <div className="team-member-options team-profile-member-options">
+                    {agents.map((agent) => {
+                      const selected = memberIds.includes(agent.id);
+                      const incompatible = !selected
+                        && !canAddAgentToNodeScopedTeam(agent, selectedAgents);
+                      return (
+                        <TeamMemberOption
+                          key={agent.id}
+                          agentId={agent.id}
+                          displayName={agent.displayName}
+                          executorKind={agent.executorKind}
+                          selected={selected}
+                          incompatible={incompatible}
+                          disabled={busy}
+                          onToggle={toggleMember}
+                        />
+                      );
+                    })}
+                  </div>
+                  {agents.length === 0 ? <span className="adm-form-hint">{t("teams.no_agents")}</span> : null}
+                  {validationError && validationError !== "lead" ? (
+                    <span id="team-profile-members-error" className="text-sm text-danger" role="alert">
+                      {validationError === "members"
+                        ? t("teams.members_required")
+                        : validationError === "unplaced"
+                          ? t("teams.members_unplaced")
+                          : t("teams.members_different_nodes")}
+                    </span>
+                  ) : null}
+                </fieldset>
+              ) : (
+                <ul className="team-profile-members">
+                  {team.members.map((member) => {
+                    const ready = member.enabled && member.availability === "ready";
+                    return (
+                      <li key={member.id} className="team-profile-member">
+                        <AgentStateBadge
+                          agent={member.executorKind}
+                          ready={ready}
+                          availability={member.enabled ? member.availability : undefined}
+                          imageUrl={member.profileImageUrl}
+                          name={member.displayName}
+                        />
+                        <span className="team-profile-member-copy">
+                          <strong>{member.displayName}</strong>
+                          <small>{agentLabel(member.executorKind)}</small>
+                        </span>
+                        {member.id === team.leadAgentId ? <Badge variant="outline">{t("teams.lead_badge")}</Badge> : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
 
-        <form className="team-profile-inline-form" onSubmit={(event) => void save(event)}>
-          <section className="workspace-dossier-name" aria-labelledby="team-profile-name">
-            <div className="workspace-dossier-instructions-head">
-              <h2 id="team-profile-name">{t("teams.name")}</h2>
-              {!editing ? (
+            {editing ? (
+              <>
+                <Field
+                  label={t("teams.lead")}
+                  wrapper="div"
+                  className="team-profile-lead-field"
+                  error={validationError === "lead" ? t("teams.lead_required") : undefined}
+                  errorId="team-profile-lead-error"
+                >
+                  <Select value={leadId} disabled={busy || memberIds.length === 0} onValueChange={(value) => {
+                    if (value) setLeadId(value);
+                    setValidationError(null);
+                  }}>
+                    <SelectTrigger
+                      ref={leadRef}
+                      className="w-full"
+                      aria-invalid={validationError === "lead" || undefined}
+                      aria-describedby={validationError === "lead" ? "team-profile-lead-error" : undefined}
+                    >
+                      <SelectValue>
+                        {(value: string) => agents.find((agent) => agent.id === value)?.displayName ?? value}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {agents.filter((agent) => memberIds.includes(agent.id)).map((agent) => (
+                        <SelectItem key={agent.id} value={agent.id}>{agent.displayName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <div className="team-profile-inline-actions">
+                  <span className="team-profile-inline-actions-spacer" />
+                  <Button type="button" variant="ghost" onClick={() => void cancelEditing()} disabled={busy}>
+                    {t("dialog.cancel")}
+                  </Button>
+                  <Button type="submit" loading={updateTeamMutation.isPending} loadingLabel={t("admin.saving")} disabled={deleteTeamMutation.isPending || imageSaving}>
+                    {t("teams.save")}
+                  </Button>
+                </div>
+              </>
+            ) : null}
+          </form>
+        </div>
+
+        <aside className="workspace-dossier-rail" aria-label={t("workspace.identity_label")}>
+          <div className="workspace-dossier-portrait">
+            <ProfileImagePicker
+              imageUrl={team.profileImageUrl}
+              name={team.name}
+              fallback={<IdentityMonogram name={team.name} size={22} />}
+              editable
+              disabled={busy}
+              onUpload={uploadImage}
+              onRemove={removeImage}
+            />
+          </div>
+
+          <div className="workspace-dossier-field">
+            <span className="workspace-dossier-field-label">{t("teams.name")}</span>
+            {renaming ? (
+              <div className="workspace-dossier-rename">
+                <Input
+                  name="team-name"
+                  type="text"
+                  aria-label={t("teams.name")}
+                  autoComplete="off"
+                  autoFocus
+                  required
+                  value={nameDraft}
+                  onChange={(event) => setNameDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void saveRename();
+                    if (event.key === "Escape") setRenaming(false);
+                  }}
+                  disabled={busy}
+                />
+                <div className="workspace-dossier-rename-actions">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setRenaming(false)}
+                    disabled={busy}
+                  >
+                    {t("dialog.cancel")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void saveRename()}
+                    disabled={busy}
+                  >
+                    {t("teams.save")}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="workspace-dossier-name-row">
+                <span className="workspace-dossier-name-value" translate="no">{team.name}</span>
                 <Button
                   type="button"
                   variant="ghost"
                   className="workspace-dossier-icon-btn"
                   aria-label={t("teams.edit")}
                   title={t("teams.edit")}
-                  onClick={startEditing}
+                  onClick={startRename}
                 >
                   <ActionEdit size={14} aria-hidden="true" />
                 </Button>
-              ) : null}
-            </div>
-            {editing ? (
-              <Input
-                ref={nameRef}
-                name="team-name"
-                type="text"
-                aria-label={t("teams.name")}
-                autoComplete="off"
-                autoFocus
-                required
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") void cancelEditing();
-                }}
-                disabled={busy}
-              />
-            ) : (
-              <p className="workspace-dossier-name-value">{team.name}</p>
-            )}
-          </section>
-
-          <section className="team-profile-section" aria-labelledby="team-profile-members">
-            <div className="team-profile-section-head">
-              <h2 id="team-profile-members" className="workspace-dossier-section-title">{t("teams.members")}</h2>
-              <span className="tnum">{editing ? memberIds.length : team.members.length}</span>
-            </div>
-            {editing ? (
-              <fieldset
-                ref={membersRef}
-                className="team-profile-member-fieldset"
-                aria-label={t("teams.members")}
-                tabIndex={-1}
-                aria-invalid={validationError && validationError !== "lead" ? true : undefined}
-                aria-describedby={validationError && validationError !== "lead" ? "team-profile-members-error" : undefined}
-              >
-                <div className="team-member-options team-profile-member-options">
-                  {agents.map((agent) => {
-                    const selected = memberIds.includes(agent.id);
-                    const incompatible = !selected
-                      && !canAddAgentToNodeScopedTeam(agent, selectedAgents);
-                    return (
-                      <TeamMemberOption
-                        key={agent.id}
-                        agentId={agent.id}
-                        displayName={agent.displayName}
-                        executorKind={agent.executorKind}
-                        selected={selected}
-                        incompatible={incompatible}
-                        disabled={busy}
-                        onToggle={toggleMember}
-                      />
-                    );
-                  })}
-                </div>
-                {agents.length === 0 ? <span className="adm-form-hint">{t("teams.no_agents")}</span> : null}
-                {validationError && validationError !== "lead" ? (
-                  <span id="team-profile-members-error" className="text-sm text-danger" role="alert">
-                    {validationError === "members"
-                      ? t("teams.members_required")
-                      : validationError === "unplaced"
-                        ? t("teams.members_unplaced")
-                        : t("teams.members_different_nodes")}
-                  </span>
-                ) : null}
-              </fieldset>
-            ) : (
-              <ul className="team-profile-members">
-                {team.members.map((member) => {
-                  const ready = member.enabled && member.availability === "ready";
-                  return (
-                    <li key={member.id} className="team-profile-member">
-                      <AgentStateBadge
-                        agent={member.executorKind}
-                        ready={ready}
-                        availability={member.enabled ? member.availability : undefined}
-                        imageUrl={member.profileImageUrl}
-                        name={member.displayName}
-                      />
-                      <span className="team-profile-member-copy">
-                        <strong>{member.displayName}</strong>
-                        <small>{agentLabel(member.executorKind)}</small>
-                      </span>
-                      {member.id === team.leadAgentId ? <Badge variant="outline">{t("teams.lead_badge")}</Badge> : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-
-          {editing ? (
-            <>
-              <Field
-                label={t("teams.lead")}
-                wrapper="div"
-                className="team-profile-lead-field"
-                error={validationError === "lead" ? t("teams.lead_required") : undefined}
-                errorId="team-profile-lead-error"
-              >
-                <Select value={leadId} disabled={busy || memberIds.length === 0} onValueChange={(value) => {
-                  if (value) setLeadId(value);
-                  setValidationError(null);
-                }}>
-                  <SelectTrigger
-                    ref={leadRef}
-                    className="w-full"
-                    aria-invalid={validationError === "lead" || undefined}
-                    aria-describedby={validationError === "lead" ? "team-profile-lead-error" : undefined}
-                  >
-                    <SelectValue>
-                      {(value: string) => agents.find((agent) => agent.id === value)?.displayName ?? value}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {agents.filter((agent) => memberIds.includes(agent.id)).map((agent) => (
-                      <SelectItem key={agent.id} value={agent.id}>{agent.displayName}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <div className="team-profile-inline-actions">
-                <span className="team-profile-inline-actions-spacer" />
-                <Button type="button" variant="ghost" onClick={() => void cancelEditing()} disabled={busy}>
-                  {t("dialog.cancel")}
-                </Button>
-                <Button type="submit" loading={updateTeamMutation.isPending} loadingLabel={t("admin.saving")} disabled={deleteTeamMutation.isPending || imageSaving}>
-                  {t("teams.save")}
-                </Button>
               </div>
-            </>
-          ) : null}
-        </form>
-
-        <section className="adm-drawer-section" aria-labelledby="team-profile-computer-title">
-          <p id="team-profile-computer-title" className="workspace-dossier-section-title">
-            {t("teams.computer_title")}
-          </p>
-          <p className="adm-form-hint">{t("teams.computer_hint")}</p>
-          <div className="team-profile-inline-actions">
-            <Select
-              value={moveTarget ?? teamNodeId}
-              disabled={busy || teamComputers.length === 0}
-              onValueChange={(value) => { if (value) setMoveTarget(value); }}
-            >
-              <SelectTrigger className="w-full" aria-label={t("teams.computer_choose")}>
-                <SelectValue>
-                  {(value: string) => nodes.find((node) => node.id === value)?.displayName
-                    ?? teamComputer?.displayName
-                    ?? value
-                    ?? t("teams.computer_unknown")}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {teamComputers.map((node) => (
-                  <SelectItem key={node.id} value={node.id}>{node.displayName || node.id}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              type="button"
-              onClick={() => void moveToComputer()}
-              disabled={busy || !moveTarget || moveTarget === teamNodeId}
-              loading={moveTeamMutation.isPending}
-              loadingLabel={t("teams.computer_moving")}
-            >
-              {t("teams.computer_move")}
-            </Button>
+            )}
           </div>
-        </section>
 
-        <section className="adm-drawer-section" aria-labelledby="team-profile-danger-title">
-          <p id="team-profile-danger-title" className="workspace-dossier-section-title">
-            {t("admin.v2.danger_zone")}
+          <p className="workspace-dossier-stamp">
+            {t("admin.v2.agent_meta_created", { time: formatRelativeTime(team.createdAt, t) })}
+            {" · "}
+            {t("admin.v2.agent_meta_updated", { time: formatRelativeTime(team.updatedAt, t) })}
           </p>
-          <Button type="button" variant="destructive" onClick={() => void remove()} loading={deleteTeamMutation.isPending} loadingLabel={t("teams.deleting")} disabled={updateTeamMutation.isPending || imageSaving}>
-            <AdminDelete size={14} aria-hidden="true" />
-            {t("teams.delete")}
-          </Button>
-        </section>
+        </aside>
+
+        {/* Management spans both columns — it acts on the whole record, not
+            on the roster document or the identity rail. */}
+        <div className="workspace-dossier-admin">
+          <section className="adm-drawer-section" aria-labelledby="team-profile-computer-title">
+            <p id="team-profile-computer-title" className="workspace-dossier-section-title">
+              {t("teams.computer_title")}
+            </p>
+            <p className="adm-form-hint">{t("teams.computer_hint")}</p>
+            <div className="team-profile-inline-actions">
+              <Select
+                value={moveTarget ?? teamNodeId}
+                disabled={busy || teamComputers.length === 0}
+                onValueChange={(value) => { if (value) setMoveTarget(value); }}
+              >
+                <SelectTrigger className="w-full" aria-label={t("teams.computer_choose")}>
+                  <SelectValue>
+                    {(value: string) => nodes.find((node) => node.id === value)?.displayName
+                      ?? teamComputer?.displayName
+                      ?? value
+                      ?? t("teams.computer_unknown")}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {teamComputers.map((node) => (
+                    <SelectItem key={node.id} value={node.id}>{node.displayName || node.id}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                onClick={() => void moveToComputer()}
+                disabled={busy || !moveTarget || moveTarget === teamNodeId}
+                loading={moveTeamMutation.isPending}
+                loadingLabel={t("teams.computer_moving")}
+              >
+                {t("teams.computer_move")}
+              </Button>
+            </div>
+          </section>
+
+          <section className="adm-drawer-section" aria-labelledby="team-profile-danger-title">
+            <p id="team-profile-danger-title" className="workspace-dossier-section-title">
+              {t("admin.v2.danger_zone")}
+            </p>
+            <Button type="button" variant="destructive" onClick={() => void remove()} loading={deleteTeamMutation.isPending} loadingLabel={t("teams.deleting")} disabled={updateTeamMutation.isPending || imageSaving}>
+              <AdminDelete size={14} aria-hidden="true" />
+              {t("teams.delete")}
+            </Button>
+          </section>
+        </div>
       </div>
     </div>
   );
@@ -465,21 +529,16 @@ function TeamProfile({
 export function TeamWorkspacePage({
   team,
   employeeId,
-  isRefreshing,
-  onRefresh,
   onOpenThread,
   onDeleted,
 }: {
   team: AgentTeam;
   employeeId?: string;
-  isRefreshing: boolean;
-  onRefresh: () => Promise<void>;
   onOpenThread: (sessionId: string) => void;
   onDeleted: () => void;
 }) {
   const { t } = useTranslation();
   const [pageTab, setPageTab] = useUrlSearchState("tab", "activities" as TeamPageTab, parseTeamTab, (value) => value === "activities" ? null : value, "push");
-  const [workspaceRefreshVersion, setWorkspaceRefreshVersion] = useState(0);
   const briefQuery = useQuery({
     queryKey: ["team-workspace-brief", team.id],
     queryFn: ({ signal }) => getWorkspaceBrief({ teamId: team.id }, signal),
@@ -488,13 +547,35 @@ export function TeamWorkspacePage({
   });
   const workspaceAgentId = teamWorkspaceAgentId(team);
 
-  async function refreshTeam(): Promise<void> {
-    if (pageTab === "workspace") setWorkspaceRefreshVersion((current) => current + 1);
-    await Promise.all([
-      pageTab !== "profile" ? briefQuery.refetch() : Promise.resolve(),
-      onRefresh(),
-    ]);
-  }
+  /* The band is the record's read-only spine, identical on all three tabs —
+     the same rule the agent record follows: facts live here and no tab panel
+     may restate them. Every field comes off the team record itself. */
+  const bandFacts: RecordFact[] = [
+    {
+      key: "availability",
+      label: t("admin.v2.agent_availability_label"),
+      value: !team.enabled
+        ? <Badge variant="neutral">{t("teams.disabled")}</Badge>
+        : <StatusPill value={teamAvailability(team)} />,
+    },
+    {
+      key: "members",
+      label: t("teams.members"),
+      value: <span className="tnum">{team.members.length}</span>,
+    },
+    {
+      key: "lead",
+      label: t("teams.lead"),
+      value: team.lead?.displayName ?? <span className="record-band-value--empty">—</span>,
+    },
+    {
+      key: "id",
+      label: t("workspace.band_team_id"),
+      value: truncateId(team.id),
+      technical: true,
+      title: team.id,
+    },
+  ];
 
   function movePageTab(event: KeyboardEvent<HTMLButtonElement>, previous: TeamPageTab, next: TeamPageTab) {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -521,7 +602,6 @@ export function TeamWorkspacePage({
             {team.name}
           </span>
         )}
-        subtitle={t("teams.profile_sub", { count: team.members.length })}
         titleVariant="display"
         layout="stacked"
         toolbar={(
@@ -545,12 +625,12 @@ export function TeamWorkspacePage({
             ))}
           </div>
         )}
-        actions={(
-          <Button type="button" variant="outline" size="icon" aria-label={t("nav.refresh")} disabled={isRefreshing || (pageTab === "activities" && briefQuery.isFetching)} onClick={() => void refreshTeam()}>
-            <NavRefresh size={16} className={isRefreshing || (pageTab === "activities" && briefQuery.isFetching) ? "spin" : undefined} />
-          </Button>
-        )}
       />
+      <RecordBand facts={bandFacts} label={t("workspace.band_team_label")} />
+
+      {/* One body shell for all three tabs, matching the agent record — it
+          owns the container query the profile dossier grid reads. */}
+      <div className="workspace-body">
       {pageTab === "profile" ? (
         <TeamProfile team={team} employeeId={employeeId} onDeleted={onDeleted} />
       ) : pageTab === "workspace" ? (
@@ -562,7 +642,6 @@ export function TeamWorkspacePage({
               threads={briefQuery.data?.sessions ?? []}
               fixedScope="shared"
               emptyMark={<TeamMark size={18} />}
-              refreshVersion={workspaceRefreshVersion}
             />
           ) : (
             <WorkspaceEmpty title={t("teams.no_workspace")} mark={<TeamMark size={18} />} announce />
@@ -591,6 +670,7 @@ export function TeamWorkspacePage({
           onOpenThread={onOpenThread}
         />
       )}
+      </div>
     </section>
   );
 }

@@ -315,6 +315,8 @@
     "band_label": "智能体档案",
     "band_computer": "计算机",
     "band_id": "智能体 ID",
+    "band_team_label": "团队档案",
+    "band_team_id": "团队 ID",
     "identity_label": "身份"
   },
   "profile_image": {
@@ -365,11 +367,6 @@
     "no_agents": "你没有可添加的智能体。",
     "no_workspace": "为团队添加成员后即可浏览其共享工作区。",
     "profile_title": "{{name}} 团队档案",
-    "profile_sub_one": "{{count}} 个智能体由一名负责人协作调度。",
-    "profile_sub_other": "{{count}} 个智能体由一名负责人协作调度。",
-    "profile_blurb": "由一名派发负责人协调的智能体团队，共享任务并汇总工作记录。",
-    "ready_members_one": "{{count}} 名成员中 {{ready}} 名就绪",
-    "ready_members_other": "{{count}} 名成员中 {{ready}} 名就绪",
     "sections": "团队分区",
     "select_title": "选择一个团队",
     "select_body": "选择团队以查看其档案、工作区和活动。",

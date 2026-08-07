@@ -315,6 +315,8 @@
     "band_label": "Agent record",
     "band_computer": "Computer",
     "band_id": "Agent ID",
+    "band_team_label": "Team record",
+    "band_team_id": "Team ID",
     "identity_label": "Identity"
   },
   "profile_image": {
@@ -365,11 +367,6 @@
     "no_agents": "You have no agents to add.",
     "no_workspace": "Add a member to this team to browse its shared workspace.",
     "profile_title": "{{name}} team profile",
-    "profile_sub_one": "{{count}} agent working under one lead.",
-    "profile_sub_other": "{{count}} agents working under one lead.",
-    "profile_blurb": "A coordinated agent crew with one dispatch lead, shared tasks, and a combined work history.",
-    "ready_members_one": "{{ready}} of {{count}} member ready",
-    "ready_members_other": "{{ready}} of {{count}} members ready",
     "sections": "Team sections",
     "select_title": "Select a team",
     "select_body": "Choose a team to inspect its profile, workspace, and activity.",

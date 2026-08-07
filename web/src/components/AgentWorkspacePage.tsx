@@ -13,7 +13,7 @@ import type {
 } from "../types";
 import { agentLabel } from "../lib/plan";
 import { isWorkspaceRetryableError, preferredWorkspaceThreadId, workspaceFilesEmptyState, workspaceHomeStatus } from "../lib/workspaceHome";
-import { NavRefresh, ActionRemove, WorkspaceFile, WorkspaceFolder } from "./icons";
+import { ActionRemove, WorkspaceFile, WorkspaceFolder } from "./icons";
 import { AgentMark } from "./AgentMark";
 import { IdentityMonogram } from "./IdentityMonogram";
 import { compactDate } from "../lib/workspaceFormat";
@@ -44,8 +44,6 @@ const PAGE_TABS: readonly WorkspacePageTab[] = ["profile", "workspace", "activit
 
 interface AgentWorkspacePageProps {
   agent: EmployeeAgent;
-  isRefreshing: boolean;
-  onRefresh: () => Promise<void>;
   onOpenThread: (sessionId: string) => void;
   canEditMeta?: boolean;
   /** Bubbles the profile tab's unsaved-draft state up to the agent switcher. */
@@ -371,15 +369,12 @@ export function WorkspaceFilesBrowser({
 
 export function AgentWorkspacePage({
   agent,
-  isRefreshing,
-  onRefresh,
   onOpenThread,
   canEditMeta = false,
   onProfileDirtyChange,
 }: AgentWorkspacePageProps) {
   const { t } = useTranslation();
   const [pageTab, setPageTab] = useUrlSearchState("tab", "activities" as WorkspacePageTab, parsePageTab, (value) => value === "activities" ? null : value, "push");
-  const [workspaceRefreshVersion, setWorkspaceRefreshVersion] = useState(0);
 
   const query = useQuery({
     queryKey: ["agent-workspace-brief", agent.id],
@@ -393,14 +388,6 @@ export function AgentWorkspacePage({
     ? query.error instanceof Error ? query.error.message : String(query.error)
     : "";
   const displayName = agent.displayName;
-
-  async function refreshWorkspace(): Promise<void> {
-    if (pageTab === "workspace") setWorkspaceRefreshVersion((current) => current + 1);
-    await Promise.all([
-      pageTab !== "profile" ? query.refetch() : Promise.resolve(),
-      onRefresh(),
-    ]);
-  }
 
   function movePageTab(event: KeyboardEvent<HTMLButtonElement>, next: WorkspacePageTab): void {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -433,7 +420,7 @@ export function AgentWorkspacePage({
   /* The band is the record's read-only spine, identical on all three tabs.
      Everything here used to live somewhere else and disagree with itself:
      runtime + computer + status were a cramped chip strip in the header,
-     owner + id sat inside a collapsed <details> on the profile tab only.
+     id sat inside a collapsed <details> on the profile tab only.
      Nothing in a tab panel may print these again. */
   const bandFacts: RecordFact[] = [
     {
@@ -459,12 +446,6 @@ export function AgentWorkspacePage({
       key: "availability",
       label: t("admin.v2.agent_availability_label"),
       value: <StatusPill value={agent.availability} />,
-    },
-    {
-      key: "owner",
-      label: t("admin.v2.agent_owner_label"),
-      value: `@${agent.employeeId}`,
-      technical: true,
     },
     {
       key: "id",
@@ -524,18 +505,6 @@ export function AgentWorkspacePage({
             })}
           </div>
         )}
-        actions={(
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label={t("nav.refresh")}
-            disabled={isRefreshing || (pageTab === "activities" && query.isFetching)}
-            onClick={() => void refreshWorkspace()}
-          >
-            <NavRefresh size={16} className={isRefreshing || (pageTab === "activities" && query.isFetching) ? "spin" : undefined} />
-          </Button>
-        )}
       />
 
       <RecordBand facts={bandFacts} label={t("workspace.band_label")} />
@@ -589,7 +558,6 @@ export function AgentWorkspacePage({
             agentId={agent.id}
             threads={brief?.sessions ?? []}
             emptyMark={<AgentMark agent={agent.executorKind} size={18} />}
-            refreshVersion={workspaceRefreshVersion}
           />
         </div>
       ) : null}

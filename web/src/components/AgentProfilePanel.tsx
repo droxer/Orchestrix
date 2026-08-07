@@ -322,7 +322,7 @@ export function AgentProfilePanel({
   if (isWorkspace) {
     /* The profile tab carries only what you can CHANGE about the record —
        portrait, name, role, instructions. Runtime, computer, availability,
-       owner, and id are printed once by the RecordBand above every tab, so
+       and id are printed once by the RecordBand above every tab, so
        restating them here (as the old hero and the collapsed "Details"
        disclosure both did) would put the same facts on screen twice. */
     return (

@@ -19,8 +19,6 @@ import { OWNERSHIP_ICON } from "./AgentPlacementBadge";
 
 interface AgentsPageProps {
   currentUser: CurrentUser;
-  isRefreshing: boolean;
-  onRefresh: () => Promise<void>;
   /** The agent currently inspected in the detail pane, driven by the pathname. */
   workspaceAgent: EmployeeAgent | null;
   isDetailRoute: boolean;
@@ -177,8 +175,6 @@ function RosterRow({
 
 export function AgentsPage({
   currentUser,
-  isRefreshing,
-  onRefresh,
   workspaceAgent,
   isDetailRoute,
   onOpenWorkspace,
@@ -310,8 +306,6 @@ export function AgentsPage({
           <AgentWorkspacePage
             key={workspaceAgent.id}
             agent={workspaceAgent}
-            isRefreshing={isRefreshing}
-            onRefresh={onRefresh}
             onOpenThread={onOpenThread}
             canEditMeta
             onProfileDirtyChange={handleProfileDirtyChange}
