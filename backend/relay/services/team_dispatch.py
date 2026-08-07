@@ -125,9 +125,22 @@ def _task_team_agents(
 def _team_member_assignment(
     agent: dict[str, Any], *, mode: str = "action"
 ) -> dict[str, Any]:
+    role = agent.get("defaultRole")
     return {
         "agentId": agent["id"],
         "agent": agent["executorKind"],
-        "mode": mode,
-        **({"role": agent["defaultRole"]} if agent.get("defaultRole") else {}),
+        "mode": _member_mode(role, mode),
+        **({"role": role} if role else {}),
     }
+
+
+def _member_mode(role: str | None, requested_mode: str) -> str:
+    """Pick the mode a member runs in, given its role and what was asked for.
+
+    Only a plain "do the work" request is specialized: a reviewer asked to act
+    reviews instead. An explicit review or ask request already describes the
+    whole round, so every member honors it as given.
+    """
+    if requested_mode == "action" and role == "reviewer":
+        return "review"
+    return requested_mode

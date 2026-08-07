@@ -27,6 +27,22 @@ from .bridge import (
 
 _HISTORY_HEADER = "[Conversation so far]"
 _HISTORY_ELISION = "[Earlier conversation omitted]"
+
+
+def _elision(progress_file: str | None) -> str:
+    """Say what was dropped, and where the agent can still find it.
+
+    Elision is silent loss: on a task that runs for hours the decisions made
+    early are exactly the ones that fall off the front. When the run keeps a
+    durable progress log, the marker points at it instead of stopping at
+    "omitted".
+    """
+    if not progress_file:
+        return _HISTORY_ELISION
+    return (
+        f"[Earlier conversation omitted — `{progress_file}` in the workspace "
+        "carries the decisions and state from before this point]"
+    )
 _DEFAULT_MAX_HISTORY_BLOCKS = 24
 _DEFAULT_MAX_HISTORY_CHARS = 16000
 
@@ -73,12 +89,18 @@ def _truncate_tail(block: str, budget: int) -> str:
     return marker + block[-tail_budget:].lstrip()
 
 
-def _cap_history_blocks(blocks: list[str], max_blocks: int, max_chars: int) -> list[str]:
+def _cap_history_blocks(
+    blocks: list[str],
+    max_blocks: int,
+    max_chars: int,
+    progress_file: str | None = None,
+) -> list[str]:
     if not blocks:
         return []
+    elision = _elision(progress_file)
     content_budget = max_chars - len(_HISTORY_HEADER) - 2
     if max_blocks <= 0 or content_budget <= 0:
-        return [_HISTORY_ELISION]
+        return [elision]
 
     kept_reversed: list[str] = []
     omitted = False
@@ -100,10 +122,10 @@ def _cap_history_blocks(blocks: list[str], max_blocks: int, max_chars: int) -> l
     if not omitted:
         return kept
 
-    kept = [_HISTORY_ELISION, *kept]
+    kept = [elision, *kept]
     while len(kept) > 1 and _history_len(kept) > content_budget:
         if len(kept) == 2:
-            available = content_budget - len(_HISTORY_ELISION) - 2
+            available = content_budget - len(elision) - 2
             kept[1] = _truncate_tail(kept[1], max(0, available))
             break
         kept.pop(1)
@@ -116,6 +138,7 @@ def compute_conversation_history(
     *,
     max_blocks: int = _DEFAULT_MAX_HISTORY_BLOCKS,
     max_chars: int = _DEFAULT_MAX_HISTORY_CHARS,
+    progress_file: str | None = None,
 ) -> str | None:
     """Build the conversation-so-far block for the next run on ``session``.
 
@@ -139,5 +162,7 @@ def compute_conversation_history(
     if not items:
         return None
 
-    blocks = _cap_history_blocks([block for _, _, block in items], max_blocks, max_chars)
+    blocks = _cap_history_blocks(
+        [block for _, _, block in items], max_blocks, max_chars, progress_file
+    )
     return _HISTORY_HEADER + "\n\n" + "\n\n".join(blocks)

@@ -23,6 +23,7 @@ import { acquireBoxliteHomeLock } from "../src/box.js";
 import { agentWorkspaceSubpath } from "../src/agent-workspace.js";
 import { listAgentWorkspace, readAgentWorkspaceFile, WorkspaceReadError } from "../src/workspace-read.js";
 import { isMainModule } from "../src/cli.js";
+import { consumeRoundResult, ROUND_RESULT_RELATIVE_PATH } from "../src/round-result.js";
 import type { DaemonNodeCommand, DaemonNodeEvent, DaemonNodeRegistration, DaemonNodeRunCommand, StreamExecResult } from "relay-core";
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -2167,4 +2168,27 @@ test("daemon stops instead of retrying when the backend reports the node was del
   // One rejected attempt, and no "stopped" registration afterwards: the node
   // is gone, so there is nothing left to report to.
   assert.equal(registrations.length, 1);
+});
+
+test("consumes the round result a run leaves behind and refuses malformed ones", () => {
+  const workspace = mkdtempSync(join(tmpdir(), "relay-round-result-"));
+  const controlPath = join(workspace, ROUND_RESULT_RELATIVE_PATH);
+  mkdirSync(join(workspace, ".relay"), { recursive: true });
+
+  // Nothing written: the run simply said nothing about being finished.
+  assert.equal(consumeRoundResult(workspace), undefined);
+
+  writeFileSync(controlPath, JSON.stringify({ status: "continue", note: "  schema left  " }));
+  assert.deepEqual(consumeRoundResult(workspace), { status: "continue", note: "schema left" });
+  // Consumed: a later round must not inherit this verdict and report "done"
+  // because a previous round said so.
+  assert.equal(existsSync(controlPath), false);
+
+  for (const malformed of ['{"status":"whatever"}', "not json at all", '["done"]', '{"note":"no status"}']) {
+    writeFileSync(controlPath, malformed);
+    assert.equal(consumeRoundResult(workspace), undefined, malformed);
+    assert.equal(existsSync(controlPath), false, `${malformed} should still be consumed`);
+  }
+
+  rmSync(workspace, { recursive: true, force: true });
 });

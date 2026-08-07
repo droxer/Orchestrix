@@ -374,3 +374,49 @@ def test_disconnecting_a_computer_frees_a_slot(
 
         assert client.delete(f"/api/v1/daemon-nodes/{node_id}").status_code == 204
         assert _enroll(client, "/Users/alice/two").status_code == 201
+
+
+def test_settings_default_and_update_task_rounds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _client(monkeypatch, database_auth=False) as client:
+        assert client.get("/api/v1/admin/settings").json()["settings"][
+            "maxTaskRounds"
+        ] == 5
+
+        assert (
+            client.put(
+                "/api/v1/admin/settings", json={"maxTaskRounds": 9}
+            ).status_code
+            == 200
+        )
+        assert client.get("/api/v1/admin/settings").json()["settings"][
+            "maxTaskRounds"
+        ] == 9
+
+        assert (
+            client.put("/api/v1/admin/settings", json={"maxTaskRounds": 0}).status_code
+            == 400
+        )
+
+
+def test_saving_one_setting_leaves_the_other_alone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Each card sends only its own field, so one save cannot revert the other."""
+    with _client(monkeypatch, database_auth=False) as client:
+        _set_global_limit(client, 7)
+        assert (
+            client.put(
+                "/api/v1/admin/settings", json={"maxTaskRounds": 2}
+            ).status_code
+            == 200
+        )
+
+        settings = client.get("/api/v1/admin/settings").json()["settings"]
+        assert settings["maxLocalComputersPerEmployee"] == 7
+        assert settings["maxTaskRounds"] == 2
+
+        assert (
+            client.put("/api/v1/admin/settings", json={}).status_code == 400
+        )

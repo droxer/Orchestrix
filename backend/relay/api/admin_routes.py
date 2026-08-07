@@ -13,6 +13,7 @@ from ..daemon_registry import public_sandbox_record
 from ..persistence.org_settings_store import (
     OrgSettingsValidationError,
     normalize_max_local_computers,
+    normalize_max_task_rounds,
 )
 from ..security.auth import require_admin_session
 from ..services.computer_limits import (
@@ -124,13 +125,22 @@ def get_org_settings(request: Request, ctx: AppContextDep) -> dict[str, Any]:
 async def update_org_settings(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     body = await json_body(request)
-    if "maxLocalComputersPerEmployee" not in body:
-        raise HTTPException(400, "maxLocalComputersPerEmployee is required.")
+    if "maxLocalComputersPerEmployee" not in body and "maxTaskRounds" not in body:
+        raise HTTPException(
+            400, "maxLocalComputersPerEmployee or maxTaskRounds is required."
+        )
     try:
         settings = ctx.org_settings_store.update_settings(
-            max_local_computers_per_employee=normalize_max_local_computers(
-                body["maxLocalComputersPerEmployee"]
-            )
+            max_local_computers_per_employee=(
+                normalize_max_local_computers(body["maxLocalComputersPerEmployee"])
+                if "maxLocalComputersPerEmployee" in body
+                else None
+            ),
+            max_task_rounds=(
+                normalize_max_task_rounds(body["maxTaskRounds"])
+                if "maxTaskRounds" in body
+                else None
+            ),
         )
     except OrgSettingsValidationError as error:
         raise HTTPException(400, str(error)) from error

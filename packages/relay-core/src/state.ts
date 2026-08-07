@@ -30,6 +30,29 @@ export interface AgentState {
   /** Durable personality profile for the selected logical agent identity. */
   agent_instructions?: string;
   /**
+   * The job this run is doing within its team, e.g. "reviewer". Distinct from
+   * the task mode: the mode decides what the agent may touch, the role decides
+   * what it is here to contribute.
+   */
+  agent_role?: string;
+  /**
+   * Workspace-relative control file where this run states whether the task is
+   * finished, e.g. ".relay/round-result.json". Only set when the daemon can
+   * read it back; absent means nothing will consume what the agent writes.
+   */
+  round_result_file?: string;
+  /**
+   * Why the lead was handed the turn back: a teammate's run failed and this
+   * run is the bounded chance to fix the cause before the pipeline resumes.
+   */
+  repair_note?: string;
+  /**
+   * Workspace-relative progress log for task work, e.g. "PROGRESS.md". The
+   * transcript is capped, so this is what carries decisions past the point
+   * where earlier turns are elided.
+   */
+  progress_file?: string;
+  /**
    * Personal home subdir (slash-separated, under the shared thread workspace)
    * for this run's logical agent, e.g. "agents/agent-<b64>". Runs execute at
    * the thread workspace root; this names the agent's private area.
