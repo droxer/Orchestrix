@@ -204,6 +204,8 @@ class TaskDispatcher:
         self.claim_id: str | None = None
 
     async def start(self) -> DispatchResult | None:
+        if not self._dispatchable():
+            return None
         team_result = self._resolve_team_assignments()
         if team_result:
             return team_result
@@ -220,6 +222,19 @@ class TaskDispatcher:
         if claim_result:
             return claim_result
         return await self._dispatch(node)
+
+    def _dispatchable(self) -> bool:
+        """Refuse a task that is not waiting to run, before anything mutates it.
+
+        Team resolution blocks the task when the team is gone or disabled, and
+        promotes a backlog task to assigned. Both are wrong for a task that is
+        already running or finished, so the status guard has to come first —
+        it used to live inside assignment preparation, which runs after.
+        """
+        return not self.task.get("isRoutine") and self.task.get("status") in (
+            "backlog",
+            "assigned",
+        )
 
     def _resolve_team_assignments(self) -> DispatchResult | None:
         if not self.task.get("assignedTeamId"):
@@ -278,11 +293,6 @@ class TaskDispatcher:
                     ),
                 }
             ]
-        if self.task.get("isRoutine") or self.task.get("status") not in (
-            "backlog",
-            "assigned",
-        ):
-            return False
         if (
             self.task.get("assignedAgentId") or self.task.get("assignedTeamId")
         ) and self.task.get("status") == "backlog":
@@ -293,7 +303,15 @@ class TaskDispatcher:
     def _resolve_node(
         self,
     ) -> tuple[dict[str, Any] | None, DispatchResult | None]:
-        if self.agent_first and not self.team_assignment_resolved:
+        if self.team_assignment_resolved:
+            # Team assignments are already bound to the placements' node. Scanning
+            # for a ready node again can hand back a different computer than the
+            # one the commands go to, pinning the thread to the wrong workspace.
+            return (
+                self.ctx.registry.get(self.run_assignments[0]["daemonNodeId"]),
+                None,
+            )
+        if self.agent_first:
             try:
                 self.run_assignments = resolve_agent_assignments(
                     self.run_assignments,

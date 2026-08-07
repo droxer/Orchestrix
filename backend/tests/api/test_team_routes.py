@@ -904,6 +904,254 @@ def test_unroutable_team_start_requests_capacity_and_queues_scheduler_retry(
         assert command["logicalAgentId"] == lead["id"]
 
 
+def test_team_reviewer_reviews_the_leads_work_and_carries_its_role(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        _employee(client, "alice")
+        app.state.registry.register(
+            {
+                "sandboxId": "node_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex", "claude"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        lead = _agent(client, "alice", "Lead", "codex", place=False)
+        reviewer = _agent(client, "alice", "Reviewer", "claude", place=False)
+        assert (
+            client.patch(
+                f"/api/v1/admin/agents/{lead['id']}",
+                json={"defaultRole": "implementer"},
+            ).status_code
+            == 200
+        )
+        assert (
+            client.patch(
+                f"/api/v1/admin/agents/{reviewer['id']}",
+                json={"defaultRole": "reviewer"},
+            ).status_code
+            == 200
+        )
+        for agent in (lead, reviewer):
+            assert (
+                client.post(
+                    f"/api/v1/admin/agents/{agent['id']}/placements",
+                    json={"daemonNodeId": "node_alice"},
+                ).status_code
+                == 201
+            )
+        team = client.post(
+            "/api/v1/admin/teams",
+            json={
+                "ownerEmployeeId": "alice",
+                "name": "Delivery",
+                "leadAgentId": lead["id"],
+                "memberAgentIds": [lead["id"], reviewer["id"]],
+            },
+        ).json()["team"]
+        task = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Build it and check it",
+                "assigneeEmployeeId": "alice",
+                "assignedTeamId": team["id"],
+            },
+        ).json()
+
+        started = client.post(f"/api/v1/tasks/{task['id']}/runs", json={})
+
+        assert started.status_code == 202
+        [lead_command] = app.state.registry.take_commands("node_alice", "node_token")
+        assert lead_command["mode"] == "action"
+        assert lead_command["role"] == "implementer"
+        assert lead_command["state"]["agent_role"] == "implementer"
+        app.state.registry.handle_event(
+            "node_alice",
+            {
+                "type": "run.completed",
+                "commandId": lead_command["id"],
+                "sessionId": lead_command["sessionId"],
+                "runId": lead_command["runId"],
+                "agent": "codex",
+                "mode": "action",
+                "exitCode": 0,
+                "agentLog": "built it",
+            },
+            "node_token",
+        )
+
+        [review_command] = app.state.registry.take_commands("node_alice", "node_token")
+        # A reviewer asked to "do the work" reviews it instead of redoing it.
+        assert review_command["mode"] == "review"
+        assert review_command["role"] == "reviewer"
+        assert review_command["state"]["agent_role"] == "reviewer"
+        app.state.registry.handle_event(
+            "node_alice",
+            {
+                "type": "run.completed",
+                "commandId": review_command["id"],
+                "sessionId": review_command["sessionId"],
+                "runId": review_command["runId"],
+                "agent": "claude",
+                "mode": "review",
+                "exitCode": 0,
+                "agentLog": "looks fine",
+            },
+            "node_token",
+        )
+
+        # A round containing a review ends with a human in the loop.
+        assert client.get(f"/api/v1/tasks/{task['id']}").json()["status"] == "review"
+        session = client.get(
+            f"/api/v1/threads/{lead_command['sessionId']}"
+        ).json()
+        assert [run["role"] for run in session["agentRuns"]] == [
+            "implementer",
+            "reviewer",
+        ]
+
+
+def test_team_start_runs_on_the_placement_node_not_any_ready_node(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        _employee(client, "alice")
+        # The team is placed here; the decoy below registers later and is
+        # therefore the node a plain ready-node scan would hand back first.
+        for node_id in ("node_alice_team", "node_alice_idle"):
+            app.state.registry.register(
+                {
+                    "sandboxId": node_id,
+                    "employeeId": "alice",
+                    "token": f"{node_id}_token",
+                    "workspacePath": f"/workspace/{node_id}",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex", "claude"],
+                    "capabilities": ["thread-workspaces"],
+                    "status": "ready",
+                }
+            )
+        lead = _agent(client, "alice", "Lead", "codex", place=False)
+        support = _agent(client, "alice", "Support", "claude", place=False)
+        for agent in (lead, support):
+            assert (
+                client.post(
+                    f"/api/v1/admin/agents/{agent['id']}/placements",
+                    json={"daemonNodeId": "node_alice_team"},
+                ).status_code
+                == 201
+            )
+        team = client.post(
+            "/api/v1/admin/teams",
+            json={
+                "ownerEmployeeId": "alice",
+                "name": "Delivery",
+                "leadAgentId": lead["id"],
+                "memberAgentIds": [lead["id"], support["id"]],
+            },
+        ).json()["team"]
+        task = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Ship from the placement node",
+                "assigneeEmployeeId": "alice",
+                "assignedTeamId": team["id"],
+            },
+        ).json()
+
+        started = client.post(f"/api/v1/tasks/{task['id']}/runs", json={})
+
+        assert started.status_code == 202
+        session = started.json()["session"]
+        assert session["daemonNodeId"] == "node_alice_team"
+        assert session["workspacePath"] == "/workspace/node_alice_team"
+        assert (
+            app.state.registry.take_commands("node_alice_idle", "node_alice_idle_token")
+            == []
+        )
+        [command] = app.state.registry.take_commands(
+            "node_alice_team", "node_alice_team_token"
+        )
+        assert command["logicalAgentId"] == lead["id"]
+
+
+def test_start_on_a_running_team_task_leaves_its_status_alone(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        _employee(client, "alice")
+        app.state.registry.register(
+            {
+                "sandboxId": "node_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        lead = _agent(client, "alice", "Lead", "codex", place=False)
+        assert (
+            client.post(
+                f"/api/v1/admin/agents/{lead['id']}/placements",
+                json={"daemonNodeId": "node_alice"},
+            ).status_code
+            == 201
+        )
+        team = client.post(
+            "/api/v1/admin/teams",
+            json={
+                "ownerEmployeeId": "alice",
+                "name": "Delivery",
+                "leadAgentId": lead["id"],
+                "memberAgentIds": [lead["id"]],
+            },
+        ).json()["team"]
+        task = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Already under way",
+                "assigneeEmployeeId": "alice",
+                "assignedTeamId": team["id"],
+            },
+        ).json()
+        assert (
+            client.post(f"/api/v1/tasks/{task['id']}/runs", json={}).json()["dispatch"][
+                "state"
+            ]
+            == "started"
+        )
+        assert client.get(f"/api/v1/tasks/{task['id']}").json()["status"] == "running"
+
+        # Disabling the team makes resolution fail permanently; a second start
+        # must not blocked-out a task whose run is still in flight.
+        assert (
+            client.patch(
+                f"/api/v1/admin/teams/{team['id']}", json={"enabled": False}
+            ).status_code
+            == 200
+        )
+        again = client.post(f"/api/v1/tasks/{task['id']}/runs", json={})
+
+        assert again.status_code == 202
+        assert again.json()["dispatch"]["state"] == "rejected"
+        assert again.json()["dispatch"]["code"] == "invalid_state"
+        assert client.get(f"/api/v1/tasks/{task['id']}").json()["status"] == "running"
+
+
 def test_team_task_create_session_uses_assignee_lead_and_team_ownership(
     monkeypatch,
 ) -> None:
