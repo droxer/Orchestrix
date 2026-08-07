@@ -262,7 +262,6 @@
   "workspace": {
     "title": "Workspace",
     "sub": "Files",
-    "profile_details": "Details",
     "sections": "Workspace sections",
     "tab_profile": "Profile",
     "tab_workspace": "Workspace",
@@ -276,9 +275,6 @@
     "empty_files_snapshot_hint": "Browse files saved from completed runs.",
     "loading": "Loading workspace…",
     "metrics": "Workspace metrics",
-    "metric_runs": "Active runs",
-    "metric_tasks": "Active tasks",
-    "metric_sessions": "Threads",
     "browse": "Browse",
     "files": "Files",
     "preview": "Preview",
@@ -314,7 +310,11 @@
     "session_runs": "{{count}} runs",
     "task_due": "Due {{date}}",
     "kind_directory": "Folder",
-    "kind_file": "File"
+    "kind_file": "File",
+    "band_label": "Agent record",
+    "band_computer": "Computer",
+    "band_id": "Agent ID",
+    "identity_label": "Identity"
   },
   "profile_image": {
     "alt": "{{name}} profile image",

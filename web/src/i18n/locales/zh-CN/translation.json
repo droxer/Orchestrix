@@ -262,7 +262,6 @@
   "workspace": {
     "title": "工作区",
     "sub": "文件",
-    "profile_details": "详细信息",
     "sections": "工作区分区",
     "tab_profile": "配置",
     "tab_workspace": "工作区",
@@ -276,9 +275,6 @@
     "empty_files_snapshot_hint": "浏览已完成运行所保存的文件。",
     "loading": "加载工作区中…",
     "metrics": "工作区指标",
-    "metric_runs": "活跃运行",
-    "metric_tasks": "活跃任务",
-    "metric_sessions": "对话",
     "browse": "浏览",
     "files": "文件",
     "preview": "预览",
@@ -314,7 +310,11 @@
     "session_runs": "{{count}} 次运行",
     "task_due": "截止 {{date}}",
     "kind_directory": "文件夹",
-    "kind_file": "文件"
+    "kind_file": "文件",
+    "band_label": "智能体档案",
+    "band_computer": "计算机",
+    "band_id": "智能体 ID",
+    "identity_label": "身份"
   },
   "profile_image": {
     "alt": "{{name}}的头像",

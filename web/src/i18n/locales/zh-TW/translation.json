@@ -262,7 +262,6 @@
   "workspace": {
     "title": "工作區",
     "sub": "檔案",
-    "profile_details": "詳細資訊",
     "sections": "工作區分區",
     "tab_profile": "設定",
     "tab_workspace": "工作區",
@@ -276,9 +275,6 @@
     "empty_files_snapshot_hint": "瀏覽已完成執行所儲存的檔案。",
     "loading": "載入工作區中…",
     "metrics": "工作區指標",
-    "metric_runs": "活躍執行",
-    "metric_tasks": "活躍任務",
-    "metric_sessions": "對話",
     "browse": "瀏覽",
     "files": "檔案",
     "preview": "預覽",
@@ -314,7 +310,11 @@
     "session_runs": "{{count}} 次執行",
     "task_due": "截止 {{date}}",
     "kind_directory": "資料夾",
-    "kind_file": "檔案"
+    "kind_file": "檔案",
+    "band_label": "智慧體檔案",
+    "band_computer": "電腦",
+    "band_id": "智慧體 ID",
+    "identity_label": "身分"
   },
   "profile_image": {
     "alt": "{{name}}的頭像",

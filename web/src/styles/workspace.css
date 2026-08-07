@@ -37,52 +37,6 @@
   box-shadow: inset 0 0 0 1px var(--line-2);
 }
 
-.workspace-header-strip {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--sp-1) var(--sp-2);
-  min-width: 0;
-  max-width: 100%;
-}
-
-.workspace-header-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-  padding: var(--sp-0-5) var(--sp-2);
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-1);
-  background: var(--surface-1);
-  color: var(--ink-3);
-  font-family: var(--font-mono);
-  letter-spacing: var(--type-code-track);
-  font-size: var(--fs-2);
-  line-height: 1.35;
-}
-
-.workspace-header-chip > svg {
-  flex: none;
-  color: var(--ink-2);
-}
-
-.workspace-header-chip-name {
-  flex: 0 1 auto;
-  overflow: hidden;
-  color: var(--ink-1);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.workspace-header-chip--empty {
-  color: var(--ink-3);
-  font-style: italic;
-}
-
 /* Stacked workspace header stays compact in the agents detail pane. */
 .workspace-page .page-header {
   padding-block: var(--sp-4);
@@ -98,13 +52,11 @@
   margin-top: var(--sp-2);
 }
 
-/* The base page-header-actions utility is shrink-0 — fine for a lone
-   refresh button, but the header strip added here is wide enough that at
-   narrow viewports the actions block must be allowed to shrink (and thus
-   let its own flex-wrap take effect) instead of overflowing the row. */
+/* The runtime/computer/status chips that used to crowd this slot now live in
+   the record band, so the actions block is a lone refresh button again and
+   can keep the base utility's shrink-0. */
 .workspace-page .page-header-actions {
-  flex-shrink: 1;
-  min-width: 0;
+  flex-shrink: 0;
 }
 
 .workspace-page-tab-count {
@@ -168,6 +120,93 @@
   color: var(--ink-2);
 }
 
+/* ---- record band + shared tab body ---------------------------------- */
+
+/* The read-only spine of a record, printed identically under the header on
+   every tab. It reuses the metric strip's geometry — flush cells divided by
+   hairlines, eyebrow above value — but carries facts instead of counts that
+   the sections below already state. */
+.record-band {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 0;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.record-band-cell {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--sp-1-5);
+  padding: var(--sp-3) var(--sp-4);
+  border-right: 1px solid var(--line-1);
+}
+
+.record-band-cell:last-child {
+  border-right: 0;
+}
+
+.record-band-label {
+  color: var(--ink-4);
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+/* Band values sit a tier below the page title on purpose: these are the
+   record's coordinates, not its headline. */
+.record-band-value {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink-1);
+  font: var(--type-body-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-band-value.code {
+  letter-spacing: var(--type-code-track);
+  font-size: var(--fs-2);
+  color: var(--ink-2);
+}
+
+.record-band-value--empty {
+  color: var(--ink-4);
+  font-style: italic;
+}
+
+.record-band-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.record-band-inline > svg {
+  flex: none;
+  color: var(--ink-2);
+}
+
+/* One shell for all three tab panels, so a tab switch changes the content
+   and nothing about the frame. It also owns the container context the
+   profile grid queries — the pane's width depends on whether the roster is
+   showing, which makes viewport width the wrong signal. */
+.workspace-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  container-type: inline-size;
+  container-name: record;
+}
+
 .workspace-inspect {
   flex: 1;
   min-height: 0;
@@ -175,70 +214,16 @@
   flex-direction: column;
 }
 
-/* ---- metric strip --------------------------------------------------- */
+/* ---- status strip ---------------------------------------------------- */
+/* What is left of the old metric strip: a single band for a caller-supplied
+   status chip. The three KPI numerals it used to carry (and their pulse
+   animation) are gone — they restated the section headers directly below. */
 
 .workspace-metric-strip {
   display: flex;
   align-items: stretch;
   gap: 0;
   border-bottom: 1px solid var(--line-1);
-}
-
-.workspace-metric-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: var(--sp-1);
-  min-width: 0;
-  border-right: 1px solid var(--line-1);
-  padding: var(--sp-4);
-}
-
-.workspace-metric-item:last-child {
-  border-right: 0;
-}
-
-/* KPI numeral — display tier (mono, 700, tracked), same language as the
-   admin dashboard tiles. atelier.css no longer patches this rule. */
-.workspace-metric-item strong {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  color: var(--ink-1);
-  font-family: var(--font-display);
-  font-size: var(--fs-6);
-  font-weight: 700;
-  letter-spacing: var(--track-display);
-  line-height: 1;
-}
-
-/* Eyebrow-above-numeral, mirroring the admin dashboard tiles. DOM order
-   stays value-then-label so screen readers announce "3 active runs". */
-.workspace-metric-item span {
-  order: -1;
-  color: var(--ink-4);
-  font: var(--type-micro);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-}
-
-/* Metrics stay grey — the --live scope rule names the workspace metric
-   strip as a calm surface, so an active-run count is a grey dot on the
-   calm cadence, never the accent and never an action fill. */
-.workspace-metric-item.is-live strong::after {
-  content: "";
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: var(--r-full);
-  background: var(--ok);
-  animation: workspace-metric-pulse var(--t-pulse-calm) var(--ease) infinite;
-}
-
-@keyframes workspace-metric-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.45; transform: scale(0.82); }
 }
 
 /* ---- two-pane grid: browse · preview desk ------------------------- */
@@ -248,6 +233,10 @@
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.6fr);
+  /* Without an explicit row the panes size to their content, so a short file
+     list left the divider — and the pane's own scroll region — floating
+     partway down an empty canvas. */
+  grid-template-rows: minmax(0, 1fr);
 }
 
 /* The preview renders only for a selected file; without one the browser
@@ -416,16 +405,100 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--sp-6) var(--sp-7);
+  padding: var(--sp-6);
 }
 
-/* Quiet hairline card — no left accent bar, no tonal plate. Identity reads
-   through the hero, not through container chrome. */
-.workspace-profile .workspace-profile-panel {
-  padding: var(--sp-7);
+/* The workspace profile is a document plus an identity rail, not a stack of
+   labelled rows. Gated on the container, not the viewport: this pane is
+   ~420px narrower whenever the agent roster is showing beside it. */
+.workspace-profile .workspace-profile-dossier {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--sp-6);
+}
+
+@container record (min-width: 768px) {
+  .workspace-profile .workspace-profile-dossier {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
+    gap: var(--sp-7);
+  }
+
+  .workspace-dossier-admin {
+    grid-column: 1 / -1;
+  }
+}
+
+.workspace-dossier-doc {
+  min-width: 0;
+}
+
+.workspace-dossier-rail {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+@container record (min-width: 768px) {
+  /* The rail is a margin note against the instructions document — the
+     hairline is what makes it read as one, so it only appears once the two
+     actually sit side by side. */
+  .workspace-dossier-rail {
+    border-left: 1px solid var(--line-2);
+    padding-left: var(--sp-6);
+  }
+}
+
+.workspace-dossier-portrait {
+  display: flex;
+}
+
+.workspace-dossier-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.workspace-dossier-field-label {
+  color: var(--ink-4);
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+.workspace-dossier-field-value {
+  color: var(--ink-1);
+  font: var(--type-body-sm);
+}
+
+.workspace-dossier-role-select {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 var(--sp-2);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-3);
-  background: var(--surface-1);
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  color: var(--ink-1);
+  font: var(--type-body-sm);
+}
+
+.workspace-dossier-stamp {
+  margin: 0;
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line-2);
+  color: var(--ink-4);
+  font: var(--type-body-sm);
+  text-wrap: pretty;
+}
+
+.workspace-dossier-admin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--line-2);
 }
 
 .workspace-profile .adm-cred-row {
@@ -471,13 +544,17 @@
   font-size: var(--fs-2);
 }
 
+/* The strip used to hold three count cells with this status chip pushed to
+   the far end. The counts are gone (the section headers carry them), so the
+   chip is the only occupant and has no reason to hug the right edge of an
+   otherwise empty band — it reads as a status line now. */
 .workspace-metric-item--status {
   flex-direction: row;
   align-items: center;
-  justify-content: flex-end;
-  margin-left: auto;
+  justify-content: flex-start;
   border-right: 0;
   gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
 }
 
 .workspace-status-pill {
@@ -566,22 +643,51 @@
   color: var(--ink-1);
 }
 
+/* One toolbar carries scope, location, thread, and source. It replaced four
+   stacked strips that pushed the first filename ~140px down the pane. */
 .workspace-files-bar {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
-  min-height: 34px;
-  border-bottom: 1px solid var(--line-2);
-  padding: 0 var(--sp-4);
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
+  min-height: 42px;
+  border-bottom: 1px solid var(--line-1);
+  padding: var(--sp-2) var(--sp-4);
 }
 
-.workspace-scope-toggle {
+.workspace-files-bar-end {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
-  min-height: 34px;
-  padding: var(--sp-1) var(--sp-4);
-  border-bottom: 1px solid var(--line-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-2) var(--sp-3);
+  min-width: 0;
+  margin-left: auto;
+}
+
+/* The browse pane loses ~60% of its width the moment a preview opens, so the
+   source chip has to yield: the word ("Live" / "Snapshot") is the signal and
+   the node id is the detail, which truncates first and keeps its full value
+   in the title attribute. */
+.workspace-files-bar-end .workspace-home-status {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.workspace-files-bar-end .workspace-home-node {
+  min-width: 0;
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The thread picker is a toolbar control, not a form field — it must not
+   out-weigh the breadcrumb it sits beside. */
+.workspace-files-bar .workspace-thread-select {
+  max-width: 190px;
+  min-height: 28px;
+  font-size: var(--fs-2);
 }
 
 /* Scope options share the segmented-control grammar of the page tabs —
@@ -620,16 +726,6 @@
   background: var(--surface-3);
   color: var(--ink-1);
   box-shadow: inset 0 0 0 1px var(--line-1);
-}
-
-.workspace-scope-hint {
-  margin-left: auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--ink-3);
-  font-size: var(--fs-2);
 }
 
 .workspace-path-crumb {
@@ -687,7 +783,6 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1-5);
-  margin-left: auto;
   color: var(--ink-3);
   font-size: var(--fs-2);
   white-space: nowrap;
@@ -1064,14 +1159,21 @@
 }
 
 /* Idle-presence pulse: the tile stays the neutral mark plate; only the dot
-   carries the (grey) presence signal on the calm cadence. */
+   carries the (grey) presence signal on the calm cadence. It is the only
+   surviving consumer of these keyframes, which the deleted metric strip
+   used to own, so they took its name. */
+@keyframes workspace-presence-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.82); }
+}
+
 .workspace-empty-state-mark.is-pulse::after {
   content: "";
   width: 8px;
   height: 8px;
   border-radius: var(--r-full);
   background: var(--ok);
-  animation: workspace-metric-pulse var(--t-pulse-calm) var(--ease) infinite;
+  animation: workspace-presence-pulse var(--t-pulse-calm) var(--ease) infinite;
 }
 
 .workspace-loading {
@@ -1112,26 +1214,12 @@
 
 /* ---- profile dossier (workspace variant) ---------------------------- */
 
-.workspace-profile-dossier {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-6);
-}
-
 .workspace-dossier-hero {
   display: flex;
   align-items: center;
   gap: var(--sp-4);
   padding-bottom: var(--sp-5);
   border-bottom: 1px solid var(--line-2);
-}
-
-.workspace-dossier-identity {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: var(--sp-1-5);
 }
 
 /* Team-profile hero slots — the agent hero uses the identity stack above. */
@@ -1172,15 +1260,6 @@
   gap: var(--sp-2);
 }
 
-.workspace-dossier-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-3);
-  color: var(--ink-3);
-  font: var(--type-label);
-}
-
 /* The profile's durable inner character. Its slightly editorial treatment
    keeps identity separate from runtime configuration. */
 .agent-personality-card {
@@ -1201,6 +1280,16 @@
 .agent-personality-card.is-editing {
   border-color: var(--line-1);
   background: var(--surface-2);
+}
+
+/* In the admin drawer the card is one block among many and earns its box.
+   On the record surface it IS the document column — the only thing in it —
+   so the box is chrome around nothing, drawn against two flush neighbours.
+   Editing still gets the plate, because there the border marks a live field. */
+.workspace-dossier-doc .agent-personality-card:not(.is-editing) {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
 }
 
 .agent-personality-card-head {
@@ -1615,7 +1704,16 @@
 }
 
 /* The agent/team name is display-tier — mono, tracked, ink-1 — the same
-   register as conversation titles and KPI numerals. */
+   register as conversation titles and KPI numerals. In the agent rail it
+   steps down: the page header already prints the name at display scale, and
+   a second display-tier copy one band below would fight it. */
+.workspace-dossier-rail .workspace-dossier-name-value {
+  font-family: var(--font-sans);
+  font-size: var(--fs-3);
+  font-weight: 500;
+  letter-spacing: var(--track-0);
+}
+
 .workspace-dossier-name-value {
   margin: 0;
   color: var(--ink-1);
@@ -1630,46 +1728,6 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--sp-2);
-}
-
-.workspace-dossier-details {
-  border-top: 1px solid var(--line-2);
-  padding-top: var(--sp-3);
-}
-
-.workspace-dossier-details summary {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  color: var(--ink-3);
-  cursor: pointer;
-  font: var(--type-label-strong);
-  list-style: none;
-  transition: color var(--t-fast) var(--ease);
-}
-
-.workspace-dossier-details-chevron {
-  transition: transform var(--t-fast) var(--ease);
-}
-
-.workspace-dossier-details[open] .workspace-dossier-details-chevron {
-  transform: rotate(180deg);
-}
-
-.workspace-dossier-details summary:hover {
-  color: var(--ink-1);
-}
-
-.workspace-dossier-details summary::-webkit-details-marker {
-  display: none;
-}
-
-.workspace-dossier-details-body {
-  display: grid;
-  gap: var(--sp-2);
-  margin-top: var(--sp-3);
-  color: var(--ink-3);
-  font: var(--type-body-sm);
 }
 
 .workspace-dossier-section-title {
@@ -1691,12 +1749,6 @@
   );
   background-size: 220% 100%;
   animation: workspace-skeleton var(--t-draw) var(--ease) infinite;
-}
-
-.workspace-skeleton-metric {
-  height: 60px;
-  flex: 1;
-  border-radius: 0;
 }
 
 .workspace-skeleton-pane {
@@ -1799,25 +1851,6 @@
 }
 
 @media (max-width: 640px) {
-  .workspace-metric-strip {
-    flex-wrap: wrap;
-  }
-
-  .workspace-metric-item {
-    flex: 1 0 50%;
-    border-bottom: 1px solid var(--line-2);
-  }
-
-  .workspace-metric-item.is-zero {
-    display: none;
-  }
-
-  .workspace-metric-item--status {
-    flex: 1 0 100%;
-    justify-content: flex-start;
-    margin-left: 0;
-  }
-
   .workspace-page .workspace-page-tabs {
     width: 100%;
   }
@@ -1835,10 +1868,6 @@
   .workspace-profile {
     padding: var(--sp-4);
   }
-
-  .workspace-profile .workspace-profile-panel {
-    padding: var(--sp-4);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1849,10 +1878,6 @@
   }
 
   .artifacts-empty-ghost {
-    animation: none;
-  }
-
-  .workspace-metric-item.is-live strong::after {
     animation: none;
   }
 

@@ -117,10 +117,20 @@ describe("type-face utilities", () => {
     assert.match(readWebSource("components/admin/NodeRow.tsx"), /adm-node-card-handle code[^]*?\{node\.id\}/);
 
     // Figures: counts, stamps, ratios.
-    for (const cls of ["conversation-stamp", "msg-time", "adm-dash-tile-value"]) {
+    for (const cls of [
+      "conversation-stamp",
+      "msg-time",
+      "adm-dash-tile-value",
+      // The workspace record surface's counts. These replaced a file-pinned
+      // assertion on the metric strip's `<strong className="tnum">{value}</strong>`,
+      // which broke the moment that strip was deleted for restating the very
+      // section headers below it — the same file-pinning mistake this block's
+      // header comment warns about, made one line further down.
+      "workspace-page-tab-count",
+      "workspace-pick-meta",
+    ]) {
       pairedWith("tnum", cls);
     }
-    assert.match(readWebSource("components/workspace/WorkspacePrimitives.tsx"), /<strong className="tnum">\{value\}<\/strong>/);
   });
 
   it("re-asserts the code face wherever a later `font` shorthand resets it", () => {
