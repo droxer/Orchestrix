@@ -1,19 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { listDaemonNodes } from "../../api";
 import { useEmployeeAgents } from "../../hooks/useEmployeeAgents";
 import { useRelayMutations } from "../../hooks/useRelayMutations";
-import { NODES_QUERY_KEY } from "../../hooks/useRelayData";
-import {
-  activePlacementNodeId,
-  canAddAgentToNodeScopedTeam,
-  nodeScopedTeamIssue,
-  teamMutationInput,
-} from "../../lib/teamForm";
-import type { AgentTeam, DaemonNodeMonitorRecord, EmployeeAgent } from "../../types";
+import { teamMutationInput } from "../../lib/teamForm";
+import type { AgentTeam } from "../../types";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -41,14 +33,12 @@ export function TeamDrawer({
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [leadId, setLeadId] = useState("");
   const [validationError, setValidationError] = useState<
-    "name" | "members" | "lead" | "unplaced" | "different-nodes" | null
+    "name" | "members" | "lead" | null
   >(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const membersRef = useRef<HTMLFieldSetElement>(null);
   const leadRef = useRef<HTMLButtonElement>(null);
-  const membersError = validationError === "members"
-    || validationError === "unplaced"
-    || validationError === "different-nodes";
+  const membersError = validationError === "members";
 
   useEffect(() => {
     setName(team?.name ?? "");
@@ -58,19 +48,9 @@ export function TeamDrawer({
   }, [open, team]);
 
   const { agents: employeeAgents } = useEmployeeAgents(open ? employeeId : undefined);
-  // Shares App's node poll through the same cache key rather than adding a timer.
-  const { data: nodes = [] } = useQuery<DaemonNodeMonitorRecord[]>({
-    queryKey: NODES_QUERY_KEY,
-    queryFn: async ({ signal }) => (await listDaemonNodes(undefined, signal)).nodes ?? [],
-    enabled: open,
-  });
   const agents = useMemo(
     () => employeeAgents.filter((agent) => !agent.deletedAt),
     [employeeAgents],
-  );
-  const selectedAgents = useMemo(
-    () => agents.filter((agent) => memberIds.includes(agent.id)),
-    [agents, memberIds],
   );
   const busy = createTeamMutation.isPending || updateTeamMutation.isPending || deleteTeamMutation.isPending;
   const saving = createTeamMutation.isPending || updateTeamMutation.isPending;
@@ -85,12 +65,6 @@ export function TeamDrawer({
   async function requestClose() {
     if (busy) return;
     if (await confirmDiscardChanges()) onClose();
-  }
-
-  function computerName(agent: EmployeeAgent): string {
-    const nodeId = activePlacementNodeId(agent);
-    const node = nodeId ? nodes.find((item) => item.id === nodeId) : undefined;
-    return node?.displayName || nodeId || t("teams.computer_unknown");
   }
 
   function toggleMember(agentId: string) {
@@ -116,12 +90,6 @@ export function TeamDrawer({
     }
     if (memberIds.length === 0) {
       setValidationError("members");
-      membersRef.current?.focus();
-      return;
-    }
-    const nodeIssue = nodeScopedTeamIssue(agents, memberIds);
-    if (nodeIssue) {
-      setValidationError(nodeIssue);
       membersRef.current?.focus();
       return;
     }
@@ -204,17 +172,13 @@ export function TeamDrawer({
           <div className="team-member-options">
             {agents.map((agent) => {
               const selected = memberIds.includes(agent.id);
-              const incompatible = !selected
-                && !canAddAgentToNodeScopedTeam(agent, selectedAgents);
               return (
                 <TeamMemberOption
                   key={agent.id}
                   agentId={agent.id}
                   displayName={agent.displayName}
                   executorKind={agent.executorKind}
-                  computerName={computerName(agent)}
                   selected={selected}
-                  incompatible={incompatible}
                   onToggle={toggleMember}
                 />
               );
@@ -223,11 +187,7 @@ export function TeamDrawer({
           {agents.length === 0 ? <span className="adm-form-hint">{t("teams.no_agents")}</span> : null}
           {membersError ? (
             <span id="team-members-error" className="text-sm text-danger" role="alert">
-              {validationError === "members"
-                ? t("teams.members_required")
-                : validationError === "unplaced"
-                  ? t("teams.members_unplaced")
-                  : t("teams.members_different_nodes")}
+              {t("teams.members_required")}
             </span>
           ) : null}
         </fieldset>

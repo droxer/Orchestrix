@@ -1,6 +1,5 @@
 "use client";
 
-import { useTranslation } from "react-i18next";
 import { agentLabel } from "../lib/plan";
 import type { AgentName } from "../types";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -12,37 +11,29 @@ export function TeamMemberOption({
   agentId,
   displayName,
   executorKind,
-  computerName,
   selected,
-  incompatible,
   disabled = false,
   onToggle,
 }: {
   agentId: string;
   displayName: string;
   executorKind: AgentName;
-  /** The computer this agent is placed on; appended to the kind label. */
-  computerName?: string;
   selected: boolean;
-  /** Blocked by the node-scope rule — gets the explanatory title. */
-  incompatible: boolean;
   disabled?: boolean;
   onToggle: (agentId: string) => void;
 }) {
-  const { t } = useTranslation();
   return (
     <label
       className="team-member-option"
-      title={incompatible ? t("teams.node_scope_required") : undefined}
     >
       <Checkbox
         checked={selected}
-        disabled={disabled || incompatible}
+        disabled={disabled}
         onCheckedChange={() => onToggle(agentId)}
         aria-label={displayName}
       />
       <span>{displayName}</span>
-      <small>{agentLabel(executorKind)}{computerName ? ` · ${computerName}` : ""}</small>
+      <small>{agentLabel(executorKind)}</small>
     </label>
   );
 }

@@ -468,9 +468,6 @@ export interface EmployeeAgent {
   version: number;
   availability: LogicalAgentAvailability;
   placements: AgentPlacement[];
-  /** Names of the teams that would be split if this agent left its computer.
-      Non-empty means its placement cannot be removed or moved on its own. */
-  placementLockedByTeams?: string[];
   createdAt: string;
   updatedAt: string;
   deletedAt?: string;

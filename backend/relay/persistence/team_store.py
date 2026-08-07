@@ -58,7 +58,6 @@ def validate_team_payload(
     payload: dict[str, Any],
     agent_store: Any,
     *,
-    placement_store: Any | None = None,
     current: dict[str, Any] | None = None,
 ) -> tuple[str, list[str]]:
     members = payload.get(
@@ -81,21 +80,6 @@ def validate_team_payload(
             raise TeamValidationError("team_member_not_found")
         if agent.get("supervisorEmployeeId") != owner_employee_id:
             raise TeamValidationError("team_member_wrong_supervisor")
-    if placement_store is not None:
-        member_node_ids: set[str] = set()
-        for agent_id in normalized:
-            active_placements = [
-                placement
-                for placement in placement_store.list_placements(agent_id=agent_id)
-                if placement.get("desiredState", "active") == "active"
-            ]
-            if not active_placements:
-                raise TeamValidationError("team_member_unplaced")
-            if len(active_placements) != 1:
-                raise TeamValidationError("team_member_placement_ambiguous")
-            member_node_ids.add(active_placements[0]["daemonNodeId"])
-        if len(member_node_ids) > 1:
-            raise TeamValidationError("team_members_different_nodes")
     return lead, normalized
 
 

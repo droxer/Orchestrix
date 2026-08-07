@@ -14,12 +14,6 @@ from ..services.agent_routing import (
 )
 from ..services.computer_names import computer_display_name
 from ..services.team_membership import remove_agent_from_teams
-from ..services.team_placement import (
-    TeamPlacementError,
-    active_placement_node_id,
-    assert_teams_stay_colocated,
-    teams_blocking_placement_change,
-)
 from ..sessions.controller import SessionController
 from .deps import AppContextDep
 from .helpers import (
@@ -217,10 +211,6 @@ async def create_agent_placement(
     node = ctx.registry.get(daemon_node_id)
     if not node:
         raise HTTPException(404, "Daemon node not found.")
-    # Placing an agent on a different computer moves it off the old one, so a
-    # single-agent placement is also the moment a team can be split.
-    if active_placement_node_id(ctx.agent_placement_store, agent_id) != node["id"]:
-        _assert_teams_stay_colocated(ctx, agent, node["id"])
     try:
         placement = create_node_placement(
             ctx.agent_placement_store, agent, node, body
@@ -238,8 +228,6 @@ async def update_agent_placement(
 ) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     body = await json_body(request)
-    if body.get("desiredState") == "removed":
-        _assert_placement_removal_keeps_teams_intact(ctx, placement_id)
     try:
         placement = ctx.agent_placement_store.update_placement(placement_id, body)
     except KeyError as error:
@@ -254,7 +242,6 @@ async def delete_agent_placement(
     placement_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
-    _assert_placement_removal_keeps_teams_intact(ctx, placement_id)
     try:
         placement = ctx.agent_placement_store.update_placement(
             placement_id, {"desiredState": "removed"}
@@ -357,7 +344,6 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             session=session,
             required_node_id=required_node_id,
             daemon_store=ctx.registry.daemon_store,
-            team_store=ctx.team_store,
         )
         parsed: dict[str, Any] = {
             "taskGoal": task_goal,
@@ -455,29 +441,6 @@ def _update_agent_and_realize_placements(
     return updated
 
 
-def _assert_teams_stay_colocated(
-    ctx: AppContextDep, agent: dict[str, Any], next_node_id: str | None
-) -> None:
-    try:
-        assert_teams_stay_colocated(
-            ctx.team_store, ctx.agent_placement_store, agent, next_node_id
-        )
-    except TeamPlacementError as error:
-        raise HTTPException(409, error.code) from error
-
-
-def _assert_placement_removal_keeps_teams_intact(
-    ctx: AppContextDep, placement_id: str
-) -> None:
-    placement = ctx.agent_placement_store.get_placement(placement_id)
-    if not placement or placement.get("desiredState") == "removed":
-        return
-    agent = ctx.agent_store.get_agent(placement["agentId"])
-    if not agent or agent.get("deletedAt"):
-        return
-    _assert_teams_stay_colocated(ctx, agent, None)
-
-
 def _agent_has_active_run(ctx: AppContextDep, agent_id: str) -> bool:
     return any(
         any(
@@ -507,14 +470,6 @@ def _agent_with_placements(ctx: AppContextDep, agent: dict[str, Any]) -> dict[st
         **agent,
         "availability": availability,
         "placements": placements,
-        # Teams that would be split if this agent gave up its computer. The
-        # view carries them so every surface — including an admin looking at
-        # another employee's agent — can explain a blocked placement change
-        # without fetching teams it cannot see.
-        "placementLockedByTeams": [
-            team["name"]
-            for team in teams_blocking_placement_change(ctx.team_store, agent)
-        ],
     }
 
 

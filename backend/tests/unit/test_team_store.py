@@ -8,7 +8,6 @@ from threading import Barrier, Lock
 import pytest
 from sqlalchemy import update
 
-from relay.persistence.agent_placement_store import LocalAgentPlacementStore
 from relay.persistence.agent_store import LocalAgentStore
 from relay.persistence import team_store as team_store_module
 from relay.persistence.team_store import DatabaseTeamStore, LocalTeamStore
@@ -211,42 +210,3 @@ def test_validate_team_payload_checks_membership(tmp_path: Path) -> None:
             {"leadAgentId": lead["id"], "memberAgentIds": [lead["id"], lead["id"]]},
             agents,
         )
-
-
-def test_validate_team_payload_requires_one_shared_node(tmp_path: Path) -> None:
-    agents = LocalAgentStore(tmp_path)
-    placements = LocalAgentPlacementStore(tmp_path)
-    lead = agents.create_agent(
-        "alice", {"displayName": "Lead", "executorKind": "codex"}
-    )
-    support = agents.create_agent(
-        "alice", {"displayName": "Support", "executorKind": "claude"}
-    )
-
-    from relay.persistence.team_store import validate_team_payload
-
-    with pytest.raises(ValueError, match="team_member_unplaced"):
-        validate_team_payload(
-            "alice",
-            {"leadAgentId": lead["id"], "memberAgentIds": [lead["id"], support["id"]]},
-            agents,
-            placement_store=placements,
-        )
-
-    placements.create_placement(lead, "node_a")
-    placements.create_placement(support, "node_b")
-    with pytest.raises(ValueError, match="team_members_different_nodes"):
-        validate_team_payload(
-            "alice",
-            {"leadAgentId": lead["id"], "memberAgentIds": [lead["id"], support["id"]]},
-            agents,
-            placement_store=placements,
-        )
-
-    placements.create_placement(support, "node_a")
-    assert validate_team_payload(
-        "alice",
-        {"leadAgentId": lead["id"], "memberAgentIds": [lead["id"], support["id"]]},
-        agents,
-        placement_store=placements,
-    ) == (lead["id"], [lead["id"], support["id"]])

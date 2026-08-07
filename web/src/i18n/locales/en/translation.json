@@ -45,8 +45,7 @@
     "delete_team": "Couldn't delete the team. Check the connection and try again.",
     "team_unavailable": "The agent team is not currently available.",
     "team_lead_not_member": "The team lead must be one of its members.",
-    "task_agent_and_team_conflict": "Choose either an agent or a team, not both.",
-    "move_team": "Couldn't move the team. Every member stayed on its current computer."
+    "task_agent_and_team_conflict": "Choose either an agent or a team, not both."
   },
   "skip_to_thread": "Skip to thread",
   "skip_to_content": "Skip to content",
@@ -351,9 +350,6 @@
     "lead": "Lead agent",
     "members_required": "Add at least 1 team member.",
     "name_required": "Enter a team name.",
-    "members_unplaced": "Every team member must have an active computer placement.",
-    "members_different_nodes": "Every team member must be on the same computer.",
-    "node_scope_required": "Only agents placed on the same computer can join this team.",
     "lead_required": "Choose a lead agent.",
     "lead_badge": "lead",
     "col_status": "Status",
@@ -371,13 +367,7 @@
     "select_title": "Select a team",
     "select_body": "Choose a team to inspect its profile, workspace, and activity.",
     "empty_title": "No teams yet",
-    "empty_body": "Group agents under a named lead for repeatable task dispatch.",
-    "computer_title": "Computer",
-    "computer_hint": "A team works together on one computer. Moving the team moves every member.",
-    "computer_choose": "Choose a computer for this team",
-    "computer_move": "Move team",
-    "computer_moving": "Moving",
-    "computer_unknown": "No computer"
+    "empty_body": "Group agents under a named lead for repeatable task dispatch."
   },
   "computer": {
     "title": "My Computer",
@@ -927,8 +917,7 @@
       "edit_employee_name_required": "A display name is required.",
       "emp_limit_over_short": "Over limit",
       "emp_limit_in_use_one": "{{count}} local computer connected now",
-      "emp_limit_in_use_other": "{{count}} local computers connected now",
-      "placement_locked_by_team": "On a team ({{teams}}) — move the whole team instead."
+      "emp_limit_in_use_other": "{{count}} local computers connected now"
     },
     "signing_in": "Signing in…"
   },

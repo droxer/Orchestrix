@@ -91,7 +91,6 @@ def resolve_team_task_assignments(
         agent_store=agent_store,
         placement_store=placement_store,
         daemon_nodes=daemon_nodes,
-        team_store=team_store,
     )
 
 

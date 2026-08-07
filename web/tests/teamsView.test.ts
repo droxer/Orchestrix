@@ -4,12 +4,7 @@ import { resolve } from "node:path";
 import { describe, it } from "node:test";
 
 import { taskAssigneeDisplayName, teamAvailability, teamReady } from "../src/lib/taskAssignment.js";
-import {
-  canAddAgentToNodeScopedTeam,
-  nodeScopedTeamIssue,
-  teamMutationInput,
-} from "../src/lib/teamForm.js";
-import { blocksPlacementRemoval, teamsBlockingPlacementChange } from "../src/lib/teamPlacement.js";
+import { teamMutationInput } from "../src/lib/teamForm.js";
 import { selectedTeamForWorkspace, teamWorkspaceAgentId } from "../src/lib/teamWorkspace.js";
 
 describe("Agent team management", () => {
@@ -79,44 +74,6 @@ describe("Agent team management", () => {
       memberAgentIds: ["agent_lead"],
       enabled: true,
     });
-  });
-
-  it("only assembles agents with active placements on one node", () => {
-    const lead = {
-      id: "agent_lead",
-      placements: [{ daemonNodeId: "node_a", desiredState: "active" }],
-    };
-    const colocated = {
-      id: "agent_support",
-      placements: [{ daemonNodeId: "node_a", desiredState: "active" }],
-    };
-    const remote = {
-      id: "agent_remote",
-      placements: [{ daemonNodeId: "node_b", desiredState: "active" }],
-    };
-    const unplaced = { id: "agent_unplaced", placements: [] };
-
-    assert.equal(canAddAgentToNodeScopedTeam(colocated, [lead]), true);
-    assert.equal(canAddAgentToNodeScopedTeam(remote, [lead]), false);
-    assert.equal(canAddAgentToNodeScopedTeam(unplaced, [lead]), false);
-    assert.equal(nodeScopedTeamIssue([lead, unplaced], ["agent_lead", "agent_unplaced"]), "unplaced");
-    assert.equal(nodeScopedTeamIssue([lead, remote], ["agent_lead", "agent_remote"]), "different-nodes");
-    assert.equal(nodeScopedTeamIssue([lead, colocated], ["agent_lead", "agent_support"]), null);
-  });
-
-  it("blocks giving up a placement that a team still depends on", () => {
-    const teams = [
-      { name: "Delivery", memberAgentIds: ["agent_lead", "agent_support"] },
-      { name: "Solo crew", memberAgentIds: ["agent_solo"] },
-    ];
-
-    assert.equal(blocksPlacementRemoval({ id: "agent_support" }, teams), true);
-    assert.equal(blocksPlacementRemoval({ id: "agent_solo" }, teams), false);
-    assert.equal(blocksPlacementRemoval({ id: "agent_loner" }, teams), false);
-    assert.deepEqual(
-      teamsBlockingPlacementChange({ id: "agent_lead" }, teams).map((team) => team.name),
-      ["Delivery"],
-    );
   });
 
   it("keeps the employee as assignee when a team executes the task", () => {

@@ -3,24 +3,17 @@
 import { useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { deleteTeamProfileImage, getWorkspaceBrief, listDaemonNodes, updateTeamProfileImage } from "../api";
+import { deleteTeamProfileImage, getWorkspaceBrief, updateTeamProfileImage } from "../api";
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { useRelayMutations } from "../hooks/useRelayMutations";
 import { TEAMS_QUERY_KEY } from "../hooks/useTeams";
-import { NODES_QUERY_KEY } from "../hooks/useRelayData";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { agentLabel } from "../lib/plan";
 import { teamAvailability, teamReady } from "../lib/taskAssignment";
-import {
-  activePlacementNodeId,
-  canAddAgentToNodeScopedTeam,
-  nodeScopedTeamIssue,
-  teamMutationInput,
-} from "../lib/teamForm";
+import { teamMutationInput } from "../lib/teamForm";
 import { teamWorkspaceAgentId } from "../lib/teamWorkspace";
-import { placeableTeamComputers } from "../lib/teamPlacement";
-import type { AgentTeam, DaemonNodeMonitorRecord } from "../types";
+import type { AgentTeam } from "../types";
 import { ActionEdit, AdminDelete } from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { PageHeader } from "./PageHeader";
@@ -62,7 +55,7 @@ function TeamProfile({
   const { t } = useTranslation();
   const { confirm } = useDialogs();
   const queryClient = useQueryClient();
-  const { updateTeamMutation, moveTeamMutation, deleteTeamMutation } = useRelayMutations();
+  const { updateTeamMutation, deleteTeamMutation } = useRelayMutations();
   const { agents: employeeAgents } = useEmployeeAgents(employeeId);
   const agents = useMemo(
     () => employeeAgents.filter((agent) => !agent.deletedAt),
@@ -74,52 +67,17 @@ function TeamProfile({
   const [memberIds, setMemberIds] = useState<string[]>(team.memberAgentIds);
   const [leadId, setLeadId] = useState(team.leadAgentId ?? "");
   const [imageSaving, setImageSaving] = useState(false);
-  const [moveTarget, setMoveTarget] = useState<string | null>(null);
-  // Shares App's node poll through the same cache key rather than adding a timer.
-  const { data: nodes = [] } = useQuery<DaemonNodeMonitorRecord[]>({
-    queryKey: NODES_QUERY_KEY,
-    queryFn: async ({ signal }) => (await listDaemonNodes(undefined, signal)).nodes ?? [],
-  });
   const [validationError, setValidationError] = useState<
-    "members" | "lead" | "unplaced" | "different-nodes" | null
+    "members" | "lead" | null
   >(null);
   const membersRef = useRef<HTMLFieldSetElement>(null);
   const leadRef = useRef<HTMLButtonElement>(null);
-  const selectedAgents = useMemo(
-    () => agents.filter((agent) => memberIds.includes(agent.id)),
-    [agents, memberIds],
-  );
   const busy = updateTeamMutation.isPending || deleteTeamMutation.isPending
-    || moveTeamMutation.isPending || imageSaving;
-  // Every member shares one computer, so any member's placement names it.
-  const teamNodeId = useMemo(() => {
-    const member = agents.find((agent) => team.memberAgentIds.includes(agent.id));
-    return member ? activePlacementNodeId(member) : null;
-  }, [agents, team.memberAgentIds]);
-  const teamComputers = useMemo(
-    () => placeableTeamComputers(nodes, employeeId ?? ""),
-    [nodes, employeeId],
-  );
-  const teamComputer = nodes.find((node) => node.id === teamNodeId) ?? null;
+    || imageSaving;
   const draftDirty = leadId !== (team.leadAgentId ?? "")
     || memberIds.length !== team.memberAgentIds.length
     || memberIds.some((id) => !team.memberAgentIds.includes(id));
   const confirmDiscardChanges = useUnsavedChangesGuard(editing && draftDirty && !busy);
-
-  async function moveToComputer() {
-    if (!moveTarget || moveTarget === teamNodeId) return;
-    try {
-      const { team: moved } = await moveTeamMutation.mutateAsync({
-        teamId: team.id,
-        daemonNodeId: moveTarget,
-      });
-      applyTeamUpdate(moved);
-      setMoveTarget(null);
-    } catch {
-      // The shared mutation error handler already announced the failure, and
-      // a refused move left every member on its original computer.
-    }
-  }
 
   function applyTeamUpdate(updated: AgentTeam) {
     queryClient.setQueriesData<{ teams: AgentTeam[] }>(
@@ -216,12 +174,6 @@ function TeamProfile({
       membersRef.current?.focus();
       return;
     }
-    const nodeIssue = nodeScopedTeamIssue(agents, memberIds);
-    if (nodeIssue) {
-      setValidationError(nodeIssue);
-      membersRef.current?.focus();
-      return;
-    }
     if (!leadId) {
       setValidationError("lead");
       leadRef.current?.focus();
@@ -299,8 +251,6 @@ function TeamProfile({
                   <div className="team-member-options team-profile-member-options">
                     {agents.map((agent) => {
                       const selected = memberIds.includes(agent.id);
-                      const incompatible = !selected
-                        && !canAddAgentToNodeScopedTeam(agent, selectedAgents);
                       return (
                         <TeamMemberOption
                           key={agent.id}
@@ -308,7 +258,6 @@ function TeamProfile({
                           displayName={agent.displayName}
                           executorKind={agent.executorKind}
                           selected={selected}
-                          incompatible={incompatible}
                           disabled={busy}
                           onToggle={toggleMember}
                         />
@@ -318,11 +267,7 @@ function TeamProfile({
                   {agents.length === 0 ? <span className="adm-form-hint">{t("teams.no_agents")}</span> : null}
                   {validationError && validationError !== "lead" ? (
                     <span id="team-profile-members-error" className="text-sm text-danger" role="alert">
-                      {validationError === "members"
-                        ? t("teams.members_required")
-                        : validationError === "unplaced"
-                          ? t("teams.members_unplaced")
-                          : t("teams.members_different_nodes")}
+                      {t("teams.members_required")}
                     </span>
                   ) : null}
                 </fieldset>
@@ -474,43 +419,6 @@ function TeamProfile({
         {/* Management spans both columns — it acts on the whole record, not
             on the roster document or the identity rail. */}
         <div className="workspace-dossier-admin">
-          <section className="adm-drawer-section" aria-labelledby="team-profile-computer-title">
-            <p id="team-profile-computer-title" className="workspace-dossier-section-title">
-              {t("teams.computer_title")}
-            </p>
-            <p className="adm-form-hint">{t("teams.computer_hint")}</p>
-            <div className="team-profile-inline-actions">
-              <Select
-                value={moveTarget ?? teamNodeId}
-                disabled={busy || teamComputers.length === 0}
-                onValueChange={(value) => { if (value) setMoveTarget(value); }}
-              >
-                <SelectTrigger className="w-full" aria-label={t("teams.computer_choose")}>
-                  <SelectValue>
-                    {(value: string) => nodes.find((node) => node.id === value)?.displayName
-                      ?? teamComputer?.displayName
-                      ?? value
-                      ?? t("teams.computer_unknown")}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {teamComputers.map((node) => (
-                    <SelectItem key={node.id} value={node.id}>{node.displayName || node.id}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                type="button"
-                onClick={() => void moveToComputer()}
-                disabled={busy || !moveTarget || moveTarget === teamNodeId}
-                loading={moveTeamMutation.isPending}
-                loadingLabel={t("teams.computer_moving")}
-              >
-                {t("teams.computer_move")}
-              </Button>
-            </div>
-          </section>
-
           <section className="adm-drawer-section" aria-labelledby="team-profile-danger-title">
             <p id="team-profile-danger-title" className="workspace-dossier-section-title">
               {t("admin.v2.danger_zone")}

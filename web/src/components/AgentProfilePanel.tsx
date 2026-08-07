@@ -310,13 +310,6 @@ export function AgentProfilePanel({
   const owner = employees.find((employee) => employee.id === agent.employeeId);
   const ownerDisplay = owner ? owner.displayName : `@${agent.employeeId}`;
   const placementDescriptions = describeAgentPlacements(agent.placements);
-  // A team keeps every member on one computer, so the last member of a team
-  // cannot hand its computer back on its own. Say so on the control instead of
-  // letting the request come back rejected.
-  const lockingTeams = agent.placementLockedByTeams ?? [];
-  const removeBlockedReason = lockingTeams.length > 0
-    ? t("admin.v2.placement_locked_by_team", { teams: lockingTeams.join(", ") })
-    : undefined;
   const isWorkspace = variant === "workspace";
 
   if (isWorkspace) {
@@ -499,7 +492,6 @@ export function AgentProfilePanel({
                       onRemove={(placement) => void handleRemovePlacement(placement)}
                       nodeMissingFor={(description) => nodes.length > 0
                         && !nodes.some((node) => node.id === description.placement.daemonNodeId)}
-                      removeBlockedReason={removeBlockedReason}
                     />
                   )}
                 </div>
@@ -672,7 +664,6 @@ export function AgentProfilePanel({
             onRemove={(placement) => void handleRemovePlacement(placement)}
             nodeMissingFor={(description) => nodes.length > 0
               && !nodes.some((node) => node.id === description.placement.daemonNodeId)}
-            removeBlockedReason={removeBlockedReason}
           />
         )}
       </div>

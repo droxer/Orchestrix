@@ -187,14 +187,6 @@ export function updateTeam(teamId: string, input: Partial<TeamMutationInput>): P
   });
 }
 
-/** Relocate every member of a team onto one computer, or fail without moving any. */
-export function moveTeamToComputer(teamId: string, daemonNodeId: string): Promise<{ team: AgentTeam }> {
-  return apiJson<{ team: AgentTeam }>(`/teams/${encodeURIComponent(teamId)}/computer`, {
-    method: "POST",
-    body: { daemonNodeId },
-  });
-}
-
 export function deleteTeam(teamId: string): Promise<{ team: AgentTeam }> {
   return apiJson<{ team: AgentTeam }>(`/teams/${encodeURIComponent(teamId)}`, { method: "DELETE" });
 }
