@@ -18,3 +18,8 @@ export function parseLimitInput(raw: string): number | null | undefined {
   if (parsed < MIN_LOCAL_COMPUTERS || parsed > MAX_LOCAL_COMPUTERS_CEILING) return undefined;
   return parsed;
 }
+
+/** Bounds for the automatic task-round budget, mirroring the backend's range in
+    `relay/persistence/org_settings_store.py`. */
+export const MIN_TASK_ROUNDS = 1;
+export const MAX_TASK_ROUNDS_CEILING = 50;

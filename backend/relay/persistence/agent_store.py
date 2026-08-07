@@ -649,10 +649,18 @@ def _normalize_agent_identity_patch(
             raise ValueError("profileImageUrl is invalid.")
         normalized["profileImageUrl"] = image_url
     if "defaultRole" in patch:
-        role = _required_string(patch, "defaultRole")
-        if role not in AGENT_ROLES:
-            raise ValueError(f"defaultRole must be one of: {', '.join(AGENT_ROLES)}.")
-        normalized["defaultRole"] = role
+        raw_role = patch["defaultRole"]
+        # null or "" clears the role: an agent that was given the wrong one has
+        # to be able to go back to taking each round's mode as given.
+        if raw_role is None or (isinstance(raw_role, str) and not raw_role.strip()):
+            normalized["defaultRole"] = None
+        else:
+            role = _required_string(patch, "defaultRole")
+            if role not in AGENT_ROLES:
+                raise ValueError(
+                    f"defaultRole must be one of: {', '.join(AGENT_ROLES)}."
+                )
+            normalized["defaultRole"] = role
     if "compatibilityKey" in patch:
         normalized["compatibilityKey"] = _required_string(patch, "compatibilityKey")
     return normalized

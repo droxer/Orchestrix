@@ -28,7 +28,10 @@ from .helpers import (
 router = APIRouter()
 
 
-AGENT_META_FIELDS = frozenset({"displayName", "instructions"})
+# What an agent's own supervisor may change. The role belongs here with the
+# personality: both describe how their agent works, and the supervisor is the
+# person who knows what job it should do on their team.
+AGENT_META_FIELDS = frozenset({"displayName", "instructions", "defaultRole"})
 
 
 @router.get("/agents")
@@ -461,8 +464,10 @@ def _agent_with_placements(ctx: AppContextDep, agent: dict[str, Any]) -> dict[st
         availability = "busy"
     elif any(placement["status"] == "pending" for placement in placements):
         availability = "pending"
-    public_agent = {key: value for key, value in agent.items() if key != "defaultRole"}
-    return {**public_agent, "availability": availability, "placements": placements}
+    # defaultRole used to be withheld because nothing acted on it. It now
+    # decides what a team member is told to do and which mode it runs in, so
+    # the people who own the agent need to see it.
+    return {**agent, "availability": availability, "placements": placements}
 
 
 def _placement_view(ctx: AppContextDep, placement: dict[str, Any]) -> dict[str, Any]:
