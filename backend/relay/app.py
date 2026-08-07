@@ -167,6 +167,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
         backend=backend,
         team_store=team_store,
         managed_node_store=managed_node_store,
+        org_settings_store=org_settings_store,
     )
 
     @asynccontextmanager
@@ -351,6 +352,7 @@ def task_scheduler_from_env(
     backend: ServerDaemonNodeBackend,
     team_store: Any,
     managed_node_store: Any | None = None,
+    org_settings_store: Any | None = None,
 ) -> TaskScheduler | None:
     enabled = os.environ.get("RELAY_TASK_SCHEDULER_ENABLED", "1").strip().lower()
     if enabled in ("0", "false", "no", "off"):
@@ -361,6 +363,7 @@ def task_scheduler_from_env(
         backend=backend,
         team_store=team_store,
         managed_node_store=managed_node_store,
+        org_settings_store=org_settings_store,
         interval_seconds=float(
             os.environ.get("RELAY_TASK_SCHEDULER_INTERVAL_SECONDS", "10")
         ),

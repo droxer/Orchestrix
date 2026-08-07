@@ -552,6 +552,23 @@ def _apply_task_occurrence_created(task: dict[str, Any], event: dict[str, Any]) 
         task["occurrenceIds"].append(occurrence_id)
 
 
+def _apply_task_round(task: dict[str, Any], event: dict[str, Any]) -> None:
+    """Apply a round's verdict and what a continuation of it would need.
+
+    Kept out of task.updated because these are execution facts, not user edits:
+    a person editing the title must never disturb the round bookkeeping, and a
+    round completing must never look like someone edited the task.
+    """
+    if event.get("roundResult") is not None:
+        task["lastRoundResult"] = event["roundResult"]
+    if event.get("roundCount") is not None:
+        task["roundCount"] = event["roundCount"]
+    if event.get("continuationSessionId") is not None:
+        task["continuationSessionId"] = event["continuationSessionId"]
+    if event.get("clearContinuation"):
+        task.pop("continuationSessionId", None)
+
+
 def _apply_task_status(task: dict[str, Any], event: dict[str, Any]) -> None:
     task["status"] = event["status"]
 
@@ -588,6 +605,7 @@ TASK_EVENT_HANDLERS: dict[str, TaskEventHandler] = {
     "task.dispatch_released": _apply_task_dispatch_released,
     "task.dispatch_outcome": _apply_task_dispatch_outcome,
     "task.occurrence_created": _apply_task_occurrence_created,
+    "task.round": _apply_task_round,
     "task.status": _apply_task_status,
     "task.deleted": _apply_task_deleted,
     "task.session_linked": _apply_task_session_linked,

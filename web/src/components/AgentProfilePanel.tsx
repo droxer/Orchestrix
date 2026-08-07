@@ -15,7 +15,8 @@ import {
   updateOwnEmployeeAgent,
 } from "../api";
 import { agentLabel } from "../lib/plan";
-import type { AgentPlacement, ControlPanelDaemonNodeRecord, EmployeeAgent, EmployeeRecord } from "../types";
+import { AGENT_ROLE_OPTIONS } from "../types";
+import type { AgentPlacement, AgentRole, ControlPanelDaemonNodeRecord, EmployeeAgent, EmployeeRecord } from "../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,6 +123,7 @@ export function AgentProfilePanel({
     return updateOwnEmployeeAgent(agent.id, {
       ...(patch.displayName !== undefined ? { displayName: patch.displayName } : {}),
       ...(patch.instructions !== undefined ? { instructions: patch.instructions } : {}),
+      ...(patch.defaultRole !== undefined ? { defaultRole: patch.defaultRole } : {}),
     });
   }
 
@@ -130,6 +132,23 @@ export function AgentProfilePanel({
     void queryClient.invalidateQueries({ queryKey: ADMIN_AGENTS_KEY });
     void queryClient.invalidateQueries({ queryKey: [EMPLOYEE_AGENTS_QUERY_KEY] });
     onAgentUpdated?.(updated);
+  }
+
+  async function handleRoleChange(next: string) {
+    // Empty means "no role": the agent goes back to taking the round's mode as
+    // given rather than specializing.
+    const role = next ? (next as AgentRole) : undefined;
+    if ((agent.defaultRole ?? "") === (role ?? "")) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await patchAgent({ defaultRole: role ?? null });
+      applyAgentUpdate(result.agent);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
   }
 
   function startRename() {
@@ -360,6 +379,28 @@ export function AgentProfilePanel({
         <details className="workspace-dossier-details">
           <summary>{t("workspace.profile_details")}</summary>
           <div className="workspace-dossier-details-body">
+            <span className="workspace-dossier-role">
+              <label htmlFor="agent-default-role">{t("admin.v2.agent_role_label")}:</label>{" "}
+              {canEditProfile ? (
+                <select
+                  id="agent-default-role"
+                  value={agent.defaultRole ?? ""}
+                  disabled={saving}
+                  onChange={(event) => void handleRoleChange(event.target.value)}
+                >
+                  <option value="">{t("admin.v2.agent_role_none")}</option>
+                  {AGENT_ROLE_OPTIONS.map((role) => (
+                    <option key={role} value={role}>
+                      {t(`admin.v2.agent_role.${role}`, { defaultValue: role })}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                agent.defaultRole
+                  ? t(`admin.v2.agent_role.${agent.defaultRole}`, { defaultValue: agent.defaultRole })
+                  : t("admin.v2.agent_role_none")
+              )}
+            </span>
             <span translate="no">@{agent.employeeId} · {agent.id}</span>
             <span>{t("admin.v2.agent_owner_label")}: @{ownerLabel}</span>
             <span>

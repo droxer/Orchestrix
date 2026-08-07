@@ -57,7 +57,7 @@ export const DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS: readonly number[] = [1];
  * in its run.completed event, so the backend never has to walk the workspace
  * itself (which only works when they share a filesystem).
  */
-export type DaemonNodeCapability = "generated-files" | "workspace-read" | "workspace-read-shared" | "structured-agent-events" | "thread-workspaces";
+export type DaemonNodeCapability = "generated-files" | "workspace-read" | "workspace-read-shared" | "structured-agent-events" | "thread-workspaces" | "round-result";
 export const DAEMON_CAPABILITY_GENERATED_FILES: DaemonNodeCapability = "generated-files";
 /** The daemon can serve agent-home file listings and reads via workspace commands. */
 export const DAEMON_CAPABILITY_WORKSPACE_READ: DaemonNodeCapability = "workspace-read";
@@ -67,6 +67,22 @@ export const DAEMON_CAPABILITY_WORKSPACE_READ_SHARED: DaemonNodeCapability = "wo
 export const DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS: DaemonNodeCapability = "structured-agent-events";
 /** The daemon executes each thread below its configured node workspace root. */
 export const DAEMON_CAPABILITY_THREAD_WORKSPACES: DaemonNodeCapability = "thread-workspaces";
+/**
+ * The daemon reads the control file a run leaves at `.relay/round-result.json`
+ * and reports it as `roundResult`, so the control plane learns whether the work
+ * is finished without parsing the agent's prose.
+ */
+export const DAEMON_CAPABILITY_ROUND_RESULT: DaemonNodeCapability = "round-result";
+
+/**
+ * A round's own verdict on the task, reported by the daemon from the control
+ * file the run left behind. "continue" asks for another round; "blocked" ends
+ * the work and needs a human; "done" is the finished case.
+ */
+export interface DaemonRoundResult {
+  status: "done" | "continue" | "blocked";
+  note?: string;
+}
 
 /** A workspace file a run created or changed, reported by the daemon. */
 export interface DaemonGeneratedFile {
@@ -243,6 +259,7 @@ export type DaemonNodeEvent =
       agentLog: string;
       tokenUsage?: TokenUsage;
       generatedFiles?: DaemonGeneratedFile[];
+      roundResult?: DaemonRoundResult;
     }
   | {
       type: "run.failed";

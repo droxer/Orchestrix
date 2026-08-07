@@ -198,6 +198,8 @@ export function getControlPanelAgent(agentId: string, signal?: AbortSignal): Pro
 export type EmployeeAgentMetaPatch = {
   displayName?: string;
   instructions?: string;
+  /** null clears the role, so an agent can go back to no specialization. */
+  defaultRole?: AgentRole | null;
 };
 
 export type EmployeeAgentAdminPatch = EmployeeAgentMetaPatch & {
@@ -324,12 +326,14 @@ export function getOrgSettings(signal?: AbortSignal): Promise<OrgSettingsRespons
   return apiJson<OrgSettingsResponse>("/admin/settings", { signal });
 }
 
+/** Each field is optional: the backend leaves out what is not sent, so saving
+    one card never overwrites the other with a stale value read earlier. */
 export function updateOrgSettings(
-  maxLocalComputersPerEmployee: number,
+  patch: { maxLocalComputersPerEmployee?: number; maxTaskRounds?: number },
 ): Promise<OrgSettingsResponse> {
   return apiJson<OrgSettingsResponse>("/admin/settings", {
     method: "PUT",
-    body: { maxLocalComputersPerEmployee },
+    body: patch,
   });
 }
 

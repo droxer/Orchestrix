@@ -275,6 +275,8 @@ export interface EmployeeRecord {
 
 export interface OrgSettings {
   maxLocalComputersPerEmployee: number;
+  /** How many extra rounds a task may run when it reports itself unfinished. */
+  maxTaskRounds: number;
   updatedAt?: string | null;
 }
 
@@ -438,6 +440,17 @@ export interface AgentPlacement {
   updatedAt: string;
 }
 
+/** The roles an agent may hold on a team, in the order they are offered.
+    Mirrors AGENT_ROLES in relay/core/models.py; the AgentRole type that
+    relay-core already owns keeps this list honest. */
+export const AGENT_ROLE_OPTIONS: readonly AgentRole[] = [
+  "implementer",
+  "reviewer",
+  "planner",
+  "tester",
+  "fixer",
+];
+
 export interface EmployeeAgent {
   id: string;
   employeeId: string;
@@ -445,6 +458,9 @@ export interface EmployeeAgent {
   profileImageUrl?: string | null;
   executorKind: AgentName;
   instructions?: string;
+  /** The job this agent does on a team, e.g. "reviewer". Shapes its prompt and,
+      for a reviewer, makes it review a round instead of redoing the work. */
+  defaultRole?: AgentRole;
   skillPolicy: Record<string, unknown>;
   toolPolicy: Record<string, unknown>;
   modelPolicy: Record<string, unknown>;

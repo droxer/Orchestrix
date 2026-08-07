@@ -1068,3 +1068,124 @@ def test_scheduler_requests_managed_capacity_for_unroutable_team_lead() -> None:
             assert managed["desiredState"] == "running"
 
     asyncio.run(run_flow())
+
+
+class _FixedOrgSettings:
+    def __init__(self, max_task_rounds: int) -> None:
+        self._settings = {"maxTaskRounds": max_task_rounds}
+
+    def get_settings(self) -> dict:
+        return dict(self._settings)
+
+
+def _round_scheduler_fixture(root: str, *, max_task_rounds: int):
+    task_store = LocalTaskStore(root)
+    registry = DaemonNodeRegistry(
+        LocalSessionStore(root), LocalDaemonStore(root), task_store=task_store
+    )
+    registry.register(
+        {
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "capabilities": ["thread-workspaces", "round-result"],
+            "status": "ready",
+        },
+        "ui_token",
+    )
+    agent_store = LocalEmployeeAgentStore(root)
+    placements = LocalAgentPlacementStore(root)
+    agent = agent_store.create_agent(
+        "alice", {"displayName": "Solo", "executorKind": "codex"}
+    )
+    placements.create_placement(agent, "sbx_alice")
+    backend = ServerDaemonNodeBackend(
+        registry, employee_agent_store=agent_store, agent_placement_store=placements
+    )
+    scheduler = TaskScheduler(
+        task_store=task_store,
+        registry=registry,
+        backend=backend,
+        org_settings_store=_FixedOrgSettings(max_task_rounds),
+    )
+    task = task_store.create_task(
+        {
+            "title": "Migrate the billing tables",
+            "assignedAgent": "codex",
+            "assignedAgentId": agent["id"],
+            "assigneeEmployeeId": "alice",
+            "status": "assigned",
+        }
+    )
+    return task_store, registry, scheduler, task
+
+
+def _report_round(registry, command, status: str) -> None:
+    registry.handle_event(
+        "sbx_alice",
+        {
+            "type": "run.completed",
+            "commandId": command["id"],
+            "sessionId": command["sessionId"],
+            "runId": command["runId"],
+            "agent": "codex",
+            "mode": "action",
+            "exitCode": 0,
+            "agentLog": "worked",
+            "roundResult": {"status": status, "note": "more to do"},
+        },
+        "node_token",
+    )
+
+
+def test_scheduler_runs_a_second_round_in_the_same_thread() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            task_store, registry, scheduler, task = _round_scheduler_fixture(
+                root, max_task_rounds=3
+            )
+
+            assert (await scheduler.tick()).dispatched == 1
+            [first] = registry.take_commands("sbx_alice", "node_token")
+            _report_round(registry, first, "continue")
+
+            assert (await scheduler.tick()).dispatched == 1
+            [second] = registry.take_commands("sbx_alice", "node_token")
+
+            # Same thread, so the second round opens the workspace the first
+            # round left behind instead of an empty one.
+            assert second["sessionId"] == first["sessionId"]
+            assert second["runId"] != first["runId"]
+            _report_round(registry, second, "done")
+
+            finished = task_store.get_task(task["id"])
+            assert finished["status"] == "done"
+            assert finished["roundCount"] == 1
+
+    asyncio.run(run_flow())
+
+
+def test_scheduler_stops_a_task_that_never_reports_itself_finished() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            task_store, registry, scheduler, task = _round_scheduler_fixture(
+                root, max_task_rounds=2
+            )
+
+            for _ in range(2):
+                assert (await scheduler.tick()).dispatched == 1
+                [command] = registry.take_commands("sbx_alice", "node_token")
+                _report_round(registry, command, "continue")
+
+            # Budget spent: the next tick refuses instead of looping forever.
+            assert (await scheduler.tick()).dispatched == 0
+            assert registry.take_commands("sbx_alice", "node_token") == []
+            stopped = task_store.get_task(task["id"])
+            assert stopped["status"] == "waiting_for_human"
+            assert stopped["dispatchOutcome"]["code"] == "round_budget_exhausted"
+            assert "2-round budget" in stopped["activity"][-1]["message"]
+
+    asyncio.run(run_flow())

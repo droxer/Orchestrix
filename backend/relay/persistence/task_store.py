@@ -462,6 +462,26 @@ class LocalTaskStore:
             relay_task_event("task.dispatch_released", task_id, {"claimId": claim_id}),
         )
 
+    def record_round(
+        self,
+        task_id: str,
+        *,
+        round_result: dict[str, Any] | None = None,
+        round_count: int | None = None,
+        continuation_session_id: str | None = None,
+        clear_continuation: bool = False,
+    ) -> dict[str, Any]:
+        return self.append_event(
+            task_id,
+            round_event(
+                task_id,
+                round_result=round_result,
+                round_count=round_count,
+                continuation_session_id=continuation_session_id,
+                clear_continuation=clear_continuation,
+            ),
+        )
+
     def record_dispatch_outcome(
         self,
         task_id: str,
@@ -1226,6 +1246,26 @@ class DatabaseTaskStore:
             relay_task_event("task.dispatch_released", task_id, {"claimId": claim_id}),
         )
 
+    def record_round(
+        self,
+        task_id: str,
+        *,
+        round_result: dict[str, Any] | None = None,
+        round_count: int | None = None,
+        continuation_session_id: str | None = None,
+        clear_continuation: bool = False,
+    ) -> dict[str, Any]:
+        return self.append_event(
+            task_id,
+            round_event(
+                task_id,
+                round_result=round_result,
+                round_count=round_count,
+                continuation_session_id=continuation_session_id,
+                clear_continuation=clear_continuation,
+            ),
+        )
+
     def record_dispatch_outcome(
         self,
         task_id: str,
@@ -1802,6 +1842,31 @@ def new_dispatch_claim(
         .isoformat()
         .replace("+00:00", "Z"),
     }
+
+
+def round_event(
+    task_id: str,
+    *,
+    round_result: dict[str, Any] | None = None,
+    round_count: int | None = None,
+    continuation_session_id: str | None = None,
+    clear_continuation: bool = False,
+) -> dict[str, Any]:
+    """Record a round's verdict and the thread a continuation would resume."""
+    return relay_task_event(
+        "task.round",
+        task_id,
+        {
+            **({"roundResult": round_result} if round_result is not None else {}),
+            **({"roundCount": round_count} if round_count is not None else {}),
+            **(
+                {"continuationSessionId": continuation_session_id}
+                if continuation_session_id is not None
+                else {}
+            ),
+            **({"clearContinuation": True} if clear_continuation else {}),
+        },
+    )
 
 
 def dispatch_outcome_event(

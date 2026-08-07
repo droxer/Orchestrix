@@ -19,6 +19,12 @@ from ..services.agent_routing import (
     dispatch_reason_code,
     resolve_agent_assignments,
 )
+from ..services.task_rounds import (
+    awaits_continuation,
+    budget_exhausted_message,
+    continuation_budget_exhausted,
+    continuation_session_id,
+)
 from ..services.team_dispatch import (
     TEAM_UNAVAILABLE_MESSAGE,
     TeamDispatchError,
@@ -123,6 +129,7 @@ class TaskScheduler:
         backend: Any,
         team_store: Any | None = None,
         managed_node_store: Any | None = None,
+        org_settings_store: Any | None = None,
         interval_seconds: float = 10.0,
         max_dispatches_per_tick: int = 5,
         today: Callable[[], date] = date.today,
@@ -132,6 +139,7 @@ class TaskScheduler:
         self.backend = backend
         self.team_store = team_store
         self.managed_node_store = managed_node_store
+        self.org_settings_store = org_settings_store
         self.interval_seconds = interval_seconds
         self.max_dispatches_per_tick = max_dispatches_per_tick
         self._today = today
@@ -262,9 +270,22 @@ class TaskScheduler:
             if self._backoff_active(task["id"], now):
                 skipped += 1
                 continue
+            if self._continuation_refused(task):
+                skipped += 1
+                continue
             team_id = task.get("assignedTeamId")
             agent = valid_agent(task.get("assignedAgent"))
             assignments: list[dict[str, Any]]
+            # A continuation resumes its own thread, so routing has to respect
+            # that thread's workspace affinity rather than pick a node afresh.
+            resume_session_id = (
+                continuation_session_id(task) if awaits_continuation(task) else None
+            )
+            resume_session = (
+                self._session_for_continuation(resume_session_id)
+                if resume_session_id
+                else None
+            )
             try:
                 employee_id = task_execution_employee_id(task)
                 daemon_nodes = self.registry.monitor_nodes()
@@ -292,6 +313,7 @@ class TaskScheduler:
                         agent_store=self.backend.agent_store,
                         placement_store=self.backend.agent_placement_store,
                         daemon_nodes=daemon_nodes,
+                        session=resume_session,
                     )
                 node = self.registry.get(assignments[0]["daemonNodeId"])
             except TeamDispatchError as error:
@@ -331,13 +353,63 @@ class TaskScheduler:
                 continue
             attempts += 1
             if await self._dispatch_claimed_task(
-                claimed, agent, node["id"], assignments, team_id=team_id
+                claimed,
+                agent,
+                node["id"],
+                assignments,
+                team_id=team_id,
+                session_id=resume_session_id,
             ):
                 dispatched += 1
                 self._dispatch_backoff.pop(task["id"], None)
             else:
                 self._register_dispatch_failure(task["id"])
         return dispatched, skipped
+
+    def _session_for_continuation(self, session_id: str) -> dict[str, Any] | None:
+        store = getattr(self.backend, "registry", None)
+        store = getattr(store, "store", None)
+        if store is None:
+            return None
+        try:
+            return store.get_session(session_id)
+        except (KeyError, FileNotFoundError):
+            return None
+
+    def _continuation_refused(self, task: dict[str, Any]) -> bool:
+        """Stop a task that keeps asking for another round. True if refused.
+
+        This is the only bound on automatic continuation: an agent that always
+        reports "continue" would otherwise re-dispatch itself indefinitely. A
+        refused task waits for a person rather than failing — the work so far
+        is intact, and continuing it is a judgement call.
+        """
+        if not awaits_continuation(task):
+            return False
+        if not continuation_session_id(task):
+            # Nothing to resume into: a fresh thread would start without the
+            # work already done, so a human has to decide what happens next.
+            self._park_for_human(
+                task,
+                "round_continuation_unavailable",
+                "The round asked to continue, but its thread is no longer known.",
+            )
+            return True
+        if continuation_budget_exhausted(task, self.org_settings_store):
+            self._park_for_human(
+                task,
+                "round_budget_exhausted",
+                budget_exhausted_message(task, self.org_settings_store),
+            )
+            return True
+        return False
+
+    def _park_for_human(self, task: dict[str, Any], code: str, message: str) -> None:
+        self.task_store.record_round(task["id"], clear_continuation=True)
+        self.task_store.update_task(task["id"], {"status": "waiting_for_human"})
+        self._record_dispatch_deferred(task, code, message, state="rejected")
+        self.task_store.record_activity(task["id"], message)
+        logger.info("Task continuation refused", task_id=task["id"], code=code)
 
     def _materialize_legacy_assignment(
         self, task: dict[str, Any]
@@ -386,6 +458,7 @@ class TaskScheduler:
         assignments: list[dict[str, Any]],
         *,
         team_id: str | None = None,
+        session_id: str | None = None,
     ) -> bool:
         claim = task.get("dispatchClaim") or {}
         claim_id = claim.get("id")
@@ -399,6 +472,7 @@ class TaskScheduler:
                     "actorIsAdmin": True,
                     "agentFirst": True,
                     **({"teamId": team_id} if team_id else {}),
+                    **({"sessionId": session_id} if session_id else {}),
                     **({"idempotencyKey": claim_id} if claim_id else {}),
                 },
             )

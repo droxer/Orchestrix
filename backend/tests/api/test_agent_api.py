@@ -1758,3 +1758,70 @@ def test_failed_agent_first_run_finalizes_instead_of_wedging(monkeypatch) -> Non
         ]
         assert active == []
         assert client.get(f"/api/v1/threads/{session_id}").json()["status"] == "failed"
+
+
+def test_agent_role_is_visible_and_can_be_cleared(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                    "displayName": "Alice",
+                },
+            ).status_code
+            == 201
+        )
+        agent = client.post(
+            "/api/v1/admin/agents",
+            json={
+                "supervisorEmployeeId": "alice",
+                "displayName": "Reviewer",
+                "executorKind": "claude",
+                "defaultRole": "reviewer",
+            },
+        ).json()["agent"]
+
+        # The role decides what a team member is told to do, so the view that
+        # renders the agent has to carry it.
+        listed = client.get("/api/v1/admin/agents").json()["agents"]
+        assert next(item for item in listed if item["id"] == agent["id"])[
+            "defaultRole"
+        ] == "reviewer"
+
+        cleared = client.patch(
+            f"/api/v1/admin/agents/{agent['id']}", json={"defaultRole": None}
+        )
+        assert cleared.status_code == 200
+        assert not cleared.json()["agent"].get("defaultRole")
+
+        assert (
+            client.patch(
+                f"/api/v1/admin/agents/{agent['id']}", json={"defaultRole": "wizard"}
+            ).status_code
+            == 400
+        )
+
+        # The supervisor sets the role from their own agent page, which is the
+        # only place the picker is rendered.
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login",
+                json={"username": "alice", "password": "userpass"},
+            ).status_code
+            == 200
+        )
+        owned = client.patch(
+            f"/api/v1/agents/{agent['id']}", json={"defaultRole": "planner"}
+        )
+        assert owned.status_code == 200, owned.text
+        assert owned.json()["agent"]["defaultRole"] == "planner"
+        assert not client.patch(
+            f"/api/v1/agents/{agent['id']}", json={"defaultRole": None}
+        ).json()["agent"].get("defaultRole")

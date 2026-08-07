@@ -1457,6 +1457,7 @@ class DatabaseDaemonStore:
         Column("current_agent", Text, nullable=True),
         Column("current_mode", Text, nullable=True),
         Column("current_started_at", DateTime(timezone=True), nullable=True),
+        Column("current_progress_at", DateTime(timezone=True), nullable=True),
         Column("error", Text, nullable=True),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
@@ -3227,6 +3228,7 @@ def run_request_to_row(
         "current_agent": record.get("currentAgent"),
         "current_mode": record.get("currentMode"),
         "current_started_at": _parse_iso(record.get("currentStartedAt")),
+        "current_progress_at": _parse_iso(record.get("currentProgressAt")),
         "error": record.get("error"),
         "created_at": _parse_iso(record["createdAt"]),
         "updated_at": _parse_iso(record["updatedAt"]),
@@ -3258,6 +3260,11 @@ def row_to_run_request(row: Any) -> dict[str, Any]:
         **(
             {"currentStartedAt": _format_iso(row["current_started_at"])}
             if row.get("current_started_at")
+            else {}
+        ),
+        **(
+            {"currentProgressAt": _format_iso(row["current_progress_at"])}
+            if row.get("current_progress_at")
             else {}
         ),
         **({"error": row["error"]} if row.get("error") else {}),

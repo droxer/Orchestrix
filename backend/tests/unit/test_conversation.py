@@ -170,3 +170,40 @@ def test_compute_conversation_history_caps_oldest_blocks() -> None:
         "[Earlier conversation omitted]\n\n"
         "[User]\nnear current follow up"
     )
+
+
+def test_elided_history_names_the_progress_log_when_the_run_keeps_one() -> None:
+    session = _session(
+        events=[
+            {
+                "type": "user.message",
+                "timestamp": "2026-06-20T00:01:00.000Z",
+                "text": "old follow up",
+            },
+            {
+                "type": "user.message",
+                "timestamp": "2026-06-20T00:02:00.000Z",
+                "text": "near current follow up",
+            },
+            {
+                "type": "user.message",
+                "timestamp": "2026-06-20T00:03:00.000Z",
+                "text": "current turn",
+            },
+        ]
+    )
+
+    out = compute_conversation_history(
+        session,
+        _FakeStore({}),
+        max_blocks=1,
+        max_chars=1000,
+        progress_file="PROGRESS.md",
+    )
+
+    assert out == (
+        "[Conversation so far]\n\n"
+        "[Earlier conversation omitted — `PROGRESS.md` in the workspace "
+        "carries the decisions and state from before this point]\n\n"
+        "[User]\nnear current follow up"
+    )

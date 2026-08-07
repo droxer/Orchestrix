@@ -20,6 +20,7 @@ import type {
 } from "relay-core";
 import { startOrchestratorSession, ensureAgentReady as ensureSandboxAgentReady, type ActiveOrchestratorSession } from "./sandbox-session.js";
 import { diffGeneratedFiles, snapshotGeneratedFiles } from "./generated-files.js";
+import { consumeRoundResult } from "./round-result.js";
 import { agentWorkspaceSubpath, ensureAgentWorkspaceDir } from "./agent-workspace.js";
 import { discoverAgentInventory } from "./agent-inventory.js";
 import { defaultExecutionManager } from "./execution.js";
@@ -53,6 +54,7 @@ import {
   GUEST_WORKSPACE,
   agentHomePath,
   DAEMON_CAPABILITY_GENERATED_FILES,
+  DAEMON_CAPABILITY_ROUND_RESULT,
   DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
   DAEMON_CAPABILITY_THREAD_WORKSPACES,
   DAEMON_CAPABILITY_WORKSPACE_READ,
@@ -252,6 +254,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
       DAEMON_CAPABILITY_WORKSPACE_READ_SHARED,
       DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
       DAEMON_CAPABILITY_THREAD_WORKSPACES,
+      DAEMON_CAPABILITY_ROUND_RESULT,
     ],
     agentHealth,
     ...(Object.keys(agentInventory).length > 0 ? { agentInventory } : {}),
@@ -925,6 +928,10 @@ async function executeCommand(
   const generatedFiles = next.last_exit_code === 0
     ? diffGeneratedFiles(threadWorkspace.hostPath, workspaceSnapshot, scanOptions)
     : [];
+  // Read the verdict even on a failed run: a round that stopped because it is
+  // blocked has something to say, and leaving the file behind would let the
+  // next round inherit it.
+  const roundResult = consumeRoundResult(threadWorkspace.hostPath);
   logger.info("run completed", {
     ...commandLogFields(sandboxId, command),
     exitCode: next.last_exit_code,
@@ -943,6 +950,7 @@ async function executeCommand(
     agentLog,
     tokenUsage: next.token_usage,
     ...(generatedFiles.length > 0 ? { generatedFiles } : {}),
+    ...(roundResult ? { roundResult } : {}),
   } satisfies DaemonNodeEvent, token, signal);
 }
 

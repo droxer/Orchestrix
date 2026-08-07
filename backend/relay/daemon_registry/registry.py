@@ -19,6 +19,7 @@ from ..core.models import (
     AGENT_NAMES,
     DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS,
 )
+from ..persistence.daemon_store import ACTIVE_RUN_REQUEST_STATUSES
 from ..persistence.protocols import SessionStore, TaskStore
 from ..persistence.stores import (
     infer_node_location,
@@ -71,8 +72,21 @@ load_backend_env()
 DAEMON_NODE_LIVENESS_TIMEOUT_MS = int(
     os.environ.get("RELAY_DAEMON_NODE_LIVENESS_TIMEOUT_MS", "15000")
 )
+# How long a run may go without reporting progress before it is treated as
+# hung. A run that keeps streaming output is working, however long it takes,
+# so this is measured from the last progress report rather than from dispatch.
 DAEMON_RUN_TIMEOUT_MS = int(
     os.environ.get("RELAY_DAEMON_RUN_TIMEOUT_MS", str(15 * 60 * 1000))
+)
+# The backstop for a run that streams forever without finishing. Measured from
+# dispatch, so it is the one bound progress reports cannot extend.
+DAEMON_RUN_MAX_DURATION_MS = int(
+    os.environ.get("RELAY_DAEMON_RUN_MAX_DURATION_MS", str(24 * 60 * 60 * 1000))
+)
+# Progress reports arrive per output chunk; persisting every one would write to
+# the run request thousands of times per run for no extra safety.
+DAEMON_RUN_PROGRESS_PERSIST_INTERVAL_SECONDS = float(
+    os.environ.get("RELAY_DAEMON_RUN_PROGRESS_PERSIST_INTERVAL_SECONDS", "30")
 )
 # How often an idle daemon's heartbeat reaches the durable node row. Must stay
 # comfortably under DAEMON_NODE_LIVENESS_TIMEOUT_MS so a replica reading
@@ -100,7 +114,45 @@ class _DispatchLockEntry:
 DAEMON_RECORD_PRUNE_INTERVAL_SECONDS = float(
     os.environ.get("RELAY_DAEMON_RECORD_PRUNE_INTERVAL_SECONDS", "60")
 )
+# The durable record a task's agents keep in the shared workspace, so work that
+# outlives one prompt survives elided history and later rounds.
+TASK_PROGRESS_FILE = "PROGRESS.md"
+
+
+def task_progress_file(session_id: str, workspace_layout: str) -> str:
+    """Name the progress log for a thread, without colliding with other threads.
+
+    A thread workspace holds one thread, so the plain name is unambiguous there.
+    A node-root workspace is shared by every thread that ever ran on the node,
+    where one `PROGRESS.md` would hand the next task the previous task's notes.
+    """
+    if workspace_layout == "thread":
+        return TASK_PROGRESS_FILE
+    return f"PROGRESS-{session_id}.md"
 ARTIFACT_SNAPSHOT_STATE_KEY = "_relay_artifact_snapshot"
+REPAIR_COUNT_STATE_KEY = "_relay_repair_count"
+REPAIR_RESUME_INDEX_STATE_KEY = "_relay_repair_resume_index"
+REPAIR_NOTE_STATE_KEY = "_relay_repair_note"
+ROUND_RESULT_STATE_KEY = "_relay_round_result"
+# Run-request bookkeeping that has to survive being re-staged. Command state is
+# filtered down to the agent-visible keys, so anything not listed here is lost
+# the moment the next command is staged.
+CARRIED_RUN_REQUEST_STATE_KEYS = frozenset(
+    {
+        REPAIR_COUNT_STATE_KEY,
+        REPAIR_RESUME_INDEX_STATE_KEY,
+        REPAIR_NOTE_STATE_KEY,
+        ROUND_RESULT_STATE_KEY,
+    }
+)
+# Mirrors ROUND_RESULT_RELATIVE_PATH in relay-daemon: `.relay/` is excluded
+# from the artifact scan, so the control file never becomes a deliverable.
+ROUND_RESULT_RELATIVE_PATH = ".relay/round-result.json"
+ROUND_RESULT_STATUSES = frozenset({"done", "continue", "blocked"})
+ROUND_RESULT_NOTE_MAX_CHARS = 2000
+# How many times the lead may be sent back to repair a failed teammate before
+# the run is allowed to fail. Each repair costs a full agent turn.
+DAEMON_RUN_MAX_REPAIRS = int(os.environ.get("RELAY_DAEMON_RUN_MAX_REPAIRS", "1"))
 TERMINAL_EVENT_STATE_KEY = "_relay_terminal_event"
 TERMINAL_CLAIM_ID_STATE_KEY = "_relay_terminal_claim_id"
 TERMINAL_CLAIM_EXPIRES_STATE_KEY = "_relay_terminal_claim_expires_at"
@@ -121,6 +173,7 @@ DAEMON_CAPABILITY_WORKSPACE_READ = "workspace-read"
 DAEMON_CAPABILITY_WORKSPACE_READ_SHARED = "workspace-read-shared"
 DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS = "structured-agent-events"
 DAEMON_CAPABILITY_THREAD_WORKSPACES = "thread-workspaces"
+DAEMON_CAPABILITY_ROUND_RESULT = "round-result"
 DAEMON_NODE_CAPABILITIES = frozenset(
     {
         DAEMON_CAPABILITY_GENERATED_FILES,
@@ -128,6 +181,7 @@ DAEMON_NODE_CAPABILITIES = frozenset(
         DAEMON_CAPABILITY_WORKSPACE_READ_SHARED,
         DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
         DAEMON_CAPABILITY_THREAD_WORKSPACES,
+        DAEMON_CAPABILITY_ROUND_RESULT,
     }
 )
 DAEMON_SANDBOX_MODES = frozenset({"none", "boxlite"})
@@ -326,6 +380,7 @@ class DaemonNodeRegistry:
         self._last_reap_at = 0.0
         self._last_prune_at = 0.0
         self._last_seen_persisted_at: dict[str, float] = {}
+        self._last_progress_persisted_at: dict[str, float] = {}
         self._load_persisted_state()
 
     @contextmanager
@@ -1391,6 +1446,12 @@ class DaemonNodeRegistry:
             self.daemon_store.renew_command_leases(
                 sandbox_id, renewable, lease_seconds=lease_seconds
             )
+            # A held lease is the daemon saying the run is still under way.
+            # Output is not: an agent can spend twenty minutes in a build or a
+            # single slow tool call without printing a line, and judging it by
+            # output alone reaps work that is plainly alive.
+            for command_id, _lease_id in renewable:
+                self._note_command_lease_progress(sandbox_id, command_id)
 
     def _renew_known_active_command_leases(
         self, sandbox_id: str, *, lease_seconds: float
@@ -1662,6 +1723,7 @@ class DaemonNodeRegistry:
             )
             seen[event["stream"]] = event["sequence"]
             self._append_run_output(event["runId"], event["text"])
+            self._note_run_progress(command)
             return
         if event["type"] == "run.collaboration":
             seen = self._output_sequences_for_run(event["sessionId"], event["runId"])
@@ -1683,6 +1745,7 @@ class DaemonNodeRegistry:
                 hydrate_events=False,
             )
             seen["collaboration"] = event["sequence"]
+            self._note_run_progress(command)
             return
         accepted = False
         if event["type"] == "run.completed":
@@ -1901,16 +1964,31 @@ class DaemonNodeRegistry:
             # A node heartbeat can land on a different backend replica from
             # this reaper. Command leases are the durable ownership signal,
             # so replica-local liveness must not make the run terminal.
-            current_started_at = request.get("currentStartedAt")
-            if (
-                current_started_at
-                and self._age_ms(current_started_at) > DAEMON_RUN_TIMEOUT_MS
-            ):
-                self.cancel_active_run(
-                    request["nodeId"], request["sessionId"], "Daemon run timed out."
-                )
-                self._fail_run_request(request, "Daemon run timed out.")
+            outcome = self._stale_run_outcome(request)
+            if outcome:
+                self.cancel_active_run(request["nodeId"], request["sessionId"], outcome)
+                self._fail_run_request(request, outcome)
                 continue
+
+    def _stale_run_outcome(self, request: dict[str, Any]) -> str | None:
+        """Name why a run should be reaped, or None while it is still allowed to run.
+
+        A long agent turn is normal work, so the idle clock runs from the last
+        progress the run reported and only falls back to dispatch time while it
+        has reported none. The absolute cap still runs from dispatch, so a run
+        that streams forever without finishing is not immortal.
+        """
+        current_started_at = request.get("currentStartedAt")
+        if not current_started_at:
+            return None
+        # Idle is checked first: a quiet run is diagnosed more precisely by how
+        # long it has been silent than by how long it has existed.
+        idle_since = request.get("currentProgressAt") or current_started_at
+        if self._age_ms(idle_since) > DAEMON_RUN_TIMEOUT_MS:
+            return "Daemon run timed out."
+        if self._age_ms(current_started_at) > DAEMON_RUN_MAX_DURATION_MS:
+            return "Daemon run exceeded its maximum duration."
+        return None
 
     def _maybe_prune_terminal_records(self, monotonic_now: float) -> None:
         if not hasattr(self.daemon_store, "prune_terminal_records"):
@@ -1921,6 +1999,46 @@ class DaemonNodeRegistry:
         self.daemon_store.prune_terminal_records(
             retention_seconds=DAEMON_COMMAND_RETENTION_SECONDS,
             per_node_limit=DAEMON_TERMINAL_RECORD_LIMIT,
+        )
+
+    def _note_command_lease_progress(self, sandbox_id: str, command_id: str) -> None:
+        """Treat a renewed command lease as progress on the run it belongs to."""
+        record = self.daemon_store.get_command(command_id)
+        if not record or record.get("nodeId") != sandbox_id:
+            return
+        if record.get("status") != "dispatched":
+            return
+        self._note_run_progress(record["command"])
+
+    def _note_run_progress(self, command: dict[str, Any]) -> None:
+        """Record that the command's run is still doing something.
+
+        Streaming output is the only signal a long agent turn gives between
+        dispatch and its terminal event. Without it the reaper judges every run
+        by its dispatch time and cancels work that is plainly alive.
+        """
+        request_id = command.get("_runRequestId")
+        if not isinstance(request_id, str) or not request_id:
+            return
+        now = time.monotonic()
+        last = self._last_progress_persisted_at.get(request_id)
+        if (
+            last is not None
+            and now - last < DAEMON_RUN_PROGRESS_PERSIST_INTERVAL_SECONDS
+        ):
+            return
+        request = self.daemon_store.get_run_request(request_id)
+        # Only the run this command belongs to may extend its own deadline; a
+        # late chunk from a superseded command must not revive the request.
+        if not request or request.get("currentCommandId") != command["id"]:
+            self._last_progress_persisted_at.pop(request_id, None)
+            return
+        if request.get("status") not in ACTIVE_RUN_REQUEST_STATUSES:
+            self._last_progress_persisted_at.pop(request_id, None)
+            return
+        self._last_progress_persisted_at[request_id] = now
+        self.daemon_store.update_run_request(
+            request_id, {"currentProgressAt": now_iso()}
         )
 
     def _enqueue_current_assignment(
@@ -1999,7 +2117,19 @@ class DaemonNodeRegistry:
         )
         if bridge:
             state["prior_agent_bridge"] = bridge
-        conversation = compute_conversation_history(session_snapshot, self.store)
+        # Task work outlives a single prompt: it spans pipeline members, later
+        # rounds, and elided history. Chat threads without a task do not need a
+        # file on disk to remember one exchange.
+        progress_file = (
+            task_progress_file(run_request["sessionId"], workspace_layout)
+            if run_request.get("taskId")
+            else None
+        )
+        if progress_file:
+            state["progress_file"] = progress_file
+        conversation = compute_conversation_history(
+            session_snapshot, self.store, progress_file=progress_file
+        )
         if conversation:
             state["prior_conversation"] = conversation
         handoff_note = compute_prior_handoff_note(
@@ -2013,6 +2143,22 @@ class DaemonNodeRegistry:
             state["agent_display_name"] = assignment["agentDisplayName"]
         if assignment.get("agentInstructions"):
             state["agent_instructions"] = assignment["agentInstructions"]
+        request_state = run_request["state"] or {}
+        if request_state.get(REPAIR_NOTE_STATE_KEY) and index == 0:
+            state["repair_note"] = request_state[REPAIR_NOTE_STATE_KEY]
+        # Only ask for the verdict where something reads it back: on a daemon
+        # without the capability the file would sit in the workspace unread,
+        # and the task would wait for a human either way.
+        if progress_file and DAEMON_CAPABILITY_ROUND_RESULT in (
+            sandbox.get("capabilities") or []
+        ):
+            state["round_result_file"] = ROUND_RESULT_RELATIVE_PATH
+        # The role was recorded on the thread but never reached the agent, so a
+        # team of specialists all received the same prompt. Carry it in the run
+        # state the way the display name and instructions travel.
+        role = effective_role_for_assignment(sandbox, assignment, mode)
+        if role:
+            state["agent_role"] = role
         command = {
             "id": new_database_id(),
             "type": "run.start",
@@ -2022,6 +2168,7 @@ class DaemonNodeRegistry:
             "agent": assignment["executorKind"],
             "mode": mode,
             "workspaceLayout": workspace_layout,
+            **({"role": role} if role else {}),
             **(
                 {"logicalAgentId": assignment["agentId"]}
                 if assignment.get("agentId")
@@ -2059,6 +2206,11 @@ class DaemonNodeRegistry:
             else workspace_generated_file_snapshot(sandbox.get("workspacePath"))
         )
         command["_artifactSnapshot"] = artifact_snapshot
+        command["_carriedState"] = {
+            key: value
+            for key, value in request_state.items()
+            if key in CARRIED_RUN_REQUEST_STATE_KEYS
+        }
         dispatch_claim_id = new_relay_id("claim")
         claimed_request = self.daemon_store.claim_run_request_dispatch(
             run_request["id"],
@@ -2104,7 +2256,11 @@ class DaemonNodeRegistry:
         assignment = run_request["assignments"][run_request.get("currentIndex", 0)]
         sandbox = self.sandboxes[command["_nodeId"]]
         controller = self._controller_for_sandbox(sandbox, run_request.get("taskId"))
-        role = effective_role_for_assignment(sandbox, assignment, command["mode"])
+        # The command already carries the role the agent was told to play; the
+        # thread must record that one, not a second resolution of it.
+        role = command.get("role") or effective_role_for_assignment(
+            sandbox, assignment, command["mode"]
+        )
         controller.record_agent_started(
             run_request["sessionId"],
             {
@@ -2146,6 +2302,7 @@ class DaemonNodeRegistry:
         artifact_snapshot = command.get("_artifactSnapshot")
         if artifact_snapshot is not None:
             state[ARTIFACT_SNAPSHOT_STATE_KEY] = artifact_snapshot
+        state.update(command.get("_carriedState") or {})
         return {
             "status": "running",
             "nodeId": command["_nodeId"],
@@ -2154,6 +2311,7 @@ class DaemonNodeRegistry:
             "currentAgent": command["agent"],
             "currentMode": command["mode"],
             "currentStartedAt": now_iso(),
+            "currentProgressAt": None,
             "state": state,
         }
 
@@ -2318,6 +2476,12 @@ class DaemonNodeRegistry:
             self._record_generated_workspace_artifacts(
                 sandbox, run_request, event, artifact_snapshot, assignment
             )
+        # The newest verdict wins: a later member speaks for the round, and a
+        # round that reported nothing leaves the previous verdict in place only
+        # until the pipeline ends, where "nothing reported" reads as done.
+        round_result = self._round_result(event)
+        if round_result:
+            next_state[ROUND_RESULT_STATE_KEY] = round_result
         if event["exitCode"] != 0:
             # Agent-first assignments carry agentId/executorKind and no "agent"
             # key, so indexing it here raised before the request could be marked
@@ -2330,6 +2494,14 @@ class DaemonNodeRegistry:
                 or "Agent"
             )
             outcome = f"{agent_label} {mode} failed with exit code {event['exitCode']}."
+            if self._send_back_for_repair(
+                run_request,
+                terminal_claim_id,
+                next_state,
+                outcome,
+                agent_label,
+            ):
+                return
             if session_before.get("status") != "failed":
                 controller.fail_session(run_request["sessionId"], outcome)
             self.daemon_store.update_run_request_if_claimed(
@@ -2342,7 +2514,9 @@ class DaemonNodeRegistry:
                 run_request["nodeId"], {"status": "ready", "lastError": outcome}
             )
             return
-        next_index = run_request.get("currentIndex", 0) + 1
+        next_index, next_state = self._next_index_after_success(
+            run_request, next_state
+        )
         updated = self.daemon_store.update_run_request_if_claimed(
             run_request["id"],
             TERMINAL_CLAIM_ID_STATE_KEY,
@@ -2356,6 +2530,7 @@ class DaemonNodeRegistry:
                 "currentAgent": None,
                 "currentMode": None,
                 "currentStartedAt": None,
+                "currentProgressAt": None,
             },
         )
         if not updated:
@@ -2364,6 +2539,100 @@ class DaemonNodeRegistry:
             self._complete_run_request(updated, "Assignments completed.")
         else:
             self._enqueue_current_assignment(updated)
+
+    @staticmethod
+    def _round_result(event: dict[str, Any]) -> dict[str, Any] | None:
+        """Validate the verdict a daemon reported for the round that just ended.
+
+        The daemon relays a file an agent wrote, so nothing about it is
+        trusted: an unknown status or an oversized note is dropped rather than
+        allowed to steer the task.
+        """
+        reported = event.get("roundResult")
+        if not isinstance(reported, dict):
+            return None
+        status = reported.get("status")
+        if status not in ROUND_RESULT_STATUSES:
+            return None
+        note = reported.get("note")
+        return {
+            "status": status,
+            **(
+                {"note": note.strip()[:ROUND_RESULT_NOTE_MAX_CHARS]}
+                if isinstance(note, str) and note.strip()
+                else {}
+            ),
+        }
+
+    def _send_back_for_repair(
+        self,
+        run_request: dict[str, Any],
+        terminal_claim_id: str,
+        next_state: dict[str, Any],
+        outcome: str,
+        agent_label: str,
+    ) -> bool:
+        """Give the lead a turn to fix a teammate's failure. True if it was sent.
+
+        A failed member used to end the whole run, discarding the work every
+        earlier member already committed to the shared workspace. The lead owns
+        the task, so it gets a bounded chance to repair and let the pipeline
+        resume at the member that failed.
+        """
+        assignments = run_request["assignments"]
+        index = run_request.get("currentIndex", 0)
+        state = dict(next_state)
+        repairs = int(state.get(REPAIR_COUNT_STATE_KEY) or 0)
+        # Nothing above index 0 to appeal to, and a lead that fails its own
+        # repair has already had its turn.
+        if index == 0 or len(assignments) < 2 or repairs >= DAEMON_RUN_MAX_REPAIRS:
+            return False
+        state[REPAIR_COUNT_STATE_KEY] = repairs + 1
+        state[REPAIR_RESUME_INDEX_STATE_KEY] = index
+        state[REPAIR_NOTE_STATE_KEY] = (
+            f"{outcome} You are the lead on this task: fix the cause so "
+            f"{agent_label} can run again. Do not repeat its work yourself."
+        )
+        updated = self.daemon_store.update_run_request_if_claimed(
+            run_request["id"],
+            TERMINAL_CLAIM_ID_STATE_KEY,
+            terminal_claim_id,
+            {
+                "status": "running",
+                "currentIndex": 0,
+                "state": state,
+                "currentCommandId": None,
+                "currentRunId": None,
+                "currentAgent": None,
+                "currentMode": None,
+                "currentStartedAt": None,
+                "currentProgressAt": None,
+            },
+        )
+        if not updated:
+            return False
+        logger.info(
+            "Sending the lead back to repair a failed teammate",
+            request_id=run_request["id"],
+            session_id=run_request["sessionId"],
+            failed_index=index,
+            repair=repairs + 1,
+        )
+        self._enqueue_current_assignment(updated)
+        return True
+
+    def _next_index_after_success(
+        self, run_request: dict[str, Any], next_state: dict[str, Any]
+    ) -> tuple[int, dict[str, Any]]:
+        """Advance one step, or resume at the member whose failure was repaired."""
+        index = run_request.get("currentIndex", 0)
+        state = dict(next_state)
+        resume_index = state.get(REPAIR_RESUME_INDEX_STATE_KEY)
+        if index != 0 or not isinstance(resume_index, int):
+            return index + 1, state
+        state.pop(REPAIR_RESUME_INDEX_STATE_KEY, None)
+        state.pop(REPAIR_NOTE_STATE_KEY, None)
+        return resume_index, state
 
     def _node_reports_generated_files(self, sandbox: dict[str, Any]) -> bool:
         return DAEMON_CAPABILITY_GENERATED_FILES in (sandbox.get("capabilities") or [])
@@ -2470,6 +2739,14 @@ class DaemonNodeRegistry:
             task_status = "review"
         else:
             task_status = "done"
+        round_result = (run_request.get("state") or {}).get(ROUND_RESULT_STATE_KEY)
+        if isinstance(round_result, dict):
+            task_status, outcome = self._round_outcome(
+                round_result, task_status, outcome
+            )
+            self._record_round_result(run_request, round_result, task_status)
+        else:
+            self._note_missing_round_result(run_request, task_status)
         if (
             self.store.get_session(run_request["sessionId"]).get("status")
             != "completed"
@@ -2482,6 +2759,88 @@ class DaemonNodeRegistry:
         )
         self.update_status(
             run_request["nodeId"], {"status": "ready", "lastError": None}
+        )
+
+    @staticmethod
+    def _round_outcome(
+        round_result: dict[str, Any], task_status: str, outcome: str
+    ) -> tuple[str, str]:
+        """Let the round's own verdict decide whether the task is finished.
+
+        Only the agent knows whether the work is actually complete; mode alone
+        cannot tell "finished" from "got through one pass". An unfinished round
+        goes back to the queue for another one, and a blocked round stops for a
+        human — neither may close the task out as done.
+        """
+        status = round_result.get("status")
+        note = round_result.get("note")
+        if status == "done":
+            return task_status, outcome
+        if status == "blocked":
+            reason = "The round reported it is blocked."
+            return "waiting_for_human", f"{reason} {note}" if note else reason
+        reason = "The round reported it is unfinished and asked to continue."
+        # "assigned" puts the task back in the scheduler's queue. The budget is
+        # enforced there, at dispatch, rather than here: this side has no view
+        # of org settings and should not grow one.
+        return "assigned", f"{reason} {note}" if note else reason
+
+    def _note_missing_round_result(
+        self, run_request: dict[str, Any], task_status: str
+    ) -> None:
+        """Say so when a task round was asked for a verdict and gave none.
+
+        Closing the task out is still the right fallback — it is what happened
+        before verdicts existed — but silently treating "the CLI exited 0" as
+        "the work is finished" is exactly the guess this contract removes. An
+        operator should be able to see which agents are answering.
+        """
+        task_id = run_request.get("taskId")
+        node = self.sandboxes.get(run_request["nodeId"]) or {}
+        if (
+            not task_id
+            or not self.task_store
+            or task_status != "done"
+            or DAEMON_CAPABILITY_ROUND_RESULT not in (node.get("capabilities") or [])
+        ):
+            return
+        self.task_store.record_activity(
+            task_id,
+            "Closed out without a round verdict: the agent did not write "
+            f"{ROUND_RESULT_RELATIVE_PATH}.",
+        )
+
+    def _record_round_result(
+        self,
+        run_request: dict[str, Any],
+        round_result: dict[str, Any],
+        task_status: str,
+    ) -> None:
+        """Record the verdict on the task, and what a continuation would need.
+
+        The continuation session is the whole point: a later round has to run
+        in this thread, because a thread workspace belongs to its session and a
+        fresh one would start without any of the work already done.
+        """
+        task_id = run_request.get("taskId")
+        if not task_id or not self.task_store:
+            return
+        if task_status != "assigned":
+            self.task_store.record_round(
+                task_id, round_result=round_result, clear_continuation=True
+            )
+            return
+        task = self.task_store.get_task(task_id)
+        rounds_used = task.get("roundCount")
+        self.task_store.record_round(
+            task_id,
+            round_result=round_result,
+            round_count=(
+                rounds_used + 1
+                if isinstance(rounds_used, int) and not isinstance(rounds_used, bool)
+                else 1
+            ),
+            continuation_session_id=run_request["sessionId"],
         )
 
     def _fail_run_request(self, run_request: dict[str, Any], outcome: str) -> None:

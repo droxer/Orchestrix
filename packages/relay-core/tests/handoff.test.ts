@@ -270,6 +270,94 @@ describe("prompts", () => {
     assert.match(prompt, /Your private directory is `agents\/agent-YWdlbnRfMQ\/`/);
     assert.match(prompt, /\[User\]\nDraft the report$/);
   });
+  it("tells a team member which role it is playing, in every task mode", () => {
+    const reviewerState = state({
+      task_goal: "Ship the endpoint",
+      agent_role: "reviewer",
+    });
+
+    for (const [label, buildCommand] of [
+      ["action", buildClaudeActionCommand],
+      ["ask", buildClaudeAskCommand],
+      ["review", buildClaudeReviewCommand],
+    ] as const) {
+      const command = buildCommand(reviewerState);
+      assert.match(
+        command,
+        /\[Role\]\nYou are the reviewer on this task\./,
+        `${label} should name the agent's role`,
+      );
+      assert.match(
+        command,
+        /Other agents on the thread hold the other roles/,
+        `${label} should scope the role against its teammates`,
+      );
+    }
+  });
+  it("points task work at its durable progress log and asks for an update", () => {
+    const taskState = state({
+      task_goal: "Migrate the billing tables",
+      progress_file: "PROGRESS.md",
+    });
+
+    const prompt = claudeTaskPrompt(taskState);
+
+    assert.match(prompt, /\[Progress log\]\n`PROGRESS\.md` in the workspace/);
+    assert.match(prompt, /Read it before you start/);
+    assert.match(prompt, /Before you finish, update it/);
+  });
+  it("does not ask a read-only ask pass to write the progress log", () => {
+    const taskState = state({
+      task_goal: "What is left here?",
+      progress_file: "PROGRESS.md",
+    });
+
+    const prompt = buildClaudeAskCommand(taskState);
+
+    assert.match(prompt, /Read it before you start/);
+    assert.doesNotMatch(prompt, /Before you finish, update it/);
+    assert.match(prompt, /Do NOT modify, create, or delete any files/);
+  });
+  it("asks a run to state whether the task is finished, but never a read-only pass", () => {
+    const roundState = state({
+      task_goal: "Migrate the billing tables",
+      round_result_file: ".relay/round-result.json",
+    });
+
+    const prompt = claudeTaskPrompt(roundState);
+    assert.match(prompt, /\[Finishing\]\nWhen you stop, write `\.relay\/round-result\.json`/);
+    assert.match(prompt, /"status": "done" \| "continue" \| "blocked"/);
+
+    // An ask pass cannot write files, so asking it for the verdict would
+    // contradict its own guard.
+    assert.doesNotMatch(buildClaudeAskCommand(roundState), /\[Finishing\]/);
+  });
+  it("tells a lead sent back to repair what it is fixing", () => {
+    const repairState = state({
+      task_goal: "Ship the migration",
+      repair_note: "Reviewer action failed with exit code 3. Fix the cause.",
+    });
+
+    const prompt = claudeTaskPrompt(repairState);
+
+    assert.match(
+      prompt,
+      /\[Repair\]\nReviewer action failed with exit code 3\. Fix the cause\./,
+    );
+    assert.ok(
+      prompt.indexOf("[Repair]") < prompt.indexOf("[User]"),
+      "the repair note should precede the user task",
+    );
+  });
+  it("omits the progress prelude when the run keeps no log", () => {
+    assert.doesNotMatch(
+      claudeTaskPrompt(state({ task_goal: "Fix auth" })),
+      /\[Progress log\]/,
+    );
+  });
+  it("omits the role prelude for an agent dispatched without one", () => {
+    assert.doesNotMatch(claudeTaskPrompt(state({ task_goal: "Fix auth" })), /\[Role\]/);
+  });
   it("omits the workspace prelude when no personal home is set", () => {
     assert.doesNotMatch(claudeTaskPrompt(state({ task_goal: "Fix auth" })), /\[Workspace\]/);
   });
