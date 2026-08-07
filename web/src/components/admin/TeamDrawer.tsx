@@ -1,15 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { listDaemonNodes } from "../../api";
 import { useEmployeeAgents } from "../../hooks/useEmployeeAgents";
 import { useRelayMutations } from "../../hooks/useRelayMutations";
+import { NODES_QUERY_KEY } from "../../hooks/useRelayData";
 import {
+  activePlacementNodeId,
   canAddAgentToNodeScopedTeam,
   nodeScopedTeamIssue,
   teamMutationInput,
 } from "../../lib/teamForm";
-import type { AgentTeam } from "../../types";
+import type { AgentTeam, DaemonNodeMonitorRecord, EmployeeAgent } from "../../types";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -54,6 +58,12 @@ export function TeamDrawer({
   }, [open, team]);
 
   const { agents: employeeAgents } = useEmployeeAgents(open ? employeeId : undefined);
+  // Shares App's node poll through the same cache key rather than adding a timer.
+  const { data: nodes = [] } = useQuery<DaemonNodeMonitorRecord[]>({
+    queryKey: NODES_QUERY_KEY,
+    queryFn: async ({ signal }) => (await listDaemonNodes(undefined, signal)).nodes ?? [],
+    enabled: open,
+  });
   const agents = useMemo(
     () => employeeAgents.filter((agent) => !agent.deletedAt),
     [employeeAgents],
@@ -75,6 +85,12 @@ export function TeamDrawer({
   async function requestClose() {
     if (busy) return;
     if (await confirmDiscardChanges()) onClose();
+  }
+
+  function computerName(agent: EmployeeAgent): string {
+    const nodeId = activePlacementNodeId(agent);
+    const node = nodeId ? nodes.find((item) => item.id === nodeId) : undefined;
+    return node?.displayName || nodeId || t("teams.computer_unknown");
   }
 
   function toggleMember(agentId: string) {
@@ -196,6 +212,7 @@ export function TeamDrawer({
                   agentId={agent.id}
                   displayName={agent.displayName}
                   executorKind={agent.executorKind}
+                  computerName={computerName(agent)}
                   selected={selected}
                   incompatible={incompatible}
                   onToggle={toggleMember}

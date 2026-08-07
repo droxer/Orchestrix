@@ -12,6 +12,7 @@ export function TeamMemberOption({
   agentId,
   displayName,
   executorKind,
+  computerName,
   selected,
   incompatible,
   disabled = false,
@@ -20,6 +21,8 @@ export function TeamMemberOption({
   agentId: string;
   displayName: string;
   executorKind: AgentName;
+  /** The computer this agent is placed on; appended to the kind label. */
+  computerName?: string;
   selected: boolean;
   /** Blocked by the node-scope rule — gets the explanatory title. */
   incompatible: boolean;
@@ -39,7 +42,7 @@ export function TeamMemberOption({
         aria-label={displayName}
       />
       <span>{displayName}</span>
-      <small>{agentLabel(executorKind)}</small>
+      <small>{agentLabel(executorKind)}{computerName ? ` · ${computerName}` : ""}</small>
     </label>
   );
 }
