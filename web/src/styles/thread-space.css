@@ -84,6 +84,11 @@
   padding: var(--sp-2);
 }
 
+/* Carries the list semantics so the row keeps its button role. */
+.thread-space-row-slot {
+  min-width: 0;
+}
+
 .thread-space-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
