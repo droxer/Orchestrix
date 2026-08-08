@@ -398,4 +398,11 @@ html:lang(zh-TW) {
 [data-density="compact"] {
   --leading-loose: 1.5;
   --sp-row: var(--sp-2);
+  /* Linear's dense lists run a 13px reading tier. The shift is expressed as a
+     scale substitution — the compact scope's --fs-4 becomes the standard
+     scope's --fs-3 — so `font: var(--type-body)` call sites pick it up with
+     no per-component override (custom properties resolve at the element, so
+     the :root role shorthand reads this scope's scale). Heading tiers are
+     untouched: density compresses rows, not hierarchy. */
+  --fs-4: 0.9286rem;
 }

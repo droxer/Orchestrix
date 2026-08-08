@@ -1,12 +1,19 @@
 "use client";
 
 import type { Dispatch, ReactNode, SetStateAction } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavPreferences, NavThreads } from "./icons";
 import { PreferencesDialog } from "./PreferencesDialog";
 import type { Theme, Language } from "./PreferencesPanel";
 import { SideNav } from "./SideNav";
 import { ArtifactNavButton } from "./ArtifactNavButton";
+import { CommandMenu } from "./CommandMenu";
+import { ShortcutsHelp } from "./ShortcutsHelp";
+import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
+import { buildCommands, type CommandId } from "@/lib/commandMenu";
+import { taskCreateIntent } from "@/lib/taskCreateIntent";
+import type { ShortcutAction } from "@/lib/shortcuts";
 import type { AppRoute, MobileView } from "@/lib/viewTypes";
 import type { CurrentUser } from "@/types";
 import { useRelayStore } from "@/lib/store";
@@ -42,6 +49,8 @@ type AppShellProps = {
   mobileChatChrome: MobileChatChrome;
   user: CurrentUser;
   onLogout: () => void;
+  /** Starts a fresh thread in the composer (the `n` chord / palette command). */
+  onNewThread: () => void;
   children: ReactNode;
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
@@ -81,6 +90,7 @@ export function AppShell({
   mobileChatChrome,
   user,
   onLogout,
+  onNewThread,
   children,
   theme,
   onThemeChange,
@@ -89,6 +99,75 @@ export function AppShell({
 }: AppShellProps) {
   const { t } = useTranslation();
   const adminView = useRelayStore((state) => state.adminView);
+  const isAdmin = user.role === "admin";
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  const queueNewTask = useCallback(() => {
+    // Queue before navigating: the event notifies a mounted backlog directly,
+    // and the one-shot flag survives the route change for a mounting one.
+    taskCreateIntent()?.queue();
+    if (route !== "backlog") onNavigateRoute("backlog");
+  }, [onNavigateRoute, route]);
+
+  const runCommand = useCallback((id: CommandId) => {
+    if (id.startsWith("go:")) {
+      onNavigateRoute(id.slice(3) as AppRoute);
+      return;
+    }
+    switch (id) {
+      case "new-thread":
+        onNewThread();
+        break;
+      case "new-task":
+        queueNewTask();
+        break;
+      case "toggle-sidebar":
+        setSidenavExpanded(!sidenavExpanded);
+        break;
+      case "toggle-theme":
+        onThemeChange(theme === "light" ? "dark" : "light");
+        break;
+      case "open-preferences":
+        setPrefsOpen(true);
+        break;
+      case "shortcuts-help":
+        setShortcutsOpen(true);
+        break;
+    }
+  }, [onNavigateRoute, onNewThread, onThemeChange, queueNewTask, setPrefsOpen, setSidenavExpanded, sidenavExpanded, theme]);
+
+  const handleShortcut = useCallback((action: ShortcutAction) => {
+    switch (action.kind) {
+      case "command-menu":
+        setCommandOpen((open) => !open);
+        break;
+      case "shortcuts-help":
+        setShortcutsOpen(true);
+        break;
+      case "go":
+        onNavigateRoute(action.route);
+        break;
+      case "new-thread":
+        onNewThread();
+        break;
+      case "new-task":
+        queueNewTask();
+        break;
+    }
+  }, [onNavigateRoute, onNewThread, queueNewTask]);
+
+  useGlobalShortcuts({
+    isAdmin,
+    overlayOpen: commandOpen || shortcutsOpen,
+    onAction: handleShortcut,
+  });
+
+  const commands = useMemo(
+    () => buildCommands({ isAdmin, t }),
+    [isAdmin, t],
+  );
+
   const mobileRouteTitle = route === "admin"
     ? t(`admin.v2.title_${adminView}`)
     : route === "main"
@@ -165,10 +244,11 @@ export function AppShell({
         route={route}
         onNavigateRoute={onNavigateRoute}
         hrefForRoute={hrefForRoute}
-        isAdmin={user.role === "admin"}
+        isAdmin={isAdmin}
         prefsOpen={prefsOpen}
         setPrefsOpen={setPrefsOpen}
         onLogout={onLogout}
+        onOpenCommandMenu={() => setCommandOpen(true)}
       />
 
       {/* display:contents (owned by shell.css, .messenger-shell > main) keeps
@@ -187,6 +267,18 @@ export function AppShell({
           language,
           onLanguageChange,
         }}
+      />
+
+      <CommandMenu
+        open={commandOpen}
+        commands={commands}
+        onRun={runCommand}
+        onClose={() => setCommandOpen(false)}
+      />
+      <ShortcutsHelp
+        open={shortcutsOpen}
+        isAdmin={isAdmin}
+        onClose={() => setShortcutsOpen(false)}
       />
     </div>
   );

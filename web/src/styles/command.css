@@ -1,0 +1,207 @@
+/* =====================================================================
+   Command menu + shortcuts overlay (⌘K / ?)
+
+   Linear's palette grammar on Relay's tokens: a single top-anchored panel on
+   the floating plane (--surface-3, --shadow-2 ring — never a drop shadow),
+   one text field, a ranked list with kbd hints. Fast in, fast out: entrance
+   uses the shared overlay-panel keyframes at the pointer-state speed, because
+   this surface opens dozens of times an hour.
+   ===================================================================== */
+
+.command-backdrop {
+  z-index: var(--z-dialog);
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  /* Top-anchored like Linear: the palette sits in the upper visual field so
+     the page behind it stays legible as context. */
+  padding: 18vh var(--sp-4) var(--sp-4);
+}
+
+.command-menu {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface-3);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-2);
+  animation: overlay-panel-in var(--t-fast) var(--ease) both;
+  outline: none;
+}
+
+.command-input-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-3);
+  min-height: var(--sp-8);
+  border-bottom: 1px solid var(--line-1);
+  color: var(--ink-3);
+}
+
+.command-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: var(--sp-3) 0;
+  color: var(--ink-1);
+  font: var(--type-body);
+}
+
+.command-input::placeholder {
+  color: var(--ink-4);
+}
+
+/* The dialog-level ring already says "this surface owns the keyboard"; a
+   second ring on the field inside it is noise. */
+.command-input:focus-visible {
+  outline: none;
+}
+
+.command-list {
+  margin: 0;
+  padding: var(--sp-2);
+  list-style: none;
+  max-height: min(50vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.command-group-label {
+  padding: var(--sp-2) var(--sp-3) var(--sp-1);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+.command-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-2);
+  color: var(--ink-2);
+  font: var(--type-body-sm);
+  cursor: pointer;
+  user-select: none;
+}
+
+.command-item[data-active="true"] {
+  background: var(--action-soft);
+  color: var(--ink-1);
+}
+
+.command-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-kbd {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--sp-5);
+  padding: 0 var(--sp-1-5);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-1);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  font: var(--type-code);
+  letter-spacing: var(--type-code-track);
+}
+
+.command-empty {
+  margin: 0;
+  padding: var(--sp-6) var(--sp-4);
+  text-align: center;
+  color: var(--ink-3);
+  font: var(--type-body-sm);
+}
+
+.command-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-2) var(--sp-3);
+  border-top: 1px solid var(--line-1);
+  color: var(--ink-4);
+  font: var(--type-label);
+}
+
+.command-footer-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1-5);
+}
+
+/* ── Shortcuts overlay (`?`) ────────────────────────────────────────── */
+
+.shortcuts-panel {
+  padding-bottom: var(--sp-3);
+}
+
+.shortcuts-title {
+  margin: 0;
+  padding: var(--sp-4) var(--sp-4) var(--sp-2);
+  color: var(--ink-1);
+  font: var(--type-heading);
+  letter-spacing: var(--type-heading-track);
+}
+
+.shortcuts-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2) var(--sp-5);
+  padding: 0 var(--sp-2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.shortcuts-group {
+  min-width: 0;
+}
+
+.shortcuts-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shortcuts-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-1-5) var(--sp-3);
+  border-radius: var(--r-2);
+  color: var(--ink-2);
+  font: var(--type-body-sm);
+}
+
+.shortcuts-row-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .command-backdrop {
+    /* The compact tier: the palette owns the top of a small screen instead
+       of floating over a page nobody can see anyway. */
+    padding-top: var(--sp-8);
+  }
+
+  .shortcuts-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .command-footer {
+    display: none;
+  }
+}

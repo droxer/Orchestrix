@@ -262,7 +262,8 @@
     "deleting": "正在刪除…",
     "delete_title": "刪除任務？",
     "delete_body": "「{{title}}」將從待辦中移除，關聯的話題、產物與執行歷史仍會保留。",
-    "toast_deleted": "任務已刪除。"
+    "toast_deleted": "任務已刪除。",
+    "inline_title_placeholder": "任務標題…"
   },
   "workspace": {
     "title": "工作區",
@@ -1202,5 +1203,32 @@
     "personality_save_hint": "按 ⌘/Ctrl + Enter 儲存",
     "select_title": "選擇一個智能體",
     "select_body": "從清單中選擇一個，檢視其工作區、檔案與活動。"
+  },
+  "command": {
+    "title": "快捷指令",
+    "placeholder": "輸入指令或搜尋…",
+    "empty": "沒有符合的指令",
+    "go_to": "前往{{name}}",
+    "toggle_sidebar": "切換側邊欄",
+    "toggle_theme": "切換主題",
+    "open_preferences": "開啟偏好設定",
+    "shortcuts_help": "鍵盤快捷鍵",
+    "group_navigate": "前往",
+    "group_create": "新增",
+    "group_view": "檢視",
+    "hint_navigate": "導覽",
+    "hint_run": "選取",
+    "hint_close": "關閉"
+  },
+  "shortcuts": {
+    "title": "鍵盤快捷鍵",
+    "group_global": "全域",
+    "group_navigate": "導覽",
+    "group_composer": "輸入框",
+    "open_command": "開啟快捷指令",
+    "show_help": "顯示鍵盤快捷鍵",
+    "new_task": "新增任務",
+    "new_thread": "新對話",
+    "send_message": "傳送訊息"
   }
 }

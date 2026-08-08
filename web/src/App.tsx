@@ -992,6 +992,7 @@ export function App() {
       }}
       user={user}
       onLogout={() => void handleLogout()}
+      onNewThread={startNewThread}
       theme={theme}
       onThemeChange={handleThemeChange}
       language={language}

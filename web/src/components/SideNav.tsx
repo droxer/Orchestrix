@@ -2,17 +2,18 @@ import { useEffect, useRef, useState, type Dispatch, type MouseEvent, type SetSt
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
-  NavAdmin, NavAgents, NavBacklog, NavChannels, NavComputer, NavLogout, NavMore, NavPreferences, NavThreads,
+  ActionSearch, NavAdmin, NavAgents, NavBacklog, NavChannels, NavComputer, NavLogout, NavMore, NavPreferences, NavThreads,
   NavTeams,
   NavRoutine, NavSidebarCollapse, NavSidebarExpand,
 } from "./icons";
 import { RelayMark } from "./RelayMark";
+import { commandShortcutLabel } from "../lib/shortcuts";
 import { Button } from "@/components/ui/button";
 import type { AppRoute } from "../lib/viewTypes";
 
 // Left rail: brand, collapse toggle, route nav, settings/logout. Owns its own
 // collapsed-state hover tooltip (only shown while the rail is collapsed).
-export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigateRoute, hrefForRoute, isAdmin, prefsOpen, setPrefsOpen, onLogout }: {
+export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigateRoute, hrefForRoute, isAdmin, prefsOpen, setPrefsOpen, onLogout, onOpenCommandMenu }: {
   sidenavExpanded: boolean;
   setSidenavExpanded: (expanded: boolean) => void;
   route: AppRoute;
@@ -22,6 +23,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
   prefsOpen: boolean;
   setPrefsOpen: Dispatch<SetStateAction<boolean>>;
   onLogout: () => void;
+  onOpenCommandMenu: () => void;
 }) {
   const { t } = useTranslation();
   const [navTooltip, setNavTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
@@ -188,6 +190,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
 
   const moreActive = route === "admin";
   const channelsHint = `${t("nav.channels")} · ${t("nav.coming_soon")}`;
+  const commandMenuHint = `${t("command.title")} · ${commandShortcutLabel()}`;
 
   return (
     <aside className="sidenav-panel" aria-label={t("nav.brand", { defaultValue: "Relay" })} data-expanded={sidenavExpanded ? "true" : "false"}>
@@ -363,6 +366,28 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
         </div>
       </nav>
       <div className="sidenav-bottom">
+        {/* The palette's visible trigger lives with the other rail-level
+            controls, not the destination list: it opens a command surface,
+            it does not navigate anywhere. */}
+        <Button
+          type="button"
+          variant="ghost"
+          className="sidenav-btn"
+          data-nav="command"
+          aria-label={commandMenuHint}
+          title={commandMenuHint}
+          onClick={() => {
+            hideNavTooltip();
+            onOpenCommandMenu();
+          }}
+          onMouseEnter={(e) => showNavTooltip(commandMenuHint, e.currentTarget)}
+          onMouseLeave={hideNavTooltip}
+          onFocus={(e) => showNavTooltip(commandMenuHint, e.currentTarget)}
+          onBlur={hideNavTooltip}
+        >
+          <ActionSearch size={18} />
+          <span className="sidenav-label sr-only">{t("command.title")}</span>
+        </Button>
         <Button
           type="button"
           variant="ghost"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type CSSProperties, type DragEvent, type FormEvent, type TouchEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type FormEvent, type TouchEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useRelayMutations } from "../hooks/useRelayMutations";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
@@ -10,11 +10,13 @@ import { useDialogs } from "@/components/ui/DialogProvider";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
 import { type CurrentUser, type DaemonNodeMonitorRecord, type EmployeeAgent, type RelaySession, type RelayTaskListItem, type TaskStatus } from "../types";
-import { ActionApprove, ActionCalendar, ActionStart, ActionStop, NavAgents, NavRefresh, ViewBoard, ViewList } from "./icons";
+import { ActionApprove, ActionAdd, ActionCalendar, ActionStart, ActionStop, NavAgents, NavRefresh, ViewBoard, ViewList } from "./icons";
 import { agentReadyForTask, canDiscussTask, discussionAgentsForTask, dueTone, filterTasks, isTaskStatus, TASK_PRIORITIES, TASK_STATUSES, tasksByStatus, type BacklogFilters } from "../lib/backlog";
 import { readDraggedTaskId, TASK_DRAG_MEDIA_TYPE, taskDropRejection } from "../lib/taskDrag";
 import { emptyBacklogForm, taskAssignmentMutationFields, taskBoardFormsEqual, type BacklogTaskFormState } from "../lib/taskBoardForm";
 import { TaskDrawer } from "./task-board/TaskDrawer";
+import { InlineTaskCreate } from "./task-board/InlineTaskCreate";
+import { taskCreateIntent } from "../lib/taskCreateIntent";
 import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
 import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
@@ -494,6 +496,9 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   const [deleting, setDeleting] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dropLane, setDropLane] = useState<TaskStatus | null>(null);
+  // The lane whose inline create field is open, if any. Also the target
+  // status for an inline create committed from the list view.
+  const [inlineCreateStatus, setInlineCreateStatus] = useState<TaskStatus | null>(null);
   const { track: trackBoardEdge, stop: stopBoardScroll } = useEdgeAutoScroll();
   const boardRef = useRef<HTMLDivElement | null>(null);
   const touchDrag = useTouchTaskDrag({
@@ -520,6 +525,32 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     () => (draggedTaskId ? backlogTasks.find((task) => task.id === draggedTaskId) ?? null : null),
     [backlogTasks, draggedTaskId],
   );
+
+  // The `c` chord and the palette's "New task" land here: the event path
+  // covers an already-mounted board, the one-shot flag covers the navigation
+  // that mounts it. Inline creation always seeds the backlog lane.
+  useEffect(() => {
+    const channel = taskCreateIntent();
+    if (!channel) return;
+    const openInlineCreate = () => {
+      if (channel.consume()) setInlineCreateStatus("backlog");
+    };
+    openInlineCreate();
+    return channel.subscribe(openInlineCreate);
+  }, []);
+
+  // Rapid-entry commit: on success the field stays open (Linear's card
+  // creation rhythm); on failure the mutation's toast speaks and the text
+  // stays put for a retry.
+  async function submitInlineCreate(title: string): Promise<boolean> {
+    if (!inlineCreateStatus) return false;
+    try {
+      await createTaskMutation.mutateAsync({ title, status: inlineCreateStatus });
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   function openTaskForm(next: BacklogTaskFormState) {
     setForm(next);
@@ -787,6 +818,14 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
             <span className="backlog-rows-head-cell backlog-rows-head-due" role="columnheader">{t("backlog.due")}</span>
             <span className="backlog-rows-head-cell backlog-rows-head-actions" role="columnheader">{t("backlog.actions")}</span>
           </div>
+          {inlineCreateStatus ? (
+            <div className="backlog-inline-create-row" role="row">
+              <InlineTaskCreate
+                onSubmit={submitInlineCreate}
+                onClose={() => setInlineCreateStatus(null)}
+              />
+            </div>
+          ) : null}
           {filteredTasks.map((task) => {
             const discussionAgents = discussionAgentsForTask(task, nodes, logicalAgents);
             const assignment = taskAssignmentDisplay(task);
@@ -828,7 +867,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
                 <span className="backlog-lane-count">{grouped[status].length}</span>
               </header>
               <div className="backlog-task-list">
-                {grouped[status].length === 0 ? (
+                {grouped[status].length === 0 && inlineCreateStatus !== status ? (
                   <p className="backlog-empty">{t("backlog.empty_lane")}</p>
                 ) : grouped[status].map((task) => {
                   const session = linkedSession(task);
@@ -852,6 +891,22 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
                     />
                   );
                 })}
+                {inlineCreateStatus === status ? (
+                  <InlineTaskCreate
+                    onSubmit={submitInlineCreate}
+                    onClose={() => setInlineCreateStatus(null)}
+                  />
+                ) : (
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    className="backlog-lane-add"
+                    onClick={() => setInlineCreateStatus(status)}
+                  >
+                    <ActionAdd size={14} />
+                    <span>{t("backlog.new_task")}</span>
+                  </Button>
+                )}
               </div>
             </section>
           ))}

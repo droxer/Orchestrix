@@ -1947,3 +1947,59 @@
     padding-inline: var(--sp-4);
   }
 }
+
+/* ── Inline creation ───────────────────────────────────────────────────
+   Linear's lane-footer create: a ghost "+" affordance that becomes a bare
+   title field. The field borrows the card shell (surface-1, hairline, r-2)
+   so the task being typed already reads as the card it will become. */
+
+.backlog-lane-add {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1-5);
+  /* Ghost affordance, not a control: it must sit below the --control-h tier
+     the shadcn Button default brings, or the lane footers become the tallest
+     rows on the board. */
+  height: auto;
+  min-height: 32px;
+  padding: var(--sp-1-5) var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-2);
+  color: var(--ink-4);
+  font: var(--type-label);
+  cursor: pointer;
+}
+
+.backlog-lane-add:hover {
+  background: var(--row-hover);
+  color: var(--ink-2);
+}
+
+.backlog-inline-create {
+  width: 100%;
+  min-height: 36px;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+  color: var(--ink-1);
+  font: var(--type-body-sm);
+}
+
+.backlog-inline-create::placeholder {
+  color: var(--ink-4);
+}
+
+.backlog-inline-create:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
+}
+
+/* List view: the field spans the title column's row box so the eye does not
+   re-anchor between the row being typed and the rows that will surround it. */
+.backlog-inline-create-row {
+  display: flex;
+  align-items: center;
+  padding: var(--sp-1) var(--sp-3);
+  border-bottom: 1px solid var(--line-2);
+}

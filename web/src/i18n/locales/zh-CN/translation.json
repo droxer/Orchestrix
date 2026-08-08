@@ -262,7 +262,8 @@
     "deleting": "正在删除…",
     "delete_title": "删除任务？",
     "delete_body": "“{{title}}”将从待办中移除，关联的话题、产物和运行历史仍会保留。",
-    "toast_deleted": "任务已删除。"
+    "toast_deleted": "任务已删除。",
+    "inline_title_placeholder": "任务标题…"
   },
   "workspace": {
     "title": "工作区",
@@ -1203,5 +1204,32 @@
     "personality_save_hint": "按 ⌘/Ctrl + Enter 保存",
     "select_title": "选择一个智能体",
     "select_body": "从列表中选择一个，查看其工作区、文件和活动。"
+  },
+  "command": {
+    "title": "快捷命令",
+    "placeholder": "输入命令或搜索…",
+    "empty": "没有匹配的命令",
+    "go_to": "前往{{name}}",
+    "toggle_sidebar": "切换侧边栏",
+    "toggle_theme": "切换主题",
+    "open_preferences": "打开偏好设置",
+    "shortcuts_help": "键盘快捷键",
+    "group_navigate": "前往",
+    "group_create": "新建",
+    "group_view": "视图",
+    "hint_navigate": "导航",
+    "hint_run": "选择",
+    "hint_close": "关闭"
+  },
+  "shortcuts": {
+    "title": "键盘快捷键",
+    "group_global": "全局",
+    "group_navigate": "导航",
+    "group_composer": "输入框",
+    "open_command": "打开快捷命令",
+    "show_help": "显示键盘快捷键",
+    "new_task": "新建任务",
+    "new_thread": "新对话",
+    "send_message": "发送消息"
   }
 }

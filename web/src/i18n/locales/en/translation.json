@@ -262,7 +262,8 @@
     "deleting": "Deleting…",
     "delete_title": "Delete task?",
     "delete_body": "“{{title}}” will be removed from Backlog. Linked threads, artifacts, and run history will stay available.",
-    "toast_deleted": "Task deleted."
+    "toast_deleted": "Task deleted.",
+    "inline_title_placeholder": "Task title…"
   },
   "workspace": {
     "title": "Workspace",
@@ -1205,5 +1206,32 @@
     "personality_save_hint": "⌘/Ctrl + Enter to save",
     "select_title": "Select an agent",
     "select_body": "Pick one from the list to view its workspace, files, and activity."
+  },
+  "command": {
+    "title": "Quickcuts",
+    "placeholder": "Type a command or search…",
+    "empty": "No matching commands",
+    "go_to": "Go to {{name}}",
+    "toggle_sidebar": "Toggle sidebar",
+    "toggle_theme": "Switch theme",
+    "open_preferences": "Open preferences",
+    "shortcuts_help": "Keyboard shortcuts",
+    "group_navigate": "Go to",
+    "group_create": "Create",
+    "group_view": "View",
+    "hint_navigate": "to navigate",
+    "hint_run": "to select",
+    "hint_close": "to close"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "group_global": "Global",
+    "group_navigate": "Navigate",
+    "group_composer": "Composer",
+    "open_command": "Open Quickcuts",
+    "show_help": "Show keyboard shortcuts",
+    "new_task": "New task",
+    "new_thread": "New thread",
+    "send_message": "Send message"
   }
 }
