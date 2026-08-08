@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { RelaySession } from "../types";
 import type { AppRoute, MobileView } from "../lib/viewTypes";
 import {
+  APP_NAVIGATION_EVENT,
   canonicalBrowserUrl,
   hrefForRoute as buildHrefForRoute,
   parseAppPath,
@@ -60,7 +61,11 @@ export function useAppRouter({
     const applyCurrentLocation = () => applyLocationState(parseAppPath(window.location.pathname, window.location.search));
     applyCurrentLocation();
     window.addEventListener("popstate", applyCurrentLocation);
-    return () => window.removeEventListener("popstate", applyCurrentLocation);
+    window.addEventListener(APP_NAVIGATION_EVENT, applyCurrentLocation);
+    return () => {
+      window.removeEventListener("popstate", applyCurrentLocation);
+      window.removeEventListener(APP_NAVIGATION_EVENT, applyCurrentLocation);
+    };
   }, [applyLocationState]);
 
   const navigateToAppState = useCallback((state: AppLocationState, replace = false) => {

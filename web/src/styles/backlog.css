@@ -911,6 +911,15 @@
   color: var(--ink-4);
 }
 
+.task-assignment-option.is-action .task-assignment-option-mark {
+  border-style: dashed;
+  color: var(--ink-2);
+}
+
+.task-assignment-option.is-action .task-assignment-option-copy > span:first-child {
+  color: var(--link);
+}
+
 .task-assignment-option-copy {
   display: flex;
   flex: 1;

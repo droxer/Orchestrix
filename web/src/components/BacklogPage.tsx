@@ -10,7 +10,7 @@ import { useDialogs } from "@/components/ui/DialogProvider";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
 import { type CurrentUser, type DaemonNodeMonitorRecord, type EmployeeAgent, type RelaySession, type RelayTaskListItem, type TaskStatus } from "../types";
-import { ActionApprove, ActionCalendar, ActionStart, ActionStop, NavRefresh, ViewBoard, ViewList } from "./icons";
+import { ActionApprove, ActionCalendar, ActionStart, ActionStop, NavAgents, NavRefresh, ViewBoard, ViewList } from "./icons";
 import { agentReadyForTask, canDiscussTask, discussionAgentsForTask, dueTone, filterTasks, isTaskStatus, TASK_PRIORITIES, TASK_STATUSES, tasksByStatus, type BacklogFilters } from "../lib/backlog";
 import { readDraggedTaskId, TASK_DRAG_MEDIA_TYPE, taskDropRejection } from "../lib/taskDrag";
 import { emptyBacklogForm, taskAssignmentMutationFields, taskBoardFormsEqual, type BacklogTaskFormState } from "../lib/taskBoardForm";
@@ -241,6 +241,7 @@ function BacklogTaskCard({
   onDragEnd,
   onTouchStart,
   onEdit,
+  onAssign,
   onStart,
   onToggleBlock,
   onDone,
@@ -257,6 +258,7 @@ function BacklogTaskCard({
   onDragEnd: () => void;
   onTouchStart: (event: TouchEvent<HTMLElement>) => void;
   onEdit: () => void;
+  onAssign: () => void;
   onStart: () => void;
   onToggleBlock: () => void;
   onDone: () => void;
@@ -304,6 +306,16 @@ function BacklogTaskCard({
       </div>
       <div className="backlog-task-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
+          <Button variant="ghost"
+            type="button"
+            className="backlog-action-icon"
+            onClick={onAssign}
+            disabled={task.status === "running" || task.status === "done"}
+            aria-label={t("backlog.assign_task")}
+            title={t("backlog.assign_task")}
+          >
+            <NavAgents size={14} />
+          </Button>
           <Button variant={startDisabled ? "ghost" : "default"}
             type="button"
             className="backlog-action-primary backlog-action-icon"
@@ -368,6 +380,7 @@ function BacklogTaskRow({
   agentDisplayName,
   canDiscuss,
   onEdit,
+  onAssign,
   onStart,
   onToggleBlock,
   onDone,
@@ -379,6 +392,7 @@ function BacklogTaskRow({
   agentDisplayName?: string;
   canDiscuss: boolean;
   onEdit: () => void;
+  onAssign: () => void;
   onStart: () => void;
   onToggleBlock: () => void;
   onDone: () => void;
@@ -411,6 +425,16 @@ function BacklogTaskRow({
       </span>
       <div className="backlog-row-actions" role="cell" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
+          <Button variant="ghost"
+            type="button"
+            className="backlog-action-icon"
+            onClick={onAssign}
+            disabled={task.status === "running" || task.status === "done"}
+            aria-label={t("backlog.assign_task")}
+            title={t("backlog.assign_task")}
+          >
+            <NavAgents size={14} />
+          </Button>
           <Button variant={startDisabled ? "ghost" : "default"}
             type="button"
             className="backlog-action-primary backlog-action-icon"
@@ -465,6 +489,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   const [form, setForm] = useState<BacklogTaskFormState | null>(null);
   const [formBaseline, setFormBaseline] = useState<BacklogTaskFormState | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [assignmentFocus, setAssignmentFocus] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -502,11 +527,18 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     setDrawerOpen(true);
   }
 
+  // Quick-assign entry from a card/row: same drawer, focus on the picker.
+  function assignTask(task: RelayTaskListItem) {
+    setAssignmentFocus(true);
+    editTask(task);
+  }
+
   // The drawer calls this after its exit animation completes — only then is
   // the form released, so every exit (save, delete, discard) animates out.
   function releaseTaskForm() {
     setForm(null);
     setFormBaseline(null);
+    setAssignmentFocus(false);
   }
 
   function dismissTaskForm() {
@@ -692,6 +724,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
       .map((agent) => ({ agentId: agent.id, agent: agent.executorKind, mode: "ask" as const }));
     return {
       onEdit: () => editTask(task),
+      onAssign: () => assignTask(task),
       onStart: () => void startTaskMutation.mutate(
         (task.assignedAgentId || task.assignedTeamId)
           ? { taskId: task.id }
@@ -841,6 +874,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
           teams={teams}
           saving={saving}
           deleting={deleting}
+          initialFocus={assignmentFocus ? "assignment" : "title"}
           title={form.id ? t("backlog.edit_task") : t("backlog.new_task")}
           subtitle={form.id ?? t("backlog.new_task_id")}
           onClose={() => { void closeTaskForm(); }}

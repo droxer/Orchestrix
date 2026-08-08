@@ -11,7 +11,7 @@ import { useDialogs } from "@/components/ui/DialogProvider";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
 import { type CurrentUser, type DaemonNodeMonitorRecord, type EmployeeAgent, type RelaySession, type RelayTaskListItem } from "../types";
-import { ActionCalendar, ActionStart, ViewGrid, ViewList } from "./icons";
+import { ActionCalendar, ActionStart, NavAgents, ViewGrid, ViewList } from "./icons";
 import { agentReadyForTask } from "../lib/backlog";
 import { TaskAssignee, TaskExecutionBadge } from "./TaskAssignee";
 import { isTaskAssigneeCurrentUser, taskAssigneeDisplayName, teamReady } from "../lib/taskAssignment";
@@ -203,6 +203,23 @@ function RoutineStartButton({
   );
 }
 
+function RoutineAssignButton({ onAssign }: { onAssign: () => void }) {
+  const { t } = useTranslation();
+
+  return (
+    <Button
+      variant="ghost"
+      type="button"
+      className="backlog-action-icon"
+      onClick={onAssign}
+      aria-label={t("backlog.assign_task")}
+      title={t("backlog.assign_task")}
+    >
+      <NavAgents size={14} />
+    </Button>
+  );
+}
+
 function RoutineCard({
   task,
   state,
@@ -212,6 +229,7 @@ function RoutineCard({
   assigneeIsSelf,
   agentDisplayName,
   onEdit,
+  onAssign,
   onStart,
 }: {
   task: RelayTaskListItem;
@@ -222,6 +240,7 @@ function RoutineCard({
   assigneeIsSelf?: boolean;
   agentDisplayName?: string;
   onEdit: () => void;
+  onAssign: () => void;
   onStart: () => void;
 }) {
   const { t } = useTranslation();
@@ -262,6 +281,7 @@ function RoutineCard({
       </div>
       <div className="backlog-task-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
+          <RoutineAssignButton onAssign={onAssign} />
           <RoutineStartButton disabled={startDisabled} onStart={onStart} />
         </div>
       </div>
@@ -308,6 +328,7 @@ function RoutineRow({
   assigneeIsSelf,
   agentDisplayName,
   onEdit,
+  onAssign,
   onStart,
 }: {
   task: RelayTaskListItem;
@@ -318,6 +339,7 @@ function RoutineRow({
   assigneeIsSelf?: boolean;
   agentDisplayName?: string;
   onEdit: () => void;
+  onAssign: () => void;
   onStart: () => void;
 }) {
   const { t } = useTranslation();
@@ -345,6 +367,7 @@ function RoutineRow({
       </span>
       <div className="backlog-row-actions" role="cell" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
+          <RoutineAssignButton onAssign={onAssign} />
           <RoutineStartButton disabled={startDisabled} onStart={onStart} />
         </div>
       </div>
@@ -409,6 +432,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
   const [form, setForm] = useState<RoutineTaskFormState | null>(null);
   const [formBaseline, setFormBaseline] = useState<RoutineTaskFormState | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [assignmentFocus, setAssignmentFocus] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const formDirty = Boolean(form && formBaseline && !taskBoardFormsEqual(form, formBaseline));
@@ -434,6 +458,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
   function releaseRoutineForm() {
     setForm(null);
     setFormBaseline(null);
+    setAssignmentFocus(false);
   }
 
   function dismissRoutineForm() {
@@ -535,9 +560,16 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
   const editingTask = form?.id ? tasks.find((task) => task.id === form.id) : undefined;
   const editingSession = editingTask ? linkedSession(editingTask) : undefined;
 
+  // Quick-assign entry from a card/row: same drawer, focus on the picker.
+  function assignTask(task: RelayTaskListItem) {
+    setAssignmentFocus(true);
+    editTask(task);
+  }
+
   function routineHandlers(task: RelayTaskListItem) {
     return {
       onEdit: () => editTask(task),
+      onAssign: () => assignTask(task),
       onStart: () => void startTaskMutation.mutate({ taskId: task.id }),
     };
   }
@@ -629,6 +661,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
           teams={teams}
           saving={saving}
           deleting={deleting}
+          initialFocus={assignmentFocus ? "assignment" : "title"}
           title={form.id ? t("routine.edit") : t("routine.new")}
           subtitle={form.id
             ? `${t(`routine.types.${form.routineType}`)} · ${t(`routine.cadences.${form.routineCadence}`)}`

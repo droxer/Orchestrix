@@ -39,8 +39,11 @@ import { IdentityMonogram } from "../IdentityMonogram";
 import { NavAgents } from "../icons";
 import { ProfileImage } from "../ProfileImagePicker";
 import { cn } from "@/lib/utils";
+import { navigateToAppPath } from "../../lib/appRoute";
 
 const NO_AGENT = "__none__";
+const NAV_AGENTS = "__nav_agents__";
+const NAV_TEAMS = "__nav_teams__";
 
 // Status is carried by the glyph's corner pip (the designed agent-state
 // indicator), never by a text label. Map availability onto the shared
@@ -202,6 +205,8 @@ type TaskDrawerProps = {
   title: string;
   subtitle: string;
   deleting?: boolean;
+  /** Field that receives focus when the drawer opens. Quick-assign actions pass "assignment". */
+  initialFocus?: "title" | "assignment";
   onClose: () => void;
   onChange: (next: TaskBoardFormState) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -321,6 +326,7 @@ export function TaskDrawer({
   title,
   subtitle,
   deleting = false,
+  initialFocus = "title",
   onClose,
   onChange,
   onSubmit,
@@ -388,7 +394,7 @@ export function TaskDrawer({
         {meta}
         <Field label={t("backlog.title_field")}>
           <Input
-            data-modal-initial-focus
+            data-modal-initial-focus={initialFocus === "title" ? "" : undefined}
             name={`${fieldPrefix}-title`}
             required
             value={form.title}
@@ -434,6 +440,14 @@ export function TaskDrawer({
               value={taskAssignmentValue(form)}
               onValueChange={(value) => {
                 if (value == null) return
+                if (value === NAV_AGENTS) {
+                  navigateToAppPath("/agents");
+                  return;
+                }
+                if (value === NAV_TEAMS) {
+                  navigateToAppPath("/teams?dialog=create");
+                  return;
+                }
                 const selection = parseTaskAssignmentValue(value);
                 if (selection.kind === "none") {
                   onChange(clearTaskAssignment(form));
@@ -460,7 +474,12 @@ export function TaskDrawer({
                 }
               }}
             >
-              <SelectTrigger id={assignmentFieldId} aria-describedby={assignmentSummaryId} className="w-full">
+              <SelectTrigger
+                id={assignmentFieldId}
+                aria-describedby={assignmentSummaryId}
+                className="w-full"
+                data-modal-initial-focus={initialFocus === "assignment" ? "" : undefined}
+              >
                 <SelectValue>
                   {(value: string) => {
                     if (value === NO_AGENT) {
@@ -489,17 +508,49 @@ export function TaskDrawer({
                       <AssignmentOption agent={agent} />
                     </SelectItem>
                   ))}
+                  {agentOptions.length === 0 ? (
+                    <SelectItem value="__empty_agents__" label={t("backlog.no_agents_available")} disabled>
+                      <span className="task-assignment-option is-empty">
+                        <span className="task-assignment-option-copy">
+                          <span>{t("backlog.no_agents_available")}</span>
+                        </span>
+                      </span>
+                    </SelectItem>
+                  ) : null}
+                  <SelectItem value={NAV_AGENTS} label={t("backlog.manage_agents")}>
+                    <span className="task-assignment-option is-action">
+                      <span className="task-assignment-option-mark" aria-hidden="true"><NavAgents size={14} /></span>
+                      <span className="task-assignment-option-copy">
+                        <span>{t("backlog.manage_agents")}</span>
+                      </span>
+                    </span>
+                  </SelectItem>
                 </SelectGroup>
-                {teamOptions.length > 0 ? (
-                  <SelectGroup>
-                    <SelectLabel>{t("backlog.teams_section")}</SelectLabel>
-                    {teamOptions.map((team) => (
-                      <SelectItem key={team.id} value={`team:${team.id}`} label={team.name}>
-                        <AssignmentOption team={team} />
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ) : null}
+                <SelectGroup>
+                  <SelectLabel>{t("backlog.teams_section")}</SelectLabel>
+                  {teamOptions.map((team) => (
+                    <SelectItem key={team.id} value={`team:${team.id}`} label={team.name}>
+                      <AssignmentOption team={team} />
+                    </SelectItem>
+                  ))}
+                  {teamOptions.length === 0 ? (
+                    <SelectItem value="__empty_teams__" label={t("backlog.no_teams_available")} disabled>
+                      <span className="task-assignment-option is-empty">
+                        <span className="task-assignment-option-copy">
+                          <span>{t("backlog.no_teams_available")}</span>
+                        </span>
+                      </span>
+                    </SelectItem>
+                  ) : null}
+                  <SelectItem value={NAV_TEAMS} label={t("backlog.create_team")}>
+                    <span className="task-assignment-option is-action">
+                      <span className="task-assignment-option-mark" aria-hidden="true"><NavAgents size={14} /></span>
+                      <span className="task-assignment-option-copy">
+                        <span>{t("backlog.create_team")}</span>
+                      </span>
+                    </span>
+                  </SelectItem>
+                </SelectGroup>
               </SelectContent>
             </Select>
             <AssignmentSummary

@@ -172,3 +172,10 @@ export function syncAppStateToUrl(state: AppLocationState, replace = false): voi
 export function syncRouteToUrl(route: AppRoute, replace = false): void {
   syncAppStateToUrl({ route, mobileView: route === "main" ? "threads" : "chat", sessionId: null }, replace);
 }
+
+/** Push an in-app path (search params allowed) and notify route/search listeners. */
+export function navigateToAppPath(path: string): void {
+  if (typeof window === "undefined") return;
+  window.history.pushState(window.history.state, "", path);
+  window.dispatchEvent(new Event(APP_NAVIGATION_EVENT));
+}
