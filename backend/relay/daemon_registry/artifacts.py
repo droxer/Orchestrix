@@ -71,18 +71,25 @@ WORKSPACE_ARTIFACT_CONTENT_MAX_BYTES = int(
 
 
 def _is_generated_artifact_path(relative_path: str) -> bool:
+    """Whether a thread-relative workspace path should be indexed as an artifact.
+
+    Binary/document types count anywhere. Text documents count only near a
+    workspace root: directly in the thread workspace, directly in an agent's
+    own home, or under an ``output/`` directory in either — so a guide an agent
+    writes beside its work is indexed while a checkout's ``README.md`` is not.
+    Mirrored in ``isTextDocumentFile``
+    (packages/relay-daemon/src/generated-files.ts); change both together.
+    """
     path = PurePosixPath(relative_path)
     suffix = path.suffix.lower()
     if suffix in GENERATED_ARTIFACT_EXTENSIONS:
         return True
-    output_root = path.parts[0] if path.parts else ""
-    if (
-        len(path.parts) >= 3
-        and path.parts[0] == "agents"
-        and path.parts[1].startswith("agent-")
-    ):
-        output_root = path.parts[2]
-    return output_root == "output" and suffix in OUTPUT_ARTIFACT_TEXT_EXTENSIONS
+    if suffix not in OUTPUT_ARTIFACT_TEXT_EXTENSIONS:
+        return False
+    parts = path.parts
+    if len(parts) >= 3 and parts[0] == "agents" and parts[1].startswith("agent-"):
+        parts = parts[2:]
+    return len(parts) == 1 or parts[0] == "output"
 
 
 def _workspace_artifact_candidates(
