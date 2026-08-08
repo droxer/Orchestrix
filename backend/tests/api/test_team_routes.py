@@ -1601,7 +1601,7 @@ def test_message_to_a_team_thread_reports_a_disabled_team(monkeypatch) -> None:
         assert answered.json()["detail"]["code"] == "team_disabled"
 
 
-def test_explicit_assignment_to_a_team_thread_bypasses_the_disabled_team_gate(
+def test_explicit_assignment_to_a_disabled_team_requires_a_recovery_decision(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
@@ -1676,7 +1676,24 @@ def test_explicit_assignment_to_a_team_thread_bypasses_the_disabled_team_gate(
             },
         )
 
-        assert answered.status_code == 202
+        assert answered.status_code == 409
+        assert answered.json()["detail"]["code"] == "team_disabled"
+
+        recovered = client.post(
+            "/api/v1/agent-runs",
+            json={
+                "taskGoal": "another pass",
+                "sessionId": session_id,
+                "assignments": [{"agentId": lead["id"]}],
+                "decision": {
+                    "kind": "rerun",
+                    "targetAgent": "codex",
+                    "targetAgentId": lead["id"],
+                },
+            },
+        )
+
+        assert recovered.status_code == 202
 
 
 def test_agent_runs_still_requires_an_assignment_for_a_solo_thread(monkeypatch) -> None:

@@ -281,7 +281,7 @@ def test_pending_employee_device_enrollment_rotates_token_after_restart(
             "workspacePath": "/Users/alice/project",
             "protocolVersion": 1,
             "supportedAgents": ["codex"],
-            "capabilities": ["thread-workspaces"],
+            "capabilities": ["thread-workspaces", "round-result"],
             "status": "ready",
         }
         with pytest.raises(PermissionError):
@@ -3217,7 +3217,11 @@ def test_lead_repairs_a_failed_teammate_and_the_pipeline_resumes() -> None:
                 {
                     "taskGoal": "ship it",
                     "assignments": [
-                        {"agent": "codex", "mode": "action"},
+                        {
+                            "agent": "codex",
+                            "mode": "action",
+                            "coordinator": True,
+                        },
                         {"agent": "claude", "mode": "action"},
                     ],
                     "taskId": task["id"],
@@ -3264,7 +3268,11 @@ def test_repair_budget_is_spent_once_and_then_the_run_fails() -> None:
                 {
                     "taskGoal": "ship it",
                     "assignments": [
-                        {"agent": "codex", "mode": "action"},
+                        {
+                            "agent": "codex",
+                            "mode": "action",
+                            "coordinator": True,
+                        },
                         {"agent": "claude", "mode": "action"},
                     ],
                     "taskId": task["id"],
@@ -3341,6 +3349,111 @@ def test_a_task_less_room_does_not_send_the_lead_back_to_repair() -> None:
             # No task, so there is nothing for a lead to "fix on this task".
             assert registry.take_commands("sbx_alice", "node_token") == []
             assert session_store.get_session(session["id"])["status"] == "failed"
+
+    asyncio.run(run_flow())
+
+
+def test_a_non_team_pipeline_does_not_invent_a_lead_for_repair() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store, _daemon_store, registry = _pipeline_registry(root)
+            backend = ServerDaemonNodeBackend(registry)
+            task = registry.task_store.create_task({"title": "Ship it"})
+            session = await backend.run(
+                "sbx_alice",
+                {
+                    "taskGoal": "ship it",
+                    "assignments": [
+                        {"agent": "codex", "mode": "action"},
+                        {"agent": "claude", "mode": "action"},
+                    ],
+                    "taskId": task["id"],
+                },
+            )
+
+            [first] = registry.take_commands("sbx_alice", "node_token")
+            _finish_run(registry, first, 0)
+            [second] = registry.take_commands("sbx_alice", "node_token")
+            _finish_run(registry, second, 3)
+
+            assert registry.take_commands("sbx_alice", "node_token") == []
+            assert session_store.get_session(session["id"])["status"] == "failed"
+
+    asyncio.run(run_flow())
+
+
+def test_a_read_only_team_discussion_does_not_attempt_a_write_repair() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store, _daemon_store, registry = _pipeline_registry(root)
+            backend = ServerDaemonNodeBackend(registry)
+            task = registry.task_store.create_task({"title": "Discuss it"})
+            session = await backend.run(
+                "sbx_alice",
+                {
+                    "taskGoal": "discuss it",
+                    "assignments": [
+                        {
+                            "agent": "codex",
+                            "mode": "ask",
+                            "coordinator": True,
+                        },
+                        {"agent": "claude", "mode": "ask"},
+                    ],
+                    "taskId": task["id"],
+                },
+            )
+
+            [lead] = registry.take_commands("sbx_alice", "node_token")
+            _finish_run(registry, lead, 0)
+            [member] = registry.take_commands("sbx_alice", "node_token")
+            _finish_run(registry, member, 3)
+
+            assert registry.take_commands("sbx_alice", "node_token") == []
+            assert session_store.get_session(session["id"])["status"] == "failed"
+
+    asyncio.run(run_flow())
+
+
+def test_only_the_final_writable_assignment_reports_the_round_result() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            _sessions, _daemon_store, registry = _pipeline_registry(root)
+            backend = ServerDaemonNodeBackend(registry)
+            task = registry.task_store.create_task({"title": "Ship it"})
+            await backend.run(
+                "sbx_alice",
+                {
+                    "taskGoal": "ship it",
+                    "assignments": [
+                        {
+                            "agent": "codex",
+                            "mode": "action",
+                            "coordinator": True,
+                            "brief": "Implement the change.",
+                        },
+                        {
+                            "agent": "claude",
+                            "mode": "review",
+                            "brief": "Review and synthesize the round.",
+                        },
+                    ],
+                    "taskId": task["id"],
+                },
+            )
+
+            [first] = registry.take_commands("sbx_alice", "node_token")
+            assert first["state"]["assignment_brief"] == "Implement the change."
+            assert "round_result_file" not in first["state"]
+            _finish_run(registry, first, 0)
+
+            [final] = registry.take_commands("sbx_alice", "node_token")
+            assert final["state"]["assignment_brief"] == (
+                "Review and synthesize the round."
+            )
+            assert final["state"]["round_result_file"] == (
+                ".relay/round-result.json"
+            )
 
     asyncio.run(run_flow())
 
@@ -3477,7 +3590,7 @@ def test_an_unfinished_round_queues_the_task_for_another_round() -> None:
     asyncio.run(run_flow())
 
 
-def test_a_round_that_reports_no_verdict_closes_out_but_says_so() -> None:
+def test_a_round_that_reports_no_verdict_waits_for_a_human() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
             _sessions, task_store, registry = _round_result_registry(root)
@@ -3499,12 +3612,11 @@ def test_a_round_that_reports_no_verdict_closes_out_but_says_so() -> None:
                 "node_token",
             )
 
-            # The fallback is the old behavior, but it is no longer silent.
-            closed = task_store.get_task(task["id"])
-            assert closed["status"] == "done"
+            waiting = task_store.get_task(task["id"])
+            assert waiting["status"] == "waiting_for_human"
             assert any(
                 "did not write .relay/round-result.json" in item["message"]
-                for item in closed["activity"]
+                for item in waiting["activity"]
             )
 
     asyncio.run(run_flow())
@@ -3533,7 +3645,7 @@ def test_a_malformed_round_result_is_ignored_rather_than_steering_the_task() -> 
                 "node_token",
             )
 
-            assert task_store.get_task(task["id"])["status"] == "done"
+            assert task_store.get_task(task["id"])["status"] == "waiting_for_human"
 
     asyncio.run(run_flow())
 

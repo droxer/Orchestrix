@@ -92,6 +92,11 @@ def test_team_member_assignments_sends_a_reviewer_to_review() -> None:
     agents = [_agent("lead", "codex"), _agent("support", "claude", defaultRole="reviewer")]
 
     assert team_member_assignments(agents, mode="action") == [
-        {"agentId": "lead", "agent": "codex", "mode": "action"},
+        {
+            "agentId": "lead",
+            "agent": "codex",
+            "mode": "action",
+            "coordinator": True,
+        },
         {"agentId": "support", "agent": "claude", "mode": "review", "role": "reviewer"},
     ]
