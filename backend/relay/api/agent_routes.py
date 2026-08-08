@@ -362,6 +362,14 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             or not item["agentId"]
         ):
             raise HTTPException(400, "Each assignment requires agentId.")
+        if team_member_ids and item["agentId"] not in team_member_ids:
+            raise HTTPException(
+                409,
+                {
+                    "code": "agent_forbidden",
+                    "message": "This thread belongs to a team; only its members can answer it.",
+                },
+            )
         assignments.append(
             {
                 "agentId": item["agentId"],
