@@ -167,9 +167,8 @@ body {
 .chat-panel { background: transparent; }
 
 .transcript { background: transparent; }
-.transcript-inner { width: min(100%, 960px); padding: var(--sp-7) var(--sp-6) var(--sp-8); gap: var(--sp-5); }
+.transcript-inner { width: min(100%, 960px); padding: var(--sp-7) var(--page-gutter) var(--sp-8); gap: var(--sp-5); }
 .transcript-inner:not(:has(.transcript-empty)) { background: none; }
-.transcript-inner:not(:has(.transcript-empty))::before { left: calc(var(--sp-6) + var(--sp-2)); opacity: 0.35; background: var(--line-1); }
 .transcript-inner:has(.transcript-empty) {
   margin: 0 auto;
   min-height: 100%;
@@ -177,8 +176,7 @@ body {
   border-radius: 0;
   background: transparent;
 }
-.transcript-phase-node { background: var(--action); box-shadow: 0 0 0 4px var(--surface-0); }
-.rail-node { border-color: var(--ink-4); border-radius: var(--r-full); background: var(--surface-3); box-shadow: 0 0 0 4px var(--surface-0); }
+.rail-node { border-color: var(--ink-4); border-radius: var(--r-full); background: var(--surface-3); }
 .msg-time { color: var(--ink-4); }
 
 /* Empty states keep the base type roles — no oversized display override. */
@@ -259,12 +257,9 @@ html[data-theme="dark"] .rail-node { background: var(--surface-3); }
   background: var(--action-soft);
 }
 
-/* Lane heads use the ink accent; node cards keep per-status tone bars from
-   admin-v2-views.css (.adm-node-card.tone-*::before). */
-.backlog-lane-head::before {
-  background: var(--action);
-}
-
+/* Node cards keep their per-status tone bars from admin-v2-views.css
+   (.adm-node-card.tone-*::before). Lane heads carry no rail — the base
+   theme removed it and atelier agrees. */
 .workspace-pane-head,
 .workspace-activity-head,
 .backlog-lane-head,

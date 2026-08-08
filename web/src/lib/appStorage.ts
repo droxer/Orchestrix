@@ -49,10 +49,10 @@ export function writeLanguage(language: Language): void {
   if (typeof window !== "undefined") localStorage.setItem(languageStorageKey, language);
 }
 
-/** Rail collapse state. Defaults to expanded; only an explicit "0" collapses. */
+/** Rail collapse state. Defaults to collapsed; only an explicit "1" expands. */
 export function readSidenavExpanded(): boolean {
-  if (typeof window === "undefined") return true;
-  return localStorage.getItem(sidenavExpandedKey) !== "0";
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(sidenavExpandedKey) === "1";
 }
 
 export function writeSidenavExpanded(expanded: boolean): void {

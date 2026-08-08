@@ -1024,35 +1024,6 @@ class DatabaseTaskStore:
             for row in rows
         ]
 
-    def list_dashboard_activity(self, *, limit: int = 20) -> list[dict[str, Any]]:
-        """Return exact newest task creation activity from indexed columns."""
-        with store_transaction(self.engine) as conn:
-            rows = (
-                conn.execute(
-                    select(
-                        self.tasks.c.id,
-                        self.tasks.c.owner_employee_id,
-                        self.tasks.c.title,
-                        self.tasks.c.created_at,
-                    )
-                    .where(self.tasks.c.snapshot["deletedAt"].as_string().is_(None))
-                    .order_by(self.tasks.c.created_at.desc())
-                    .limit(max(1, limit))
-                )
-                .mappings()
-                .all()
-            )
-        return [
-            {
-                "kind": "task.created",
-                "timestamp": _format_iso(row["created_at"]),
-                "taskId": row["id"],
-                "employeeId": row["owner_employee_id"],
-                "message": row["title"] or "Task created",
-            }
-            for row in rows
-        ]
-
     def delete_task(
         self,
         task_id: str,

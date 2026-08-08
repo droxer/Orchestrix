@@ -679,15 +679,6 @@ export interface DashboardSessionsResponse {
   topEmployees: Array<{ employeeId: string; sessionCount: number }>;
 }
 
-export interface DashboardActivityItem {
-  kind: string;
-  timestamp: string;
-  sessionId?: string;
-  taskId?: string;
-  employeeId?: string | null;
-  message: string;
-}
-
 export interface TokenUsageSnapshot {
   available: boolean;
   totalInput: number;
@@ -702,10 +693,6 @@ export interface TokenUsageSnapshot {
 
 export function getDashboardSessions(signal?: AbortSignal): Promise<DashboardSessionsResponse> {
   return apiJson<DashboardSessionsResponse>("/admin/dashboard/sessions", { signal });
-}
-
-export function getDashboardActivity(signal?: AbortSignal): Promise<{ items: DashboardActivityItem[] }> {
-  return apiJson<{ items: DashboardActivityItem[] }>("/admin/dashboard/activity?limit=20", { signal });
 }
 
 export function getDashboardTokens(signal?: AbortSignal): Promise<TokenUsageSnapshot> {

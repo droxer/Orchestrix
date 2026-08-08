@@ -838,64 +838,6 @@ def dashboard_sessions(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     }
 
 
-@router.get("/admin/dashboard/activity")
-def dashboard_activity(
-    request: Request,
-    ctx: AppContextDep,
-    limit: int = 20,
-) -> dict[str, Any]:
-    require_admin_session(request, ctx.auth_store)
-    limit = max(1, min(limit, 100))
-
-    if hasattr(ctx.session_store, "list_dashboard_activity") and hasattr(
-        ctx.task_store, "list_dashboard_activity"
-    ):
-        items = [
-            *ctx.session_store.list_dashboard_activity(limit=limit),
-            *ctx.task_store.list_dashboard_activity(limit=limit),
-        ]
-    else:
-        items = _fallback_dashboard_activity(ctx)
-
-    items.sort(key=lambda item: item.get("timestamp") or "", reverse=True)
-    return {"items": items[:limit]}
-
-
-def _fallback_dashboard_activity(ctx: AppContextDep) -> list[dict[str, Any]]:
-    items: list[dict[str, Any]] = []
-    for session in ctx.session_store.list_sessions():
-        owner = session.get("ownerEmployeeId")
-        created_at = session.get("createdAt")
-        if created_at:
-            items.append({
-                "kind": "session.created",
-                "timestamp": created_at,
-                "sessionId": session.get("id"),
-                "employeeId": owner,
-                "message": session.get("taskGoal") or "Session created",
-            })
-        status = session.get("status")
-        if status in {"completed", "failed"} and session.get("updatedAt"):
-            items.append({
-                "kind": f"session.{status}",
-                "timestamp": session.get("updatedAt"),
-                "sessionId": session.get("id"),
-                "employeeId": owner,
-                "message": session.get("taskGoal") or f"Session {status}",
-            })
-    tasks = ctx.task_store.list_tasks() if hasattr(ctx.task_store, "list_tasks") else []
-    for task in tasks:
-        if task.get("createdAt"):
-            items.append({
-                "kind": "task.created",
-                "timestamp": task["createdAt"],
-                "taskId": task.get("id"),
-                "employeeId": task.get("ownerEmployeeId"),
-                "message": task.get("title") or "Task created",
-            })
-    return items
-
-
 @router.get("/admin/dashboard/tokens")
 def dashboard_tokens(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)

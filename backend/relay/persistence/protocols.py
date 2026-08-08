@@ -30,9 +30,6 @@ class SessionStore(Protocol):
     def list_session_summaries(
         self, *, owner_employee_id: str | None = None, limit: int = 100
     ) -> list[dict[str, Any]]: ...
-    def list_dashboard_activity(
-        self, *, limit: int = 20
-    ) -> list[dict[str, Any]]: ...
     def create_artifact(
         self, session_id: str, payload: dict[str, Any]
     ) -> tuple[dict[str, Any], dict[str, Any]]: ...
@@ -55,9 +52,6 @@ class TaskStore(Protocol):
     def list_tasks(self) -> list[dict[str, Any]]: ...
     def list_task_summaries(
         self, *, employee_id: str | None = None, limit: int | None = None
-    ) -> list[dict[str, Any]]: ...
-    def list_dashboard_activity(
-        self, *, limit: int = 20
     ) -> list[dict[str, Any]]: ...
     def update_task(
         self,

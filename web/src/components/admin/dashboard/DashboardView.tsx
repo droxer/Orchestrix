@@ -1,13 +1,11 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
-import { useDashboardActivity } from "../../../hooks/useDashboardActivity";
 import { useDashboardSessions } from "../../../hooks/useDashboardSessions";
 import { useTokenUsage } from "../../../hooks/useTokenUsage";
 import type { NodeMetrics } from "../../../hooks/useNodeMetrics";
 import type { ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../../types";
 import { ActivityChart } from "./ActivityChart";
-import { ActivityFeed } from "./ActivityFeed";
 import { NodeStatusCard } from "./NodeStatusCard";
 import { KpiTile } from "./KpiTile";
 import { TokenUsageChart } from "./TokenUsageChart";
@@ -22,7 +20,6 @@ interface DashboardViewProps {
 export function DashboardView({ nodes, employees, metrics }: DashboardViewProps) {
   const { t, i18n } = useTranslation();
   const sessionsQuery = useDashboardSessions(true);
-  const activity = useDashboardActivity(true);
   const tokens = useTokenUsage();
 
   const sessionsReady = !sessionsQuery.isLoading;
@@ -115,8 +112,6 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
           />
         </div>
       </div>
-
-      <ActivityFeed items={activity.items} employees={employees} className="relay-enter relay-enter-delay-9" />
     </div>
   );
 }

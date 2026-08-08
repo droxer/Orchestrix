@@ -189,6 +189,11 @@
   --sidenav-w-open: 228px;
   --thread-w: 318px;
   --header-h: 64px;
+  /* Shared inline gutter for page chrome — route PageHeaders, the thread
+     rail, and the chat header/transcript all inset by this one token so the
+     content edges of adjacent panes line up instead of each picking its own
+     step on the spacing scale. */
+  --page-gutter: var(--sp-5);
 
   /* Z layers — surface < drawer < float < dialog.
      Only three tiers are real, and every one of them has consumers.

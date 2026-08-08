@@ -41,7 +41,7 @@
   flex-shrink: 0;
   justify-content: space-between;
   gap: var(--sp-4);
-  padding-inline: var(--sp-7);
+  padding-inline: var(--page-gutter);
 }
 
 .page-header--inline {
@@ -136,7 +136,6 @@
   .page-header {
     padding-inline: var(--sp-4);
   }
-
   .page-header--inline {
     padding-block: var(--sp-3);
   }

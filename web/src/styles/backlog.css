@@ -24,7 +24,7 @@
   flex-wrap: wrap;
   align-items: baseline;
   margin: 0;
-  padding: var(--sp-3) var(--sp-7);
+  padding: var(--sp-3) var(--page-gutter);
   border-bottom: 1px solid var(--line-1);
   background: var(--surface-0);
 }
@@ -74,7 +74,7 @@
   display: flex;
   align-items: center;
   gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-7);
+  padding: var(--sp-3) var(--page-gutter);
 }
 
 .backlog-filter-search-wrap {
@@ -193,7 +193,7 @@
   display: grid;
   grid-template-columns: repeat(5, minmax(120px, 1fr));
   gap: var(--sp-2);
-  padding: 0 var(--sp-7) var(--sp-3);
+  padding: 0 var(--page-gutter) var(--sp-3);
 }
 
 /* Filters are <FilterSelect> (the shadcn Select) and <Input> now, so they carry
@@ -228,7 +228,6 @@
 }
 
 .backlog-lane {
-  --lane-accent: var(--ink-4);
   flex: 0 0 var(--backlog-lane-w);
   min-width: var(--backlog-lane-w);
   min-height: 0;
@@ -236,7 +235,7 @@
   flex-direction: column;
   scroll-snap-align: start;
   border-right: 1px solid var(--line-2);
-  background: color-mix(in srgb, var(--surface-0) 88%, var(--surface-1));
+  background: var(--surface-0);
 }
 
 /* Chip that trails the finger during a touch drag, standing in for the drag
@@ -287,14 +286,6 @@
   cursor: not-allowed;
 }
 
-.backlog-lane[data-status="backlog"] { --lane-accent: var(--ink-4); }
-.backlog-lane[data-status="assigned"] { --lane-accent: var(--info); }
-.backlog-lane[data-status="running"] { --lane-accent: var(--ink-1); }
-.backlog-lane[data-status="waiting_for_human"] { --lane-accent: var(--warn); }
-.backlog-lane[data-status="review"] { --lane-accent: color-mix(in srgb, var(--info) 70%, var(--ink-1)); }
-.backlog-lane[data-status="blocked"] { --lane-accent: var(--err); }
-.backlog-lane[data-status="done"] { --lane-accent: var(--ok); }
-
 .backlog-lane-head {
   position: sticky;
   top: 0;
@@ -308,16 +299,10 @@
   background: var(--surface-0);
 }
 
-.backlog-lane-head::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  background: var(--lane-accent);
-}
-
+/* No colored lane rail: the caps label + count carry lane identity, and the
+   hairline column separators carry the board structure. Seven accent bars
+   read as decoration, not information. */
 .backlog-lane-label {
-  padding-left: var(--sp-2);
   color: var(--ink-1);
   font: var(--type-label);
   letter-spacing: var(--track-caps);
@@ -369,18 +354,9 @@
   cursor: grabbing;
 }
 
-.backlog-task[data-priority="high"] {
-  border-left: 3px solid var(--err);
-}
-
-.backlog-task[data-priority="normal"] {
-  border-left: 3px solid var(--ink-1);
-}
-
-.backlog-task[data-priority="low"] {
-  border-left: 3px solid var(--ink-4);
-}
-
+/* Priority lives on the PriorityBadge alone — the badge's ascending bars
+   already carry rank, so the old 3px colored card edge was double signaling
+   (and painted a red stripe down every high-priority card). */
 .backlog-task-badges {
   display: flex;
   flex-wrap: wrap;
@@ -1433,7 +1409,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  padding: var(--sp-2) var(--sp-7) var(--sp-7);
+  padding: var(--sp-2) var(--page-gutter) var(--sp-7);
 }
 
 .backlog-rows-head {
@@ -1873,41 +1849,30 @@
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   align-content: start;
   gap: var(--sp-3);
-  padding: var(--sp-4) var(--sp-7) var(--sp-7);
+  padding: var(--sp-4) var(--page-gutter) var(--sp-7);
 }
 
 .routine-card {
   min-width: 0;
 }
 
-/* Card-level state. The left edge is already spoken for by priority
-   (.backlog-task[data-priority] paints a 3px border-left), so state tints the
-   other three sides only — the shorthand `border-color` would repaint that
-   rail and silently delete the priority signal. Priority owns the left edge,
-   state owns the rest.
-
-   Running is the one place a routine card earns --live: an occurrence is
-   executing right now, which is exactly the --t-pulse condition. Idle boards
-   stay fully grey, so colour density across the grid reads as utilisation. */
+/* Card-level state tints the hairline. Running is the one place a routine
+   card earns --live: an occurrence is executing right now, which is exactly
+   the --t-pulse condition. Idle boards stay fully grey, so colour density
+   across the grid reads as utilisation. */
 .routine-card[data-routine-state="running"] {
-  border-top-color: color-mix(in srgb, var(--live) 40%, var(--line-1));
-  border-right-color: color-mix(in srgb, var(--live) 40%, var(--line-1));
-  border-bottom-color: color-mix(in srgb, var(--live) 40%, var(--line-1));
+  border-color: color-mix(in srgb, var(--live) 40%, var(--line-1));
 }
 
 .routine-card[data-routine-state="overdue"] {
-  border-top-color: color-mix(in srgb, var(--err) 28%, var(--line-1));
-  border-right-color: color-mix(in srgb, var(--err) 28%, var(--line-1));
-  border-bottom-color: color-mix(in srgb, var(--err) 28%, var(--line-1));
+  border-color: color-mix(in srgb, var(--err) 28%, var(--line-1));
 }
 
 /* Paused routines dispatch nothing, so they recede: dimmer title and
    description, hairline held at the soft step. The dashed pill border carries
    the actual statement — this is only the supporting weight. */
 .routine-card[data-routine-state="paused"] {
-  border-top-color: var(--line-2);
-  border-right-color: var(--line-2);
-  border-bottom-color: var(--line-2);
+  border-color: var(--line-2);
 }
 
 .routine-card[data-routine-state="paused"] .backlog-task-title {

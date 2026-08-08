@@ -117,14 +117,9 @@ export function WorkspaceError({
   );
 }
 
-function ActivitySection({ title, count, index = 0, children }: { title: string; count: number; index?: number; children: ReactNode }) {
+function ActivitySection({ title, count, children }: { title: string; count: number; index?: number; children: ReactNode }) {
   return (
-    <section
-      className="workspace-activity-section"
-      /* The delay itself belongs to the stylesheet (calc off --t-stagger);
-         only the section's position in the ladder is data. */
-      style={{ "--stagger-index": index } as CSSProperties}
-    >
+    <section className="workspace-activity-section">
       <header className="workspace-activity-head">
         <h2>{title}</h2>
         <span className="tnum">{count}</span>

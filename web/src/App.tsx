@@ -120,7 +120,7 @@ export function App() {
   const [composerMode, setComposerMode] = useState<AgentTaskMode>("action");
   const [threadQuery, setThreadQuery] = useState("");
   const [prefsOpen, setPrefsOpen] = useState(false);
-  const [sidenavExpanded, setSidenavExpanded] = useState(true);
+  const [sidenavExpanded, setSidenavExpanded] = useState(false);
   const [theme, setTheme] = useState<Theme>("system");
   const [language, setLanguage] = useState<Language>("en");
   const [handoffOpen, setHandoffOpen] = useState(false);

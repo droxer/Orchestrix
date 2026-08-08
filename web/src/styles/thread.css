@@ -14,7 +14,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-4);
-  padding: 0 var(--sp-4);
+  padding: 0 var(--page-gutter);
 }
 
 .conversation-heading {
@@ -58,7 +58,7 @@
 
 .conversation-search {
   background: var(--surface-2);
-  margin: 0 var(--sp-4);
+  margin: 0 var(--page-gutter);
   align-self: start;
 }
 
@@ -82,25 +82,6 @@
   background: transparent;
   color: var(--ink-1);
   transition: background var(--t-fast) var(--ease);
-  --rise-from: var(--rise-sm);
-
-  animation: rise var(--t-slow) var(--ease) both;
-}
-
-/* Staggered reveal — first 8 rows fade-rise on mount. Cheap delight; the
-   chat panel feels populated rather than slapped together. */
-/* 1x --t-stagger: a dense row ladder, so consecutive rows read as one sweep. */
-.conversation-row:nth-child(1) { animation-delay: calc(var(--t-stagger) * 1); }
-.conversation-row:nth-child(2) { animation-delay: calc(var(--t-stagger) * 2); }
-.conversation-row:nth-child(3) { animation-delay: calc(var(--t-stagger) * 3); }
-.conversation-row:nth-child(4) { animation-delay: calc(var(--t-stagger) * 4); }
-.conversation-row:nth-child(5) { animation-delay: calc(var(--t-stagger) * 5); }
-.conversation-row:nth-child(6) { animation-delay: calc(var(--t-stagger) * 6); }
-.conversation-row:nth-child(7) { animation-delay: calc(var(--t-stagger) * 7); }
-.conversation-row:nth-child(8) { animation-delay: calc(var(--t-stagger) * 8); }
-
-@media (prefers-reduced-motion: reduce) {
-  .conversation-row { animation: none; }
 }
 
 /* Full-width inner button — carries the grid layout and all interactive content */
@@ -112,7 +93,7 @@
   flex: 1;
   min-width: 0;
   min-height: 60px;
-  padding: var(--sp-row) var(--sp-4);
+  padding: var(--sp-row) var(--page-gutter);
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -136,7 +117,7 @@
 
 .conversation-empty {
   margin: 0;
-  padding: var(--sp-4);
+  padding: var(--page-gutter);
   color: var(--ink-3);
   font-size: var(--fs-3);
   line-height: 1.5;
@@ -360,7 +341,7 @@
   display: flex;
   align-items: baseline;
   gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-4) var(--sp-1);
+  padding: var(--sp-2) var(--page-gutter) var(--sp-1);
   font: var(--type-label);
   letter-spacing: var(--track-0);
   color: var(--ink-3);

@@ -1233,69 +1233,6 @@ class DatabaseSessionStore:
             ],
         }
 
-    def list_dashboard_activity(self, *, limit: int = 20) -> list[dict[str, Any]]:
-        """Return exact newest session activity candidates from indexed columns."""
-        limit = max(1, limit)
-        with store_transaction(self.engine) as conn:
-            created_rows = (
-                conn.execute(
-                    select(
-                        self.sessions.c.id,
-                        self.sessions.c.owner_employee_id,
-                        self.sessions.c.task_goal,
-                        self.sessions.c.created_at,
-                    )
-                    .order_by(self.sessions.c.created_at.desc())
-                    .limit(limit)
-                )
-                .mappings()
-                .all()
-            )
-            terminal_rows = (
-                conn.execute(
-                    select(
-                        self.events.c.session_id,
-                        self.sessions.c.owner_employee_id,
-                        self.sessions.c.task_goal,
-                        self.events.c.type,
-                        self.events.c.timestamp,
-                    )
-                    .select_from(
-                        self.events.join(
-                            self.sessions,
-                            self.events.c.session_id == self.sessions.c.id,
-                        )
-                    )
-                    .where(
-                        self.events.c.type.in_(("session.completed", "session.failed"))
-                    )
-                    .order_by(self.events.c.timestamp.desc())
-                    .limit(limit)
-                )
-                .mappings()
-                .all()
-            )
-        return [
-            {
-                "kind": "session.created",
-                "timestamp": _format_iso(row["created_at"]),
-                "sessionId": row["id"],
-                "employeeId": row["owner_employee_id"],
-                "message": row["task_goal"] or "Session created",
-            }
-            for row in created_rows
-        ] + [
-            {
-                "kind": row["type"],
-                "timestamp": _format_iso(row["timestamp"]),
-                "sessionId": row["session_id"],
-                "employeeId": row["owner_employee_id"],
-                "message": row["task_goal"]
-                or f"Session {str(row['type']).removeprefix('session.')}",
-            }
-            for row in terminal_rows
-        ]
-
     def list_dashboard_token_usage(
         self, *, since: datetime, recent_session_limit: int = 10
     ) -> list[dict[str, Any]]:

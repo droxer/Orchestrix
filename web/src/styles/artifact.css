@@ -3,14 +3,9 @@
    kind tag plus a one-line semantic stat (+/−, pass/fail) — so large
    bodies (diffs, logs) never disrupt the conversation flow. */
 
-/* Artifact chips take a single neutral accent (--info) — the icon plate and
-   kind tag are tinted washes of it. Kind is carried by the icon and the mono
-   kind tag, never by a per-kind hue. */
-.artifact-chip,
-.artifact-kind-tag {
-  --artifact-accent: var(--info);
-}
-
+/* Artifact chips are deliberately flat: no tinted icon plate, no tinted kind
+   tag — one hairline card with a muted meta row. Kind is carried by the icon
+   and the mono tag text, never by a wash of accent colour. */
 .artifact-chip {
   min-width: 0;
   border: 1px solid var(--line-1);
@@ -21,7 +16,7 @@
 }
 
 .artifact-chip:hover {
-  border-color: color-mix(in srgb, var(--artifact-accent) 45%, var(--line-1));
+  border-color: var(--line-strong);
   background: var(--surface-2);
 }
 
@@ -51,9 +46,7 @@
   place-items: center;
   width: 28px;
   height: 28px;
-  border-radius: var(--r-2);
-  background: color-mix(in srgb, var(--artifact-accent) 12%, transparent);
-  color: var(--artifact-accent);
+  color: var(--ink-3);
 }
 
 .artifact-chip-copy {
@@ -85,11 +78,8 @@
 .artifact-kind-tag {
   display: inline-flex;
   align-items: center;
-  padding: 1px 7px;
-  border-radius: var(--r-2);
-  background: color-mix(in srgb, var(--artifact-accent) 14%, transparent);
-  color: var(--artifact-accent);
-  font: var(--type-label-strong);
+  color: var(--ink-3);
+  font: var(--type-label);
   letter-spacing: var(--track-0);
   white-space: nowrap;
 }

@@ -1,35 +1,11 @@
 /* =====================================================================
-   Relay empty states + shared enter motion
+   Relay empty states
 
    One visual language for transcript, board, and setup zero-data surfaces.
-   Motion is the shared `rise` keyframe from tokens/base.css at the pane
-   tier — login and the admin view stage ride the same one.
+   No entrance choreography: monitoring and data surfaces render settled.
+   The .relay-enter / .relay-enter-delay-* classes remain on JSX call sites
+   as inert markers — they no longer carry motion.
    ===================================================================== */
-
-/* Staggered reveal — pair with delay utilities below. */
-.relay-enter {
-  opacity: 0;
-  animation: rise var(--t-slow) var(--ease) forwards;
-}
-
-/* 2x --t-stagger: sparse block ladder, one beat per line of an empty state. */
-.relay-enter-delay-1 { animation-delay: calc(var(--t-stagger) * 2); }
-.relay-enter-delay-2 { animation-delay: calc(var(--t-stagger) * 4); }
-.relay-enter-delay-3 { animation-delay: calc(var(--t-stagger) * 6); }
-.relay-enter-delay-4 { animation-delay: calc(var(--t-stagger) * 8); }
-.relay-enter-delay-5 { animation-delay: calc(var(--t-stagger) * 10); }
-.relay-enter-delay-6 { animation-delay: calc(var(--t-stagger) * 12); }
-.relay-enter-delay-7 { animation-delay: calc(var(--t-stagger) * 14); }
-.relay-enter-delay-8 { animation-delay: calc(var(--t-stagger) * 16); }
-.relay-enter-delay-9 { animation-delay: calc(var(--t-stagger) * 18); }
-
-@media (prefers-reduced-motion: reduce) {
-  .relay-enter {
-    animation: none;
-    opacity: 1;
-    transform: none;
-  }
-}
 
 /* Bled "R" mark — the login signature extended to soft empty-state surfaces. */
 .relay-bleed-mark {

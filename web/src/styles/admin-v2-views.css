@@ -9,7 +9,7 @@
 
 .adm-content-main {
   overflow-y: auto;
-  padding: var(--sp-7);
+  padding: var(--sp-6) var(--page-gutter);
   min-width: 0;
 }
 
@@ -17,12 +17,7 @@
   padding: 0;
 }
 
-.adm-view-stage {
-  animation: rise var(--t-fast) var(--ease) both;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .adm-view-stage,
   .adm-emp-row.is-pulse::after,
   .adm-node-card.is-pulse::after {
     animation: none;
@@ -713,7 +708,7 @@
 .adm-node-cols,
 .adm-node-row {
   display: grid;
-  grid-template-columns: minmax(200px, 1.4fr) minmax(0, 2fr) auto;
+  grid-template-columns: minmax(200px, 1.4fr) minmax(120px, 1fr) minmax(0, 1.6fr) auto;
   gap: var(--sp-6);
 }
 
@@ -787,6 +782,30 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--sp-1);
+}
+
+.adm-node-row-employee {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.adm-node-row-employee-label {
+  font-size: var(--fs-2);
+  color: var(--ink-3);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-node-card-employee {
+  font-size: var(--fs-2);
+  color: var(--ink-3);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 719px) {
@@ -2129,45 +2148,65 @@
 
 /* ── Settings view ───────────────────────────────────────────────────── */
 
-/* One form on an otherwise empty page: hold it to a reading measure rather
-   than letting the field stretch the full console width. */
-.adm-settings-card {
+/* A flat list of independent org-wide defaults on the bare canvas — no card
+   chrome. A hairline between items carries the grouping, and the control row
+   keeps input, save, and confirmation on one line. */
+.adm-settings {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-5);
-  max-width: 460px;
-  padding: var(--sp-6);
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-1);
+  max-width: 560px;
+}
+
+.adm-settings > .adm-view-error {
+  margin: 0 0 var(--sp-4);
+}
+
+.adm-settings-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-6) 0;
+}
+
+.adm-settings-item + .adm-settings-item {
+  border-top: 1px solid var(--line-1);
 }
 
 .adm-settings-head {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-1);
 }
 
 .adm-settings-title {
   margin: 0;
-  font: var(--type-title);
-  letter-spacing: var(--track-display);
+  font-size: var(--fs-3);
+  font-weight: 600;
   color: var(--ink-1);
 }
 
 .adm-settings-sub {
   margin: 0;
-  font-size: var(--fs-3);
+  font-size: var(--fs-2);
   color: var(--ink-3);
 }
 
-.adm-settings-actions {
+/* Values here are small whole numbers — hold the control to a numeric
+   measure instead of filling the row. */
+.adm-settings-input {
+  max-width: 7rem;
+}
+
+.adm-settings-control {
   display: flex;
   align-items: center;
-  gap: var(--sp-4);
+  gap: var(--sp-3);
 }
 
 .adm-settings-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1-5);
   font-size: var(--fs-2);
-  color: var(--ink-3);
+  color: var(--ok);
 }

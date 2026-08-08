@@ -345,17 +345,6 @@
 
 .workspace-activity-section {
   border-bottom: 1px solid var(--line-1);
-  opacity: 0;
-  animation: rise var(--t-slow) var(--ease) forwards;
-}
-
-/* Sparse section ladder on odd multiples of --t-stagger. The section supplies
-   only its rung (--stagger-index, set by ActivitySection); the cadence lives
-   here. This replaced a set of :nth-child rules that an inline
-   `animationDelay` in the component silently overrode — two ladders for one
-   list, and the losing one was the only one on the token scale. */
-.workspace-activity-section {
-  animation-delay: calc(var(--t-stagger) * (1 + var(--stagger-index, 0) * 2));
 }
 
 .workspace-activity-section:last-child {

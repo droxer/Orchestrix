@@ -16,7 +16,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-5);
-  padding: var(--sp-6) var(--sp-7) var(--sp-8);
+  padding: var(--sp-6) var(--page-gutter) var(--sp-8);
   min-width: 0;
   max-width: 1440px;
   margin: 0 auto;
@@ -147,49 +147,10 @@
   min-width: 0;
 }
 
-/* The card shell — surface, hairline, radius, padding, head/title/hint/foot —
-   is the <Card> primitive now (components/ui/card.tsx). The hover hairline it
-   hand-mixed here became the --line-strong role. Only the two per-card layout
-   modifiers remain. */
-.adm-dash-card--feed {
-  overflow: hidden;
-}
-
-/* ── Charts ───────────────────────────────────────────────────────── */
-@keyframes adm-chart-draw {
-  from { stroke-dashoffset: var(--chart-path-length, 1000); }
-  to { stroke-dashoffset: 0; }
-}
-
-@keyframes adm-chart-area-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.adm-dash-chart-line {
-  stroke-dasharray: var(--chart-path-length, 1000);
-  stroke-dashoffset: var(--chart-path-length, 1000);
-  animation: adm-chart-draw var(--t-draw) var(--ease) calc(var(--t-stagger) * 4) forwards;
-}
-
-.adm-dash-chart-area {
-  opacity: 0;
-  animation: adm-chart-area-in var(--t-draw) var(--ease) calc(var(--t-stagger) * 12) forwards;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .adm-dash-chart-line {
-    stroke-dasharray: none;
-    stroke-dashoffset: 0;
-    animation: none;
-  }
-
-  .adm-dash-chart-area {
-    opacity: 1;
-    animation: none;
-  }
-}
-
+/* ── Charts ─────────────────────────────────────────────────────────
+   No draw-in choreography: an operational chart renders settled. The data
+   is the point, and a line that draws itself on every mount makes a
+   monitoring surface feel like a launch page. */
 .adm-dash-chart {
   width: 100%;
   height: auto;
@@ -497,103 +458,6 @@
   letter-spacing: var(--track-display);
   color: var(--ink-1);
   font-variant-numeric: tabular-nums;
-}
-
-/* ── Activity feed — vertical timeline ────────────────────────────── */
-.adm-dash-feed {
-  list-style: none;
-  margin: 0;
-  padding: 0 0 0 var(--sp-2);
-  display: flex;
-  flex-direction: column;
-  position: relative;
-}
-
-.adm-dash-feed::before {
-  content: "";
-  position: absolute;
-  left: 19px;
-  top: var(--sp-3);
-  bottom: var(--sp-3);
-  width: 1px;
-  background: var(--line-1);
-}
-
-.adm-dash-feed-row {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
-  gap: var(--sp-3);
-  padding: var(--sp-3) 0;
-  align-items: start;
-  position: relative;
-  content-visibility: auto;
-  contain-intrinsic-size: auto 52px;
-}
-
-.adm-dash-feed-row:not(:last-child) {
-  border-bottom: 1px solid var(--line-2);
-}
-
-.adm-dash-feed-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--r-full);
-  border: 1px solid currentColor;
-  background: var(--surface-1);
-  position: relative;
-  z-index: 1;
-}
-
-/* No tone-live here: feed rows are history, not work in flight. */
-.adm-dash-feed-icon.tone-good { color: var(--ok); }
-.adm-dash-feed-icon.tone-bad  { color: var(--err); }
-.adm-dash-feed-icon.tone-muted { color: var(--ink-4); }
-
-.adm-dash-feed-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-0-5);
-  min-width: 0;
-}
-
-.adm-dash-feed-message {
-  font-size: var(--fs-3);
-  color: var(--ink-2);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  word-break: break-word;
-  line-height: 1.4;
-}
-
-.adm-dash-feed-owner {
-  font-size: var(--fs-1);
-  color: var(--ink-4);
-  letter-spacing: var(--track-caps);
-}
-
-.adm-dash-feed-time {
-  font-size: var(--fs-1);
-  color: var(--ink-4);
-  letter-spacing: var(--track-caps);
-  white-space: nowrap;
-  padding-top: var(--sp-1);
-  font-variant-numeric: tabular-nums;
-}
-
-@media (min-width: 900px) {
-  .adm-dash-feed-row {
-    grid-template-columns: 24px minmax(0, 1fr) 5rem;
-  }
-
-  .adm-dash-feed-time {
-    text-align: right;
-  }
 }
 
 /* ── Responsive ───────────────────────────────────────────────────── */

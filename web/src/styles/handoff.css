@@ -26,20 +26,21 @@
   transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
 }
 
-/* Ghost secondaries keep the quiet grey fill; the variant system leaves ghost
-   transparent, and in this dense bar a soft fill reads better than bare text. */
+/* Ghost secondaries match the global ghost grammar: transparent at rest, a
+   hairline + ink on hover. No accent-coloured hover — the filled primary
+   (Approve/Send) is the only coloured control in the bar. */
 .decision-bar button[data-variant="ghost"],
 .handoff-actions button[data-variant="ghost"] {
-  border: 1px solid var(--line-1);
-  background: var(--surface-2);
-  color: var(--ink-1);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-2);
 }
 
 .decision-bar button[data-variant="ghost"]:hover:not(:disabled),
 .handoff-actions button[data-variant="ghost"]:hover:not(:disabled) {
-  border-color: var(--action);
-  background: var(--surface-0);
-  color: var(--action);
+  border-color: var(--line-strong);
+  background: transparent;
+  color: var(--ink-1);
 }
 
 .handoff-panel {

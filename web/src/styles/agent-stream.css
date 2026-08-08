@@ -12,7 +12,6 @@
   padding: var(--sp-3) var(--sp-4);
   border: 1px solid var(--line-2);
   border-radius: var(--r-2);
-  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
 }
 
 .collaboration-tree-title {
@@ -313,21 +312,17 @@
 /* Syntax-highlight token colors live in styles/syntax.css (highlight.js
    `hljs-*` classes), shared with the workspace file preview. */
 
-/* As a bare block sharing the code's own left edge and line rhythm, the label
-   scanned as a stray token of the snippet ("ts" sitting above `export …`).
-   Make it unmistakably chrome: a bordered micro-caps chip on its own surface.
-   `sticky left:0` keeps it anchored when a wide snippet scrolls sideways. */
+/* The language label is plain muted micro text on the code's own left edge —
+   no chip, no border — so it reads as a caption of the block, not chrome
+   competing with the snippet. `sticky left:0` keeps it anchored when a wide
+   snippet scrolls sideways. */
 .agent-code-lang {
   position: sticky;
   left: 0;
   display: block;
   width: max-content;
-  margin-bottom: var(--sp-2);
-  padding: var(--sp-0-5) var(--sp-1-5);
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-1);
-  background: var(--surface-1);
-  color: var(--ink-3);
+  margin-bottom: var(--sp-1);
+  color: var(--ink-4);
   font: var(--type-micro);
   letter-spacing: var(--track-caps);
   text-transform: uppercase;

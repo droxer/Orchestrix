@@ -14,7 +14,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--sp-3);
-  padding: 0 var(--sp-4);
+  padding: 0 var(--page-gutter);
   border-bottom: 1px solid var(--line-1);
   background: var(--surface-0);
 }
@@ -236,27 +236,10 @@
   width: min(100%, 960px);
   min-height: 100%;
   margin: 0 auto;
-  padding: var(--sp-7) var(--sp-6) var(--sp-8);
+  padding: var(--sp-7) var(--page-gutter) var(--sp-8);
   display: flex;
   flex-direction: column;
   gap: var(--sp-5);
-}
-
-/* Active transcript — container spine. Flat: the left edge is carried by
-   the ::before spine alone, no directional wash. */
-.transcript-inner:not(:has(.transcript-empty)) {
-  position: relative;
-}
-
-.transcript-inner:not(:has(.transcript-empty))::before {
-  content: "";
-  position: absolute;
-  left: calc(var(--sp-6) + 9px);
-  top: var(--sp-7);
-  bottom: var(--sp-8);
-  width: 1px;
-  background: var(--line-1);
-  pointer-events: none;
 }
 
 /* Empty transcript — flat soft surface behind the shared empty state. */
@@ -274,27 +257,26 @@
   display: contents;
 }
 
-/* Session phase marker — chapters along the rail at agent handoffs. */
+/* Session phase marker — a quiet label at agent handoffs. No node dot, no
+   trailing rule: the phase reads as a caption between turns, not a third
+   visual row competing with the messages it separates. */
 .transcript-phase {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr) auto;
   gap: var(--sp-3);
   align-items: center;
   padding: var(--sp-1) 0;
-  color: var(--ink-3);
+  color: var(--ink-4);
 }
 
 .transcript-phase-node {
-  width: 8px;
-  height: 8px;
-  margin-left: var(--sp-1-5);
-  border-radius: var(--r-full);
-  background: var(--line-1);
-  box-shadow: 0 0 0 2px var(--surface-0);
-  justify-self: center;
+  display: none;
 }
 
 .transcript-phase-label {
+  /* The hidden node leaves column 1 to the rail alignment; the label holds
+     column 2 explicitly so it still lines up with the turn bodies. */
+  grid-column: 2;
   font: var(--type-micro);
   letter-spacing: var(--track-0);
   overflow: hidden;
@@ -308,18 +290,7 @@
   width: 12px;
   height: 12px;
   margin-right: var(--sp-2);
-  color: var(--ink-3);
-}
-
-.transcript-phase-label::after {
-  content: "";
-  display: inline-block;
-  width: 100%;
-  max-width: 120px;
-  height: 1px;
-  margin-left: var(--sp-3);
-  vertical-align: middle;
-  background: var(--line-2);
+  color: var(--ink-4);
 }
 
 .msg {
@@ -330,44 +301,6 @@
   align-items: start;
   content-visibility: auto;
   contain-intrinsic-size: auto 160px;
-}
-
-/* Staggered reveal — first dozen turns fade-rise on mount, at the row tier
-   of the shared `rise` keyframe (tokens/base.css). */
-/* 1x --t-stagger: a dense turn ladder, so a long transcript reveals as one
-   sweep rather than twelve separate arrivals. */
-.transcript-inner > .transcript-turn {
-  --rise-from: var(--rise-sm);
-}
-
-.transcript-inner > .transcript-turn:nth-child(1) .msg,
-.transcript-inner > .transcript-turn:nth-child(1) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 1); }
-.transcript-inner > .transcript-turn:nth-child(2) .msg,
-.transcript-inner > .transcript-turn:nth-child(2) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 2); }
-.transcript-inner > .transcript-turn:nth-child(3) .msg,
-.transcript-inner > .transcript-turn:nth-child(3) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 3); }
-.transcript-inner > .transcript-turn:nth-child(4) .msg,
-.transcript-inner > .transcript-turn:nth-child(4) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 4); }
-.transcript-inner > .transcript-turn:nth-child(5) .msg,
-.transcript-inner > .transcript-turn:nth-child(5) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 5); }
-.transcript-inner > .transcript-turn:nth-child(6) .msg,
-.transcript-inner > .transcript-turn:nth-child(6) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 6); }
-.transcript-inner > .transcript-turn:nth-child(7) .msg,
-.transcript-inner > .transcript-turn:nth-child(7) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 7); }
-.transcript-inner > .transcript-turn:nth-child(8) .msg,
-.transcript-inner > .transcript-turn:nth-child(8) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 8); }
-.transcript-inner > .transcript-turn:nth-child(9) .msg,
-.transcript-inner > .transcript-turn:nth-child(9) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 9); }
-.transcript-inner > .transcript-turn:nth-child(10) .msg,
-.transcript-inner > .transcript-turn:nth-child(10) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 10); }
-.transcript-inner > .transcript-turn:nth-child(11) .msg,
-.transcript-inner > .transcript-turn:nth-child(11) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 11); }
-.transcript-inner > .transcript-turn:nth-child(12) .msg,
-.transcript-inner > .transcript-turn:nth-child(12) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: calc(var(--t-stagger) * 12); }
-
-@media (prefers-reduced-motion: reduce) {
-  .transcript-inner > .transcript-turn .msg,
-  .transcript-inner > .transcript-turn .transcript-phase { animation: none; }
 }
 
 .rail-node {
@@ -382,12 +315,9 @@
   color: var(--ink-1);
   background: var(--surface-0);
   border: 1px solid var(--line-1);
-  box-shadow: 0 0 0 2px var(--surface-0);
-  z-index: 1;
   /* Agents are squares; the human is a rounded badge/avatar filled with the
      action color. Agent identity is the profile image inside. */
   border-radius: var(--r-1);
-  animation: node-in var(--t-fast) var(--ease) both;
 }
 
 .rail-node-agent > svg { display: block; }
@@ -424,14 +354,12 @@
   border-color: transparent;
   background: var(--action);
   color: var(--on-action);
-  box-shadow: 0 0 0 2px var(--surface-0);
 }
 
 .msg-agent .rail-node.rail-node-agent {
   border-radius: var(--r-2);
   background: var(--surface-3);
   border-color: color-mix(in srgb, var(--action) 32%, var(--line-1));
-  box-shadow: 0 0 0 2px var(--surface-0);
 }
 
 /* The vendor glyph paints in ink against the light tile. */
@@ -443,21 +371,12 @@
   border: none;
   border-radius: var(--r-full);
   background: var(--ink-4);
-  box-shadow: 0 0 0 2px var(--surface-0);
   justify-self: center;
 }
 
 .rail-node-system.tone-good { background: var(--ok); }
 .rail-node-system.tone-bad  { background: var(--err); }
 .rail-node-system.tone-info { background: var(--info); }
-
-@keyframes node-in {
-  from { transform: scale(0.4); opacity: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .rail-node { animation: none; }
-}
 
 /* A continuation from the same agent drops its header and softens the node. */
 .msg-agent.grouped .turn-body > header {
@@ -467,7 +386,6 @@
 .msg-agent.grouped .rail-node-agent {
   border-color: color-mix(in srgb, var(--line-1) 55%, transparent);
   background: transparent;
-  box-shadow: 0 0 0 2px var(--surface-0);
 }
 
 .msg-agent.grouped .rail-node-agent > svg,
@@ -566,9 +484,7 @@
 @media (prefers-reduced-motion: no-preference) {
   .msg-agent.streaming .rail-node-agent {
     border-color: var(--live);
-    animation:
-      node-in var(--t-fast) var(--ease) both,
-      agent-rail-pulse var(--t-pulse) var(--ease) infinite;
+    animation: agent-rail-pulse var(--t-pulse) var(--ease) infinite;
   }
 }
 
@@ -576,8 +492,8 @@
    by a second shadow, which the shared single-shadow pulse-ring cannot carry.
    The tint tracks pulse-ring's 40% so it reads at the same strength. */
 @keyframes agent-rail-pulse {
-  0%   { box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 2px color-mix(in srgb, var(--live) 40%, transparent); }
-  100% { box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 9px color-mix(in srgb, var(--live) 0%, transparent); }
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 40%, transparent); }
+  100% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--live) 0%, transparent); }
 }
 
 /* The user turn is a compact, content-hugging bubble — not a full-width card.
@@ -657,15 +573,18 @@
   gap: var(--sp-0-5);
 }
 
+/* Turn actions are ghost text buttons — no resting fill, no pill chrome —
+   so a completed transcript doesn't accumulate a ladder of grey lozenges
+   down the right edge. The hover hairline is the only affordance. */
 .msg-turn-action {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1-5);
   height: var(--sp-6);
-  padding: 0 var(--sp-3);
+  padding: 0 var(--sp-2);
   border: 1px solid transparent;
   border-radius: var(--r-2);
-  background: var(--surface-3);
+  background: transparent;
   color: var(--ink-3);
   font: var(--type-label);
   cursor: pointer;
@@ -679,7 +598,7 @@
 .msg-turn-action:hover:not(:disabled) {
   color: var(--ink-1);
   border-color: var(--line-1);
-  background: var(--surface-3);
+  background: transparent;
 }
 
 .msg-turn-action:disabled {
