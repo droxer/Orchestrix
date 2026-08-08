@@ -446,9 +446,19 @@ class SessionController:
                 session_id,
                 {
                     "runId": step["runId"],
+                    **(
+                        {"assignmentId": step["assignmentId"]}
+                        if step.get("assignmentId")
+                        else {}
+                    ),
                     "agent": step["agent"],
                     **({"role": role} if role else {}),
                     "mode": step["mode"],
+                    **(
+                        {"teamPhase": step["teamPhase"]}
+                        if step.get("teamPhase")
+                        else {}
+                    ),
                     **(
                         {"logicalAgentId": step["logicalAgentId"]}
                         if step.get("logicalAgentId")
@@ -477,6 +487,15 @@ class SessionController:
                     **(
                         {"workspaceIdentity": step["workspaceIdentity"]}
                         if step.get("workspaceIdentity")
+                        else {}
+                    ),
+                    **({"brief": step["brief"]} if step.get("brief") else {}),
+                    **(
+                        {"coordinator": True} if step.get("coordinator") is True else {}
+                    ),
+                    **(
+                        {"teamSnapshot": step["teamSnapshot"]}
+                        if isinstance(step.get("teamSnapshot"), dict)
                         else {}
                     ),
                 },
@@ -528,6 +547,11 @@ class SessionController:
         }
         completed_payload = {
             "runId": step_result["runId"],
+            **(
+                {"assignmentId": step_result["assignmentId"]}
+                if step_result.get("assignmentId")
+                else {}
+            ),
             "agent": step_result["agent"],
             "status": step_result["status"],
             "exitCode": step_result["exitCode"],

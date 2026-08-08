@@ -365,8 +365,13 @@ def _apply_agent_started(session: dict[str, Any], event: dict[str, Any]) -> None
         "daemonNodeId",
         "agentVersion",
         "workspaceIdentity",
+        "brief",
+        "coordinator",
+        "teamSnapshot",
+        "assignmentId",
+        "teamPhase",
     ):
-        if event.get(key):
+        if event.get(key) is not None:
             run[key] = event[key]
     session["status"] = "running"
     session["phase"] = f"{event['agent']}:{event['mode']}"

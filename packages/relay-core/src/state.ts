@@ -35,6 +35,12 @@ export interface AgentState {
    * what it is here to contribute.
    */
   agent_role?: string;
+  /** Concrete scope owned by this member within the shared team goal. */
+  assignment_brief?: string;
+  /** Stable identity for this assignment across at-least-once delivery. */
+  assignment_id?: string;
+  /** Explicit collaboration phase for this assignment. */
+  team_phase?: "discussion" | "execution" | "review";
   /**
    * Workspace-relative control file where this run states whether the task is
    * finished, e.g. ".relay/round-result.json". Only set when the daemon can

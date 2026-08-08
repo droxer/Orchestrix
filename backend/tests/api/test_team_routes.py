@@ -989,9 +989,7 @@ def test_team_reviewer_reviews_the_leads_work_and_carries_its_role(monkeypatch) 
 
         # A round containing a review ends with a human in the loop.
         assert client.get(f"/api/v1/tasks/{task['id']}").json()["status"] == "review"
-        session = client.get(
-            f"/api/v1/threads/{lead_command['sessionId']}"
-        ).json()
+        session = client.get(f"/api/v1/threads/{lead_command['sessionId']}").json()
         assert [run["role"] for run in session["agentRuns"]] == [
             "implementer",
             "reviewer",
@@ -1519,13 +1517,29 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
         assert answered.status_code == 202
         [room_command] = app.state.registry.take_commands("node_alice", "node_token")
         assert room_command["logicalAgentId"] == lead["id"]
-        request = app.state.registry.daemon_store.active_run_request_for_session_any_node(
-            session_id
+        request = (
+            app.state.registry.daemon_store.active_run_request_for_session_any_node(
+                session_id
+            )
         )
         assert [item["agentId"] for item in request["assignments"]] == [
             lead["id"],
             support["id"],
         ]
+        assert request["assignments"][0]["coordinator"] is True
+        assert request["assignments"][0]["phase"] == "execution"
+        assert request["assignments"][0]["brief"]
+        assert request["assignments"][0]["teamSnapshot"] == {
+            "teamId": team["id"],
+            "teamRevision": team["updatedAt"],
+            "memberAgentIds": [lead["id"], support["id"]],
+            "leadAgentId": lead["id"],
+        }
+        assert (
+            room_command["state"]["assignment_brief"]
+            == (request["assignments"][0]["brief"])
+        )
+        assert room_command["state"]["team_phase"] == "execution"
 
 
 def test_message_to_a_team_thread_reports_a_disabled_team(monkeypatch) -> None:
@@ -1601,7 +1615,7 @@ def test_message_to_a_team_thread_reports_a_disabled_team(monkeypatch) -> None:
         assert answered.json()["detail"]["code"] == "team_disabled"
 
 
-def test_explicit_assignment_to_a_team_thread_bypasses_the_disabled_team_gate(
+def test_explicit_assignment_to_a_disabled_team_requires_a_recovery_decision(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
@@ -1676,7 +1690,24 @@ def test_explicit_assignment_to_a_team_thread_bypasses_the_disabled_team_gate(
             },
         )
 
-        assert answered.status_code == 202
+        assert answered.status_code == 409
+        assert answered.json()["detail"]["code"] == "team_disabled"
+
+        recovered = client.post(
+            "/api/v1/agent-runs",
+            json={
+                "taskGoal": "another pass",
+                "sessionId": session_id,
+                "assignments": [{"agentId": lead["id"]}],
+                "decision": {
+                    "kind": "rerun",
+                    "targetAgent": "codex",
+                    "targetAgentId": lead["id"],
+                },
+            },
+        )
+
+        assert recovered.status_code == 202
 
 
 def test_agent_runs_still_requires_an_assignment_for_a_solo_thread(monkeypatch) -> None:
@@ -1846,8 +1877,10 @@ def test_a_team_thread_accepts_an_assignment_naming_one_member(monkeypatch) -> N
         )
 
         assert answered.status_code == 202
-        request = app.state.registry.daemon_store.active_run_request_for_session_any_node(
-            session_id
+        request = (
+            app.state.registry.daemon_store.active_run_request_for_session_any_node(
+                session_id
+            )
         )
         assert [item["agentId"] for item in request["assignments"]] == [support["id"]]
 
@@ -1953,8 +1986,10 @@ def test_message_to_a_team_thread_runs_every_member_as_the_owning_employee(
         assert answered.status_code == 202
         [room_command] = app.state.registry.take_commands("node_alice", "node_token")
         assert room_command["logicalAgentId"] == lead["id"]
-        request = app.state.registry.daemon_store.active_run_request_for_session_any_node(
-            session_id
+        request = (
+            app.state.registry.daemon_store.active_run_request_for_session_any_node(
+                session_id
+            )
         )
         assert [item["agentId"] for item in request["assignments"]] == [
             lead["id"],
@@ -2045,7 +2080,9 @@ def test_a_team_thread_narrows_to_one_member_for_the_owning_employee(
         )
 
         assert answered.status_code == 202
-        request = app.state.registry.daemon_store.active_run_request_for_session_any_node(
-            session_id
+        request = (
+            app.state.registry.daemon_store.active_run_request_for_session_any_node(
+                session_id
+            )
         )
         assert [item["agentId"] for item in request["assignments"]] == [support["id"]]
