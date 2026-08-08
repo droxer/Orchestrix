@@ -791,21 +791,55 @@
 }
 
 .adm-node-row-employee-label {
-  font-size: var(--fs-2);
-  color: var(--ink-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 20px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-1);
+  background: var(--surface-2);
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ink-2);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.adm-node-card-employee {
-  font-size: var(--fs-2);
+.adm-node-row-employee-icon {
+  flex-shrink: 0;
   color: var(--ink-3);
-  max-width: 100%;
+}
+
+.adm-node-card-employee-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 20px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-1);
+  background: var(--surface-2);
+  width: fit-content;
+}
+
+.adm-node-card-employee-icon {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+
+.adm-node-card-employee-badge-text {
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ink-2);
+  max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 @media (max-width: 719px) {

@@ -14,9 +14,11 @@ import { NodeActions } from "./NodeActions";
 import { NodeProfileBadges, nodeOwnershipIcon } from "./NodeProfileBadges";
 import { NodePresence } from "./NodePresence";
 import { NodeRuntimeMarks } from "./NodeRuntimeMarks";
+import { AdminEmployees } from "../icons";
 
 interface NodeRowProps {
   node: ControlPanelDaemonNodeRecord;
+  employeeName?: string;
   storedTokens: StoredNodeTokenMap;
   colocated: boolean;
   onReveal?: (node: ControlPanelDaemonNodeRecord) => void;
@@ -26,7 +28,7 @@ interface NodeRowProps {
   t: TFunction;
 }
 
-export function NodeRow({ node, storedTokens, colocated, onReveal, onRename, onManageExecutors, onDelete, t }: NodeRowProps) {
+export function NodeRow({ node, employeeName, storedTokens, colocated, onReveal, onRename, onManageExecutors, onDelete, t }: NodeRowProps) {
   const { deletePending, deleteError, handleDelete } = useNodeDelete(node, onDelete, t);
   const nodeName = node.displayName || node.id;
   const status = visualStatus(node);
@@ -75,6 +77,15 @@ export function NodeRow({ node, storedTokens, colocated, onReveal, onRename, onM
             hideSavedHere
           />
         </span>
+      </div>
+
+      <div className="adm-node-row-employee" role="cell">
+        {employeeName ? (
+          <span className="adm-node-row-employee-label" translate="no">
+            <AdminEmployees size={12} className="adm-node-row-employee-icon" aria-hidden="true" />
+            {employeeName}
+          </span>
+        ) : null}
       </div>
 
       <div

@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
 import { Button } from "@/components/ui/button";
-import type { ControlPanelDaemonNodeRecord } from "../../types";
+import type { ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../types";
 import { AdminNode, ICON_STROKE_LARGE } from "../icons";
 import { SearchInput } from "@/components/ui/search-input";
 import { canUseLocalControlPanel } from "../../lib/controlPanel";
@@ -22,6 +22,7 @@ import { AdminLayoutToggle, type AdminLayout } from "./AdminLayoutToggle";
 
 interface NodesViewProps {
   nodes: ControlPanelDaemonNodeRecord[];
+  employees: EmployeeRecord[];
   storedTokens: StoredNodeTokenMap;
   layout: AdminLayout;
   onLayoutChange: (next: AdminLayout) => void;
@@ -41,11 +42,17 @@ function filterLabel(filter: NodeQuickFilter, t: TFunction): string {
   return t(`status.${filter}`, { defaultValue: filter });
 }
 
-export function NodesView({ nodes, storedTokens, layout, onLayoutChange, onRevealCredentials, onRenameNode, onManageExecutors, onDeleteNode, onAddNode }: NodesViewProps) {
+export function NodesView({ nodes, employees, storedTokens, layout, onLayoutChange, onRevealCredentials, onRenameNode, onManageExecutors, onDeleteNode, onAddNode }: NodesViewProps) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<NodeQuickFilter>("all");
   const [query, setQuery] = useState("");
   const colocated = canUseLocalControlPanel();
+
+  const employeeById = useMemo(() => {
+    const map = new Map<string, EmployeeRecord>();
+    for (const employee of employees) map.set(employee.id, employee);
+    return map;
+  }, [employees]);
 
   const counts = useMemo(() => {
     const result: Record<NodeQuickFilter, number> = {
@@ -73,18 +80,21 @@ export function NodesView({ nodes, storedTokens, layout, onLayoutChange, onRevea
     return stableNodeOrder(nodes).filter((node) => {
       if (!matchesNodeQuickFilter(node, filter)) return false;
       if (!q) return true;
+      const employee = (node.employeeId && employeeById.get(node.employeeId)) ?? null;
+      const employeeName = employee ? `${employee.displayName} ${employee.id}`.toLowerCase() : "";
       const haystack = [
         node.id,
         node.displayName ?? "",
         node.workspacePath ?? "",
         node.sandboxMode ?? "",
         ...Object.keys(node.agents),
+        employeeName,
       ]
         .join(" ")
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [nodes, filter, query]);
+  }, [nodes, filter, query, employeeById]);
 
   return (
     <div className="adm-view">
@@ -134,32 +144,14 @@ export function NodesView({ nodes, storedTokens, layout, onLayoutChange, onRevea
         />
       ) : layout === "card" ? (
         <div className="adm-fleet-grid">
-          {filtered.map((node) => (
-            <NodeCard
-              key={node.id}
-              node={node}
-              storedTokens={storedTokens}
-              colocated={colocated}
-              onReveal={onRevealCredentials}
-              onRename={onRenameNode}
-              onManageExecutors={onManageExecutors}
-              onDelete={onDeleteNode}
-              t={t}
-            />
-          ))}
-        </div>
-      ) : (
-        <div role="table" aria-label={t("admin.v2.nav_nodes")}>
-          <div className="adm-node-cols" role="row">
-            <span className="adm-col-label" role="columnheader">{t("admin.v2.col_node")}</span>
-            <span className="adm-col-label" role="columnheader">{t("admin.v2.node_runtimes")}</span>
-            <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_actions")}</span>
-          </div>
-          <ul className="adm-node-list" role="rowgroup">
-            {filtered.map((node) => (
-              <NodeRow
+          {filtered.map((node) => {
+            const employee = node.employeeId ? employeeById.get(node.employeeId) : undefined;
+            const employeeName = employee?.displayName;
+            return (
+              <NodeCard
                 key={node.id}
                 node={node}
+                employeeName={employeeName}
                 storedTokens={storedTokens}
                 colocated={colocated}
                 onReveal={onRevealCredentials}
@@ -168,7 +160,36 @@ export function NodesView({ nodes, storedTokens, layout, onLayoutChange, onRevea
                 onDelete={onDeleteNode}
                 t={t}
               />
-            ))}
+            );
+          })}
+        </div>
+      ) : (
+        <div role="table" aria-label={t("admin.v2.nav_nodes")}>
+          <div className="adm-node-cols" role="row">
+            <span className="adm-col-label" role="columnheader">{t("admin.v2.col_node")}</span>
+            <span className="adm-col-label" role="columnheader">{t("admin.v2.col_employee")}</span>
+            <span className="adm-col-label" role="columnheader">{t("admin.v2.node_runtimes")}</span>
+            <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_actions")}</span>
+          </div>
+          <ul className="adm-node-list" role="rowgroup">
+            {filtered.map((node) => {
+              const employee = node.employeeId ? employeeById.get(node.employeeId) : undefined;
+              const employeeName = employee?.displayName;
+              return (
+                <NodeRow
+                  key={node.id}
+                  node={node}
+                  employeeName={employeeName}
+                  storedTokens={storedTokens}
+                  colocated={colocated}
+                  onReveal={onRevealCredentials}
+                  onRename={onRenameNode}
+                  onManageExecutors={onManageExecutors}
+                  onDelete={onDeleteNode}
+                  t={t}
+                />
+              );
+            })}
           </ul>
         </div>
       )}

@@ -16,11 +16,12 @@ import { NodeProfileBadges, nodeOwnershipIcon } from "./NodeProfileBadges";
 import { NodePresence } from "./NodePresence";
 import { NodeRuntimeMarks } from "./NodeRuntimeMarks";
 import { Button } from "@/components/ui/button";
-import { ActionApprove, ActionCopy } from "../icons";
+import { ActionApprove, ActionCopy, AdminEmployees } from "../icons";
 import { isNodeOnline, nodeOwnershipProfile } from "../../lib/adminHelpers";
 
 interface NodeCardProps {
   node: ControlPanelDaemonNodeRecord;
+  employeeName?: string;
   storedTokens?: StoredNodeTokenMap;
   colocated?: boolean;
   onReveal?: (node: ControlPanelDaemonNodeRecord) => void;
@@ -32,6 +33,7 @@ interface NodeCardProps {
 
 export function NodeCard({
   node,
+  employeeName,
   storedTokens = {},
   colocated = false,
   onReveal,
@@ -110,6 +112,13 @@ export function NodeCard({
         hideThisHost
         hideSavedHere
       />
+
+      {employeeName ? (
+        <div className="adm-node-card-employee-badge" title={employeeName} translate="no">
+          <AdminEmployees size={12} className="adm-node-card-employee-icon" aria-hidden="true" />
+          <span className="adm-node-card-employee-badge-text">{employeeName}</span>
+        </div>
+      ) : null}
 
       <div className="adm-node-card-body">
         <div className="adm-node-runtimes" title={t("admin.v2.node_runtimes")}>

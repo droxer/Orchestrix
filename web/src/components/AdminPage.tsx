@@ -525,6 +525,7 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
                 <>
                   <NodesView
                     nodes={nodes}
+                    employees={employees}
                     storedTokens={storedTokens}
                     layout={layout}
                     onLayoutChange={setLayout}
