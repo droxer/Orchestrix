@@ -13,6 +13,11 @@ from ..services.agent_routing import (
     resolve_session_daemon_node_id,
 )
 from ..services.computer_names import computer_display_name
+from ..services.team_dispatch import (
+    TeamDispatchError,
+    team_agents,
+    team_member_assignments,
+)
 from ..services.team_membership import remove_agent_from_teams
 from ..sessions.controller import SessionController
 from .deps import AppContextDep
@@ -256,9 +261,11 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
     actor = request_actor(request, ctx.auth_store)
     body = await json_body(request)
     task_goal = string_field(body, "taskGoal") or string_field(body, "task_goal")
+    if not task_goal:
+        raise HTTPException(400, "taskGoal is required.")
     raw_assignments = body.get("assignments")
-    if not task_goal or not isinstance(raw_assignments, list) or not raw_assignments:
-        raise HTTPException(400, "taskGoal and at least one assignment are required.")
+    if raw_assignments is not None and not isinstance(raw_assignments, list):
+        raise HTTPException(400, "assignments must be a list.")
     idempotency_key = string_field(body, "idempotencyKey") or string_field(
         body, "idempotency_key"
     )
@@ -280,6 +287,32 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             session = SessionController(ctx.session_store).record_runtime_affinity(
                 session["id"], managed_node_id
             )
+    team_id = session.get("teamId") if session else None
+    team_member_ids: set[str] = set()
+    if team_id:
+        team_employee_id = (
+            (session.get("ownerEmployeeId") or actor["employeeId"])
+            if actor["isAdmin"]
+            else actor["employeeId"]
+        )
+        try:
+            _team, members = team_agents(
+                team_id,
+                team_employee_id,
+                team_store=ctx.team_store,
+                agent_store=ctx.agent_store,
+            )
+        except TeamDispatchError as error:
+            raise HTTPException(
+                409, {"code": error.code, "message": str(error)}
+            ) from error
+        team_member_ids = {agent["id"] for agent in members}
+        if not raw_assignments:
+            raw_assignments = team_member_assignments(
+                members, mode=agent_task_mode(body.get("mode"))
+            )
+    if not raw_assignments:
+        raise HTTPException(400, "At least one assignment is required.")
     requested_node_id = string_field(body, "daemonNodeId") or string_field(
         body, "daemon_node_id"
     )
