@@ -106,6 +106,7 @@ describe("settings copy", () => {
       "settings_limit_invalid",
       "settings_save",
       "settings_saved",
+      "settings_reset",
       "emp_limit_label",
       "emp_limit_hint",
       "emp_limit_placeholder",

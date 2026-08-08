@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { getOrgSettings, updateOrgSettings } from "../../api";
+import { CheckIcon } from "../icons";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,11 @@ export function SettingsView() {
 
   return (
     <div className="adm-view adm-settings">
+      {loadError ? (
+        <p className="adm-view-error" role="alert">
+          {loadError}
+        </p>
+      ) : null}
       <NumberSettingCard
         name="max-local-computers"
         title={t("admin.v2.settings_computers_title")}
@@ -46,7 +52,6 @@ export function SettingsView() {
         max={MAX_LOCAL_COMPUTERS_CEILING}
         saved={settings?.maxLocalComputersPerEmployee}
         isLoading={settingsQuery.isLoading}
-        loadError={loadError}
         onSave={async (next) => {
           await updateOrgSettings({ maxLocalComputersPerEmployee: next });
           await settingsQuery.refetch();
@@ -65,7 +70,6 @@ export function SettingsView() {
         max={MAX_TASK_ROUNDS_CEILING}
         saved={settings?.maxTaskRounds}
         isLoading={settingsQuery.isLoading}
-        loadError={loadError}
         onSave={async (next) => {
           await updateOrgSettings({ maxTaskRounds: next });
           await settingsQuery.refetch();
@@ -85,7 +89,6 @@ interface NumberSettingCardProps {
   max: number;
   saved: number | undefined;
   isLoading: boolean;
-  loadError: string | null;
   onSave: (value: number) => Promise<void>;
 }
 
@@ -101,7 +104,6 @@ function NumberSettingCard({
   max,
   saved,
   isLoading,
-  loadError,
   onSave,
 }: NumberSettingCardProps) {
   const { t } = useTranslation();
@@ -116,6 +118,14 @@ function NumberSettingCard({
     if (saved === undefined) return;
     setValue(String(saved));
   }, [saved]);
+
+  // The saved confirmation only needs to acknowledge the click — let it fade
+  // on its own instead of sitting beside the button indefinitely.
+  useEffect(() => {
+    if (savedAt === null) return;
+    const timer = window.setTimeout(() => setSavedAt(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [savedAt]);
 
   const parsed = Number(value);
   const isValid =
@@ -145,7 +155,7 @@ function NumberSettingCard({
   }
 
   return (
-    <form className="adm-settings-card" onSubmit={(event) => void handleSubmit(event)}>
+    <form className="adm-settings-item" onSubmit={(event) => void handleSubmit(event)}>
       <div className="adm-settings-head">
         <h2 className="adm-settings-title">{title}</h2>
         <p className="adm-settings-sub">{subtitle}</p>
@@ -154,38 +164,52 @@ function NumberSettingCard({
       <Field
         label={label}
         hint={hint}
-        error={error ?? loadError ?? undefined}
+        error={error ?? undefined}
         errorId={errorId}
       >
-        <Input
-          name={name}
-          type="number"
-          inputMode="numeric"
-          min={min}
-          max={max}
-          step={1}
-          value={value}
-          disabled={isLoading || isBusy}
-          aria-invalid={value !== "" && !isValid}
-          aria-describedby={error || loadError ? errorId : undefined}
-          onChange={(event) => {
-            setValue(event.target.value);
-            setError(null);
-            setSavedAt(null);
-          }}
-        />
+        <div className="adm-settings-control">
+          <Input
+            name={name}
+            className="adm-settings-input"
+            type="number"
+            inputMode="numeric"
+            min={min}
+            max={max}
+            step={1}
+            value={value}
+            disabled={isLoading || isBusy}
+            aria-invalid={value !== "" && !isValid}
+            aria-describedby={error ? errorId : undefined}
+            onChange={(event) => {
+              setValue(event.target.value);
+              setError(null);
+              setSavedAt(null);
+            }}
+          />
+          <Button type="submit" variant="secondary" disabled={isBusy || !isDirty || !isValid}>
+            {isBusy ? t("admin.v2.settings_saving") : t("admin.v2.settings_save")}
+          </Button>
+          {isDirty && !isBusy ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setValue(saved === undefined ? "" : String(saved));
+                setError(null);
+                setSavedAt(null);
+              }}
+            >
+              {t("admin.v2.settings_reset")}
+            </Button>
+          ) : null}
+          {savedAt !== null && !isDirty ? (
+            <span className="adm-settings-saved relay-enter" role="status">
+              <CheckIcon size={14} aria-hidden="true" />
+              {t("admin.v2.settings_saved")}
+            </span>
+          ) : null}
+        </div>
       </Field>
-
-      <div className="adm-settings-actions">
-        <Button type="submit" disabled={isBusy || !isDirty || !isValid}>
-          {isBusy ? t("admin.v2.settings_saving") : t("admin.v2.settings_save")}
-        </Button>
-        {savedAt !== null && !isDirty ? (
-          <span className="adm-settings-saved" role="status">
-            {t("admin.v2.settings_saved")}
-          </span>
-        ) : null}
-      </div>
     </form>
   );
 }
