@@ -1991,11 +1991,42 @@ test("generated-file diff detects changed files and skips excluded directories",
   writeFile(joinPath(workspace, "report.html"), "<h1>hi</h1>");
   writeFile(joinPath(workspace, "data.csv"), "a,b\nc,d\n");
   writeFile(joinPath(workspace, "output", "summary.md"), "# Summary\n");
-  writeFile(joinPath(workspace, "notes.md"), "not a generated artifact\n");
+  // A doc written beside the work is the agent's deliverable; one buried in a
+  // checkout the run merely touched is not.
+  writeFile(joinPath(workspace, "notes.md"), "a thread-root deliverable\n");
+  makeDir(joinPath(workspace, "checkout"));
+  writeFile(joinPath(workspace, "checkout", "README.md"), "someone else's repo\n");
 
   const changed = diffGeneratedFiles(workspace, before);
-  assert.deepEqual(changed.map((file) => file.relativePath).sort(), ["data.csv", "output/summary.md", "report.html"]);
+  assert.deepEqual(changed.map((file) => file.relativePath).sort(), [
+    "data.csv",
+    "notes.md",
+    "output/summary.md",
+    "report.html",
+  ]);
   assert.deepEqual(diffGeneratedFiles(workspace, snapshotGeneratedFiles(workspace)), []);
+});
+
+test("generated-file scan reports text documents at an agent home root and output dir", async (t: TestContext) => {
+  const { mkdtempSync, mkdirSync: makeDir, rmSync, writeFileSync: writeFile } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join: joinPath } = await import("node:path");
+  const { diffGeneratedFiles } = await import("../src/generated-files.js");
+  const workspace = mkdtempSync(joinPath(tmpdir(), "relay-generated-textdocs-"));
+  t.after(() => rmSync(workspace, { recursive: true, force: true }));
+
+  const own = agentWorkspaceSubpath("agent_self");
+  makeDir(joinPath(workspace, own, "output"), { recursive: true });
+  makeDir(joinPath(workspace, own, "scratch"), { recursive: true });
+  writeFile(joinPath(workspace, own, "guide.md"), "# Guide\n");
+  writeFile(joinPath(workspace, own, "output", "report.txt"), "done\n");
+  writeFile(joinPath(workspace, own, "scratch", "buffer.md"), "working notes\n");
+
+  const changed = diffGeneratedFiles(workspace, {}, { ownAgentHomeSubdir: own });
+  assert.deepEqual(changed.map((file) => file.relativePath).sort(), [
+    `${own}/guide.md`,
+    `${own}/output/report.txt`,
+  ]);
 });
 
 test("generated-file scan skips sibling agent homes but keeps the running agent's own", async (t: TestContext) => {

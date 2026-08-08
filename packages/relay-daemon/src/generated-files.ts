@@ -120,9 +120,23 @@ function fileExtension(name: string): string {
   return dot > 0 ? name.slice(dot).toLowerCase() : "";
 }
 
-function isOutputFile(relativePath: string, extension: string): boolean {
-  const [first] = relativePath.split("/");
-  return first === "output" && OUTPUT_FILE_TEXT_EXTENSIONS.has(extension);
+/**
+ * Text documents count only near a workspace root: directly in the thread
+ * workspace, directly in the running agent's own home, or under an `output/`
+ * directory in either. Paths are thread-relative here, so an agent that writes
+ * `guide.md` beside its work is reported, while `somecheckout/README.md` — a
+ * repo file the run merely touched — is not. Mirrored in
+ * `_is_generated_artifact_path` (backend/relay/daemon_registry/artifacts.py);
+ * change both together.
+ */
+function isTextDocumentFile(relativePath: string, extension: string): boolean {
+  if (!OUTPUT_FILE_TEXT_EXTENSIONS.has(extension)) return false;
+  const parts = relativePath.split("/");
+  const scoped =
+    parts.length >= 3 && parts[0] === "agents" && parts[1].startsWith("agent-")
+      ? parts.slice(2)
+      : parts;
+  return scoped.length === 1 || scoped[0] === "output";
 }
 
 function isSiblingAgentHome(relativeDir: string, ownAgentHomeSubdir: string | undefined): boolean {
@@ -174,7 +188,7 @@ function listCandidates(
       }
       if (!stat.isFile()) continue;
       const relativePath = relative(workspacePath, path).split(sep).join("/");
-      if (!GENERATED_FILE_EXTENSIONS.has(extension) && !isOutputFile(relativePath, extension)) continue;
+      if (!GENERATED_FILE_EXTENSIONS.has(extension) && !isTextDocumentFile(relativePath, extension)) continue;
       files.push({
         path,
         relativePath,

@@ -22,6 +22,7 @@ from relay.daemon_registry import (
     sandbox_ui_token_matches,
     workspace_paths_match,
 )
+from relay.daemon_registry.artifacts import _is_generated_artifact_path
 from relay.daemon_registry.registry import task_progress_file
 from relay.persistence.agent_placement_store import LocalAgentPlacementStore
 from relay.persistence.task_store import LocalTaskStore
@@ -1095,7 +1096,11 @@ def test_daemon_completion_indexes_text_files_under_output_folder() -> None:
             [command] = registry.take_commands("sbx_alice", "node_token")
             generated = output / "summary.md"
             generated.write_text("# Summary\n", encoding="utf-8")
-            (workspace / "notes.md").write_text("normal docs edit\n", encoding="utf-8")
+            (workspace / "notes.md").write_text("a root deliverable\n", encoding="utf-8")
+            (workspace / "checkout").mkdir()
+            (workspace / "checkout" / "README.md").write_text(
+                "a repo file the run merely touched\n", encoding="utf-8"
+            )
 
             registry.handle_event(
                 "sbx_alice",
@@ -1119,14 +1124,49 @@ def test_daemon_completion_indexes_text_files_under_output_folder() -> None:
                 if item["kind"] == "workspace_file"
             ]
             assert [artifact["workspaceRelativePath"] for artifact in files] == [
-                "output/summary.md"
+                "notes.md",
+                "output/summary.md",
             ]
+            by_path = {
+                artifact["workspaceRelativePath"]: artifact for artifact in files
+            }
             assert (
-                session_store.read_artifact_content(session["id"], files[0]["id"])
+                session_store.read_artifact_content(
+                    session["id"], by_path["output/summary.md"]["id"]
+                )
                 == b"# Summary\n"
+            )
+            assert (
+                session_store.read_artifact_content(
+                    session["id"], by_path["notes.md"]["id"]
+                )
+                == b"a root deliverable\n"
             )
 
     asyncio.run(run_flow())
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "indexed"),
+    [
+        # Binary/document types count wherever they land.
+        ("deep/nested/report.pdf", True),
+        # Text documents count at a workspace root...
+        ("agent-loop-guide.md", True),
+        ("output/summary.md", True),
+        ("agents/agent-YWdlbnRfc2VsZg/guide.md", True),
+        ("agents/agent-YWdlbnRfc2VsZg/output/summary.md", True),
+        # ...but not once they are buried in a tree the run merely touched.
+        ("checkout/README.md", False),
+        ("agents/agent-YWdlbnRfc2VsZg/scratch/buffer.md", False),
+        # An unlisted text extension stays out regardless of position.
+        ("notes.rst", False),
+    ],
+)
+def test_is_generated_artifact_path_scopes_text_documents_to_workspace_roots(
+    relative_path: str, indexed: bool
+) -> None:
+    assert _is_generated_artifact_path(relative_path) is indexed
 
 
 def test_daemon_reported_generated_files_index_without_shared_filesystem() -> None:
@@ -1208,6 +1248,11 @@ def test_daemon_reported_generated_files_index_without_shared_filesystem() -> No
                             "title": "cover.pdf",
                             "bytes": 3,
                         },
+                        {
+                            "relativePath": "checkout/README.md",
+                            "title": "README.md",
+                            "bytes": 3,
+                        },
                         {"relativePath": "notes.md", "title": "notes.md", "bytes": 3},
                     ],
                 },
@@ -1223,6 +1268,9 @@ def test_daemon_reported_generated_files_index_without_shared_filesystem() -> No
             assert [artifact["workspaceRelativePath"] for artifact in files] == [
                 "agents/agent-YWdlbnRfcmVzZWFyY2g/reports/q2.pdf",
                 "agents/agent-YWdlbnRfcmVzZWFyY2g/output/summary.md",
+                # A doc at the thread workspace root is a deliverable; the same
+                # extension inside a checkout the run touched is not.
+                "notes.md",
             ]
             assert files[0]["path"].startswith(
                 f"/remote/daemon/workspace/{session['id']}/agents/"
