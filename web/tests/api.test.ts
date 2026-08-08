@@ -489,3 +489,29 @@ describe("apiJson", () => {
     assert.equal(requestedUrl, "/api/v1/agents/agent_1/workspace/file?path=src%2Fapp.tsx&threadId=ses_1");
   });
 });
+
+describe("agent run payloads", () => {
+  it("omits assignments when the message is addressed to the room", async () => {
+    const calls: Array<{ url: string; body: unknown }> = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), body: JSON.parse(String(init?.body ?? "{}")) });
+      return new Response(JSON.stringify({ id: "ses_1" }), {
+        status: 202,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      await runLogicalAgents({ taskGoal: "one more pass", sessionId: "ses_1", mode: "action" });
+    } finally {
+      globalThis.fetch = original;
+    }
+
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].body, {
+      taskGoal: "one more pass",
+      sessionId: "ses_1",
+      mode: "action",
+    });
+  });
+});
