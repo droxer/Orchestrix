@@ -108,6 +108,14 @@ export function canonicalSearchForPath(pathname: string, search = ""): string {
   if (head === "login" && !entityId) {
     const rawReturnTo = source.get("returnTo");
     if (rawReturnTo) target.set("returnTo", validatedReturnTo(rawReturnTo));
+  } else if (head === "threads" && entityId && entityId !== "new" && rest.length === 0) {
+    // The thread space panel is URL-driven (?space=1&artifact=<id>) so an open
+    // panel survives reload and can be shared. The selection only means
+    // something while the panel is open.
+    if (source.get("space") === "1") {
+      target.set("space", "1");
+      copyParam(source, target, "artifact");
+    }
   } else if (head === "agents" && !entityId) {
     copyParam(source, target, "q");
     const availability = source.get("availability");

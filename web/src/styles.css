@@ -43,6 +43,7 @@
 @import "./styles/agent-stream.css" layer(relay);
 @import "./styles/syntax.css" layer(relay);
 @import "./styles/artifact.css" layer(relay);
+@import "./styles/thread-space.css" layer(relay);
 @import "./styles/handoff.css" layer(relay);
 @import "./styles/composer.css" layer(relay);
 

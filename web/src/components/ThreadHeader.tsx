@@ -4,10 +4,13 @@ import { NavThreads } from "./icons";
 import { ArtifactNavButton } from "./ArtifactNavButton";
 import { Button } from "@/components/ui/button";
 
-export function ThreadHeader({ activeSession, artifactCount, onOpenArtifacts, onBackToThreads }: {
+export function ThreadHeader({ activeSession, artifactCount, spaceOpen, threadListHidden, onToggleSpace, onToggleThreadList, onBackToThreads }: {
   activeSession: RelaySession | undefined;
   artifactCount: number;
-  onOpenArtifacts: () => void;
+  spaceOpen: boolean;
+  threadListHidden: boolean;
+  onToggleSpace: () => void;
+  onToggleThreadList: () => void;
   onBackToThreads: () => void;
 }) {
   const { t } = useTranslation();
@@ -22,9 +25,24 @@ export function ThreadHeader({ activeSession, artifactCount, onOpenArtifacts, on
         </div>
       </div>
       <div className="chat-tools">
+        {spaceOpen ? (
+          <Button
+            variant="ghost"
+            type="button"
+            className="icon-button chat-threadlist-button"
+            aria-label={t("space.toggle_threads")}
+            title={t("space.toggle_threads")}
+            aria-expanded={!threadListHidden}
+            onClick={onToggleThreadList}
+          >
+            <NavThreads size={16} />
+          </Button>
+        ) : null}
         <ArtifactNavButton
           artifactCount={artifactCount}
-          onOpenArtifacts={onOpenArtifacts}
+          onOpenArtifacts={onToggleSpace}
+          expanded={spaceOpen}
+          disabled={!activeSession}
           className="icon-button chat-artifacts-button"
         />
       </div>

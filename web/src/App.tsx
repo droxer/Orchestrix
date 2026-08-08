@@ -18,7 +18,7 @@ import { mergeThreadRuntimeNodes, mergeVisibleDaemonNodes } from "./lib/daemonNo
 import { formatDispatchError } from "./lib/agentReadiness";
 import { isEmployeeAgentRoutable, preferredRoutableAgent } from "./lib/agentDisplayNames";
 import { routeComposerMessage, teamMembersForMention, teamRunInput } from "./lib/messageRouting";
-import { applyTheme, readLanguage, readSidenavExpanded, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeSidenavExpanded, writeTheme } from "./lib/appStorage";
+import { applyTheme, readLanguage, readSidenavExpanded, readTheme, readThreadSpaceWidth, readTokens, selectedEmployeeKey, writeLanguage, writeSidenavExpanded, writeTheme, writeThreadSpaceWidth } from "./lib/appStorage";
 import { canUseLocalControlPanel } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
 import { useAuthSession } from "./hooks/useAuthSession";
@@ -56,7 +56,9 @@ import {
   threadRuntimeNodeId,
 } from "./lib/threadRuntime";
 import { useStableValue } from "./hooks/useStableValue";
+import { useUrlSearchState } from "./hooks/useUrlSearchState";
 import { validatedReturnTo } from "./lib/appRoute";
+import { clampSpaceWidth, SPACE_WIDTH_DEFAULT } from "./lib/threadSpace";
 
 const AdminPage = lazy(() => import("./components/AdminPage").then((m) => ({ default: m.AdminPage })));
 const BacklogPage = lazy(() => import("./components/BacklogPage").then((m) => ({ default: m.BacklogPage })));
@@ -124,8 +126,23 @@ export function App() {
   const [theme, setTheme] = useState<Theme>("system");
   const [language, setLanguage] = useState<Language>("en");
   const [handoffOpen, setHandoffOpen] = useState(false);
-  const [artifactsDrawerOpen, setArtifactsDrawerOpen] = useState(false);
-  const [initialArtifactId, setInitialArtifactId] = useState<string | null>(null);
+  // The thread space panel is URL-driven (?space=1&artifact=<id>) so the view
+  // survives reload and can be shared.
+  const [spaceOpen, setSpaceOpen] = useUrlSearchState<boolean>(
+    "space",
+    false,
+    (value) => value === "1",
+    (value) => (value ? "1" : null),
+  );
+  const [spaceArtifactId, setSpaceArtifactId] = useUrlSearchState<string | null>(
+    "artifact",
+    null,
+    (value) => value,
+    (value) => value,
+  );
+  const [threadListHidden, setThreadListHidden] = useState(false);
+  const [spaceWidth, setSpaceWidth] = useState(SPACE_WIDTH_DEFAULT);
+  const [spaceResizing, setSpaceResizing] = useState(false);
   const [handoffAgentId, setHandoffAgentId] = useState<string>("");
   const [handoffMode, setHandoffMode] = useState<AgentTaskMode>("action");
   const [handoffNote, setHandoffNote] = useState("");
@@ -369,6 +386,8 @@ export function App() {
 
   const awaitingDecision = useMemo(() => isAwaitingFeedbackDecision(activeSession), [activeSession]);
 
+  const spaceVisible = route === "main" && spaceOpen && Boolean(activeSession);
+
   const threadItems = useMemo<ThreadItem[]>(() => {
     const runningBy = new Map(visibleNodes.flatMap((node) => node.activeRuns.map((run) => [run.sessionId, run.agent] as const)));
     return myThreads.map((session) => ({
@@ -400,6 +419,7 @@ export function App() {
     // Read after mount, not in the initializer: the export is prerendered,
     // so touching localStorage during the first render mismatches hydration.
     setSidenavExpanded(readSidenavExpanded());
+    setSpaceWidth(clampSpaceWidth(readThreadSpaceWidth() ?? SPACE_WIDTH_DEFAULT));
   }, [mounted]);
 
   // Persisted on toggle rather than in an effect on `sidenavExpanded`: the
@@ -512,8 +532,9 @@ export function App() {
   }, [activeSession?.id]);
 
   useEffect(() => {
-    setArtifactsDrawerOpen(false);
-    setInitialArtifactId(null);
+    // Session switches navigate to a new path, which drops the space/artifact
+    // search params; only the local thread-rail collapse needs resetting.
+    setThreadListHidden(false);
   }, [activeSession?.id]);
 
   useEffect(() => {
@@ -645,10 +666,31 @@ export function App() {
     }
   }
 
-  function openArtifactsDrawer(artifact?: RelayArtifact) {
+  function openThreadSpace(artifact?: RelayArtifact) {
     if (!activeSession) return;
-    setInitialArtifactId(artifact?.id ?? null);
-    setArtifactsDrawerOpen(true);
+    setThreadListHidden(true);
+    // space=1 must land first: the canonical URL keeps ?artifact only while
+    // the panel is open, so writing the selection first would drop it.
+    setSpaceOpen(true);
+    setSpaceArtifactId(artifact?.id ?? null);
+  }
+
+  function toggleThreadSpace() {
+    if (!activeSession) return;
+    if (spaceOpen) closeThreadSpace();
+    else openThreadSpace();
+  }
+
+  function closeThreadSpace() {
+    setSpaceOpen(false);
+    setSpaceArtifactId(null);
+    setThreadListHidden(false);
+  }
+
+  function handleSpaceResize(width: number, commit: boolean) {
+    const clamped = clampSpaceWidth(width);
+    setSpaceWidth(clamped);
+    if (commit) writeThreadSpaceWidth(clamped);
   }
 
   async function renameThread(session: RelaySession) {
@@ -986,9 +1028,15 @@ export function App() {
       setPrefsOpen={setPrefsOpen}
       skipLinkHref={skipLinkHref}
       activeThreadLabel={activeThreadLabel}
+      threadSpaceOpen={spaceVisible}
+      threadSpaceWidth={spaceWidth}
+      threadSpaceResizing={spaceResizing}
+      threadListHidden={threadListHidden}
       mobileChatChrome={{
         artifactCount: visibleArtifacts.length,
-        onOpenArtifacts: () => openArtifactsDrawer(),
+        spaceOpen: spaceVisible,
+        spaceDisabled: !activeSession,
+        onToggleSpace: toggleThreadSpace,
       }}
       user={user}
       onLogout={() => void handleLogout()}
@@ -1071,10 +1119,17 @@ export function App() {
             }}
             artifactCount={visibleArtifacts.length}
             visibleArtifacts={visibleArtifacts}
-            artifactsDrawerOpen={artifactsDrawerOpen}
-            initialArtifactId={initialArtifactId}
-            onOpenArtifacts={openArtifactsDrawer}
-            onCloseArtifactsDrawer={() => setArtifactsDrawerOpen(false)}
+            spaceOpen={spaceVisible}
+            spaceArtifactId={spaceArtifactId}
+            spaceWidth={spaceWidth}
+            threadListHidden={threadListHidden}
+            onOpenArtifacts={openThreadSpace}
+            onToggleSpace={toggleThreadSpace}
+            onCloseSpace={closeThreadSpace}
+            onSelectSpaceArtifact={setSpaceArtifactId}
+            onSpaceResize={handleSpaceResize}
+            onSpaceResizeActive={setSpaceResizing}
+            onToggleThreadList={() => setThreadListHidden((hidden) => !hidden)}
             onBackToThreads={() => navigateToMobileView("threads")}
             selectedEmployee={selectedEmployee}
             initializingThread={initializingThread}

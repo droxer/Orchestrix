@@ -3,6 +3,7 @@
 // semantics later.
 
 import {
+  ArrowLeft,
   ArrowRightLeft,
   ArrowUp,
   Bot,
@@ -137,6 +138,7 @@ export const ComposerStop = forwardRef<SVGSVGElement, LucideProps>((props, ref) 
 ComposerStop.displayName = "ComposerStop";
 export const ActionAddPerson = withStandardStroke(UserPlus, "ActionAddPerson");
 export const ActionRemove = withStandardStroke(X, "ActionRemove");
+export const NavBack = withStandardStroke(ArrowLeft, "NavBack");
 export const ActionSearch = withStandardStroke(Search, "ActionSearch");
 export const ActionCalendar = withStandardStroke(CalendarDays, "ActionCalendar");
 export const WorkspaceFile = withStandardStroke(FileText, "WorkspaceFile");

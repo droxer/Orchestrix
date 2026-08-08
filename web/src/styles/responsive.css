@@ -2,11 +2,11 @@
 
 @media (max-width: 1040px) {
   .messenger-shell {
-    grid-template-columns: var(--sidenav-w) var(--thread-w) minmax(0, 1fr);
+    grid-template-columns: var(--sidenav-w) var(--thread-w) minmax(0, 1fr) 0;
   }
 
   .messenger-shell[data-sidenav="open"] {
-    grid-template-columns: var(--sidenav-w-open) var(--thread-w) minmax(0, 1fr);
+    grid-template-columns: var(--sidenav-w-open) var(--thread-w) minmax(0, 1fr) 0;
   }
 }
 
@@ -19,6 +19,29 @@
     grid-template-rows: auto minmax(0, 1fr) auto;
     min-height: 100dvh;
     padding: 0;
+  }
+
+  /* No split view at this width: the space panel leaves the grid (which
+     stays single-column) and takes over the viewport like the drawers in
+     mobile-overlays.css. */
+  .messenger-shell[data-space="open"],
+  .messenger-shell[data-space="open"][data-sidenav="open"],
+  .messenger-shell[data-space="open"][data-threadlist="open"],
+  .messenger-shell[data-space="open"][data-threadlist="open"][data-sidenav="open"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .thread-space-panel {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-drawer);
+    width: auto;
+    border-left: 0;
+    background: var(--surface-0);
+  }
+
+  .thread-space-resize {
+    display: none;
   }
 
   .mobile-topbar--chat {

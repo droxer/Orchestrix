@@ -1049,6 +1049,16 @@
     "size_kb": "{{count}} KB",
     "size_mb": "{{count}} MB"
   },
+  "space": {
+    "panel_label": "對話產物",
+    "title": "產物",
+    "toggle": "切換對話產物面板",
+    "toggle_threads": "顯示對話列表",
+    "resize_label": "調整產物面板寬度",
+    "list_label": "對話產物",
+    "empty_title": "還沒有產物",
+    "empty_body": "此對話產生的檔案和報告會自動顯示在這裡。"
+  },
   "agent_stream": {
     "empty_working": "執行中…",
     "empty_done": "暫無輸出。",

@@ -97,12 +97,12 @@ body {
 }
 
 .messenger-shell {
-  grid-template-columns: var(--sidenav-w) var(--thread-w) minmax(0, 1fr);
+  grid-template-columns: var(--sidenav-w) var(--thread-w) minmax(0, 1fr) 0;
   background: var(--surface-0);
 }
 
 .messenger-shell[data-sidenav="open"] {
-  grid-template-columns: var(--sidenav-w-open) var(--thread-w) minmax(0, 1fr);
+  grid-template-columns: var(--sidenav-w-open) var(--thread-w) minmax(0, 1fr) 0;
 }
 
 /* A themed rail, not a permanently-dark island: the active route is a

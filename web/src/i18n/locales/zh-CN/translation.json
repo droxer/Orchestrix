@@ -1049,6 +1049,16 @@
     "size_kb": "{{count}} KB",
     "size_mb": "{{count}} MB"
   },
+  "space": {
+    "panel_label": "对话产物",
+    "title": "产物",
+    "toggle": "切换对话产物面板",
+    "toggle_threads": "显示对话列表",
+    "resize_label": "调整产物面板宽度",
+    "list_label": "对话产物",
+    "empty_title": "还没有产物",
+    "empty_body": "该对话生成的文件和报告会自动出现在这里。"
+  },
   "agent_stream": {
     "empty_working": "运行中…",
     "empty_done": "暂无输出。",

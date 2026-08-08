@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 export { filterArtifacts } from "../../lib/artifactFilters";
 
-function ArtifactKindIcon({ kind, size }: { kind: RelayArtifact["kind"]; size: number }) {
+export function ArtifactKindIcon({ kind, size }: { kind: RelayArtifact["kind"]; size: number }) {
   switch (kind) {
     case "plan":
       return <ArtifactPlan size={size} />;

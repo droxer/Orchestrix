@@ -1,6 +1,6 @@
 "use client";
 
-import type { Dispatch, ReactNode, SetStateAction } from "react";
+import type { CSSProperties, Dispatch, ReactNode, SetStateAction } from "react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavPreferences, NavThreads } from "./icons";
@@ -31,7 +31,9 @@ const WORK_ROUTE_LABEL_KEYS: Record<Exclude<AppRoute, "main">, string> = {
 
 export type MobileChatChrome = {
   artifactCount: number;
-  onOpenArtifacts: () => void;
+  spaceOpen: boolean;
+  spaceDisabled: boolean;
+  onToggleSpace: () => void;
 };
 
 type AppShellProps = {
@@ -46,6 +48,10 @@ type AppShellProps = {
   setPrefsOpen: Dispatch<SetStateAction<boolean>>;
   skipLinkHref: string;
   activeThreadLabel: string;
+  threadSpaceOpen: boolean;
+  threadSpaceWidth: number;
+  threadSpaceResizing: boolean;
+  threadListHidden: boolean;
   mobileChatChrome: MobileChatChrome;
   user: CurrentUser;
   onLogout: () => void;
@@ -87,6 +93,10 @@ export function AppShell({
   setPrefsOpen,
   skipLinkHref,
   activeThreadLabel,
+  threadSpaceOpen,
+  threadSpaceWidth,
+  threadSpaceResizing,
+  threadListHidden,
   mobileChatChrome,
   user,
   onLogout,
@@ -176,7 +186,16 @@ export function AppShell({
   const isMobileChat = route === "main" && mobileView === "chat";
 
   return (
-    <div className="messenger-shell" data-mobile-view={mobileView} data-route={route} data-sidenav={sidenavExpanded ? "open" : "closed"}>
+    <div
+      className="messenger-shell"
+      data-mobile-view={mobileView}
+      data-route={route}
+      data-sidenav={sidenavExpanded ? "open" : "closed"}
+      data-space={threadSpaceOpen ? "open" : undefined}
+      data-space-resizing={threadSpaceResizing || undefined}
+      data-threadlist={threadSpaceOpen && !threadListHidden ? "open" : undefined}
+      style={{ "--space-w": `${threadSpaceWidth}px` } as CSSProperties}
+    >
       <a className="skip-link" href={skipLinkHref}>{t("skip_to_content")}</a>
 
       <div
@@ -200,7 +219,9 @@ export function AppShell({
               <div className="mobile-topbar-chat-tools">
                 <ArtifactNavButton
                   artifactCount={mobileChatChrome.artifactCount}
-                  onOpenArtifacts={mobileChatChrome.onOpenArtifacts}
+                  onOpenArtifacts={mobileChatChrome.onToggleSpace}
+                  expanded={mobileChatChrome.spaceOpen}
+                  disabled={mobileChatChrome.spaceDisabled}
                 />
                 <PreferencesButton prefsOpen={prefsOpen} setPrefsOpen={setPrefsOpen} />
               </div>

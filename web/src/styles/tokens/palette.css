@@ -188,6 +188,7 @@
   --sidenav-w: 72px;
   --sidenav-w-open: 228px;
   --thread-w: 318px;
+  --space-w: 384px;
   --header-h: 64px;
   /* Shared inline gutter for page chrome — route PageHeaders, the thread
      rail, and the chat header/transcript all inset by this one token so the

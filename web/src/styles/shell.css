@@ -2,7 +2,10 @@
 
 .messenger-shell {
   display: grid;
-  grid-template-columns: var(--sidenav-w) var(--thread-w) minmax(0, 1fr);
+  /* The trailing 0 track is the thread space panel's slot: always present so
+     opening/closing the panel animates through the grid-track transition
+     below instead of jumping between track counts. */
+  grid-template-columns: var(--sidenav-w) var(--thread-w) minmax(0, 1fr) 0;
   height: 100vh;
   height: 100dvh;
   min-height: 100dvh;
@@ -22,7 +25,32 @@
 }
 
 .messenger-shell[data-sidenav="open"] {
-  grid-template-columns: var(--sidenav-w-open) var(--thread-w) minmax(0, 1fr);
+  grid-template-columns: var(--sidenav-w-open) var(--thread-w) minmax(0, 1fr) 0;
+}
+
+/* Space panel open: the thread rail collapses to zero by default; the user
+   may re-open it on top of the panel (data-threadlist="open"), producing
+   three columns beside the sidenav. */
+.messenger-shell[data-space="open"] {
+  grid-template-columns: var(--sidenav-w) 0 minmax(0, 1fr) var(--space-w);
+}
+
+.messenger-shell[data-space="open"][data-sidenav="open"] {
+  grid-template-columns: var(--sidenav-w-open) 0 minmax(0, 1fr) var(--space-w);
+}
+
+.messenger-shell[data-space="open"][data-threadlist="open"] {
+  grid-template-columns: var(--sidenav-w) var(--thread-w) minmax(0, 1fr) var(--space-w);
+}
+
+.messenger-shell[data-space="open"][data-threadlist="open"][data-sidenav="open"] {
+  grid-template-columns: var(--sidenav-w-open) var(--thread-w) minmax(0, 1fr) var(--space-w);
+}
+
+/* During a drag the pointer owns the width; the track transition would
+   rubber-band behind it. */
+.messenger-shell[data-space-resizing="true"] {
+  transition: none;
 }
 
 .mobile-topbar {

@@ -1,0 +1,199 @@
+/* ========================== thread space ==========================
+   Split-view panel showing what the open thread produced. Lives in the
+   shell grid's fourth track (--space-w); at <=820px responsive.css pulls
+   it out of the grid and makes it a full-screen overlay. */
+
+.thread-space-panel {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--line-1);
+  background: var(--surface-0);
+  overflow: hidden;
+}
+
+.thread-space-resize {
+  width: var(--sp-1-5);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.thread-space-resize::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--sp-1) - 1px);
+  width: 2px;
+  background: transparent;
+  transition: background var(--t-fast) var(--ease);
+}
+
+.thread-space-resize:hover::after,
+.thread-space-resize:active::after {
+  background: var(--line-strong);
+}
+
+.thread-space-resize:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
+}
+
+.thread-space-inner {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.thread-space-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  min-height: var(--header-h);
+  padding-inline: var(--sp-4);
+  border-bottom: 1px solid var(--line-1);
+}
+
+.thread-space-title {
+  margin: 0;
+  color: var(--ink-1);
+  font: var(--type-heading);
+  letter-spacing: var(--track-display);
+}
+
+.thread-space-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  color: var(--ink-2);
+  font: var(--type-label-strong);
+}
+
+.thread-space-back:hover {
+  color: var(--ink-1);
+}
+
+.thread-space-list {
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-2);
+}
+
+.thread-space-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--sp-3);
+  width: 100%;
+  min-width: 0;
+  padding: var(--sp-3);
+  border: 0;
+  border-radius: var(--r-2);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.thread-space-row:hover {
+  background: var(--row-hover);
+}
+
+.thread-space-row.is-active {
+  background: var(--surface-2);
+}
+
+.thread-space-row.is-new {
+  animation: thread-space-row-new var(--t-slow) var(--ease);
+}
+
+@keyframes thread-space-row-new {
+  from { background: var(--action-soft); }
+  to { background: transparent; }
+}
+
+.thread-space-row-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-2);
+  background: color-mix(in srgb, var(--info) 12%, transparent);
+  color: var(--info);
+}
+
+.thread-space-row-copy {
+  display: grid;
+  min-width: 0;
+  gap: var(--sp-0-5);
+}
+
+.thread-space-row-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-1);
+  font: var(--type-label-strong);
+}
+
+.thread-space-row-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-3);
+  font-size: var(--fs-2);
+}
+
+.thread-space-empty {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: var(--sp-2);
+  min-height: 0;
+  padding: var(--sp-7) var(--sp-5);
+  text-align: center;
+}
+
+.thread-space-empty-title {
+  margin: 0;
+  color: var(--ink-1);
+  font: var(--type-label-strong);
+}
+
+.thread-space-empty-body {
+  margin: 0;
+  max-width: var(--measure-tight);
+  color: var(--ink-3);
+  font-size: var(--fs-3);
+  line-height: 1.45;
+}
+
+.thread-space-preview {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.thread-space-preview .artifact-preview-body {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Collapsed thread rail (space open, list not re-opened): the grid track is
+   0, so clip the panel's content and drop its hairline instead of letting it
+   spill into the transcript column. */
+.messenger-shell[data-space="open"]:not([data-threadlist="open"]) .thread-panel {
+  min-width: 0;
+  overflow: hidden;
+  visibility: hidden;
+  border-right-color: transparent;
+}

@@ -19,7 +19,8 @@ import { MessageBlock, isGroupedContinuation, type DerivedMessage } from "./Mess
 import { phaseDividerLabel } from "../lib/projectMessages";
 import { DecisionBar } from "./composer/DecisionBar";
 import { Composer, type ComposerHandle } from "./composer/Composer";
-import { ArtifactsDrawer } from "./artifact/ArtifactsDrawer";
+import { ThreadSpacePanel } from "./space/ThreadSpacePanel";
+import { buildSpaceItems, threadHasMultipleProducers } from "../lib/threadSpace";
 
 export type ThreadsViewProps = {
   filteredThreads: ThreadItem[];
@@ -43,10 +44,17 @@ export type ThreadsViewProps = {
   onLogicalAgentPicked: (agent: EmployeeAgent) => void;
   artifactCount: number;
   visibleArtifacts: RelayArtifact[];
-  artifactsDrawerOpen: boolean;
-  initialArtifactId: string | null;
+  spaceOpen: boolean;
+  spaceArtifactId: string | null;
+  spaceWidth: number;
+  threadListHidden: boolean;
   onOpenArtifacts: (artifact?: RelayArtifact) => void;
-  onCloseArtifactsDrawer: () => void;
+  onToggleSpace: () => void;
+  onCloseSpace: () => void;
+  onSelectSpaceArtifact: (artifactId: string | null) => void;
+  onSpaceResize: (width: number, commit: boolean) => void;
+  onSpaceResizeActive: (active: boolean) => void;
+  onToggleThreadList: () => void;
   onBackToThreads: () => void;
   selectedEmployee: string;
   initializingThread: boolean;
@@ -96,10 +104,17 @@ export function ThreadsView({
   onLogicalAgentPicked,
   artifactCount,
   visibleArtifacts,
-  artifactsDrawerOpen,
-  initialArtifactId,
+  spaceOpen,
+  spaceArtifactId,
+  spaceWidth,
+  threadListHidden,
   onOpenArtifacts,
-  onCloseArtifactsDrawer,
+  onToggleSpace,
+  onCloseSpace,
+  onSelectSpaceArtifact,
+  onSpaceResize,
+  onSpaceResizeActive,
+  onToggleThreadList,
   onBackToThreads,
   selectedEmployee,
   initializingThread,
@@ -138,6 +153,14 @@ export function ThreadsView({
     () => activeLogicalAgent?.displayName ?? displayNameForExecutor(activeAgent, logicalAgents),
     [activeAgent, activeLogicalAgent, logicalAgents],
   );
+  const spaceItems = useMemo(
+    () => buildSpaceItems(visibleArtifacts, activeSession?.agentRuns, logicalAgentNames, agentDisplayNames),
+    [visibleArtifacts, activeSession?.agentRuns, logicalAgentNames, agentDisplayNames],
+  );
+  const spaceShowProducer = useMemo(
+    () => threadHasMultipleProducers(activeSession?.agentRuns),
+    [activeSession?.agentRuns],
+  );
 
   return (
     <>
@@ -156,7 +179,10 @@ export function ThreadsView({
         <ThreadHeader
           activeSession={activeSession}
           artifactCount={artifactCount}
-          onOpenArtifacts={onOpenArtifacts}
+          spaceOpen={spaceOpen}
+          threadListHidden={threadListHidden}
+          onToggleSpace={onToggleSpace}
+          onToggleThreadList={onToggleThreadList}
           onBackToThreads={onBackToThreads}
         />
 
@@ -263,13 +289,19 @@ export function ThreadsView({
         />
       </section>
 
-      <ArtifactsDrawer
-        open={artifactsDrawerOpen}
-        onClose={onCloseArtifactsDrawer}
-        sessionId={activeSession?.id ?? ""}
-        artifacts={visibleArtifacts}
-        initialArtifactId={initialArtifactId ?? undefined}
-      />
+      {spaceOpen && activeSession ? (
+        <ThreadSpacePanel
+          sessionId={activeSession.id}
+          items={spaceItems}
+          showProducer={spaceShowProducer}
+          selectedArtifactId={spaceArtifactId}
+          onSelectArtifact={onSelectSpaceArtifact}
+          onClose={onCloseSpace}
+          width={spaceWidth}
+          onResize={onSpaceResize}
+          onResizeActive={onSpaceResizeActive}
+        />
+      ) : null}
     </>
   );
 }

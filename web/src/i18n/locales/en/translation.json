@@ -1050,6 +1050,16 @@
     "size_kb": "{{count}} KB",
     "size_mb": "{{count}} MB"
   },
+  "space": {
+    "panel_label": "Thread output",
+    "title": "Output",
+    "toggle": "Toggle thread output panel",
+    "toggle_threads": "Show thread list",
+    "resize_label": "Resize output panel",
+    "list_label": "Thread output",
+    "empty_title": "Nothing produced yet",
+    "empty_body": "Files and reports this thread produces will appear here automatically."
+  },
   "agent_stream": {
     "empty_working": "Working…",
     "empty_done": "No output.",

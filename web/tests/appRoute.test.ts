@@ -81,4 +81,19 @@ describe("app pathname routes", () => {
     assert.equal(canonicalBrowserUrl("/teams", "?dialog=create&tab=artifacts"), "/teams?dialog=create");
     assert.equal(canonicalBrowserUrl("/backlog", "?q=stale"), "/backlog");
   });
+
+  it("round-trips the thread space panel params on thread paths", () => {
+    // ?space=1&artifact=<id> survive reload and sharing on an open thread.
+    assert.equal(
+      canonicalBrowserUrl("/threads/ses-1", "?space=1&artifact=art-9"),
+      "/threads/ses-1?space=1&artifact=art-9",
+    );
+    assert.equal(canonicalBrowserUrl("/threads/ses-1", "?space=1"), "/threads/ses-1?space=1");
+    // A selection without an open panel is meaningless; so is space=0.
+    assert.equal(canonicalBrowserUrl("/threads/ses-1", "?artifact=art-9"), "/threads/ses-1");
+    assert.equal(canonicalBrowserUrl("/threads/ses-1", "?space=0"), "/threads/ses-1");
+    // Composing a new thread has no output, and the collection has no panel.
+    assert.equal(canonicalBrowserUrl("/threads/new", "?space=1"), "/threads/new");
+    assert.equal(canonicalBrowserUrl("/threads", "?space=1&artifact=art-9"), "/threads");
+  });
 });

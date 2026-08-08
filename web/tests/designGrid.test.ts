@@ -160,4 +160,40 @@ describe("design grid", () => {
     );
     assert.deepEqual(inlineDelay, [], "pass --stagger-index and let CSS own the cadence");
   });
+
+  it("collapses the thread track to zero when the space panel is open", () => {
+    // The split view trades the thread rail for the panel by default; the
+    // fourth track (--space-w) only appears in the data-space rules.
+    const shell = readStyle("shell.css");
+    assert.match(
+      shell,
+      /\.messenger-shell\[data-space="open"\]\s*\{\s*grid-template-columns:\s*var\(--sidenav-w\)\s+0\s+minmax\(0,\s*1fr\)\s+var\(--space-w\)/,
+      "opening the space panel must collapse --thread-w to 0 and add the --space-w track",
+    );
+    assert.match(
+      shell,
+      /\.messenger-shell\[data-space="open"\]\[data-threadlist="open"\]\s*\{\s*grid-template-columns:\s*var\(--sidenav-w\)\s+var\(--thread-w\)\s+minmax\(0,\s*1fr\)\s+var\(--space-w\)/,
+      "re-opening the thread list on top of the panel must restore --thread-w",
+    );
+  });
+
+  it("keeps the space track out of the narrow-viewport grid", () => {
+    // At <=820px there is no split view: the shell stays single-column and
+    // the panel becomes a fixed overlay.
+    const responsive = readStyle("responsive.css");
+    const mobileStart = responsive.indexOf("@media (max-width: 820px)");
+    assert.ok(mobileStart >= 0, "responsive.css lost its 820px block");
+    const mobile = responsive.slice(mobileStart);
+    const shellGrids = [...mobile.matchAll(/\.messenger-shell(?:\[[^\]]*\])*\s*\{[^}]*?grid-template-columns:\s*([^;]+);/g)]
+      .map((m) => m[1].trim());
+    assert.ok(shellGrids.length > 0, "the mobile block must keep pinning the shell grid");
+    for (const grid of shellGrids) {
+      assert.equal(grid, "minmax(0, 1fr)", "no fourth track under the narrow-viewport media query");
+    }
+    assert.match(
+      mobile,
+      /\.thread-space-panel\s*\{[^}]*position:\s*fixed/,
+      "the space panel must leave the grid and overlay at <=820px",
+    );
+  });
 });
