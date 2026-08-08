@@ -272,6 +272,8 @@ export type DaemonNodeEvent =
       error: string;
       agentLog?: string;
       exitCode?: number;
+      /** Files written by an otherwise successful agent process before output delivery failed. */
+      generatedFiles?: DaemonGeneratedFile[];
     }
   | {
       type: "run.cancelled";

@@ -2449,6 +2449,14 @@ class DaemonNodeRegistry:
                         "assignmentId": assignment.get("assignmentId"),
                     },
                 )
+            # Preserve deliverables when the agent process succeeded but the
+            # daemon could not deliver every live output event. Failed events
+            # without an explicit report retain the historical no-artifact
+            # behavior, including legacy daemons and genuine agent failures.
+            if isinstance(event.get("generatedFiles"), list):
+                self._record_generated_workspace_artifacts(
+                    sandbox, run_request, event, artifact_snapshot, assignment
+                )
             if session_before.get("status") != "failed":
                 controller.fail_session(run_request["sessionId"], event["error"])
             self.daemon_store.update_run_request_if_claimed(

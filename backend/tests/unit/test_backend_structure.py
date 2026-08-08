@@ -123,9 +123,18 @@ def test_daemon_node_event_parser_keeps_error_messages_and_raw_logs() -> None:
             "mode": "action",
             "error": "stream post failed",
             "agentLog": raw_log,
+            "generatedFiles": [
+                {
+                    "relativePath": "agent-loop-guide.md",
+                    "title": "agent-loop-guide.md",
+                    "bytes": 13,
+                    "contentType": "text/markdown",
+                }
+            ],
         }
     )
     assert parsed_failed["agentLog"] == raw_log
+    assert parsed_failed["generatedFiles"][0]["relativePath"] == "agent-loop-guide.md"
 
     parsed_with_usage = daemon_node_event(
         {

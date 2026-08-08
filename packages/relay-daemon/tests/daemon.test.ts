@@ -792,16 +792,21 @@ test("relay daemon retries terminal event posts across backend failures", async 
   assert.equal(terminalAttempts, 2);
 });
 
-test("relay daemon preserves final agent log when output event post fails", async () => {
+test("relay daemon preserves final agent log and generated files when output event post fails", async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "relay-output-post-failed-"));
   const stop = new AbortController();
-  const command = runCommand("cmd_output_post_failed");
+  const command = {
+    ...runCommand("cmd_output_post_failed"),
+    workspacePath: root,
+  };
   const events: DaemonNodeEvent[] = [];
   let commandServed = false;
+  t.after(() => rmSync(root, { recursive: true, force: true }));
   const daemon = runRelayDaemon({
     backendUrl: "http://relay.test",
     sandboxId: "sbx_test",
     employeeId: "alice",
-    workspacePath: process.cwd(),
+    workspacePath: root,
     token: "node_token",
     pollIntervalMs: 5,
     shutdownGraceMs: 50,
@@ -809,7 +814,10 @@ test("relay daemon preserves final agent log when output event post fails", asyn
     signal: stop.signal,
     environment: fakeEnvironment({
       exec: async (_cmd, args, options) => {
-        if (!isInventoryProbe(args)) options?.stdoutRenderer?.("  done\n\n");
+        if (!isInventoryProbe(args)) {
+          writeFileSync(join(options?.cwd ?? root, "agent-loop-guide.md"), "# Agent Loop\n");
+          options?.stdoutRenderer?.("  done\n\n");
+        }
         return { exit_code: 0, stdout: "  done\n\n", stderr: "" };
       },
     }),
@@ -845,6 +853,7 @@ test("relay daemon preserves final agent log when output event post fails", asyn
   if (!failed || failed.type !== "run.failed") throw new Error("missing run.failed event");
   assert.equal(failed.agentLog, "[Codex Action Exit 0]\nstdout:\n  done\n\n");
   assert.match(failed.error, /Daemon lost agent output/);
+  assert.deepEqual(failed.generatedFiles?.map((file) => file.relativePath), ["agent-loop-guide.md"]);
 });
 
 test("relay daemon opens a circuit when the output post backlog is unbounded", async () => {

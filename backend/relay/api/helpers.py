@@ -583,6 +583,10 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
             **({"generatedFiles": generated_files} if isinstance(generated_files, list) else {}),
         }
     if event_type == "run.failed":
+        # An agent process may finish successfully and write deliverables even
+        # when delivery of its live output fails. The registry sanitizes these
+        # reports before indexing them, exactly as for run.completed.
+        generated_files = value.get("generatedFiles")
         return {
             "type": event_type,
             "commandId": command_id,
@@ -594,6 +598,7 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
             "error": string_field(value, "error") or "Daemon node command failed.",
             **({"agentLog": raw_string_field(value, "agentLog")} if isinstance(value.get("agentLog"), str) else {}),
             **({"exitCode": int(value["exitCode"])} if isinstance(value.get("exitCode"), (int, float)) else {}),
+            **({"generatedFiles": generated_files} if isinstance(generated_files, list) else {}),
         }
     if event_type == "run.cancelled":
         return {

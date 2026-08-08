@@ -910,6 +910,12 @@ async function executeCommand(
     });
     return;
   }
+  // Output delivery can fail after the agent process has successfully written
+  // its deliverables. Preserve those files on the terminal failure event so
+  // the backend can still index them for the thread Space.
+  const generatedFiles = next.last_exit_code === 0
+    ? diffGeneratedFiles(threadWorkspace.hostPath, workspaceSnapshot, scanOptions)
+    : [];
   if (outputPostFailure) {
     await postJsonWithRetry(fetchFn, eventUrl, {
       type: "run.failed",
@@ -922,12 +928,10 @@ async function executeCommand(
       error: `Daemon lost agent output: ${outputPostFailure.message}`,
       agentLog,
       exitCode: next.last_exit_code || 1,
+      ...(generatedFiles.length > 0 ? { generatedFiles } : {}),
     } satisfies DaemonNodeEvent, token, signal);
     return;
   }
-  const generatedFiles = next.last_exit_code === 0
-    ? diffGeneratedFiles(threadWorkspace.hostPath, workspaceSnapshot, scanOptions)
-    : [];
   // Read the verdict even on a failed run: a round that stopped because it is
   // blocked has something to say, and leaving the file behind would let the
   // next round inherit it.

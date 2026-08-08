@@ -2135,6 +2135,79 @@ def test_daemon_failed_event_preserves_agent_log_without_artifact() -> None:
     asyncio.run(run_flow())
 
 
+def test_daemon_failed_event_indexes_reported_generated_files() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register(
+                {
+                    "sandboxId": "sbx_alice",
+                    "employeeId": "alice",
+                    "token": "node_token",
+                    "workspacePath": "/remote/workspace",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "capabilities": ["generated-files", "thread-workspaces"],
+                    "status": "ready",
+                },
+                "ui_token",
+            )
+
+            session = await backend.run(
+                "sbx_alice",
+                {
+                    "taskGoal": "write the guide",
+                    "assignments": [{"agent": "codex", "mode": "action"}],
+                },
+            )
+            [command] = registry.take_commands("sbx_alice", "node_token")
+            registry.handle_event(
+                "sbx_alice",
+                {
+                    "type": "run.failed",
+                    "commandId": command["id"],
+                    "sessionId": command["sessionId"],
+                    "runId": command["runId"],
+                    "agent": "codex",
+                    "mode": "action",
+                    "error": "Daemon lost agent output: stream post failed",
+                    # The agent process itself succeeded and wrote this file;
+                    # the terminal event reports failure because live-output
+                    # delivery was incomplete.
+                    "exitCode": 1,
+                    "generatedFiles": [
+                        {
+                            "relativePath": "agent-loop-guide.md",
+                            "title": "agent-loop-guide.md",
+                            "bytes": 13,
+                            "contentType": "text/markdown",
+                            "contentBase64": base64.b64encode(b"# Agent Loop\n").decode(
+                                "ascii"
+                            ),
+                        }
+                    ],
+                },
+                "node_token",
+            )
+
+            updated = session_store.get_session(session["id"])
+            assert updated["status"] == "failed"
+            assert [item["workspaceRelativePath"] for item in updated["artifacts"]] == [
+                "agent-loop-guide.md"
+            ]
+            artifact = updated["artifacts"][0]
+            assert updated["agentRuns"][0]["artifactIds"] == [artifact["id"]]
+            assert (
+                session_store.read_artifact_content(session["id"], artifact["id"])
+                == b"# Agent Loop\n"
+            )
+
+    asyncio.run(run_flow())
+
+
 def test_daemon_follow_up_run_gets_prior_conversation_state() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
