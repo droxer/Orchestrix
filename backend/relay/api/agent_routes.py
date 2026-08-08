@@ -289,7 +289,7 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             )
     team_id = session.get("teamId") if session else None
     team_member_ids: set[str] = set()
-    if team_id:
+    if team_id and not raw_assignments:
         team_employee_id = (
             (session.get("ownerEmployeeId") or actor["employeeId"])
             if actor["isAdmin"]
@@ -307,10 +307,19 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
                 409, {"code": error.code, "message": str(error)}
             ) from error
         team_member_ids = {agent["id"] for agent in members}
-        if not raw_assignments:
-            raw_assignments = team_member_assignments(
-                members, mode=agent_task_mode(body.get("mode"))
-            )
+        raw_assignments = team_member_assignments(
+            members, mode=agent_task_mode(body.get("mode"))
+        )
+    elif team_id and raw_assignments:
+        # An explicit assignment list must pass through untouched: the team's
+        # enabled/ownership gate (team_agents) only governs the expansion
+        # path. Derive membership leniently, without raising, so a
+        # retry/rerun/handoff naming one agent in a team thread still works
+        # even if the team is disabled, owned by someone else, or its lead
+        # was removed. A later task uses team_member_ids to reject an
+        # assignment naming a non-member.
+        team = ctx.team_store.get_team(team_id)
+        team_member_ids = set((team or {}).get("memberAgentIds") or [])
     if not raw_assignments:
         raise HTTPException(400, "At least one assignment is required.")
     requested_node_id = string_field(body, "daemonNodeId") or string_field(

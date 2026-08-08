@@ -1601,6 +1601,84 @@ def test_message_to_a_team_thread_reports_a_disabled_team(monkeypatch) -> None:
         assert answered.json()["detail"]["code"] == "team_disabled"
 
 
+def test_explicit_assignment_to_a_team_thread_bypasses_the_disabled_team_gate(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        _employee(client, "alice")
+        app.state.registry.register(
+            {
+                "sandboxId": "node_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex", "claude"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        lead = _agent(client, "alice", "Lead", "codex")
+        assert (
+            client.post(
+                f"/api/v1/admin/agents/{lead['id']}/placements",
+                json={"daemonNodeId": "node_alice"},
+            ).status_code
+            == 201
+        )
+        team = client.post(
+            "/api/v1/admin/teams",
+            json={
+                "ownerEmployeeId": "alice",
+                "name": "Delivery",
+                "leadAgentId": lead["id"],
+                "memberAgentIds": [lead["id"]],
+            },
+        ).json()["team"]
+        task = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Ship with the team",
+                "ownerEmployeeId": "alice",
+                "assigneeEmployeeId": "alice",
+                "assignedTeamId": team["id"],
+            },
+        ).json()
+        started = client.post(f"/api/v1/tasks/{task['id']}/runs", json={})
+        session_id = started.json()["session"]["id"]
+        command = app.state.registry.take_commands("node_alice", "node_token")[0]
+        app.state.registry.handle_event(
+            "node_alice",
+            {
+                "type": "run.completed",
+                "commandId": command["id"],
+                "sessionId": session_id,
+                "runId": command["runId"],
+                "agent": "codex",
+                "mode": "action",
+                "exitCode": 0,
+                "agentLog": "done",
+            },
+            "node_token",
+        )
+        client.patch(f"/api/v1/admin/teams/{team['id']}", json={"enabled": False})
+
+        answered = client.post(
+            "/api/v1/agent-runs",
+            json={
+                "taskGoal": "another pass",
+                "sessionId": session_id,
+                "assignments": [{"agentId": lead["id"]}],
+            },
+        )
+
+        assert answered.status_code == 202
+
+
 def test_agent_runs_still_requires_an_assignment_for_a_solo_thread(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
