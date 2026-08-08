@@ -1,0 +1,97 @@
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
+
+from relay.services.team_dispatch import (
+    TeamDispatchError,
+    team_agents,
+    team_member_assignments,
+)
+
+
+class FakeTeamStore:
+    def __init__(self, team: dict[str, Any] | None) -> None:
+        self._team = team
+
+    def get_team(self, team_id: str) -> dict[str, Any] | None:
+        if self._team and self._team["id"] == team_id:
+            return self._team
+        return None
+
+
+class FakeAgentStore:
+    def __init__(self, agents: list[dict[str, Any]]) -> None:
+        self._agents = {agent["id"]: agent for agent in agents}
+
+    def get_agent(self, agent_id: str) -> dict[str, Any] | None:
+        return self._agents.get(agent_id)
+
+
+def _agent(agent_id: str, executor: str, **overrides: Any) -> dict[str, Any]:
+    return {
+        "id": agent_id,
+        "executorKind": executor,
+        "displayName": agent_id.title(),
+        "enabled": True,
+        "version": 1,
+        **overrides,
+    }
+
+
+def _team(**overrides: Any) -> dict[str, Any]:
+    return {
+        "id": "team_1",
+        "ownerEmployeeId": "alice",
+        "leadAgentId": "lead",
+        "memberAgentIds": ["support", "lead"],
+        "enabled": True,
+        **overrides,
+    }
+
+
+def test_team_agents_returns_the_lead_first() -> None:
+    team, agents = team_agents(
+        "team_1",
+        "alice",
+        team_store=FakeTeamStore(_team()),
+        agent_store=FakeAgentStore([_agent("lead", "codex"), _agent("support", "claude")]),
+    )
+
+    assert team["id"] == "team_1"
+    assert [agent["id"] for agent in agents] == ["lead", "support"]
+
+
+@pytest.mark.parametrize(
+    ("team", "agents", "code"),
+    [
+        (None, [], "team_not_found"),
+        (_team(deletedAt="2026-01-01T00:00:00Z"), [], "team_not_found"),
+        (_team(enabled=False), [], "team_disabled"),
+        (_team(ownerEmployeeId="bob"), [], "team_forbidden"),
+        (_team(leadAgentId="stranger"), [], "team_invalid"),
+    ],
+)
+def test_team_agents_refuses_an_unusable_team(
+    team: dict[str, Any] | None, agents: list[dict[str, Any]], code: str
+) -> None:
+    with pytest.raises(TeamDispatchError) as error:
+        team_agents(
+            "team_1",
+            "alice",
+            team_store=FakeTeamStore(team),
+            agent_store=FakeAgentStore(agents or [_agent("lead", "codex"), _agent("support", "claude")]),
+        )
+
+    assert error.value.code == code
+    assert error.value.permanent is True
+
+
+def test_team_member_assignments_sends_a_reviewer_to_review() -> None:
+    agents = [_agent("lead", "codex"), _agent("support", "claude", defaultRole="reviewer")]
+
+    assert team_member_assignments(agents, mode="action") == [
+        {"agentId": "lead", "agent": "codex", "mode": "action"},
+        {"agentId": "support", "agent": "claude", "mode": "review", "role": "reviewer"},
+    ]

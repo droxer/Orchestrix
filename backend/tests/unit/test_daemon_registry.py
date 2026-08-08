@@ -3170,7 +3170,9 @@ def test_daemon_run_timeout_marks_session_failed(monkeypatch) -> None:
 def _pipeline_registry(root: str) -> tuple[Any, Any, Any]:
     session_store = LocalSessionStore(root)
     daemon_store = LocalDaemonStore(root)
-    registry = DaemonNodeRegistry(session_store, daemon_store)
+    registry = DaemonNodeRegistry(
+        session_store, daemon_store, task_store=LocalTaskStore(root)
+    )
     registry.register(
         {
             "sandboxId": "sbx_alice",
@@ -3209,6 +3211,7 @@ def test_lead_repairs_a_failed_teammate_and_the_pipeline_resumes() -> None:
         with TemporaryDirectory() as root:
             session_store, _daemon_store, registry = _pipeline_registry(root)
             backend = ServerDaemonNodeBackend(registry)
+            task = registry.task_store.create_task({"title": "Ship it"})
             session = await backend.run(
                 "sbx_alice",
                 {
@@ -3217,6 +3220,7 @@ def test_lead_repairs_a_failed_teammate_and_the_pipeline_resumes() -> None:
                         {"agent": "codex", "mode": "action"},
                         {"agent": "claude", "mode": "action"},
                     ],
+                    "taskId": task["id"],
                 },
             )
 
@@ -3254,6 +3258,7 @@ def test_repair_budget_is_spent_once_and_then_the_run_fails() -> None:
         with TemporaryDirectory() as root:
             session_store, _daemon_store, registry = _pipeline_registry(root)
             backend = ServerDaemonNodeBackend(registry)
+            task = registry.task_store.create_task({"title": "Ship it"})
             session = await backend.run(
                 "sbx_alice",
                 {
@@ -3262,6 +3267,7 @@ def test_repair_budget_is_spent_once_and_then_the_run_fails() -> None:
                         {"agent": "codex", "mode": "action"},
                         {"agent": "claude", "mode": "action"},
                     ],
+                    "taskId": task["id"],
                 },
             )
             [lead] = registry.take_commands("sbx_alice", "node_token")
@@ -3289,6 +3295,7 @@ def test_a_failing_lead_is_not_sent_back_to_repair_itself() -> None:
         with TemporaryDirectory() as root:
             session_store, _daemon_store, registry = _pipeline_registry(root)
             backend = ServerDaemonNodeBackend(registry)
+            task = registry.task_store.create_task({"title": "Ship it"})
             session = await backend.run(
                 "sbx_alice",
                 {
@@ -3297,12 +3304,41 @@ def test_a_failing_lead_is_not_sent_back_to_repair_itself() -> None:
                         {"agent": "codex", "mode": "action"},
                         {"agent": "claude", "mode": "action"},
                     ],
+                    "taskId": task["id"],
                 },
             )
             [lead] = registry.take_commands("sbx_alice", "node_token")
 
             _finish_run(registry, lead, 1)
 
+            assert registry.take_commands("sbx_alice", "node_token") == []
+            assert session_store.get_session(session["id"])["status"] == "failed"
+
+    asyncio.run(run_flow())
+
+
+def test_a_task_less_room_does_not_send_the_lead_back_to_repair() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store, _daemon_store, registry = _pipeline_registry(root)
+            backend = ServerDaemonNodeBackend(registry)
+            session = await backend.run(
+                "sbx_alice",
+                {
+                    "taskGoal": "what do you two think?",
+                    "assignments": [
+                        {"agent": "codex", "mode": "action"},
+                        {"agent": "claude", "mode": "action"},
+                    ],
+                },
+            )
+            [lead] = registry.take_commands("sbx_alice", "node_token")
+            _finish_run(registry, lead, 0)
+            [member] = registry.take_commands("sbx_alice", "node_token")
+
+            _finish_run(registry, member, 3)
+
+            # No task, so there is nothing for a lead to "fix on this task".
             assert registry.take_commands("sbx_alice", "node_token") == []
             assert session_store.get_session(session["id"])["status"] == "failed"
 

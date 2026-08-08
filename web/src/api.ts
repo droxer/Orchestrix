@@ -849,7 +849,8 @@ export function runLogicalAgents(input: AgentRunInput): Promise<RelaySession> {
     body: {
       taskGoal: input.taskGoal,
       ...(input.daemonNodeId ? { daemonNodeId: input.daemonNodeId } : {}),
-      assignments: input.assignments,
+      ...(input.assignments ? { assignments: input.assignments } : {}),
+      ...(input.mode ? { mode: input.mode } : {}),
       sessionId: input.sessionId,
       ...(input.userMessageId ? { userMessageId: input.userMessageId } : {}),
       ...(input.decision ? { decision: input.decision } : {}),

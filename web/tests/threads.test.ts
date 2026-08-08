@@ -19,6 +19,7 @@ import {
   threadRuntimeNodeId,
 } from "../src/lib/threadRuntime.js";
 import { isAwaitingFeedbackDecision, rerunAssignmentForSession } from "../src/lib/workflow.js";
+import { teamMembersForMention, teamRunInput } from "../src/lib/messageRouting.js";
 import type { RelaySession } from "../src/types.js";
 
 type AgentRuns = RelaySession["agentRuns"];
@@ -352,5 +353,81 @@ describe("new-thread computer selection", () => {
       threadComputerSignature(first),
       threadComputerSignature([ready("node_a"), ready("node_b")]),
     );
+  });
+});
+
+describe("team thread run input", () => {
+  const teamMembers = [
+    { id: "agent_lead", displayName: "Lead" },
+    { id: "agent_support", displayName: "Support" },
+  ];
+
+  it("addresses the room when no member is mentioned", () => {
+    const input = teamRunInput({
+      taskGoal: "one more pass",
+      sessionId: "ses_1",
+      teamMembers,
+      mode: "action",
+      userMessageId: "evt_1",
+    });
+
+    assert.equal(input.assignments, undefined);
+    assert.equal(input.mode, "action");
+    assert.equal(input.sessionId, "ses_1");
+    assert.equal(input.userMessageId, "evt_1");
+  });
+
+  it("narrows to the mentioned member", () => {
+    const input = teamRunInput({
+      taskGoal: "@Support take this",
+      sessionId: "ses_1",
+      teamMembers,
+      mode: "action",
+      userMessageId: "evt_1",
+    });
+
+    assert.deepEqual(input.assignments, [{ agentId: "agent_support", mode: "action" }]);
+    assert.equal(input.mode, undefined);
+  });
+});
+
+describe("team mention candidates", () => {
+  const employeeAgents = [
+    { id: "agent_lead", displayName: "Lead" },
+    { id: "agent_support", displayName: "Support" },
+    { id: "agent_scout", displayName: "Scout" },
+  ];
+
+  it("only includes agents on the team roster, not every agent the employee owns", () => {
+    const members = teamMembersForMention(["agent_lead", "agent_support"], employeeAgents);
+
+    assert.deepEqual(members, [
+      { id: "agent_lead", displayName: "Lead" },
+      { id: "agent_support", displayName: "Support" },
+    ]);
+  });
+
+  it("returns an empty list when the roster is missing (team not loaded/found)", () => {
+    assert.deepEqual(teamMembersForMention(undefined, employeeAgents), []);
+    assert.deepEqual(teamMembersForMention([], employeeAgents), []);
+  });
+
+  it("a mention naming an owned agent that is NOT on the team roster falls back to the room", () => {
+    // Lead and Support are on the team; Scout is an agent the employee owns
+    // but is not a member of this team.
+    const members = teamMembersForMention(["agent_lead", "agent_support"], employeeAgents);
+
+    const input = teamRunInput({
+      taskGoal: "@Scout can you look at this?",
+      sessionId: "ses_1",
+      teamMembers: members,
+      mode: "action",
+      userMessageId: "evt_1",
+    });
+
+    // Unknown to the room, so the message runs the whole room instead of
+    // narrowing to (and being rejected for) an outsider.
+    assert.equal(input.assignments, undefined);
+    assert.equal(input.mode, "action");
   });
 });

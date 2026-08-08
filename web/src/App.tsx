@@ -17,7 +17,7 @@ import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeThreadRuntimeNodes, mergeVisibleDaemonNodes } from "./lib/daemonNodes";
 import { formatDispatchError } from "./lib/agentReadiness";
 import { isEmployeeAgentRoutable, preferredRoutableAgent } from "./lib/agentDisplayNames";
-import { routeComposerMessage } from "./lib/messageRouting";
+import { routeComposerMessage, teamMembersForMention, teamRunInput } from "./lib/messageRouting";
 import { applyTheme, readLanguage, readSidenavExpanded, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeSidenavExpanded, writeTheme } from "./lib/appStorage";
 import { canUseLocalControlPanel } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
@@ -30,6 +30,7 @@ import { matchesThreadQuery, myThreadSessions, pickActiveThreadSession } from ".
 import { shouldTailSessionEvents } from "./lib/sessionEventStream";
 import { useEmployeeProvisioning } from "./hooks/useEmployeeProvisioning";
 import { useEmployeeAgents } from "./hooks/useEmployeeAgents";
+import { useTeams } from "./hooks/useTeams";
 import { isAwaitingFeedbackDecision, rerunAssignmentForSession } from "./lib/workflow";
 import { useDialogs } from "./components/ui/DialogProvider";
 import { AppShell, RouteFallback } from "./components/AppShell";
@@ -142,6 +143,7 @@ export function App() {
   const { user, authChecked, setUser } = useAuthSession();
   const mounted = useClientMounted();
   const { agents: logicalAgents } = useEmployeeAgents(user?.employeeId);
+  const { teams } = useTeams(user?.employeeId);
   const localNodeAdoptionStartedRef = useRef(false);
   const [preferencesUserId, setPreferencesUserId] = useState<string | null>(null);
   const authenticatedUserIdRef = useRef<string | null>(null);
@@ -742,13 +744,29 @@ export function App() {
     composerRef.current?.clear();
     atBottomRef.current = true;
     try {
-      const done = await runLogicalAgentsMutation.mutateAsync({
-        taskGoal: goal,
-        ...(selectedThreadNodeId ? { daemonNodeId: selectedThreadNodeId } : {}),
-        assignments: [{ agentId: routedLogicalAgent.id, mode: composerMode }],
-        sessionId,
-        ...(sessionId ? { userMessageId } : {}),
-      });
+      const teamMembers = sessionId && activeSession?.teamId
+        ? teamMembersForMention(
+            teams.find((team) => team.id === activeSession.teamId)?.memberAgentIds,
+            logicalAgents.map((agent) => ({ id: agent.id, displayName: agent.displayName })),
+          )
+        : [];
+      const done = await runLogicalAgentsMutation.mutateAsync(
+        sessionId && activeSession?.teamId
+          ? teamRunInput({
+              taskGoal: goal,
+              sessionId,
+              teamMembers,
+              mode: composerMode,
+              userMessageId,
+            })
+          : {
+              taskGoal: goal,
+              ...(selectedThreadNodeId ? { daemonNodeId: selectedThreadNodeId } : {}),
+              assignments: [{ agentId: routedLogicalAgent.id, mode: composerMode }],
+              sessionId,
+              ...(sessionId ? { userMessageId } : {}),
+            },
+      );
       setActiveSessionId(done.id);
       setSelectedSessionId(done.id);
       setComposingNew(false);

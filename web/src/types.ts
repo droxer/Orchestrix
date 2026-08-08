@@ -516,11 +516,14 @@ export interface AgentRunInput {
   taskGoal: string;
   /** Computer selected as the immutable runtime for a new thread. */
   daemonNodeId?: string;
-  assignments: Array<{
+  /** Absent means "this thread's participants" — the whole team for a team thread. */
+  assignments?: Array<{
     agentId: string;
     mode: AgentTaskMode;
     role?: AgentRole;
   }>;
+  /** Mode applied to every member when addressing the room. */
+  mode?: AgentTaskMode;
   sessionId?: string;
   userMessageId?: string;
   decision?: {

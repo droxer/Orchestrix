@@ -85,7 +85,7 @@ def resolve_team_task_assignments(
         agent_store=agent_store,
     )
     return resolve_agent_assignments(
-        [_team_member_assignment(agent, mode=mode) for agent in agents],
+        team_member_assignments(agents, mode=mode),
         employee_id=task_execution_employee_id(task),
         is_admin=False,
         agent_store=agent_store,
@@ -94,15 +94,19 @@ def resolve_team_task_assignments(
     )
 
 
-def _task_team_agents(
-    task: dict[str, Any],
+def team_agents(
+    team_id: str,
+    employee_id: str,
     *,
     team_store: Any,
     agent_store: Any,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    team_id = task.get("assignedTeamId")
+    """Resolve a team to its ordered, dispatchable members. Lead first.
+
+    The single validation point for "can this team run work right now",
+    shared by task dispatch and by thread continuation.
+    """
     team = team_store.get_team(team_id) if team_store and team_id else None
-    employee_id = task_execution_employee_id(task)
     if not team or team.get("deletedAt"):
         raise TeamDispatchError("team_not_found", permanent=True)
     if not team.get("enabled", True):
@@ -120,6 +124,26 @@ def _task_team_agents(
     if any(not agent.get("enabled", True) for agent in agents):
         raise TeamDispatchError("team_disabled", permanent=True)
     return team, agents
+
+
+def team_member_assignments(
+    agents: list[dict[str, Any]], *, mode: str = "action"
+) -> list[dict[str, Any]]:
+    return [_team_member_assignment(agent, mode=mode) for agent in agents]
+
+
+def _task_team_agents(
+    task: dict[str, Any],
+    *,
+    team_store: Any,
+    agent_store: Any,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    return team_agents(
+        task.get("assignedTeamId") or "",
+        task_execution_employee_id(task),
+        team_store=team_store,
+        agent_store=agent_store,
+    )
 
 
 def _team_member_assignment(
