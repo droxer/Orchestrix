@@ -1,4 +1,4 @@
-import type { AgentName } from "../types.js";
+import type { AgentName, AgentRunInput, AgentTaskMode } from "../types.js";
 
 export type RoutedComposerMessage = {
   agentId: string;
@@ -48,4 +48,23 @@ export function resolveLeadingMention(
       && member.displayName.length === best.displayName.length,
   );
   return ambiguous ? null : { agentId: best.id };
+}
+
+/** Build the run for a message typed into a team thread: the room, or one member. */
+export function teamRunInput({ taskGoal, sessionId, teamMembers, mode, userMessageId }: {
+  taskGoal: string;
+  sessionId: string;
+  teamMembers: Array<{ id: string; displayName: string }>;
+  mode: AgentTaskMode;
+  userMessageId: string;
+}): AgentRunInput {
+  const mentioned = resolveLeadingMention(taskGoal, teamMembers);
+  return {
+    taskGoal,
+    sessionId,
+    userMessageId,
+    ...(mentioned
+      ? { assignments: [{ agentId: mentioned.agentId, mode }] }
+      : { mode }),
+  };
 }

@@ -19,6 +19,7 @@ import {
   threadRuntimeNodeId,
 } from "../src/lib/threadRuntime.js";
 import { isAwaitingFeedbackDecision, rerunAssignmentForSession } from "../src/lib/workflow.js";
+import { teamRunInput } from "../src/lib/messageRouting.js";
 import type { RelaySession } from "../src/types.js";
 
 type AgentRuns = RelaySession["agentRuns"];
@@ -352,5 +353,40 @@ describe("new-thread computer selection", () => {
       threadComputerSignature(first),
       threadComputerSignature([ready("node_a"), ready("node_b")]),
     );
+  });
+});
+
+describe("team thread run input", () => {
+  const teamMembers = [
+    { id: "agent_lead", displayName: "Lead" },
+    { id: "agent_support", displayName: "Support" },
+  ];
+
+  it("addresses the room when no member is mentioned", () => {
+    const input = teamRunInput({
+      taskGoal: "one more pass",
+      sessionId: "ses_1",
+      teamMembers,
+      mode: "action",
+      userMessageId: "evt_1",
+    });
+
+    assert.equal(input.assignments, undefined);
+    assert.equal(input.mode, "action");
+    assert.equal(input.sessionId, "ses_1");
+    assert.equal(input.userMessageId, "evt_1");
+  });
+
+  it("narrows to the mentioned member", () => {
+    const input = teamRunInput({
+      taskGoal: "@Support take this",
+      sessionId: "ses_1",
+      teamMembers,
+      mode: "action",
+      userMessageId: "evt_1",
+    });
+
+    assert.deepEqual(input.assignments, [{ agentId: "agent_support", mode: "action" }]);
+    assert.equal(input.mode, undefined);
   });
 });

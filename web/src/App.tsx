@@ -17,7 +17,7 @@ import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeThreadRuntimeNodes, mergeVisibleDaemonNodes } from "./lib/daemonNodes";
 import { formatDispatchError } from "./lib/agentReadiness";
 import { isEmployeeAgentRoutable, preferredRoutableAgent } from "./lib/agentDisplayNames";
-import { routeComposerMessage } from "./lib/messageRouting";
+import { routeComposerMessage, teamRunInput } from "./lib/messageRouting";
 import { applyTheme, readLanguage, readSidenavExpanded, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeSidenavExpanded, writeTheme } from "./lib/appStorage";
 import { canUseLocalControlPanel } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
@@ -742,13 +742,28 @@ export function App() {
     composerRef.current?.clear();
     atBottomRef.current = true;
     try {
-      const done = await runLogicalAgentsMutation.mutateAsync({
-        taskGoal: goal,
-        ...(selectedThreadNodeId ? { daemonNodeId: selectedThreadNodeId } : {}),
-        assignments: [{ agentId: routedLogicalAgent.id, mode: composerMode }],
-        sessionId,
-        ...(sessionId ? { userMessageId } : {}),
-      });
+      const teamMembers = sessionId && activeSession?.teamId
+        ? selectableLogicalAgents
+            .filter((agent) => isEmployeeAgentRoutable(agent))
+            .map((agent) => ({ id: agent.id, displayName: agent.displayName }))
+        : [];
+      const done = await runLogicalAgentsMutation.mutateAsync(
+        sessionId && activeSession?.teamId
+          ? teamRunInput({
+              taskGoal: goal,
+              sessionId,
+              teamMembers,
+              mode: composerMode,
+              userMessageId,
+            })
+          : {
+              taskGoal: goal,
+              ...(selectedThreadNodeId ? { daemonNodeId: selectedThreadNodeId } : {}),
+              assignments: [{ agentId: routedLogicalAgent.id, mode: composerMode }],
+              sessionId,
+              ...(sessionId ? { userMessageId } : {}),
+            },
+      );
       setActiveSessionId(done.id);
       setSelectedSessionId(done.id);
       setComposingNew(false);
