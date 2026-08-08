@@ -1,11 +1,15 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import type { RelayArtifact } from "relay-core";
 import {
+  clampSpaceWidth,
   isThreadSpaceEmpty,
+  maxSpaceWidth,
   resolveSelectedSpaceItem,
+  SPACE_WIDTH_DEFAULT,
+  SPACE_WIDTH_MAX,
+  SPACE_WIDTH_MIN,
   type SpaceItem,
 } from "../../lib/threadSpace";
 import { ArtifactBody } from "../artifact/ArtifactBody";
@@ -14,9 +18,23 @@ import { ThreadSpaceList } from "./ThreadSpaceList";
 import { NavBack } from "../icons";
 import { Button } from "@/components/ui/button";
 import { OverlayCloseButton } from "@/components/ui/OverlayCloseButton";
+import { useModalDrawer } from "@/hooks/useModalDrawer";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
-function resolveSessionId(artifact: RelayArtifact, fallback: string): string {
-  return (artifact as unknown as { sessionId?: string }).sessionId ?? fallback;
+/** Matches the breakpoint in responsive.css where the panel leaves the shell
+ *  grid and covers the viewport. Below it the panel is a modal overlay and
+ *  owes the full dialog contract (Escape, focus trap, scroll lock). */
+const OVERLAY_QUERY = "(max-width: 820px)";
+
+const KEYBOARD_RESIZE_STEP = 16;
+
+/** The chat column, measured to work out how much width the panel may still
+ *  take. Read straight from the DOM rather than threaded down as a prop: the
+ *  grid — not React — owns the column's real width. */
+function transcriptWidth(): number | null {
+  if (typeof document === "undefined") return null;
+  const chat = document.getElementById("chat-panel");
+  return chat ? chat.getBoundingClientRect().width : null;
 }
 
 export function ThreadSpacePanel({
@@ -42,38 +60,91 @@ export function ThreadSpacePanel({
 }) {
   const { t } = useTranslation();
   const selected = resolveSelectedSpaceItem(items, selectedArtifactId);
-  const effectiveSessionId = selected ? resolveSessionId(selected.artifact, sessionId) : sessionId;
+  const isOverlay = useMediaQuery(OVERLAY_QUERY);
+  const panelRef = useModalDrawer<HTMLElement>(onClose, isOverlay);
+
+  // A drag registers listeners outside React; this releases them if the panel
+  // unmounts (or the thread changes) mid-gesture, which would otherwise leak
+  // the listeners and strand the shell in its resizing state.
+  const releaseDragRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => releaseDragRef.current?.(), []);
 
   const startResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     const handle = event.currentTarget;
     const startX = event.clientX;
+    // Ceiling fixed at gesture start: the transcript shrinks as the drag
+    // proceeds, so re-measuring per move would let the panel walk past it.
+    const max = maxSpaceWidth(width, transcriptWidth());
     handle.setPointerCapture(event.pointerId);
     onResizeActive(true);
-    const move = (moveEvent: PointerEvent) => onResize(width + (startX - moveEvent.clientX), false);
-    const up = (upEvent: PointerEvent) => {
+
+    const widthAt = (clientX: number) => clampSpaceWidth(width + (startX - clientX), max);
+    const move = (moveEvent: PointerEvent) => onResize(widthAt(moveEvent.clientX), false);
+    const finish = (finalX: number | null) => {
       handle.removeEventListener("pointermove", move);
       handle.removeEventListener("pointerup", up);
-      onResize(width + (startX - upEvent.clientX), true);
+      handle.removeEventListener("pointercancel", cancel);
+      releaseDragRef.current = null;
+      if (finalX !== null) onResize(widthAt(finalX), true);
       onResizeActive(false);
     };
+    const up = (upEvent: PointerEvent) => finish(upEvent.clientX);
+    // A cancelled gesture (system takeover, touch interruption) never fires
+    // pointerup — without this the shell keeps `data-space-resizing` forever.
+    const cancel = () => finish(null);
+
     handle.addEventListener("pointermove", move);
     handle.addEventListener("pointerup", up);
+    handle.addEventListener("pointercancel", cancel);
+    releaseDragRef.current = () => finish(null);
   }, [onResize, onResizeActive, width]);
 
   const resizeByKeyboard = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    const max = maxSpaceWidth(width, transcriptWidth());
+    if (event.key === "Home") {
+      event.preventDefault();
+      onResize(clampSpaceWidth(SPACE_WIDTH_DEFAULT, max), true);
+      return;
+    }
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
-    onResize(width + (event.key === "ArrowLeft" ? 16 : -16), true);
+    const delta = event.key === "ArrowLeft" ? KEYBOARD_RESIZE_STEP : -KEYBOARD_RESIZE_STEP;
+    onResize(clampSpaceWidth(width + delta, max), true);
   }, [onResize, width]);
 
+  // A window that narrows while the panel is open can push the transcript
+  // under its floor; give the room back rather than leaving the conversation
+  // squeezed. Only ever shrinks — maxSpaceWidth is a ceiling, not a target.
+  useEffect(() => {
+    if (isOverlay) return;
+    const onWindowResize = () => {
+      const max = maxSpaceWidth(width, transcriptWidth());
+      // Not committed: a temporarily narrow window shouldn't overwrite the
+      // width the user actually chose.
+      if (width > max) onResize(max, false);
+    };
+    window.addEventListener("resize", onWindowResize);
+    return () => window.removeEventListener("resize", onWindowResize);
+  }, [isOverlay, onResize, width]);
+
   return (
-    <aside className="thread-space-panel" aria-label={t("space.panel_label")}>
+    <aside
+      ref={panelRef}
+      className="thread-space-panel"
+      aria-label={t("space.panel_label")}
+      role={isOverlay ? "dialog" : undefined}
+      aria-modal={isOverlay || undefined}
+      tabIndex={isOverlay ? -1 : undefined}
+    >
       <div
         className="thread-space-resize"
         role="separator"
         aria-orientation="vertical"
         aria-label={t("space.resize_label")}
+        aria-valuenow={width}
+        aria-valuemin={SPACE_WIDTH_MIN}
+        aria-valuemax={SPACE_WIDTH_MAX}
         tabIndex={0}
         onPointerDown={startResize}
         onKeyDown={resizeByKeyboard}
@@ -97,9 +168,9 @@ export function ThreadSpacePanel({
         </header>
         {selected ? (
           <div className="thread-space-preview">
-            <ArtifactPreviewHeader artifact={selected.artifact} sessionId={effectiveSessionId} />
+            <ArtifactPreviewHeader artifact={selected.artifact} sessionId={sessionId} />
             <div className="artifact-preview-body">
-              <ArtifactBody artifact={selected.artifact} sessionId={effectiveSessionId} />
+              <ArtifactBody artifact={selected.artifact} sessionId={sessionId} />
             </div>
           </div>
         ) : isThreadSpaceEmpty(items) ? (

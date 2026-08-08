@@ -7,11 +7,13 @@ import {
   buildSpaceItems,
   clampSpaceWidth,
   isThreadSpaceEmpty,
+  maxSpaceWidth,
   resolveSelectedSpaceItem,
   SPACE_WIDTH_DEFAULT,
   SPACE_WIDTH_MAX,
   SPACE_WIDTH_MIN,
   threadHasMultipleProducers,
+  TRANSCRIPT_MIN_WIDTH,
 } from "../src/lib/threadSpace.js";
 
 function artifact(input: Partial<RelayArtifact> & Pick<RelayArtifact, "id" | "createdAt">): RelayArtifact {
@@ -179,5 +181,40 @@ describe("clampSpaceWidth", () => {
     assert.equal(clampSpaceWidth(10), SPACE_WIDTH_MIN);
     assert.equal(clampSpaceWidth(10_000), SPACE_WIDTH_MAX);
     assert.equal(clampSpaceWidth(Number.NaN), SPACE_WIDTH_DEFAULT);
+  });
+
+  it("honours a tighter ceiling from the available room", () => {
+    assert.equal(clampSpaceWidth(700, 500), 500);
+    assert.equal(clampSpaceWidth(400, 500), 400);
+    // A ceiling below the minimum still yields a usable panel.
+    assert.equal(clampSpaceWidth(700, 100), SPACE_WIDTH_MIN);
+    // And it can never exceed the absolute maximum.
+    assert.equal(clampSpaceWidth(10_000, 10_000), SPACE_WIDTH_MAX);
+  });
+});
+
+describe("maxSpaceWidth", () => {
+  it("lets the panel take only what the transcript can spare", () => {
+    // 700px transcript, 420px floor → 280px of room on top of the current width.
+    assert.equal(maxSpaceWidth(384, 700), 384 + (700 - TRANSCRIPT_MIN_WIDTH));
+  });
+
+  it("caps at the absolute maximum however wide the transcript is", () => {
+    assert.equal(maxSpaceWidth(384, 4000), SPACE_WIDTH_MAX);
+  });
+
+  it("shrinks the ceiling below the current width once the floor is crossed", () => {
+    // Transcript already under its floor: the ceiling drops below the current
+    // width, which is what makes the window-resize clamp give room back.
+    assert.ok(maxSpaceWidth(600, TRANSCRIPT_MIN_WIDTH - 100) < 600);
+  });
+
+  it("falls back to the absolute maximum with nothing to measure", () => {
+    assert.equal(maxSpaceWidth(384, null), SPACE_WIDTH_MAX);
+    assert.equal(maxSpaceWidth(384, Number.NaN), SPACE_WIDTH_MAX);
+  });
+
+  it("never reports a ceiling below the panel minimum", () => {
+    assert.equal(maxSpaceWidth(SPACE_WIDTH_MIN, 0), SPACE_WIDTH_MIN);
   });
 });

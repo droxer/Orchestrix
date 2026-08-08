@@ -11,9 +11,27 @@ export const SPACE_WIDTH_DEFAULT = 384;
 export const SPACE_WIDTH_MIN = 288;
 export const SPACE_WIDTH_MAX = 720;
 
-export function clampSpaceWidth(width: number): number {
+/** The transcript column never yields below this. The shell grid gives the
+ *  chat column `minmax(0, 1fr)`, so without this floor a wide panel plus a
+ *  re-opened thread rail can squeeze the conversation to a few pixels. */
+export const TRANSCRIPT_MIN_WIDTH = 420;
+
+/** How wide the panel may grow right now: whatever the transcript can give up
+ *  before hitting its floor, capped by the absolute maximum. `transcriptWidth`
+ *  is the chat column's measured width at the same moment `currentWidth` was
+ *  the panel's — measure both once at the start of a gesture so the ceiling
+ *  doesn't drift as the grid re-lays out mid-drag. Null (nothing measurable,
+ *  e.g. off-DOM) falls back to the absolute maximum. */
+export function maxSpaceWidth(currentWidth: number, transcriptWidth: number | null): number {
+  if (transcriptWidth === null || !Number.isFinite(transcriptWidth)) return SPACE_WIDTH_MAX;
+  const room = currentWidth + (transcriptWidth - TRANSCRIPT_MIN_WIDTH);
+  return Math.min(SPACE_WIDTH_MAX, Math.max(SPACE_WIDTH_MIN, Math.round(room)));
+}
+
+export function clampSpaceWidth(width: number, max: number = SPACE_WIDTH_MAX): number {
   if (typeof width !== "number" || Number.isNaN(width)) return SPACE_WIDTH_DEFAULT;
-  return Math.min(SPACE_WIDTH_MAX, Math.max(SPACE_WIDTH_MIN, Math.round(width)));
+  const ceiling = Math.min(SPACE_WIDTH_MAX, Math.max(SPACE_WIDTH_MIN, max));
+  return Math.min(ceiling, Math.max(SPACE_WIDTH_MIN, Math.round(width)));
 }
 
 function fallbackExecutorLabel(agent: string): string {

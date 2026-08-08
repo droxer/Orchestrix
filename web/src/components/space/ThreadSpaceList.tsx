@@ -36,7 +36,9 @@ function formatRowSize(bytes: number | undefined, kind: string, t: TFunction, lo
   return t("artifact.size_bytes", { count: new Intl.NumberFormat(locale).format(bytes) });
 }
 
-const NEW_ITEM_HIGHLIGHT_MS = 1600;
+/** The `is-new` class only has to outlive the one-shot flash keyframe
+ *  (--t-slow, 280ms); holding it longer keeps dead state on the row. */
+const NEW_ITEM_HIGHLIGHT_MS = 600;
 
 export function ThreadSpaceList({
   items,
@@ -58,6 +60,14 @@ export function ThreadSpaceList({
     knownIdsRef.current = new Set(items.map((item) => item.artifact.id));
   }
 
+  // The timer lives outside the effect body: an `items` change that brings no
+  // new ids must not cancel the pending clear (the cleanup would fire, the
+  // early return would skip re-arming, and the highlight would never lift).
+  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+  }, []);
+
   useEffect(() => {
     const known = knownIdsRef.current ?? new Set<string>();
     const fresh = items.filter((item) => !known.has(item.artifact.id)).map((item) => item.artifact.id);
@@ -65,8 +75,11 @@ export function ThreadSpaceList({
     knownIdsRef.current = known;
     if (fresh.length === 0) return;
     setHighlightedIds(new Set(fresh));
-    const timer = setTimeout(() => setHighlightedIds(new Set()), NEW_ITEM_HIGHLIGHT_MS);
-    return () => clearTimeout(timer);
+    if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+    clearTimerRef.current = setTimeout(() => {
+      clearTimerRef.current = null;
+      setHighlightedIds(new Set());
+    }, NEW_ITEM_HIGHLIGHT_MS);
   }, [items]);
 
   return (
@@ -79,24 +92,27 @@ export function ThreadSpaceList({
           .filter(Boolean)
           .join(" · ");
         return (
-          <Button
-            variant="ghost"
-            key={artifact.id}
-            type="button"
-            role="listitem"
-            className={`thread-space-row${artifact.id === selectedId ? " is-active" : ""}${highlightedIds.has(artifact.id) ? " is-new" : ""}`}
-            data-kind={artifact.kind}
-            aria-current={artifact.id === selectedId || undefined}
-            onClick={() => onSelect(artifact.id)}
-          >
-            <span className="thread-space-row-icon" aria-hidden="true">
-              <ArtifactKindIcon kind={artifact.kind} size={14} />
-            </span>
-            <span className="thread-space-row-copy">
-              <span className="thread-space-row-title">{artifact.title}</span>
-              <span className="thread-space-row-meta">{meta}</span>
-            </span>
-          </Button>
+          // The listitem role belongs on the wrapper: putting it on the button
+          // would replace the button role, and AT would announce a focusable
+          // list item with no press affordance.
+          <div key={artifact.id} role="listitem" className="thread-space-row-slot">
+            <Button
+              variant="ghost"
+              type="button"
+              className={`thread-space-row${artifact.id === selectedId ? " is-active" : ""}${highlightedIds.has(artifact.id) ? " is-new" : ""}`}
+              data-kind={artifact.kind}
+              aria-current={artifact.id === selectedId || undefined}
+              onClick={() => onSelect(artifact.id)}
+            >
+              <span className="thread-space-row-icon" aria-hidden="true">
+                <ArtifactKindIcon kind={artifact.kind} size={14} />
+              </span>
+              <span className="thread-space-row-copy">
+                <span className="thread-space-row-title">{artifact.title}</span>
+                <span className="thread-space-row-meta">{meta}</span>
+              </span>
+            </Button>
+          </div>
         );
       })}
     </div>
