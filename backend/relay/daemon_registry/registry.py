@@ -2583,11 +2583,11 @@ class DaemonNodeRegistry:
         index = run_request.get("currentIndex", 0)
         state = dict(next_state)
         repairs = int(state.get(REPAIR_COUNT_STATE_KEY) or 0)
-        # Nothing above index 0 to appeal to, and a lead that fails its own
-        # repair has already had its turn.
         # A repair turn instructs the lead to fix the task the failing member
-        # was working on. Without a task that instruction is false, so a
+        # was working on; without a task that instruction is false, so a
         # task-less room fails the round instead of inventing a lead's duty.
+        # There is also nothing above index 0 to appeal to, and a lead that
+        # fails its own repair has already had its turn.
         if (
             not run_request.get("taskId")
             or index == 0

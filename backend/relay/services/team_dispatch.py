@@ -85,7 +85,7 @@ def resolve_team_task_assignments(
         agent_store=agent_store,
     )
     return resolve_agent_assignments(
-        [_team_member_assignment(agent, mode=mode) for agent in agents],
+        team_member_assignments(agents, mode=mode),
         employee_id=task_execution_employee_id(task),
         is_admin=False,
         agent_store=agent_store,

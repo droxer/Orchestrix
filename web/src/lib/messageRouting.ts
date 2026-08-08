@@ -50,6 +50,28 @@ export function resolveLeadingMention(
   return ambiguous ? null : { agentId: best.id };
 }
 
+/**
+ * Resolve the mention candidates for a team thread from the team's roster,
+ * not from every agent the employee happens to own.
+ *
+ * A name that resolves to an agent the employee owns but that is NOT on this
+ * team's roster must be treated as unknown, so the message falls back to the
+ * whole room instead of narrowing to (and being rejected for) an outsider.
+ * When the roster is missing (team not loaded/found), this returns an empty
+ * list, which makes `resolveLeadingMention` return null and every mention
+ * fall back to the room — the safe default.
+ */
+export function teamMembersForMention(
+  memberAgentIds: string[] | undefined,
+  employeeAgents: Array<{ id: string; displayName: string }>,
+): Array<{ id: string; displayName: string }> {
+  if (!memberAgentIds || memberAgentIds.length === 0) return [];
+  const agentsById = new Map(employeeAgents.map((agent) => [agent.id, agent]));
+  return memberAgentIds
+    .map((id) => agentsById.get(id))
+    .filter((agent): agent is { id: string; displayName: string } => Boolean(agent));
+}
+
 /** Build the run for a message typed into a team thread: the room, or one member. */
 export function teamRunInput({ taskGoal, sessionId, teamMembers, mode, userMessageId }: {
   taskGoal: string;
