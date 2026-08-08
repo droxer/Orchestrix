@@ -129,11 +129,14 @@ def task_progress_file(session_id: str, workspace_layout: str) -> str:
     if workspace_layout == "thread":
         return TASK_PROGRESS_FILE
     return f"PROGRESS-{session_id}.md"
+
+
 ARTIFACT_SNAPSHOT_STATE_KEY = "_relay_artifact_snapshot"
 REPAIR_COUNT_STATE_KEY = "_relay_repair_count"
 REPAIR_RESUME_INDEX_STATE_KEY = "_relay_repair_resume_index"
 REPAIR_NOTE_STATE_KEY = "_relay_repair_note"
 ROUND_RESULT_STATE_KEY = "_relay_round_result"
+PARTICIPANT_FAILURES_STATE_KEY = "_relay_participant_failures"
 # Run-request bookkeeping that has to survive being re-staged. Command state is
 # filtered down to the agent-visible keys, so anything not listed here is lost
 # the moment the next command is staged.
@@ -143,6 +146,7 @@ CARRIED_RUN_REQUEST_STATE_KEYS = frozenset(
         REPAIR_RESUME_INDEX_STATE_KEY,
         REPAIR_NOTE_STATE_KEY,
         ROUND_RESULT_STATE_KEY,
+        PARTICIPANT_FAILURES_STATE_KEY,
     }
 )
 # Mirrors ROUND_RESULT_RELATIVE_PATH in relay-daemon: `.relay/` is excluded
@@ -1480,6 +1484,13 @@ class DaemonNodeRegistry:
         active_runs: list[dict[str, Any]] | None = None,
         request_id: str | None = None,
     ) -> dict[str, Any]:
+        assignments = [
+            {
+                **assignment,
+                "assignmentId": assignment.get("assignmentId") or new_database_id(),
+            }
+            for assignment in assignments
+        ]
         node_ids = [
             sandbox_id,
             *(
@@ -1740,6 +1751,17 @@ class DaemonNodeRegistry:
                         "mode": event["mode"],
                         "sequence": event["sequence"],
                         "collaboration": event["collaboration"],
+                        "collaborationScope": "assignment",
+                        **(
+                            {"assignmentId": command["assignmentId"]}
+                            if command.get("assignmentId")
+                            else {}
+                        ),
+                        **(
+                            {"logicalAgentId": command["logicalAgentId"]}
+                            if command.get("logicalAgentId")
+                            else {}
+                        ),
                     },
                 ),
                 hydrate_events=False,
@@ -2143,14 +2165,20 @@ class DaemonNodeRegistry:
             state["agent_display_name"] = assignment["agentDisplayName"]
         if assignment.get("agentInstructions"):
             state["agent_instructions"] = assignment["agentInstructions"]
+        if assignment.get("brief"):
+            state["assignment_brief"] = assignment["brief"]
+        state["assignment_id"] = assignment["assignmentId"]
+        state["team_phase"] = assignment.get("phase") or self._assignment_phase(mode)
         request_state = run_request["state"] or {}
         if request_state.get(REPAIR_NOTE_STATE_KEY) and index == 0:
             state["repair_note"] = request_state[REPAIR_NOTE_STATE_KEY]
         # Only ask for the verdict where something reads it back: on a daemon
         # without the capability the file would sit in the workspace unread,
         # and the task would wait for a human either way.
-        if progress_file and DAEMON_CAPABILITY_ROUND_RESULT in (
-            sandbox.get("capabilities") or []
+        if (
+            progress_file
+            and self._assignment_reports_round_result(assignments, index)
+            and DAEMON_CAPABILITY_ROUND_RESULT in (sandbox.get("capabilities") or [])
         ):
             state["round_result_file"] = ROUND_RESULT_RELATIVE_PATH
         # The role was recorded on the thread but never reached the agent, so a
@@ -2167,6 +2195,8 @@ class DaemonNodeRegistry:
             "taskGoal": run_request["taskGoal"],
             "agent": assignment["executorKind"],
             "mode": mode,
+            "phase": state["team_phase"],
+            "assignmentId": assignment["assignmentId"],
             "workspaceLayout": workspace_layout,
             **({"role": role} if role else {}),
             **(
@@ -2265,9 +2295,11 @@ class DaemonNodeRegistry:
             run_request["sessionId"],
             {
                 "runId": command["runId"],
+                "assignmentId": assignment["assignmentId"],
                 "agent": command["agent"],
                 **({"role": role} if role else {}),
                 "mode": command["mode"],
+                "teamPhase": command["phase"],
                 **(
                     {"logicalAgentId": command["logicalAgentId"]}
                     if command.get("logicalAgentId")
@@ -2292,6 +2324,17 @@ class DaemonNodeRegistry:
                 **(
                     {"workspaceIdentity": command["workspaceIdentity"]}
                     if command.get("workspaceIdentity")
+                    else {}
+                ),
+                **({"brief": assignment["brief"]} if assignment.get("brief") else {}),
+                **(
+                    {"coordinator": True}
+                    if assignment.get("coordinator") is True
+                    else {}
+                ),
+                **(
+                    {"teamSnapshot": assignment["teamSnapshot"]}
+                    if isinstance(assignment.get("teamSnapshot"), dict)
                     else {}
                 ),
             },
@@ -2403,6 +2446,7 @@ class DaemonNodeRegistry:
                         "status": "failed",
                         "exitCode": event.get("exitCode", 1),
                         "agentLog": agent_log,
+                        "assignmentId": assignment.get("assignmentId"),
                     },
                 )
             if session_before.get("status") != "failed":
@@ -2430,6 +2474,7 @@ class DaemonNodeRegistry:
                         "status": "cancelled",
                         "exitCode": 130,
                         "agentLog": "",
+                        "assignmentId": assignment.get("assignmentId"),
                     },
                 )
             if session_before.get("status") != "cancelled":
@@ -2468,6 +2513,7 @@ class DaemonNodeRegistry:
                     "exitCode": event["exitCode"],
                     "agentLog": agent_log,
                     "tokenUsage": event.get("tokenUsage"),
+                    "assignmentId": assignment.get("assignmentId"),
                     **({"pipelineHasNext": True} if has_next else {}),
                 },
             )
@@ -2476,10 +2522,16 @@ class DaemonNodeRegistry:
             self._record_generated_workspace_artifacts(
                 sandbox, run_request, event, artifact_snapshot, assignment
             )
-        # The newest verdict wins: a later member speaks for the round, and a
-        # round that reported nothing leaves the previous verdict in place only
-        # until the pipeline ends, where "nothing reported" reads as done.
-        round_result = self._round_result(event)
+        # Exactly one assignment speaks for the whole round: the last writable
+        # member. Earlier per-member verdicts are deliberately ignored.
+        round_result = (
+            self._round_result(event)
+            if event["exitCode"] == 0
+            and self._assignment_reports_round_result(
+                assignments, run_request.get("currentIndex", 0)
+            )
+            else None
+        )
         if round_result:
             next_state[ROUND_RESULT_STATE_KEY] = round_result
         if event["exitCode"] != 0:
@@ -2502,6 +2554,15 @@ class DaemonNodeRegistry:
                 agent_label,
             ):
                 return
+            if self._continue_after_non_action_failure(
+                run_request,
+                terminal_claim_id,
+                next_state,
+                outcome,
+                agent_label,
+                mode,
+            ):
+                return
             if session_before.get("status") != "failed":
                 controller.fail_session(run_request["sessionId"], outcome)
             self.daemon_store.update_run_request_if_claimed(
@@ -2514,9 +2575,7 @@ class DaemonNodeRegistry:
                 run_request["nodeId"], {"status": "ready", "lastError": outcome}
             )
             return
-        next_index, next_state = self._next_index_after_success(
-            run_request, next_state
-        )
+        next_index, next_state = self._next_index_after_success(run_request, next_state)
         updated = self.daemon_store.update_run_request_if_claimed(
             run_request["id"],
             TERMINAL_CLAIM_ID_STATE_KEY,
@@ -2593,6 +2652,8 @@ class DaemonNodeRegistry:
             or index == 0
             or len(assignments) < 2
             or repairs >= DAEMON_RUN_MAX_REPAIRS
+            or assignments[0].get("coordinator") is not True
+            or (assignments[0].get("mode") or "action") != "action"
         ):
             return False
         state[REPAIR_COUNT_STATE_KEY] = repairs + 1
@@ -2641,6 +2702,81 @@ class DaemonNodeRegistry:
         state.pop(REPAIR_RESUME_INDEX_STATE_KEY, None)
         state.pop(REPAIR_NOTE_STATE_KEY, None)
         return resume_index, state
+
+    def _continue_after_non_action_failure(
+        self,
+        run_request: dict[str, Any],
+        terminal_claim_id: str,
+        next_state: dict[str, Any],
+        outcome: str,
+        agent_label: str,
+        mode: str,
+    ) -> bool:
+        """Keep collecting discussion/review results after one member fails."""
+        if mode not in ("ask", "review"):
+            return False
+        assignments = run_request["assignments"]
+        index = run_request.get("currentIndex", 0)
+        state = dict(next_state)
+        failures = list(state.get(PARTICIPANT_FAILURES_STATE_KEY) or [])
+        failures.append(
+            {
+                "assignmentId": assignments[index].get("assignmentId"),
+                "agent": agent_label,
+                "mode": mode,
+                "outcome": outcome,
+            }
+        )
+        state[PARTICIPANT_FAILURES_STATE_KEY] = failures
+        next_index = index + 1
+        updated = self.daemon_store.update_run_request_if_claimed(
+            run_request["id"],
+            TERMINAL_CLAIM_ID_STATE_KEY,
+            terminal_claim_id,
+            {
+                "status": "running",
+                "currentIndex": next_index,
+                "state": state,
+                "currentCommandId": None,
+                "currentRunId": None,
+                "currentAgent": None,
+                "currentMode": None,
+                "currentStartedAt": None,
+                "currentProgressAt": None,
+            },
+        )
+        if not updated:
+            return False
+        if next_index < len(assignments):
+            self._enqueue_current_assignment(updated)
+        else:
+            self._complete_run_request(
+                updated,
+                "The round completed with one or more participant failures.",
+            )
+        return True
+
+    @staticmethod
+    def _assignment_reports_round_result(
+        assignments: list[dict[str, Any]], index: int
+    ) -> bool:
+        """Only the last writable member may publish the aggregate verdict."""
+        if index < 0 or index >= len(assignments):
+            return False
+        if (assignments[index].get("mode") or "action") == "ask":
+            return False
+        return not any(
+            (assignment.get("mode") or "action") != "ask"
+            for assignment in assignments[index + 1 :]
+        )
+
+    @staticmethod
+    def _assignment_phase(mode: str) -> str:
+        if mode == "ask":
+            return "discussion"
+        if mode == "review":
+            return "review"
+        return "execution"
 
     def _node_reports_generated_files(self, sandbox: dict[str, Any]) -> bool:
         return DAEMON_CAPABILITY_GENERATED_FILES in (sandbox.get("capabilities") or [])
@@ -2755,6 +2891,20 @@ class DaemonNodeRegistry:
             self._record_round_result(run_request, round_result, task_status)
         else:
             self._note_missing_round_result(run_request, task_status)
+            if self._round_result_was_required(run_request):
+                task_status = "waiting_for_human"
+                outcome = (
+                    "The round ended without its required aggregate verdict. "
+                    "Review the work before continuing or closing the task."
+                )
+        participant_failures = (run_request.get("state") or {}).get(
+            PARTICIPANT_FAILURES_STATE_KEY
+        )
+        if isinstance(participant_failures, list) and participant_failures:
+            outcome = (
+                f"{outcome} {len(participant_failures)} participant assignment(s) "
+                "failed; inspect the thread before closing the work."
+            )
         if (
             self.store.get_session(run_request["sessionId"]).get("status")
             != "completed"
@@ -2798,10 +2948,9 @@ class DaemonNodeRegistry:
     ) -> None:
         """Say so when a task round was asked for a verdict and gave none.
 
-        Closing the task out is still the right fallback — it is what happened
-        before verdicts existed — but silently treating "the CLI exited 0" as
-        "the work is finished" is exactly the guess this contract removes. An
-        operator should be able to see which agents are answering.
+        Silently treating "the CLI exited 0" as "the work is finished" is the
+        guess this contract removes. The caller parks capable task rounds for a
+        person after recording this diagnostic activity.
         """
         task_id = run_request.get("taskId")
         node = self.sandboxes.get(run_request["nodeId"]) or {}
@@ -2816,6 +2965,17 @@ class DaemonNodeRegistry:
             task_id,
             "Closed out without a round verdict: the agent did not write "
             f"{ROUND_RESULT_RELATIVE_PATH}.",
+        )
+
+    def _round_result_was_required(self, run_request: dict[str, Any]) -> bool:
+        if not run_request.get("taskId") or not self.task_store:
+            return False
+        node = self.sandboxes.get(run_request["nodeId"]) or {}
+        if DAEMON_CAPABILITY_ROUND_RESULT not in (node.get("capabilities") or []):
+            return False
+        return any(
+            (assignment.get("mode") or "action") != "ask"
+            for assignment in run_request.get("assignments", [])
         )
 
     def _record_round_result(

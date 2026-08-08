@@ -294,6 +294,23 @@ describe("prompts", () => {
       );
     }
   });
+  it("scopes a team member to its explicit assignment brief", () => {
+    const assignedState = state({
+      task_goal: "Ship the endpoint",
+      assignment_brief: "Implement only the database migration and its tests.",
+      team_phase: "execution",
+    });
+
+    const prompt = claudeTaskPrompt(assignedState);
+
+    assert.match(prompt, /\[Your assignment\]/);
+    assert.match(prompt, /Implement only the database migration and its tests\./);
+    assert.match(prompt, /\[Team phase\]\nThis assignment is in the execution phase\./);
+    assert.ok(
+      prompt.indexOf("[Your assignment]") < prompt.indexOf("[User]"),
+      "the assignment boundary should precede the shared team goal",
+    );
+  });
   it("points task work at its durable progress log and asks for an update", () => {
     const taskState = state({
       task_goal: "Migrate the billing tables",
@@ -1614,6 +1631,7 @@ describe("token usage accounting", () => {
       }),
       relayEvent("agent.started", sessionId, {
         runId: "run_1",
+        assignmentId: "assignment_1",
         agent: "codex",
         role: "fixer",
         mode: "action",
@@ -1622,6 +1640,14 @@ describe("token usage accounting", () => {
         daemonNodeId: "node_1",
         agentVersion: 7,
         workspaceIdentity: { workspacePath: "/workspace" },
+        brief: "Implement the migration.",
+        coordinator: true,
+        teamSnapshot: {
+          teamId: "team_1",
+          memberAgentIds: ["agent_builder", "agent_reviewer"],
+          leadAgentId: "agent_builder",
+        },
+        teamPhase: "execution",
       }),
       relayEvent("agent.completed", sessionId, {
         runId: "run_1",
@@ -1640,6 +1666,11 @@ describe("token usage accounting", () => {
     assert.equal(session.agentRuns[0].daemonNodeId, "node_1");
     assert.equal(session.agentRuns[0].agentVersion, 7);
     assert.deepEqual(session.agentRuns[0].workspaceIdentity, { workspacePath: "/workspace" });
+    assert.equal(session.agentRuns[0].assignmentId, "assignment_1");
+    assert.equal(session.agentRuns[0].brief, "Implement the migration.");
+    assert.equal(session.agentRuns[0].coordinator, true);
+    assert.equal(session.agentRuns[0].teamPhase, "execution");
+    assert.deepEqual(session.agentRuns[0].teamSnapshot?.memberAgentIds, ["agent_builder", "agent_reviewer"]);
     assert.deepEqual(session.tokenUsage, { input: 5, output: 7, cache: 3, total: 15 });
   });
 

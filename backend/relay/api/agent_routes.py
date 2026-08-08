@@ -37,6 +37,7 @@ router = APIRouter()
 # personality: both describe how their agent works, and the supervisor is the
 # person who knows what job it should do on their team.
 AGENT_META_FIELDS = frozenset({"displayName", "instructions", "defaultRole"})
+ASSIGNMENT_BRIEF_MAX_CHARS = 4000
 
 
 @router.get("/agents")
@@ -289,6 +290,12 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             )
     team_id = session.get("teamId") if session else None
     team_member_ids: set[str] = set()
+    team_snapshot: dict[str, Any] | None = None
+    decision = body.get("decision")
+    is_recovery_decision = isinstance(decision, dict) and decision.get("kind") in (
+        "rerun",
+        "handoff",
+    )
     if team_id and not raw_assignments:
         team_employee_id = (
             (session.get("ownerEmployeeId") or actor["employeeId"])
@@ -296,7 +303,7 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             else actor["employeeId"]
         )
         try:
-            _team, members = team_agents(
+            team, members = team_agents(
                 team_id,
                 team_employee_id,
                 team_store=ctx.team_store,
@@ -307,19 +314,56 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
                 409, {"code": error.code, "message": str(error)}
             ) from error
         team_member_ids = {agent["id"] for agent in members}
+        team_snapshot = {
+            "teamId": team["id"],
+            "teamRevision": team.get("updatedAt") or team.get("createdAt"),
+            "memberAgentIds": [agent["id"] for agent in members],
+            "leadAgentId": team.get("leadAgentId"),
+        }
         raw_assignments = team_member_assignments(
-            members, mode=agent_task_mode(body.get("mode"))
+            members, mode=agent_task_mode(body.get("mode")), team=team
         )
     elif team_id and raw_assignments:
-        # An explicit assignment list must pass through untouched: the team's
-        # enabled/ownership gate (team_agents) only governs the expansion
-        # path. Derive membership leniently, without raising, so a
-        # retry/rerun/handoff naming one agent in a team thread still works
-        # even if the team is disabled, owned by someone else, or its lead
-        # was removed. A later task uses team_member_ids to reject an
-        # assignment naming a non-member.
-        team = ctx.team_store.get_team(team_id)
-        team_member_ids = set((team or {}).get("memberAgentIds") or [])
+        team_employee_id = (
+            (session.get("ownerEmployeeId") or actor["employeeId"])
+            if actor["isAdmin"]
+            else actor["employeeId"]
+        )
+        if is_recovery_decision:
+            # A named recovery may target a surviving member after a team was
+            # disabled, but it still cannot inject an outsider into the room.
+            team = ctx.team_store.get_team(team_id)
+            if not team or team.get("deletedAt"):
+                raise HTTPException(
+                    409,
+                    {"code": "team_not_found", "message": "team_not_found"},
+                )
+            if team.get("ownerEmployeeId") != team_employee_id:
+                raise HTTPException(
+                    409,
+                    {"code": "team_forbidden", "message": "team_forbidden"},
+                )
+            team_member_ids = set(team.get("memberAgentIds") or [])
+        else:
+            try:
+                team, members = team_agents(
+                    team_id,
+                    team_employee_id,
+                    team_store=ctx.team_store,
+                    agent_store=ctx.agent_store,
+                )
+            except TeamDispatchError as error:
+                raise HTTPException(
+                    409, {"code": error.code, "message": str(error)}
+                ) from error
+            team_member_ids = {agent["id"] for agent in members}
+        if team:
+            team_snapshot = {
+                "teamId": team["id"],
+                "teamRevision": team.get("updatedAt") or team.get("createdAt"),
+                "memberAgentIds": list(team.get("memberAgentIds") or []),
+                "leadAgentId": team.get("leadAgentId"),
+            }
     if not raw_assignments:
         raise HTTPException(400, "At least one assignment is required.")
     requested_node_id = string_field(body, "daemonNodeId") or string_field(
@@ -362,7 +406,7 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             or not item["agentId"]
         ):
             raise HTTPException(400, "Each assignment requires agentId.")
-        if team_member_ids and item["agentId"] not in team_member_ids:
+        if team_id and item["agentId"] not in team_member_ids:
             raise HTTPException(
                 409,
                 {
@@ -370,6 +414,15 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
                     "message": "This thread belongs to a team; only its members can answer it.",
                 },
             )
+        mode = agent_task_mode(item.get("mode"))
+        role = role_name(item.get("role"))
+        phase = (
+            "discussion"
+            if mode == "ask"
+            else "review"
+            if mode == "review" or role == "reviewer"
+            else "execution"
+        )
         assignments.append(
             {
                 "agentId": item["agentId"],
@@ -379,8 +432,21 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
                     and item["executorKind"]
                     else {}
                 ),
-                "mode": agent_task_mode(item.get("mode")),
-                **({"role": item["role"]} if role_name(item.get("role")) else {}),
+                "mode": mode,
+                "phase": phase,
+                **({"role": role} if role else {}),
+                **(
+                    {"brief": item["brief"].strip()[:ASSIGNMENT_BRIEF_MAX_CHARS]}
+                    if isinstance(item.get("brief"), str) and item["brief"].strip()
+                    else {}
+                ),
+                **(
+                    {"coordinator": True}
+                    if team_snapshot
+                    and item["agentId"] == team_snapshot.get("leadAgentId")
+                    else {}
+                ),
+                **({"teamSnapshot": team_snapshot} if team_snapshot else {}),
             }
         )
     try:
@@ -412,7 +478,6 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             parsed["userMessageId"] = user_message_id
         if idempotency_key:
             parsed["idempotencyKey"] = idempotency_key
-        decision = body.get("decision")
         if isinstance(decision, dict):
             kind = decision.get("kind")
             target_agent = decision.get("targetAgent")

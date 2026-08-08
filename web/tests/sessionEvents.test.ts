@@ -31,6 +31,7 @@ describe("applySessionEvent", () => {
       sessionId: "ses_1",
       timestamp: "2026-06-20T00:00:01.000Z",
       runId: "run_1",
+      assignmentId: "assignment_1",
       agent: "codex",
       mode: "action",
       logicalAgentId: "agent_1",
@@ -38,12 +39,30 @@ describe("applySessionEvent", () => {
       daemonNodeId: "node_1",
       agentVersion: 3,
       workspaceIdentity,
+      role: "implementer",
+      brief: "Implement only the migration.",
+      coordinator: true,
+      teamSnapshot: {
+        teamId: "team_1",
+        teamRevision: "2026-06-20T00:00:00.000Z",
+        memberAgentIds: ["agent_1", "agent_2"],
+        leadAgentId: "agent_1",
+      },
+      teamPhase: "execution",
     });
 
+    assert.equal(updated.agentRuns[0]?.assignmentId, "assignment_1");
     assert.equal(updated.agentRuns[0]?.daemonNodeId, "node_1");
     assert.equal(updated.agentRuns[0]?.placementId, "placement_1");
     assert.equal(updated.agentRuns[0]?.agentVersion, 3);
     assert.deepEqual(updated.agentRuns[0]?.workspaceIdentity, workspaceIdentity);
+    assert.equal(updated.agentRuns[0]?.brief, "Implement only the migration.");
+    assert.equal(updated.agentRuns[0]?.coordinator, true);
+    assert.equal(updated.agentRuns[0]?.teamPhase, "execution");
+    assert.deepEqual(updated.agentRuns[0]?.teamSnapshot?.memberAgentIds, [
+      "agent_1",
+      "agent_2",
+    ]);
   });
 
   it("materializes streamed feedback waits before the list poll catches up", () => {

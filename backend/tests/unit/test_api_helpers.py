@@ -6,7 +6,7 @@ import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
 
-from relay.api.helpers import json_body
+from relay.api.helpers import assignment_list, json_body
 
 
 def test_json_body_translates_client_disconnect_to_http_error() -> None:
@@ -28,3 +28,17 @@ def test_json_body_translates_client_disconnect_to_http_error() -> None:
 
     assert raised.value.status_code == 400
     assert raised.value.detail == "Client disconnected while reading request body."
+
+
+def test_assignment_list_preserves_and_bounds_per_assignment_briefs() -> None:
+    [assignment] = assignment_list(
+        [
+            {
+                "agent": "codex",
+                "mode": "action",
+                "brief": f"  {'x' * 4100}  ",
+            }
+        ]
+    )
+
+    assert assignment["brief"] == "x" * 4000

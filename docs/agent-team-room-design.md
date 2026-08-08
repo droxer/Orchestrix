@@ -1,6 +1,7 @@
 # Agent Team: a Room That Deliberates, Divides, and Implements
 
-Status: proposed
+Status: proposed; current sequential-round contracts are hardened by
+[ADR-014](adr/014-agent-team-round-contracts.md)
 Date: 2026-08-08
 
 ## Why
@@ -216,10 +217,11 @@ repair path on `run_request["taskId"]`. For task work the repair turn becomes
 *more* justified than before: the lead authored the plan the failing member was
 executing.
 
-**Fail-fast stays.** A member exiting non-zero ends the round, because
-`has_next` requires `exitCode == 0`. This is arguably wrong for a room, but
-changing advancement changes it for every path at once. It is honest and visible
-today. See Follow-ups.
+**Failure is phase-aware in the current sequential runtime.** A failed
+`ask`/`review` member is recorded and later participants still run; the final
+outcome warns that participation was incomplete. A failed writable member uses
+the bounded, explicitly marked coordinator repair path or ends the round. See
+ADR-014. A future two-phase plan runtime must preserve this distinction.
 
 ## Not building
 
@@ -260,9 +262,7 @@ Registry pipeline tests already cover advancement and need no change.
 
 ## Follow-ups
 
-1. A failed member should not silence the rest of the room. Requires advancement
-   to distinguish "this member failed" from "the round failed".
-2. A dispatch mode that skips deliberation for trivial team work.
-3. `continue` re-runs the whole room. Once a round reports which participants
+1. A dispatch mode that skips deliberation for trivial team work.
+2. `continue` re-runs the whole room. Once a round reports which participants
    still have work, continuation could narrow — the plan file is the natural
    place for that signal to live.

@@ -50,6 +50,18 @@ function promptPreludes(state: AgentState, options: PreludeOptions = {}): string
       ].join("\n"),
     );
   }
+  if (state.assignment_brief) {
+    preludes.push(
+      [
+        "[Your assignment]",
+        state.assignment_brief,
+        "Treat the user task below as the shared team goal; own this assignment boundary and preserve completed teammate work.",
+      ].join("\n"),
+    );
+  }
+  if (state.team_phase) {
+    preludes.push(["[Team phase]", `This assignment is in the ${state.team_phase} phase.`].join("\n"));
+  }
   if (state.agent_instructions) {
     preludes.push(
       [

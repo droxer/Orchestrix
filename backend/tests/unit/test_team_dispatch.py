@@ -56,7 +56,9 @@ def test_team_agents_returns_the_lead_first() -> None:
         "team_1",
         "alice",
         team_store=FakeTeamStore(_team()),
-        agent_store=FakeAgentStore([_agent("lead", "codex"), _agent("support", "claude")]),
+        agent_store=FakeAgentStore(
+            [_agent("lead", "codex"), _agent("support", "claude")]
+        ),
     )
 
     assert team["id"] == "team_1"
@@ -81,7 +83,9 @@ def test_team_agents_refuses_an_unusable_team(
             "team_1",
             "alice",
             team_store=FakeTeamStore(team),
-            agent_store=FakeAgentStore(agents or [_agent("lead", "codex"), _agent("support", "claude")]),
+            agent_store=FakeAgentStore(
+                agents or [_agent("lead", "codex"), _agent("support", "claude")]
+            ),
         )
 
     assert error.value.code == code
@@ -89,14 +93,46 @@ def test_team_agents_refuses_an_unusable_team(
 
 
 def test_team_member_assignments_sends_a_reviewer_to_review() -> None:
-    agents = [_agent("lead", "codex"), _agent("support", "claude", defaultRole="reviewer")]
-
+    agents = [
+        _agent("lead", "codex"),
+        _agent("support", "claude", defaultRole="reviewer"),
+    ]
     assert team_member_assignments(agents, mode="action") == [
         {
             "agentId": "lead",
             "agent": "codex",
             "mode": "action",
+            "phase": "execution",
             "coordinator": True,
+            "brief": (
+                "Coordinate the round, establish clear boundaries, and keep the "
+                "shared work coherent."
+            ),
         },
-        {"agentId": "support", "agent": "claude", "mode": "review", "role": "reviewer"},
+        {
+            "agentId": "support",
+            "agent": "claude",
+            "mode": "review",
+            "phase": "review",
+            "role": "reviewer",
+            "brief": (
+                "Review the accumulated workspace changes and synthesize "
+                "blocking issues and missing tests."
+            ),
+        },
     ]
+
+
+def test_team_member_assignments_freezes_the_roster_for_the_round() -> None:
+    team = _team(updatedAt="2026-08-08T00:00:00Z")
+    agents = [_agent("lead", "codex"), _agent("support", "claude")]
+
+    assignments = team_member_assignments(agents, team=team)
+
+    expected = {
+        "teamId": "team_1",
+        "teamRevision": "2026-08-08T00:00:00Z",
+        "memberAgentIds": ["lead", "support"],
+        "leadAgentId": "lead",
+    }
+    assert [item["teamSnapshot"] for item in assignments] == [expected, expected]

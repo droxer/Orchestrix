@@ -521,6 +521,7 @@ export interface AgentRunInput {
     agentId: string;
     mode: AgentTaskMode;
     role?: AgentRole;
+    brief?: string;
   }>;
   /** Mode applied to every member when addressing the room. */
   mode?: AgentTaskMode;
@@ -542,6 +543,7 @@ export interface RunInput {
     agent: AgentName;
     mode: AgentTaskMode;
     role?: AgentRole;
+    brief?: string;
   }>;
   sessionId?: string;
   /** Client-generated id for the follow-up user message, so the optimistic echo

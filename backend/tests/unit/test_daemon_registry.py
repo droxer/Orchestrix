@@ -857,6 +857,8 @@ def test_daemon_collaboration_retry_after_registry_restart_is_deduplicated() -> 
                 if event["type"] == "agent.collaboration"
             ]
             assert len(events) == 1
+            assert events[0]["collaborationScope"] == "assignment"
+            assert events[0]["assignmentId"] == command["assignmentId"]
 
     asyncio.run(run_flow())
 
@@ -3181,7 +3183,7 @@ def _pipeline_registry(root: str) -> tuple[Any, Any, Any]:
             "workspacePath": "/workspace/alice",
             "protocolVersion": 1,
             "supportedAgents": ["codex", "claude"],
-            "capabilities": ["thread-workspaces"],
+            "capabilities": ["thread-workspaces", "round-result"],
             "status": "ready",
         },
         "ui_token",
@@ -3410,7 +3412,131 @@ def test_a_read_only_team_discussion_does_not_attempt_a_write_repair() -> None:
             _finish_run(registry, member, 3)
 
             assert registry.take_commands("sbx_alice", "node_token") == []
-            assert session_store.get_session(session["id"])["status"] == "failed"
+            completed = session_store.get_session(session["id"])
+            assert completed["status"] == "completed"
+            assert "participant failures" in completed["finalOutcome"]
+            assert registry.task_store.get_task(task["id"])["status"] == (
+                "waiting_for_human"
+            )
+
+    asyncio.run(run_flow())
+
+
+def test_a_discussion_continues_after_an_earlier_member_fails() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store, _daemon_store, registry = _pipeline_registry(root)
+            backend = ServerDaemonNodeBackend(registry)
+            task = registry.task_store.create_task({"title": "Discuss it"})
+            session = await backend.run(
+                "sbx_alice",
+                {
+                    "taskGoal": "discuss it",
+                    "assignments": [
+                        {"agent": "codex", "mode": "ask", "coordinator": True},
+                        {"agent": "claude", "mode": "ask"},
+                    ],
+                    "taskId": task["id"],
+                },
+            )
+
+            [lead] = registry.take_commands("sbx_alice", "node_token")
+            _finish_run(registry, lead, 3)
+
+            [member] = registry.take_commands("sbx_alice", "node_token")
+            assert member["agent"] == "claude"
+            _finish_run(registry, member, 0)
+
+            assert registry.take_commands("sbx_alice", "node_token") == []
+            completed = session_store.get_session(session["id"])
+            assert completed["status"] == "completed"
+            assert "participant assignment(s) failed" in completed["finalOutcome"]
+
+    asyncio.run(run_flow())
+
+
+def test_a_review_verdict_still_surfaces_an_earlier_participant_failure() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store, _daemon_store, registry = _pipeline_registry(root)
+            backend = ServerDaemonNodeBackend(registry)
+            task = registry.task_store.create_task({"title": "Review it"})
+            session = await backend.run(
+                "sbx_alice",
+                {
+                    "taskGoal": "review it",
+                    "assignments": [
+                        {"agent": "codex", "mode": "review"},
+                        {"agent": "claude", "mode": "review"},
+                    ],
+                    "taskId": task["id"],
+                },
+            )
+
+            [first] = registry.take_commands("sbx_alice", "node_token")
+            _finish_run(registry, first, 3)
+            [final] = registry.take_commands("sbx_alice", "node_token")
+            registry.handle_event(
+                "sbx_alice",
+                {
+                    "type": "run.completed",
+                    "commandId": final["id"],
+                    "sessionId": final["sessionId"],
+                    "runId": final["runId"],
+                    "agent": final["agent"],
+                    "mode": final["mode"],
+                    "exitCode": 0,
+                    "agentLog": "reviewed",
+                    "roundResult": {"status": "done", "note": "review complete"},
+                },
+                "node_token",
+            )
+
+            completed = session_store.get_session(session["id"])
+            assert completed["status"] == "completed"
+            assert "participant assignment(s) failed" in completed["finalOutcome"]
+            assert registry.task_store.get_task(task["id"])["status"] == "review"
+
+    asyncio.run(run_flow())
+
+
+def test_a_failed_final_reviewer_cannot_publish_a_success_verdict() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store, _daemon_store, registry = _pipeline_registry(root)
+            backend = ServerDaemonNodeBackend(registry)
+            task = registry.task_store.create_task({"title": "Review it"})
+            session = await backend.run(
+                "sbx_alice",
+                {
+                    "taskGoal": "review it",
+                    "assignments": [{"agent": "codex", "mode": "review"}],
+                    "taskId": task["id"],
+                },
+            )
+
+            [reviewer] = registry.take_commands("sbx_alice", "node_token")
+            registry.handle_event(
+                "sbx_alice",
+                {
+                    "type": "run.completed",
+                    "commandId": reviewer["id"],
+                    "sessionId": reviewer["sessionId"],
+                    "runId": reviewer["runId"],
+                    "agent": reviewer["agent"],
+                    "mode": reviewer["mode"],
+                    "exitCode": 3,
+                    "agentLog": "review failed",
+                    "roundResult": {"status": "done", "note": "do not trust"},
+                },
+                "node_token",
+            )
+
+            completed = session_store.get_session(session["id"])
+            assert "without its required aggregate verdict" in completed["finalOutcome"]
+            assert registry.task_store.get_task(task["id"])["status"] == (
+                "waiting_for_human"
+            )
 
     asyncio.run(run_flow())
 
@@ -3418,7 +3544,7 @@ def test_a_read_only_team_discussion_does_not_attempt_a_write_repair() -> None:
 def test_only_the_final_writable_assignment_reports_the_round_result() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
-            _sessions, _daemon_store, registry = _pipeline_registry(root)
+            sessions, _daemon_store, registry = _pipeline_registry(root)
             backend = ServerDaemonNodeBackend(registry)
             task = registry.task_store.create_task({"title": "Ship it"})
             await backend.run(
@@ -3443,17 +3569,20 @@ def test_only_the_final_writable_assignment_reports_the_round_result() -> None:
             )
 
             [first] = registry.take_commands("sbx_alice", "node_token")
+            assert first["assignmentId"]
             assert first["state"]["assignment_brief"] == "Implement the change."
+            assert first["state"]["assignment_id"] == first["assignmentId"]
             assert "round_result_file" not in first["state"]
+            [first_run] = sessions.get_session(first["sessionId"])["agentRuns"]
+            assert first_run["assignmentId"] == first["assignmentId"]
+            assert first_run["brief"] == "Implement the change."
             _finish_run(registry, first, 0)
 
             [final] = registry.take_commands("sbx_alice", "node_token")
             assert final["state"]["assignment_brief"] == (
                 "Review and synthesize the round."
             )
-            assert final["state"]["round_result_file"] == (
-                ".relay/round-result.json"
-            )
+            assert final["state"]["round_result_file"] == (".relay/round-result.json")
 
     asyncio.run(run_flow())
 

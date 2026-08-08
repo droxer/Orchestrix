@@ -10,6 +10,7 @@ export type WorkspaceLayout = "node-root" | "thread";
 
 export interface AgentRun {
   id: string;
+  assignmentId?: string;
   agent: AgentName;
   /** Logical (employee) agent that ran this step. `agent` is only its executor
    * kind, which several named agents can share — this is the identity. */
@@ -20,6 +21,15 @@ export interface AgentRun {
   agentVersion?: number;
   workspaceIdentity?: Record<string, unknown>;
   role?: AgentRole;
+  brief?: string;
+  coordinator?: boolean;
+  teamSnapshot?: {
+    teamId: string;
+    teamRevision?: string;
+    memberAgentIds: string[];
+    leadAgentId?: string;
+  };
+  teamPhase?: "discussion" | "execution" | "review";
   mode: AgentTaskMode;
   status: "running" | "completed" | "failed" | "cancelled";
   startedAt: string;
@@ -126,6 +136,7 @@ export type RelayEvent =
       sessionId: string;
       timestamp: string;
       runId: string;
+      assignmentId?: string;
       agent: AgentName;
       /** Logical (employee) agent dispatched for this run; absent on legacy
        * runs and workflow dispatches that name only an executor kind. */
@@ -136,6 +147,10 @@ export type RelayEvent =
       agentVersion?: number;
       workspaceIdentity?: Record<string, unknown>;
       role?: AgentRole;
+      brief?: string;
+      coordinator?: boolean;
+      teamSnapshot?: AgentRun["teamSnapshot"];
+      teamPhase?: AgentRun["teamPhase"];
       mode: AgentTaskMode;
     }
   | {
@@ -155,6 +170,9 @@ export type RelayEvent =
       sessionId: string;
       timestamp: string;
       runId: string;
+      assignmentId?: string;
+      logicalAgentId?: string;
+      collaborationScope?: "assignment";
       agent: AgentName;
       mode: AgentTaskMode;
       sequence: number;
@@ -180,6 +198,7 @@ export type RelayEvent =
       sessionId: string;
       timestamp: string;
       runId: string;
+      assignmentId?: string;
       agent: AgentName;
       status: AgentRun["status"];
       exitCode: number;
@@ -287,15 +306,18 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
       session.currentAgent = event.agent;
       session.agentRuns.push({
         id: event.runId,
+        ...(event.assignmentId ? { assignmentId: event.assignmentId } : {}),
         agent: event.agent,
         ...(event.logicalAgentId ? { logicalAgentId: event.logicalAgentId } : {}),
-        ...(event.daemonNodeId ? { daemonNodeId: event.daemonNodeId } : {}),
         ...(event.role ? { role: event.role } : {}),
-        ...(event.logicalAgentId ? { logicalAgentId: event.logicalAgentId } : {}),
         ...(event.placementId ? { placementId: event.placementId } : {}),
         ...(event.daemonNodeId ? { daemonNodeId: event.daemonNodeId } : {}),
         ...(event.agentVersion !== undefined ? { agentVersion: event.agentVersion } : {}),
         ...(event.workspaceIdentity ? { workspaceIdentity: event.workspaceIdentity } : {}),
+        ...(event.brief ? { brief: event.brief } : {}),
+        ...(event.coordinator ? { coordinator: true } : {}),
+        ...(event.teamSnapshot ? { teamSnapshot: event.teamSnapshot } : {}),
+        ...(event.teamPhase ? { teamPhase: event.teamPhase } : {}),
         mode: event.mode,
         status: "running",
         startedAt: event.timestamp,

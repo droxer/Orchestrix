@@ -53,10 +53,10 @@ def task_thread_assignments(
 ) -> list[dict[str, Any]]:
     team_id = task.get("assignedTeamId")
     if isinstance(team_id, str) and team_id:
-        _team, agents = _task_team_agents(
+        team, agents = _task_team_agents(
             task, team_store=team_store, agent_store=agent_store
         )
-        return [_team_member_assignment(agent) for agent in agents]
+        return team_member_assignments(agents, team=team)
     assigned_agent_id = task.get("assignedAgentId")
     assigned_agent = task.get("assignedAgent")
     if assigned_agent_id and assigned_agent:
@@ -79,13 +79,13 @@ def resolve_team_task_assignments(
     daemon_nodes: list[dict[str, Any]],
     mode: str = "action",
 ) -> list[dict[str, Any]]:
-    _team, agents = _task_team_agents(
+    team, agents = _task_team_agents(
         task,
         team_store=team_store,
         agent_store=agent_store,
     )
     return resolve_agent_assignments(
-        team_member_assignments(agents, mode=mode),
+        team_member_assignments(agents, mode=mode, team=team),
         employee_id=task_execution_employee_id(task),
         is_admin=False,
         agent_store=agent_store,
@@ -127,9 +127,30 @@ def team_agents(
 
 
 def team_member_assignments(
-    agents: list[dict[str, Any]], *, mode: str = "action"
+    agents: list[dict[str, Any]],
+    *,
+    mode: str = "action",
+    team: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    return [_team_member_assignment(agent, mode=mode) for agent in agents]
+    snapshot = (
+        {
+            "teamId": team["id"],
+            "teamRevision": team.get("updatedAt") or team.get("createdAt"),
+            "memberAgentIds": [agent["id"] for agent in agents],
+            "leadAgentId": team.get("leadAgentId"),
+        }
+        if team
+        else None
+    )
+    return [
+        _team_member_assignment(
+            agent,
+            mode=mode,
+            coordinator=index == 0,
+            team_snapshot=snapshot,
+        )
+        for index, agent in enumerate(agents)
+    ]
 
 
 def _task_team_agents(
@@ -147,15 +168,47 @@ def _task_team_agents(
 
 
 def _team_member_assignment(
-    agent: dict[str, Any], *, mode: str = "action"
+    agent: dict[str, Any],
+    *,
+    mode: str = "action",
+    coordinator: bool = False,
+    team_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     role = agent.get("defaultRole")
     return {
         "agentId": agent["id"],
         "agent": agent["executorKind"],
         "mode": _member_mode(role, mode),
+        "phase": _member_phase(role, mode),
         **({"role": role} if role else {}),
+        **({"coordinator": True} if coordinator else {}),
+        "brief": _member_brief(role, coordinator),
+        **({"teamSnapshot": team_snapshot} if team_snapshot else {}),
     }
+
+
+def _member_brief(role: str | None, coordinator: bool) -> str:
+    if role == "planner":
+        return "Develop the plan, dependencies, risks, and open questions for the shared goal."
+    if role == "reviewer":
+        return "Review the accumulated workspace changes and synthesize blocking issues and missing tests."
+    if role == "tester":
+        return "Validate the accumulated implementation with focused tests and report reproducible failures."
+    if role == "fixer":
+        return "Fix confirmed defects in the accumulated implementation without duplicating completed work."
+    if role == "implementer":
+        return "Implement the part of the shared goal that fits your role and preserve earlier teammates' work."
+    if coordinator:
+        return "Coordinate the round, establish clear boundaries, and keep the shared work coherent."
+    return "Contribute a distinct part of the shared goal and avoid duplicating completed teammate work."
+
+
+def _member_phase(role: str | None, requested_mode: str) -> str:
+    if requested_mode == "ask":
+        return "discussion"
+    if requested_mode == "review" or role == "reviewer":
+        return "review"
+    return "execution"
 
 
 def _member_mode(role: str | None, requested_mode: str) -> str:

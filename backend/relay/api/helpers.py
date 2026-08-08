@@ -418,6 +418,7 @@ def assignment_list(value: Any) -> list[dict[str, Any]]:
             "mode": agent_task_mode(item.get("mode")),
             **({"agentId": item["agentId"]} if isinstance(item.get("agentId"), str) and item["agentId"] else {}),
             **({"role": item["role"]} if role_name(item.get("role")) else {}),
+            **({"brief": item["brief"].strip()[:4000]} if isinstance(item.get("brief"), str) and item["brief"].strip() else {}),
         })
     return result
 
