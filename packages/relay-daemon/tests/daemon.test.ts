@@ -9,6 +9,7 @@ import test, { type TestContext } from "node:test";
 import {
   backendReconnectDelayMs,
   collectExecution,
+  createDaemonLogger,
   discoverAgentInventory,
   localProcessExecStream,
   parseInventoryOutput,
@@ -856,14 +857,16 @@ test("relay daemon preserves final agent log and generated files when output eve
   assert.deepEqual(failed.generatedFiles?.map((file) => file.relativePath), ["agent-loop-guide.md"]);
 });
 
-test("relay daemon opens a circuit when the output post backlog is unbounded", async () => {
+test("relay daemon coalesces burst output before posting it", async () => {
   const stop = new AbortController();
   const command = runCommand("cmd_output_backlog");
   let commandServed = false;
-  let terminalError = "";
+  let terminalType = "";
+  const outputEvents: Extract<DaemonNodeEvent, { type: "run.output" }>[] = [];
   await runRelayDaemon({
     backendUrl: "http://relay.test",
     sandboxId: "sbx_test",
+    sandbox: "none",
     employeeId: "alice",
     workspacePath: process.cwd(),
     token: "node_token",
@@ -875,7 +878,10 @@ test("relay daemon opens a circuit when the output post backlog is unbounded", a
       exec: async (_cmd, args, options) => {
         if (!isInventoryProbe(args)) {
           for (let index = 0; index < 300; index += 1) {
-            options?.stdoutRenderer?.(`chunk-${index}\n`);
+            const render = index % 2 === 0
+              ? options?.stdoutRenderer
+              : options?.stderrRenderer;
+            render?.(`chunk-${index}\n`);
           }
         }
         return { exit_code: 0, stdout: "done", stderr: "" };
@@ -894,8 +900,9 @@ test("relay daemon opens a circuit when the output post backlog is unbounded", a
       }
       if (path.endsWith("/events")) {
         const event = await jsonBody<DaemonNodeEvent>(init);
-        if (event.type === "run.failed") {
-          terminalError = event.error;
+        if (event.type === "run.output") outputEvents.push(event);
+        if (event.type === "run.failed" || event.type === "run.completed") {
+          terminalType = event.type;
           setTimeout(() => stop.abort(), 0);
         }
         return jsonResponse({ ok: true }, 202);
@@ -904,7 +911,23 @@ test("relay daemon opens a circuit when the output post backlog is unbounded", a
     },
   });
 
-  assert.match(terminalError, /backlog exceeded 256 events/);
+  assert.equal(terminalType, "run.completed");
+  assert.equal(outputEvents.length, 2);
+  assert.match(outputEvents.find((event) => event.stream === "stdout")?.text ?? "", /chunk-0\n[\s\S]*chunk-298\n/);
+  assert.match(outputEvents.find((event) => event.stream === "stderr")?.text ?? "", /chunk-1\n[\s\S]*chunk-299\n/);
+});
+
+test("daemon logger flushes non-blocking node and run logs", async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "relay-daemon-logger-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const logger = createDaemonLogger({ workspacePath: root, sandboxId: "sbx_test" });
+
+  logger.output({ runId: "run_test", stream: "stdout", text: "hello", sequence: 0 });
+  assert.equal(typeof logger.flush, "function");
+  await logger.flush?.();
+
+  assert.match(readFileSync(join(root, ".relay", "daemon-nodes", "logs", "sbx_test.jsonl"), "utf8"), /"text":"hello"/);
+  assert.match(readFileSync(join(root, ".relay", "daemon-nodes", "logs", "run_test.jsonl"), "utf8"), /"text":"hello"/);
 });
 
 test("relay daemon exits startup preflight after external stop", async () => {

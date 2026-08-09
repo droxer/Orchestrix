@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { accessSync, appendFileSync, constants, mkdirSync, statSync } from "node:fs";
+import { accessSync, constants, mkdirSync, statSync } from "node:fs";
+import { appendFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 
@@ -64,6 +65,7 @@ import {
 } from "relay-core";
 import { workspaceCommandEvent } from "./workspace-read.js";
 import { ThreadWorkspaceManager } from "./thread-workspace.js";
+import { OutputEventBuffer } from "./output-event-buffer.js";
 
 export type DaemonSandboxMode = DaemonNodeSandboxMode;
 const DEFAULT_DAEMON_SANDBOX_MODE: DaemonSandboxMode = "boxlite";
@@ -137,6 +139,9 @@ export interface DaemonLogger {
   warn(message: string, fields?: DaemonLogFields): void;
   error(message: string, fields?: DaemonLogFields): void;
   output(fields: DaemonLogFields & { text: string; stream: "stdout" | "stderr" }): void;
+  /** Wait until asynchronously buffered log writes have reached the filesystem. */
+  flush?(): Promise<void>;
+  close?(): Promise<void>;
 }
 
 export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promise<void> {
@@ -228,6 +233,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     setHealth("stopping", { signal: "external" });
     await environment.close();
     setHealth("stopped");
+    await logger.close?.();
     return;
   }
   let agentHealth = await discoverDaemonAgentHealth(environment, logger, sandboxId, options.signal);
@@ -312,6 +318,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
       }
       await environment.close();
       setHealth("stopped");
+      await logger.close?.();
       if (exitProcess) process.exit(0);
     })();
   };
@@ -825,32 +832,41 @@ async function executeCommand(
         pendingOutputPosts -= 1;
       });
   };
+  const emitOutput = (agent: AgentName, stream: "stdout" | "stderr", text: string): void => {
+    const sequence = outputSequence++;
+    logger.output({
+      ...commandLogFields(sandboxId, command),
+      agent,
+      stream,
+      text,
+      sequence,
+    });
+    enqueueOutputPost(
+      () => postJsonWithRetry(fetchFn, eventUrl, {
+          type: "run.output",
+          commandId: command.id,
+          ...commandLeaseEventFields(command),
+          sessionId: command.sessionId,
+          runId: command.runId,
+          agent,
+          stream,
+          text,
+          sequence,
+        } satisfies DaemonNodeEvent, token, signal),
+      { agent, stream, sequence },
+    );
+  };
+  const outputBuffer = new OutputEventBuffer(
+    (stream, text) => emitOutput(command.agent, stream, text),
+  );
   const eventSink = {
-    agentOutput: (_runId: string, agent: AgentName, stream: "stdout" | "stderr", text: string): void => {
-      const sequence = outputSequence++;
-      logger.output({
-        ...commandLogFields(sandboxId, command),
-        agent,
-        stream,
-        text,
-        sequence,
-      });
-      enqueueOutputPost(
-        () => postJsonWithRetry(fetchFn, eventUrl, {
-            type: "run.output",
-            commandId: command.id,
-            ...commandLeaseEventFields(command),
-            sessionId: command.sessionId,
-            runId: command.runId,
-            agent,
-            stream,
-            text,
-            sequence,
-          } satisfies DaemonNodeEvent, token, signal),
-        { agent, stream, sequence },
-      );
+    agentOutput: (_runId: string, _agent: AgentName, stream: "stdout" | "stderr", text: string): void => {
+      outputBuffer.push(stream, text);
     },
     agentCollaboration: (_runId: string, agent: AgentName, collaboration: CodexCollaborationEvent): void => {
+      // Keep structured collaboration events behind all output that preceded
+      // them in the agent's JSONL stream.
+      outputBuffer.flush();
       const sequence = outputSequence++;
       enqueueOutputPost(
         () => postJsonWithRetry(fetchFn, eventUrl, {
@@ -893,9 +909,14 @@ async function executeCommand(
   // Snapshot document-type workspace files so a successful run can report
   // exactly what it created or changed (see generated-files.ts).
   const workspaceSnapshot = snapshotGeneratedFiles(threadWorkspace.hostPath, scanOptions);
-  const patch = await runAgentNode(command.agent, command.mode, runState, options);
+  let patch;
+  try {
+    patch = await runAgentNode(command.agent, command.mode, runState, options);
+  } finally {
+    outputBuffer.close();
+    await outputPostChain;
+  }
   const next = mergeAgentState(state, patch);
-  await outputPostChain;
   const agentLog = next.agent_logs.slice(-1)[0] ?? "";
   if (signal?.aborted) {
     logger.info("run cancelled", {
@@ -1283,6 +1304,8 @@ export function createDaemonLogger(input: {
 }
 
 class JsonlDaemonLogger implements DaemonLogger {
+  private pendingWrite: Promise<void> = Promise.resolve();
+
   constructor(
     private readonly logDir: string,
     public readonly logPath: string,
@@ -1312,10 +1335,25 @@ class JsonlDaemonLogger implements DaemonLogger {
       ...fields,
     };
     const line = `${JSON.stringify(entry)}\n`;
-    appendFileSync(this.logPath, line);
+    const paths = [this.logPath];
     if (typeof fields.runId === "string" && fields.runId) {
-      appendFileSync(join(this.logDir, `${safeLogFileName(fields.runId)}.jsonl`), line);
+      paths.push(join(this.logDir, `${safeLogFileName(fields.runId)}.jsonl`));
     }
+    this.pendingWrite = this.pendingWrite
+      .then(async () => {
+        await Promise.all(paths.map((path) => appendFile(path, line, "utf8")));
+      })
+      .catch((error: unknown) => {
+        process.stderr.write(`Relay daemon log write failed: ${error instanceof Error ? error.message : String(error)}\n`);
+      });
+  }
+
+  async flush(): Promise<void> {
+    await this.pendingWrite;
+  }
+
+  async close(): Promise<void> {
+    await this.flush();
   }
 }
 

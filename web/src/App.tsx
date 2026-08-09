@@ -37,7 +37,7 @@ import { AppShell, RouteFallback } from "./components/AppShell";
 import { ThreadsView } from "./components/ThreadsView";
 import type { ComposerHandle } from "./components/composer/Composer";
 import type { DerivedMessage } from "./components/MessageBlock";
-import { projectMessages } from "./components/MessageBlock";
+import { ProjectMessagesAccumulator } from "./lib/projectMessages";
 import type { AppRoute } from "./lib/viewTypes";
 import { visibleThreadArtifacts } from "./lib/threadArtifacts";
 import {
@@ -169,6 +169,7 @@ export function App() {
   const composerRef = useRef<ComposerHandle>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
+  const messageProjectorRef = useRef(new ProjectMessagesAccumulator());
 
   const selectedEmployeeToken = tokens[selectedEmployee];
   const { sandboxes, nodes, sessions, tasks, isRefreshing, refresh, setSandboxes } = useRelayData(selectedEmployeeToken, Boolean(user));
@@ -354,7 +355,10 @@ export function App() {
     pendingSend: pendingUserMessage !== null,
     dispatchingRun: isRunning,
   });
-  const messages = useMemo<DerivedMessage[]>(() => projectMessages(activeSession, t), [activeSession, t]);
+  const messages = useMemo<DerivedMessage[]>(
+    () => messageProjectorRef.current.update(activeSession, t),
+    [activeSession, t],
+  );
   const displayMessages = useMemo<DerivedMessage[]>(() => {
     if (!pendingUserMessage) return messages;
     const present = messages.some(
@@ -850,6 +854,7 @@ export function App() {
   const handleComposerSend = useStableEvent(() => { void sendMessage(); });
   const handleCancelRun = useStableEvent(() => { void cancelActiveRun(); });
   const handleRetryAgent = useStableEvent((agent: AgentName, mode: AgentTaskMode, agentId?: string) => { void retryAgentMessage(agent, mode, agentId); });
+  const handleOpenThreadSpace = useStableEvent((artifact?: RelayArtifact) => openThreadSpace(artifact));
 
   async function sendDecision(kind: "approve" | "reject" | "rerun" | "mark_done") {
     if (!activeSession) return;
@@ -1123,7 +1128,7 @@ export function App() {
             spaceArtifactId={spaceArtifactId}
             spaceWidth={spaceWidth}
             threadListHidden={threadListHidden}
-            onOpenArtifacts={openThreadSpace}
+            onOpenArtifacts={handleOpenThreadSpace}
             onToggleSpace={toggleThreadSpace}
             onCloseSpace={closeThreadSpace}
             onSelectSpaceArtifact={setSpaceArtifactId}

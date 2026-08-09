@@ -1,5 +1,5 @@
 import { StatusError, StatusInfo, StatusOk, StatusWarn } from "./icons";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CodexCollaborationEvent } from "relay-core";
 
@@ -13,7 +13,7 @@ import {
   reasoningDisplay,
   type AgentSegment,
 } from "../lib/agentStream";
-import { Markdown, MarkdownContent } from "./Markdown";
+import { MarkdownContent } from "./Markdown";
 import { buildCollaborationTree } from "../lib/collaborationTree";
 import { SubagentTree } from "./SubagentTree";
 import { useDebouncedStreamingAnnouncement, useSmoothStreamingText } from "../hooks/useSmoothStreamingText";
@@ -214,24 +214,20 @@ function TextSegment({ text, live }: { text: string; live: boolean }) {
   const announcement = useDebouncedStreamingAnnouncement(text, live);
   return (
     <div className={`agent-text ${live ? "is-live" : ""}`}>
-      {live
-        ? (
-            <>
-              <StreamingProse text={visibleText} />
-              <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-                {announcement}
-              </span>
-            </>
-          )
-        : renderProse(text)}
+      <StreamingProse text={visibleText} live={live} />
+      {live ? (
+        <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {announcement}
+        </span>
+      ) : null}
     </div>
   );
 }
 
-function StreamingProse({ text }: { text: string }) {
-  const parts = splitStreamingMarkdown(text);
+function StreamingProse({ text, live }: { text: string; live: boolean }) {
+  const parts = splitStreamingMarkdown(text, live);
   return (
-    <div className="agent-prose agent-prose-live" aria-hidden="true">
+    <div className={`agent-prose ${live ? "agent-prose-live" : ""}`} aria-hidden={live || undefined}>
       {parts.map((part, index) => part.kind === "markdown"
         ? <MarkdownContent key={`markdown-${index}`} text={part.text} />
         : <p key={`text-${index}`}>{part.text}</p>)}
@@ -244,8 +240,4 @@ function StatusIcon({ tone }: { tone: "good" | "bad" | "warn" | "info" }) {
   if (tone === "bad") return <StatusError size={13} aria-hidden="true" />;
   if (tone === "warn") return <StatusWarn size={13} aria-hidden="true" />;
   return <StatusInfo size={13} aria-hidden="true" />;
-}
-
-function renderProse(text: string): ReactNode {
-  return <Markdown text={text} />;
 }

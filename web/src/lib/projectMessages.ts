@@ -216,38 +216,89 @@ function applyCompletedLogFallback(state: { stdout: string; stderr: string }, ag
   state.stderr = appendMissingStream(state.stderr, fallback.stderr);
 }
 
-export function projectMessages(session: RelaySession | undefined, t: TFunction): DerivedMessage[] {
-  if (!session) return [];
-  const out: DerivedMessage[] = [];
-  out.push({
-    kind: "user",
-    id: `${session.id}:goal`,
-    timestamp: session.createdAt,
-    text: session.taskGoal,
-  });
+type RunProjectionState = {
+  index: number;
+  attachmentIds: Set<string>;
+  stdout: string;
+  stderr: string;
+  collaborations: CodexCollaborationEvent[];
+};
 
-  const runState = new Map<
-    string,
-    {
-      index: number;
-      attachmentIds: Set<string>;
-      stdout: string;
-      stderr: string;
-      collaborations: CodexCollaborationEvent[];
+/** Incrementally materialize only the event suffix appended since the last render. */
+export class ProjectMessagesAccumulator {
+  private sessionId: string | undefined;
+  private taskGoal = "";
+  private createdAt = "";
+  private translator: TFunction | undefined;
+  private processedEvents = 0;
+  private lastEventId: string | undefined;
+  private out: DerivedMessage[] = [];
+  private snapshot: DerivedMessage[] = [];
+  private readonly runState = new Map<string, RunProjectionState>();
+
+  update(session: RelaySession | undefined, t: TFunction): DerivedMessage[] {
+    if (!session) {
+      this.clear();
+      return [];
     }
-  >();
+    const appendOnly = this.sessionId === session.id
+      && this.taskGoal === session.taskGoal
+      && this.createdAt === session.createdAt
+      && this.translator === t
+      && this.processedEvents <= session.events.length
+      && (this.processedEvents === 0 || session.events[this.processedEvents - 1]?.id === this.lastEventId);
+    if (!appendOnly) this.initialize(session, t);
 
-  const ensureRun = (
+    let changed = !appendOnly;
+    for (let index = this.processedEvents; index < session.events.length; index += 1) {
+      changed = this.applyEvent(session.events[index], t) || changed;
+    }
+    this.processedEvents = session.events.length;
+    this.lastEventId = session.events.at(-1)?.id;
+    if (changed) this.snapshot = [...this.out];
+    return this.snapshot;
+  }
+
+  private initialize(session: RelaySession, t: TFunction): void {
+    this.sessionId = session.id;
+    this.taskGoal = session.taskGoal;
+    this.createdAt = session.createdAt;
+    this.translator = t;
+    this.processedEvents = 0;
+    this.lastEventId = undefined;
+    this.runState.clear();
+    this.out = [{
+      kind: "user",
+      id: `${session.id}:goal`,
+      timestamp: session.createdAt,
+      text: session.taskGoal,
+    }];
+    this.snapshot = [...this.out];
+  }
+
+  private clear(): void {
+    this.sessionId = undefined;
+    this.taskGoal = "";
+    this.createdAt = "";
+    this.translator = undefined;
+    this.processedEvents = 0;
+    this.lastEventId = undefined;
+    this.runState.clear();
+    this.out = [];
+    this.snapshot = [];
+  }
+
+  private ensureRun(
     runId: string,
     agent: AgentName,
     timestamp: string,
     mode: AgentTaskMode = "action",
-  ): number => {
-    const existing = runState.get(runId);
-    if (existing) return existing.index;
-    const block: DerivedMessage = {
+  ): { index: number; created: boolean } {
+    const existing = this.runState.get(runId);
+    if (existing) return { index: existing.index, created: false };
+    this.out.push({
       kind: "agent",
-      id: `${session.id}:run:${runId}`,
+      id: `${this.sessionId}:run:${runId}`,
       timestamp,
       agent,
       mode,
@@ -257,95 +308,92 @@ export function projectMessages(session: RelaySession | undefined, t: TFunction)
       stderr: "",
       collaborations: [],
       attachments: [],
-    };
-    out.push(block);
-    const index = out.length - 1;
-    runState.set(runId, {
+    });
+    const index = this.out.length - 1;
+    this.runState.set(runId, {
       index,
       attachmentIds: new Set(),
       stdout: "",
       stderr: "",
       collaborations: [],
     });
-    return index;
-  };
+    return { index, created: true };
+  }
 
-  for (const event of session.events) {
+  private applyEvent(event: RelaySession["events"][number], t: TFunction): boolean {
     switch (event.type) {
       case "session.created":
-        break;
-      case "user.message": {
-        out.push({
-          kind: "user",
-          id: event.id,
-          timestamp: event.timestamp,
-          text: event.text,
-        });
-        break;
-      }
+      case "session.status":
+      case "session.completed":
+      case "session.failed":
+        return false;
+      case "user.message":
+        this.out.push({ kind: "user", id: event.id, timestamp: event.timestamp, text: event.text });
+        return true;
       case "agent.started": {
-        const index = ensureRun(event.runId, event.agent, event.timestamp, event.mode);
-        // The run can be created by an out-of-order agent.output first (which
-        // carries neither mode nor logical agent); agent.started is the
-        // authoritative source for both — reconcile them.
-        const block = out[index];
+        const ensured = this.ensureRun(event.runId, event.agent, event.timestamp, event.mode);
+        const block = this.out[ensured.index];
         if (block.kind === "agent" && (block.mode !== event.mode || block.agentId !== event.logicalAgentId)) {
-          out[index] = {
+          this.out[ensured.index] = {
             ...block,
             mode: event.mode,
             ...(event.logicalAgentId ? { agentId: event.logicalAgentId } : {}),
           };
+          return true;
         }
-        break;
+        return ensured.created;
       }
       case "agent.output": {
-        const index = ensureRun(event.runId, event.agent, event.timestamp);
-        const state = runState.get(event.runId);
-        if (!state) break;
+        const ensured = this.ensureRun(event.runId, event.agent, event.timestamp);
+        const state = this.runState.get(event.runId);
+        if (!state) return ensured.created;
         if (event.stream === "stdout") state.stdout += event.text;
         else state.stderr += event.text;
-        const block = out[index];
+        const block = this.out[ensured.index];
         if (block.kind === "agent") {
-          out[index] = { ...block, stdout: state.stdout, stderr: state.stderr };
+          this.out[ensured.index] = { ...block, stdout: state.stdout, stderr: state.stderr };
+          return true;
         }
-        break;
+        return ensured.created;
       }
       case "agent.collaboration": {
-        const index = ensureRun(event.runId, event.agent, event.timestamp, event.mode);
-        const state = runState.get(event.runId);
-        if (!state) break;
+        const ensured = this.ensureRun(event.runId, event.agent, event.timestamp, event.mode);
+        const state = this.runState.get(event.runId);
+        if (!state) return ensured.created;
         state.collaborations.push(event.collaboration);
-        const block = out[index];
+        const block = this.out[ensured.index];
         if (block.kind === "agent") {
-          out[index] = { ...block, collaborations: [...state.collaborations] };
+          this.out[ensured.index] = { ...block, collaborations: [...state.collaborations] };
+          return true;
         }
-        break;
+        return ensured.created;
       }
       case "artifact.created": {
-        if (event.artifact.kind === "command_log") break;
+        if (event.artifact.kind === "command_log") return false;
         const runId = event.artifact.agentRunId;
-        const state = runId ? runState.get(runId) : undefined;
+        const state = runId ? this.runState.get(runId) : undefined;
         if (runId && state) {
-          const block = out[state.index];
+          const block = this.out[state.index];
           if (!state.attachmentIds.has(event.artifact.id) && block.kind === "agent") {
             state.attachmentIds.add(event.artifact.id);
-            out[state.index] = { ...block, attachments: [...block.attachments, event.artifact] };
+            this.out[state.index] = { ...block, attachments: [...block.attachments, event.artifact] };
+            return true;
           }
-        } else {
-          out.push({
-            kind: "system",
-            id: event.id,
-            timestamp: event.timestamp,
-            tone: "neutral",
-            label: t("message.artifact", { kind: t(`artifact.kind.${event.artifact.kind}`, { defaultValue: event.artifact.kind }) }),
-            detail: event.artifact.title,
-            artifact: event.artifact,
-          });
+          return false;
         }
-        break;
+        this.out.push({
+          kind: "system",
+          id: event.id,
+          timestamp: event.timestamp,
+          tone: "neutral",
+          label: t("message.artifact", { kind: t(`artifact.kind.${event.artifact.kind}`, { defaultValue: event.artifact.kind }) }),
+          detail: event.artifact.title,
+          artifact: event.artifact,
+        });
+        return true;
       }
-      case "human.decision": {
-        out.push({
+      case "human.decision":
+        this.out.push({
           kind: "system",
           id: event.id,
           timestamp: event.timestamp,
@@ -353,33 +401,29 @@ export function projectMessages(session: RelaySession | undefined, t: TFunction)
           label: t("message.decision", { kind: t(`decision.${event.decision.kind}`, { defaultValue: event.decision.kind }) }),
           detail: event.decision.kind === "cancel" ? t("message.cancelled") : event.decision.note,
         });
-        break;
-      }
+        return true;
       case "agent.completed": {
-        const index = ensureRun(event.runId, event.agent, event.timestamp);
-        const state = runState.get(event.runId);
-        if (state) {
-          if (event.agentLog) {
-            applyCompletedLogFallback(state, event.agentLog);
-          }
-          const block = out[index];
-          if (block.kind === "agent") {
-            out[index] = {
-              ...block,
-              streaming: false,
-              stdout: state.stdout,
-              stderr: state.stderr,
-              ...(event.tokenUsage ? { tokenUsage: event.tokenUsage } : {}),
-            };
-          }
-        }
-        break;
+        const ensured = this.ensureRun(event.runId, event.agent, event.timestamp);
+        const state = this.runState.get(event.runId);
+        if (!state) return ensured.created;
+        if (event.agentLog) applyCompletedLogFallback(state, event.agentLog);
+        const block = this.out[ensured.index];
+        if (block.kind !== "agent") return ensured.created;
+        this.out[ensured.index] = {
+          ...block,
+          streaming: false,
+          stdout: state.stdout,
+          stderr: state.stderr,
+          ...(event.tokenUsage ? { tokenUsage: event.tokenUsage } : {}),
+        };
+        return true;
       }
-      case "session.status":
-      case "session.completed":
-      case "session.failed":
-        break;
+      default:
+        return false;
     }
   }
-  return out;
+}
+
+export function projectMessages(session: RelaySession | undefined, t: TFunction): DerivedMessage[] {
+  return new ProjectMessagesAccumulator().update(session, t);
 }

@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import type { TFunction } from "i18next";
 
-import { isGroupedContinuation, phaseDividerLabel, projectMessages } from "../src/lib/projectMessages.js";
+import { isGroupedContinuation, phaseDividerLabel, projectMessages, ProjectMessagesAccumulator } from "../src/lib/projectMessages.js";
 import {
   buildExecutorDisplayNameMap,
   buildLogicalAgentNameMap,
@@ -40,6 +41,49 @@ function session(events: RelaySession["events"]): RelaySession {
     events,
   };
 }
+
+describe("ProjectMessagesAccumulator", () => {
+  it("preserves settled message identities while applying an appended event suffix", () => {
+    const projector = new ProjectMessagesAccumulator();
+    const started = {
+      id: "ev_started",
+      type: "agent.started" as const,
+      sessionId: "ses_1",
+      timestamp,
+      runId: "run_1",
+      agent: "codex" as const,
+      mode: "action" as const,
+    };
+    const first = projector.update(session([started]), t);
+    const second = projector.update(session([
+      started,
+      {
+        id: "ev_output",
+        type: "agent.output",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "codex",
+        stream: "stdout",
+        text: "hello",
+        sequence: 0,
+      },
+    ]), t);
+
+    assert.equal(second[0], first[0]);
+    assert.notEqual(second[1], first[1]);
+    assert.equal(second[1]?.kind === "agent" ? second[1].stdout : "", "hello");
+  });
+});
+
+describe("memoized transcript messages", () => {
+  it("passes a stable artifact callback to MessageBlock", () => {
+    const source = readFileSync("web/src/App.tsx", "utf8");
+
+    assert.match(source, /const handleOpenThreadSpace = useStableEvent\(/);
+    assert.match(source, /onOpenArtifacts=\{handleOpenThreadSpace\}/);
+  });
+});
 
 describe("projectMessages artifact projection", () => {
   it("attaches structured collaboration events to the matching run", () => {

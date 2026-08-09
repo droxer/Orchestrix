@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { mergeSessionEventIntoSessions, mergeSessionEventsIntoSessions } from "../src/lib/sessionEventMerge.js";
-import { applySessionEvent } from "../src/lib/sessionEvents.js";
+import {
+  mergeSessionEventIntoSessions,
+  mergeSessionEventsIntoSessions,
+  SessionEventIdIndex,
+} from "../src/lib/sessionEventMerge.js";
+import { applySessionEvent, applySessionEventsUnchecked } from "../src/lib/sessionEvents.js";
 import type { RelaySession } from "../src/types.js";
 
 function session(partial: Partial<RelaySession> = {}): RelaySession {
@@ -124,7 +128,7 @@ describe("mergeSessionEventIntoSessions", () => {
         text: "two",
         sequence: 1,
       },
-    ], applySessionEvent);
+    ], applySessionEvent, applySessionEventsUnchecked);
 
     assert.notEqual(result.sessions, existing);
     assert.equal(result.consumed, 3);
@@ -157,5 +161,58 @@ describe("mergeSessionEventIntoSessions", () => {
 
     assert.equal(result.consumed, 1);
     assert.equal(result.sessions?.[0].events.length, 1);
+  });
+
+  it("indexes only the appended cache suffix after a poll race", () => {
+    const first = {
+      id: "evt_first",
+      type: "session.created" as const,
+      sessionId: "ses_1",
+      timestamp: "2026-06-20T00:00:01.000Z",
+      workspacePath: "/workspace",
+      taskGoal: "Test task",
+      participants: ["human"],
+    };
+    const polled = {
+      id: "evt_polled",
+      type: "session.status" as const,
+      sessionId: "ses_1",
+      timestamp: "2026-06-20T00:00:02.000Z",
+      status: "running" as const,
+      phase: "running",
+    };
+    const streamed = {
+      id: "evt_streamed",
+      type: "session.status" as const,
+      sessionId: "ses_1",
+      timestamp: "2026-06-20T00:00:03.000Z",
+      status: "waiting_for_human" as const,
+      phase: "feedback",
+    };
+    const index = new SessionEventIdIndex([first]);
+    let fullMapScans = 0;
+    const trackedEvents = new Proxy([first, polled], {
+      get(target, property, receiver) {
+        if (property === "map") fullMapScans += 1;
+        return Reflect.get(target, property, receiver);
+      },
+    });
+
+    const result = mergeSessionEventsIntoSessions(
+      [session({ events: trackedEvents })],
+      "ses_1",
+      [polled, streamed],
+      applySessionEvent,
+      applySessionEventsUnchecked,
+      index,
+    );
+
+    assert.equal(result.consumed, 1);
+    assert.deepEqual(result.sessions?.[0].events.map((event) => event.id), [
+      "evt_first",
+      "evt_polled",
+      "evt_streamed",
+    ]);
+    assert.equal(fullMapScans, 0);
   });
 });

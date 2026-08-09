@@ -572,7 +572,9 @@ async def daemon_events(
             )
             ctx.workspace_query_broker.resolve(event["commandId"], sandbox_id, event)
             return {"ok": True}
-        ctx.registry.handle_event(sandbox_id, event, bearer_token(request))
+        await run_in_threadpool(
+            ctx.registry.handle_event, sandbox_id, event, bearer_token(request)
+        )
         logger.debug(
             "Daemon node event handled",
             sandbox_id=sandbox_id,

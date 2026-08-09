@@ -21,10 +21,24 @@ export function applySessionEvent(session: RelaySession, event: RelayEvent): Rel
 
 /** Apply an event whose id was already checked by a batch-level Set. */
 export function applySessionEventUnchecked(session: RelaySession, event: RelayEvent): RelaySession {
+  return applySessionEventsUnchecked(session, [event]);
+}
+
+/** Apply a deduplicated SSE batch while copying the growing event list once. */
+export function applySessionEventsUnchecked(session: RelaySession, events: RelayEvent[]): RelaySession {
+  if (events.length === 0) return session;
+  let next: RelaySession = {
+    ...session,
+    events: [...session.events, ...events],
+  };
+  for (const event of events) next = applySessionEventProjection(next, event);
+  return next;
+}
+
+function applySessionEventProjection(session: RelaySession, event: RelayEvent): RelaySession {
   const next: RelaySession = {
     ...session,
     updatedAt: event.timestamp,
-    events: [...session.events, event],
   };
 
   switch (event.type) {

@@ -1,5 +1,5 @@
 import { IdentityUser, MetricTokens, StreamAttachment } from "./icons";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { AgentMark } from "./AgentMark";
@@ -179,7 +179,7 @@ type MessageBlockProps = {
   retryDisabled?: boolean;
 };
 
-export function MessageBlock({
+export const MessageBlock = memo(function MessageBlock({
   message,
   sessionId,
   grouped = false,
@@ -310,4 +310,4 @@ export function MessageBlock({
       <MsgTime value={message.timestamp} />
     </div>
   );
-}
+});

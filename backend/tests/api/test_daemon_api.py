@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from tempfile import TemporaryDirectory
@@ -57,6 +58,41 @@ def _create_user(client: TestClient, username: str, *, employee_id: str) -> None
         },
     )
     assert response.status_code == 201
+
+
+def test_daemon_run_events_leave_the_async_event_loop(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        ran_on_event_loop: list[bool] = []
+
+        def handle_event(*_args: object) -> None:
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                ran_on_event_loop.append(False)
+            else:
+                ran_on_event_loop.append(True)
+
+        monkeypatch.setattr(app.state.registry, "handle_event", handle_event)
+        response = client.post(
+            "/api/v1/daemon-nodes/sbx_test/events",
+            json={
+                "type": "run.output",
+                "commandId": "cmd_1",
+                "sessionId": "ses_1",
+                "runId": "run_1",
+                "agent": "codex",
+                "stream": "stdout",
+                "text": "live",
+                "sequence": 0,
+            },
+            headers={"Authorization": "Bearer node_token"},
+        )
+
+        assert response.status_code == 200
+        assert ran_on_event_loop == [False]
 
 
 def test_workspace_event_is_authorized_and_resolves_query_broker(monkeypatch) -> None:

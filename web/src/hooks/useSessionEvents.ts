@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RelaySession } from "../types";
-import { applySessionEventUnchecked } from "../lib/sessionEvents";
-import { mergeSessionEventsIntoSessions } from "../lib/sessionEventMerge";
+import { applySessionEventUnchecked, applySessionEventsUnchecked } from "../lib/sessionEvents";
+import { mergeSessionEventsIntoSessions, SessionEventIdIndex } from "../lib/sessionEventMerge";
 import { isTerminalSessionStatus, lastSessionEventId, sessionEventsUrl } from "../lib/sessionEventStream";
 import { browserFrameSchedulerHost, createFrameScheduler } from "../lib/frameScheduler";
 
@@ -33,7 +33,7 @@ export function useSessionEvents(sessionId: string | undefined, enabled: boolean
     // linear scan of the session's growing event list on every streamed delta.
     const cached = queryClient.getQueryData<RelaySession[]>(SESSIONS_KEY)
       ?.find((session) => session.id === sessionId);
-    const seen = new Set(cached?.events.map((event) => event.id) ?? []);
+    const eventIds = new SessionEventIdIndex(cached?.events ?? []);
     const queued = new Set<string>();
     let pending: RelayEvent[] = [];
     // Frame-aligned when the page paints, timer-backed when it does not — a
@@ -49,10 +49,9 @@ export function useSessionEvents(sessionId: string | undefined, enabled: boolean
           sessionId,
           events,
           applySessionEventUnchecked,
+          applySessionEventsUnchecked,
+          eventIds,
         );
-        if (sessions?.some((session) => session.id === sessionId)) {
-          for (const event of events) seen.add(event.id);
-        }
         return result.sessions;
       });
       for (const event of events) queued.delete(event.id);
@@ -60,7 +59,7 @@ export function useSessionEvents(sessionId: string | undefined, enabled: boolean
 
     const enqueue = (events: RelayEvent[]) => {
       for (const event of events) {
-        if (!event?.id || seen.has(event.id) || queued.has(event.id)) continue;
+        if (!event?.id || eventIds.has(event.id) || queued.has(event.id)) continue;
         queued.add(event.id);
         pending.push(event);
       }

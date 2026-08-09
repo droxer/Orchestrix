@@ -32,10 +32,11 @@ function closesFence(line: string, fence: Fence): boolean {
  * renderer can highlight those stable blocks without reparsing the unfinished
  * prose tail on every animation frame.
  */
-export function splitStreamingMarkdown(text: string): StreamingMarkdownPart[] {
-  if (!text) return [{ kind: "text", text }];
+export function splitStreamingMarkdown(text: string, streaming = true): StreamingMarkdownPart[] {
+  if (!text) return [{ kind: streaming ? "text" : "markdown", text }];
   const parts: StreamingMarkdownPart[] = [];
   let plainStart = 0;
+  let stablePlainEnd = 0;
   let fenceStart = -1;
   let fence: Fence | null = null;
   let lineStart = 0;
@@ -50,15 +51,20 @@ export function splitStreamingMarkdown(text: string): StreamingMarkdownPart[] {
     if (!fence) {
       const opener = openingFence(line);
       if (opener) {
+        if (plainStart < lineStart) {
+          parts.push({ kind: "markdown", text: text.slice(plainStart, lineStart) });
+        }
         fence = opener;
         fenceStart = lineStart;
+        plainStart = lineStart;
+        stablePlainEnd = lineStart;
+      } else if (line.trim() === "" && newline >= 0) {
+        stablePlainEnd = nextLineStart;
       }
     } else if (closesFence(line, fence)) {
-      if (plainStart < fenceStart) {
-        parts.push({ kind: "text", text: text.slice(plainStart, fenceStart) });
-      }
       parts.push({ kind: "markdown", text: text.slice(fenceStart, nextLineStart) });
       plainStart = nextLineStart;
+      stablePlainEnd = nextLineStart;
       fenceStart = -1;
       fence = null;
     }
@@ -66,8 +72,12 @@ export function splitStreamingMarkdown(text: string): StreamingMarkdownPart[] {
     lineStart = nextLineStart;
   }
 
+  if (!fence && stablePlainEnd > plainStart) {
+    parts.push({ kind: "markdown", text: text.slice(plainStart, stablePlainEnd) });
+    plainStart = stablePlainEnd;
+  }
   if (plainStart < text.length) {
-    parts.push({ kind: "text", text: text.slice(plainStart) });
+    parts.push({ kind: streaming ? "text" : "markdown", text: text.slice(plainStart) });
   }
   return parts;
 }
