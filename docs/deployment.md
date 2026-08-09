@@ -16,6 +16,7 @@ the hosting:
 | `backend/` (FastAPI) | **Railway** | Long-lived process: SSE streams, daemon command queue, background task scheduler. |
 | Postgres | **Railway** | Sessions, tasks, events, auth, daemon registry. |
 | `relay-daemon` | **Neither** | Runs where the sandbox lives — see below. |
+| `relay-supervisor` | **Depends on its provider** | Control plane with `--provider command`, execution plane with `--provider local`. See [The supervisor](#the-supervisor). |
 
 **Daemons do not belong on Vercel or Railway.** The backend never executes
 agents; it queues commands that daemons poll for. A daemon in its default mode
@@ -28,6 +29,43 @@ You *can* run a daemon in a plain container with `--sandbox none`, where agents
 are host processes rather than VM guests. That trades the sandbox boundary for
 container isolation only, and you must supply each agent CLI's credentials in
 the image. Treat it as a deliberate choice, not the default.
+
+### The supervisor
+
+`relay-supervisor` reconciles requested managed computers into running daemons.
+Where it can be hosted depends entirely on which provider it uses, because the
+two providers put it on opposite sides of the control/execution split:
+
+- **`--provider local`** (the default) spawns `relay-daemon` as a child process
+  on its own host (`LocalProcessProvider`), and defaults to `--sandbox boxlite`.
+  That makes it an execution-plane component: it inherits every daemon
+  constraint, including hardware virtualization, and does not belong on Railway.
+- **`--provider command`** renders a command template — `gcloud workstations
+  ssh …`, `ssh`, a cloud API call — that starts the daemon on infrastructure
+  you control. The supervisor itself then runs no agents and no sandbox, so it
+  is deployable next to the backend as a second Railway service.
+
+Either way it is **never a Vercel workload**: it is a reconcile loop
+(`--interval-ms`, default 10s), and in command mode it holds a live child
+process per launched daemon rather than dispatching and forgetting.
+
+If you deploy it on Railway with `--provider command`:
+
+- It authenticates to the backend with `RELAY_ADMIN_TOKEN` as a bearer token,
+  so that variable must stay set on the backend and be given to the supervisor
+  service. That is a standing admin credential — see
+  [Secrets](#secrets).
+- Node tokens are interpolated into a shell command line (`shell: true`), so
+  they are visible in the process table of whatever host runs the template.
+  Keep that host dedicated.
+- Restarts kill the child processes it is holding. Reconciliation restarts them
+  on the next pass, but a redeploy is a disruption, not a no-op.
+- Run one replica, for the same reason the backend does: two supervisors
+  reconcile the same desired state against the same nodes.
+
+`--once` runs a single reconcile pass and exits, which suits a scheduled job
+better than a long-lived service if your provider template is fully
+fire-and-forget.
 
 ```
    browser
@@ -104,7 +142,7 @@ This is the better steady state once you have a domain. Requires DNS.
 
    | Variable | Value | Notes |
    | --- | --- | --- |
-   | `RELAY_ADMIN_TOKEN` | a long random string | Bootstraps the first admin, once. Remove it afterwards. |
+   | `RELAY_ADMIN_TOKEN` | a long random string | Bootstraps the first admin — and stays a valid admin bearer token for as long as it is set. Remove it after bootstrap unless a supervisor needs it. |
    | `RELAY_CORS_ALLOW_ORIGINS` | `https://app.example.com` | **Option B only.** Exact origins, comma-separated. `*` is rejected. |
    | `RELAY_CORS_ALLOW_ORIGIN_REGEX` | `https://relay-web-[a-z0-9-]+\.vercel\.app` | **Option B only**, if you want Vercel preview deployments to reach the API. |
    | `RELAY_SESSION_COOKIE_DOMAIN` | `.example.com` | **Option B only.** Shares the cookie across `app.` and `api.`. |
@@ -172,9 +210,16 @@ calls the backend origin directly with `credentials: "include"`.
      -d '{"token":"<RELAY_ADMIN_TOKEN>","username":"admin","password":"<password>"}'
    ```
 
-   Then delete `RELAY_ADMIN_TOKEN` from the service variables and redeploy. It
-   is a bootstrap credential, not a runtime one — the route refuses to run once
-   a user exists, but there is no reason to keep it deployed.
+   Then delete `RELAY_ADMIN_TOKEN` from the service variables and redeploy —
+   unless you run a supervisor, which authenticates with it (see
+   [The supervisor](#the-supervisor)).
+
+   This token is **not** only a bootstrap credential. `require_admin_session`
+   accepts it as a bearer token on every admin route, so while it is deployed
+   it is a standing admin bypass that no user account, password change, or
+   session revocation affects. Treat it as a break-glass key: remove it once
+   the first admin exists, and if a supervisor needs it, scope that service's
+   variables accordingly and rotate the value if it leaks.
 
 2. **Sign in** at the Vercel URL and confirm the admin dashboard loads.
 
@@ -220,6 +265,12 @@ matter.
 the platform's variable store, never in `backend/.env` — that file is
 git-ignored and is a local-development convenience only. Daemon tokens are
 issued per computer by the backend and are never set as service variables.
+
+`RELAY_ADMIN_TOKEN` deserves separate care: `require_admin_session` accepts it
+as a bearer token on every admin route, ahead of any session check. While it is
+set, it grants full admin access that is unaffected by user accounts, password
+changes, or session revocation. Remove it after bootstrap; keep it only if a
+supervisor authenticates with it, and rotate it if it is ever exposed.
 
 ### Local development is unchanged
 
