@@ -1,4 +1,4 @@
-import { relayApiEndpoint } from "./apiOrigin.js";
+import { relayApiEndpoint } from "./apiOrigin";
 import type { RelaySession, SessionStatus } from "../types.js";
 
 const TERMINAL_SESSION_STATUSES: ReadonlySet<SessionStatus> = new Set(["completed", "failed", "cancelled"]);

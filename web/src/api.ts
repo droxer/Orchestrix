@@ -1,4 +1,4 @@
-import { relayApiEndpoint, relayBackendPath } from "./lib/apiOrigin.js";
+import { relayApiEndpoint, relayBackendPath } from "./lib/apiOrigin";
 import type {
   AgentName,
   AgentRole,
