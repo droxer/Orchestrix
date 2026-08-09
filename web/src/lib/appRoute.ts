@@ -108,10 +108,15 @@ export function canonicalSearchForPath(pathname: string, search = ""): string {
   if (head === "login" && !entityId) {
     const rawReturnTo = source.get("returnTo");
     if (rawReturnTo) target.set("returnTo", validatedReturnTo(rawReturnTo));
-  } else if (head === "threads" && entityId && entityId !== "new" && rest.length === 0) {
+  } else if (head === "threads" && entityId !== "new" && rest.length === 0) {
     // The thread space panel is URL-driven (?space=1&artifact=<id>) so an open
     // panel survives reload and can be shared. The selection only means
     // something while the panel is open.
+    // The bare /threads path owns these too: on desktop it still shows a
+    // thread (the most recent one, picked as the fallback), so the panel can
+    // be opened from there. Dropping the params on that path made the toggle
+    // write space=1 and have it canonicalized straight back out — a click
+    // that did nothing at all. Only /threads/new has no thread to describe.
     if (source.get("space") === "1") {
       target.set("space", "1");
       copyParam(source, target, "artifact");
@@ -149,6 +154,14 @@ export function canonicalSearchForPath(pathname: string, search = ""): string {
 
 export function canonicalBrowserUrl(pathname: string, search = ""): string {
   return `${pathname}${canonicalSearchForPath(pathname, search)}`;
+}
+
+/** Whether `?space=1` survives on this path. A surface that writes a search
+ *  param the path does not own gets it canonicalized straight back out, so
+ *  the write silently does nothing — assert ownership here rather than
+ *  discovering it as a dead control. */
+export function pathKeepsThreadSpaceParams(pathname: string): boolean {
+  return canonicalSearchForPath(pathname, "?space=1") !== "";
 }
 
 export function validatedReturnTo(value: string | null, origin = "http://relay.local"): string {

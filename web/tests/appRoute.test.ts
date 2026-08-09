@@ -6,6 +6,7 @@ import {
   hrefForRoute,
   parseAppPath,
   pathForAppState,
+  pathKeepsThreadSpaceParams,
   validatedReturnTo,
 } from "../src/lib/appRoute.js";
 
@@ -94,6 +95,22 @@ describe("app pathname routes", () => {
     assert.equal(canonicalBrowserUrl("/threads/ses-1", "?space=0"), "/threads/ses-1");
     // Composing a new thread has no output, and the collection has no panel.
     assert.equal(canonicalBrowserUrl("/threads/new", "?space=1"), "/threads/new");
-    assert.equal(canonicalBrowserUrl("/threads", "?space=1&artifact=art-9"), "/threads");
+    // The bare list path still shows a thread on desktop, so it owns the
+    // panel params too — otherwise the toggle writes them and the canonical
+    // URL drops them again, and the button does nothing.
+    assert.equal(
+      canonicalBrowserUrl("/threads", "?space=1&artifact=art-9"),
+      "/threads?space=1&artifact=art-9",
+    );
+  });
+
+  it("reports which paths keep the thread space params", () => {
+    // A surface that writes ?space=1 on a path that does not own it gets the
+    // param canonicalized straight back out, so the toggle does nothing at
+    // all — so every path that can show the toggle has to keep them.
+    assert.equal(pathKeepsThreadSpaceParams("/threads/ses-1"), true);
+    assert.equal(pathKeepsThreadSpaceParams("/threads"), true);
+    assert.equal(pathKeepsThreadSpaceParams("/threads/new"), false);
+    assert.equal(pathKeepsThreadSpaceParams("/backlog"), false);
   });
 });

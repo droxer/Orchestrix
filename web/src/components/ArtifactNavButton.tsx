@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
-import { StreamAttachment } from "./icons";
+import { ThreadSpaceToggle } from "./icons";
 import { Button } from "@/components/ui/button";
 
 export function ArtifactNavButton({ artifactCount, onOpenArtifacts, expanded, disabled, className }: {
@@ -25,7 +25,7 @@ export function ArtifactNavButton({ artifactCount, onOpenArtifacts, expanded, di
       disabled={disabled}
       onClick={onOpenArtifacts}
     >
-      <StreamAttachment size={16} />
+      <ThreadSpaceToggle size={16} />
       {artifactCount > 0 ? (
         <span className="chat-artifacts-count tnum" aria-label={t("artifact.drawer_subtitle", { count: artifactCount })}>
           {artifactCount}
