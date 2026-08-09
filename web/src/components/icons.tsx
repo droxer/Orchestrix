@@ -45,6 +45,7 @@ import {
   Network,
   PanelLeftClose,
   PanelLeftOpen,
+  PanelRight,
   Paperclip,
   Pencil,
   Plus,
@@ -188,6 +189,14 @@ export const StatusInfo = withStandardStroke(Info, "StatusInfo");
 export const StatusWarn = withStandardStroke(TriangleAlert, "StatusWarn");
 export const StatusError = withStandardStroke(CircleAlert, "StatusError");
 export const StreamAttachment = withStandardStroke(Paperclip, "StreamAttachment");
+
+// The thread space toggle shows and hides the right-hand panel; it is a
+// panel control, not an attachment. A paperclip pictured "something clipped
+// to this message" — the wrong object, since the panel holds what the thread
+// *produced*. `PanelRight` joins the existing PanelLeft* sidebar pair so
+// every chrome control that reveals a panel is drawn the same way, and the
+// filled edge points at the side the panel appears on.
+export const ThreadSpaceToggle = withStandardStroke(PanelRight, "ThreadSpaceToggle");
 
 // Identity and metrics inside a transcript.
 export const IdentityUser = withStandardStroke(UserRound, "IdentityUser");
