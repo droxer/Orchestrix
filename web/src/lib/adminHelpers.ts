@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import { backendPublicOrigin } from "./apiOrigin";
+import { backendPublicOrigin } from "./apiOrigin.ts";
 import type { AgentName, ControlPanelDaemonNodeRecord, EmployeeAgent, EmployeeRecord, LogicalAgentAvailability, Tone } from "../types.js";
 
 export const ADMIN_AGENTS_KEY = ["admin", "agents"] as const;

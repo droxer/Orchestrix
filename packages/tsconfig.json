@@ -9,6 +9,8 @@
     "skipLibCheck": true,
     "outDir": "../dist",
     "rootDir": "..",
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "types": ["node"],
     "baseUrl": "..",
     "paths": {

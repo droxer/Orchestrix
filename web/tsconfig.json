@@ -12,6 +12,7 @@
     },
     "isolatedModules": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "plugins": [{ "name": "next" }]
   },
   "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts"],
