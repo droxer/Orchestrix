@@ -12,6 +12,7 @@ import { AgentWorkspacePage, type WorkspacePageTab } from "./AgentWorkspacePage"
 import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { FilterSelect } from "./FiltersBar";
 import { SearchInput } from "@/components/ui/search-input";
 import { describeAgentPlacements } from "../lib/agentPlacements";
@@ -121,7 +122,8 @@ function RosterRow({
         data-availability={agent.availability}
         data-selected={selected ? "true" : "false"}
       >
-        <button
+        <Button
+          variant="ghost"
           type="button"
           className="agents-roster-row-select"
           aria-current={selected ? "page" : undefined}
@@ -167,7 +169,7 @@ function RosterRow({
               <StatusPill value={agent.availability} />
             </span>
           ) : null}
-        </button>
+        </Button>
       </article>
     </li>
   );

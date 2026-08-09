@@ -53,12 +53,14 @@ export function useModalDrawer<T extends HTMLElement>(onClose: () => void, enabl
     (preferred ?? panel)?.focus();
 
     function handleKey(event: KeyboardEvent) {
-      // Confirm/prompt dialogs and portalled Radix overlays own the keyboard while open; defer.
-      if (
-        document.querySelector(
-          '.dialog-backdrop, [data-slot="select-content"], [data-radix-popper-content-wrapper]',
-        )
-      ) {
+      // Confirm/prompt dialogs and portalled Radix overlays own the keyboard
+      // while open; defer. DialogProvider itself uses this hook and its portal
+      // wraps the panel in `.dialog-backdrop` — a match containing this panel
+      // is our own backdrop, not a higher layer.
+      const topOverlay = document.querySelector(
+        '.dialog-backdrop, [data-slot="select-content"], [data-radix-popper-content-wrapper]',
+      );
+      if (topOverlay && !topOverlay.contains(panel)) {
         return;
       }
 

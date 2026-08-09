@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { StreamAttachment } from "./icons";
 import { Button } from "@/components/ui/button";
 
-export function ArtifactNavButton({ artifactCount, onOpenArtifacts, expanded, disabled, className = "icon-button" }: {
+export function ArtifactNavButton({ artifactCount, onOpenArtifacts, expanded, disabled, className }: {
   artifactCount: number;
   onOpenArtifacts: () => void;
   expanded?: boolean;
@@ -15,7 +15,8 @@ export function ArtifactNavButton({ artifactCount, onOpenArtifacts, expanded, di
 
   return (
     <Button
-      variant="ghost"
+      variant="icon"
+      size="icon-r"
       className={className}
       type="button"
       aria-label={t("space.toggle")}

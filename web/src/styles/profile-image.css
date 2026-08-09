@@ -167,7 +167,7 @@
 
 .teams-list-mark .profile-image {
   width: 28px;
-  height: 28px;
+  height: var(--control-h-xs);
   border-radius: inherit;
 }
 

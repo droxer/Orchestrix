@@ -120,9 +120,11 @@ describe("statusTone", () => {
   it("maps known statuses to tones", () => {
     assert.equal(statusTone("ready"), "good");
     assert.equal(statusTone("running"), "info");
+    assert.equal(statusTone("busy"), "info");
     assert.equal(statusTone("provisioning"), "info");
     assert.equal(statusTone("failed"), "bad");
     assert.equal(statusTone("stale"), "bad");
+    assert.equal(statusTone("pending"), "warn");
     assert.equal(statusTone("stopped"), "warn");
     assert.equal(statusTone("anything-else"), "neutral");
   });

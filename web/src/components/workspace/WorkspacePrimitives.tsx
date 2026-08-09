@@ -139,10 +139,10 @@ function ActivityRow({ title, meta, onClick }: { title: string; meta: string; on
     );
   }
   return (
-    <button type="button" className="workspace-pick workspace-activity-pick" onClick={onClick}>
+    <Button variant="ghost" type="button" className="workspace-pick workspace-activity-pick" onClick={onClick}>
       <span className="workspace-pick-title">{title}</span>
       <span className="workspace-pick-meta tnum">{meta}</span>
-    </button>
+    </Button>
   );
 }
 

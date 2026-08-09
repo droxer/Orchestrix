@@ -196,4 +196,61 @@ describe("design grid", () => {
       "the space panel must leave the grid and overlay at <=820px",
     );
   });
+
+  it("keeps each class selector owned by exactly one non-exempt sheet", () => {
+    // A selector defined in two surface sheets resolves by import order, not
+    // by the rule you edited — the .conversation-row / .adm-drawer-title /
+    // .adm-view-toggle drift class, where atelier.css's copy silently won.
+    //
+    // Three sheets are exempt because they restate selectors BY DESIGN:
+    //   responsive.css — the sanctioned late sheet for media-query overrides;
+    //   a11y.css       — the sanctioned late sheet for reduced-motion/forced-
+    //                    colors restatements;
+    //   atelier.css    — a grammar layer that deliberately re-declares other
+    //                    sheets' classes (documented as canonical owner at
+    //                    sidenav.css:287, workspace.css:966, responsive.css:150).
+    // The guard therefore only catches redefinition BETWEEN non-exempt sheets.
+    const entry = readFileSync(path.join(repoRoot, "web", "src", "styles.css"), "utf8");
+    const order = [...entry.matchAll(/@import\s+["']\.\/styles\/([^"']+\.css)["']/g)].map((m) => m[1]);
+    assert.ok(order.length > 0, "styles.css lost its sheet imports");
+
+    const exempt: Record<string, true> = { "responsive.css": true, "a11y.css": true, "atelier.css": true };
+    const surface = new Set(surfaceSheets().map(({ name }) => name));
+
+    /** Remove at-rule blocks (@media/@supports/@keyframes) — nested rules are
+        sanctioned contextual overrides, not competing definitions. Bodies
+        here never nest deeper than rule > declarations. */
+    const stripAtRuleBlocks = (source: string): string => {
+      let out = source;
+      const pattern = /@[a-zA-Z-]+[^{}]*\{(?:[^{}]|\{[^{}]*\})*\}/g;
+      for (;;) {
+        const next = out.replace(pattern, "");
+        if (next === out) return out;
+        out = next;
+      }
+    };
+
+    const owner = new Map<string, string>();
+    const duplicates: string[] = [];
+    for (const name of order) {
+      if (exempt[name] || !surface.has(name)) continue;
+      const source = stripAtRuleBlocks(stripComments(readStyle(name)));
+      // Key on the full selector (classes + attributes + pseudos), not on the
+      // class names inside it: `.agents-detail .relay-empty--fill` styles the
+      // empty state in context; it does not redefine `.relay-empty--fill`.
+      const selectors = new Set<string>();
+      for (const m of source.matchAll(/([^{}]+)\{/g)) {
+        for (const part of m[1].split(",")) {
+          const selector = part.replace(/\s+/g, " ").trim();
+          if (selector && !selector.startsWith("@") && selector.includes(".")) selectors.add(selector);
+        }
+      }
+      for (const selector of selectors) {
+        const first = owner.get(selector);
+        if (first) duplicates.push(`${selector}: defined in both ${first} and ${name}`);
+        else owner.set(selector, name);
+      }
+    }
+    assert.deepEqual(duplicates, [], "one selector, one owning sheet — overrides belong in an exempt late sheet");
+  });
 });

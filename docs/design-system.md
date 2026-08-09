@@ -213,6 +213,7 @@ header)" and `--t-pulse-calm` as "passive presence (online dot, idle node)".
 | agent stream activity | login readiness |
 | busy header agent | any idle or merely-present state |
 | thread pulse, streaming rail node | |
+| status pill on a running agent/node (TonePill `live`) | |
 
 "One colour" is a claim about **meaning**, not pigment. Three carve-outs, all
 deliberate — a reader who takes the rule literally will file them as bugs:

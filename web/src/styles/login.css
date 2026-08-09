@@ -78,7 +78,7 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--fs-5);
-  font-weight: 550;
+  font-weight: 600;
   letter-spacing: var(--track-display);
   color: var(--lg-ink);
 }

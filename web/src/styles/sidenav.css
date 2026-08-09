@@ -66,7 +66,7 @@
 .sidenav-brand-word {
   color: var(--ink-1);
   font: var(--type-heading);
-  letter-spacing: var(--track-display);
+  letter-spacing: var(--type-heading-track);
   opacity: 0;
   transition: opacity var(--t-fast) var(--ease) calc(var(--t-fast) * 0.75);
 }
@@ -134,20 +134,6 @@
   font: var(--type-micro);
   font-size: var(--fs-1);
   letter-spacing: var(--track-0);
-}
-
-.sidenav-separator {
-  width: var(--sp-6);
-  height: 1px;
-  margin: var(--sp-2) 0;
-  border-color: var(--line-1);
-  background-color: var(--line-1);
-  flex-shrink: 0;
-}
-
-.sidenav-panel[data-expanded="true"] .sidenav-separator {
-  width: auto;
-  margin: var(--sp-2) var(--sp-3);
 }
 
 .sidenav-bottom {
@@ -402,13 +388,6 @@
 
 .sidenav-toggle svg {
   flex-shrink: 0;
-}
-
-.thread-panel {
-  min-width: 0;
-  min-height: 0;
-  background: var(--surface-0);
-  border-color: var(--line-1);
 }
 
 /* "Coming soon" marker (Channels): a micro-caps pill beside the label when

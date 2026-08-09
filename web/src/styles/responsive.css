@@ -125,7 +125,7 @@
     justify-self: end;
   }
 
-  .mobile-topbar-chat-tools .icon-button,
+  .mobile-topbar-chat-tools [data-variant="icon"],
   .mobile-topbar-chat-tools .mobile-settings {
     position: relative;
     width: var(--touch-target);
@@ -265,7 +265,6 @@
 
   .sidenav-brand-row,
   .sidenav-bottom,
-  .sidenav-separator,
   .sidenav-group-label,
   .sidenav-tooltip,
   .sidenav-settings-menu {
@@ -479,7 +478,7 @@
   /* Bottom tab bar already owns safe-area-inset-bottom. Composer sits above
      it, so a second inset here creates a dead band on notched phones. */
   .composer {
-    --composer-inline: 18px;
+    --composer-inline: var(--sp-4);
     padding: var(--sp-3) var(--sp-3) var(--sp-4);
   }
 

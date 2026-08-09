@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { RelayEmptyState } from "../RelayEmptyState";
+import { TonePill } from "../StatusPill";
 import { Drawer } from "@/components/ui/Drawer";
 import {
   activateChatIntegration,
@@ -42,7 +43,7 @@ import {
 import { agentsOnNodes } from "../../lib/adminHelpers";
 import { backendPublicOrigin } from "../../lib/apiOrigin";
 import { useUrlSearchState } from "../../hooks/useUrlSearchState";
-import type { ChatIntegration, ChatProvider } from "../../types";
+import type { ChatIntegration, ChatProvider, Tone } from "../../types";
 
 const CHAT_INTEGRATIONS_KEY = ["admin", "chat-integrations"] as const;
 const TELEGRAM_CREDENTIAL_FIELDS = [
@@ -80,7 +81,10 @@ function ProviderAvatar({ provider, size }: { provider: ChatProvider; size?: "lg
   );
 }
 
-function statusTone(status: ChatIntegration["status"]): string {
+// Canonical tone semantics (see lib/statusTone.ts): a healthy integration is
+// good, a degraded one is warn (queued/impaired), a disabled one is bad
+// (unreachable), anything else falls through to neutral.
+function statusTone(status: ChatIntegration["status"]): Tone {
   if (status === "active") return "good";
   if (status === "degraded") return "warn";
   if (status === "disabled") return "bad";
@@ -623,7 +627,7 @@ export function ChannelsView({
         </p>
       ) : null}
       {notice ? (
-        <p className="adm-view-notice relay-enter" role="status" aria-live="polite">
+        <p className="adm-view-notice" role="status" aria-live="polite">
           {notice}
         </p>
       ) : null}
@@ -665,20 +669,19 @@ export function ChannelsView({
     return (
       <div className="adm-view adm-chat">
         {alerts}
-        <div className="adm-chat-stage relay-enter">
+        <div className="adm-chat-stage">
           <div className="adm-chat-stage-intro">
-            <div className="adm-chat-stage-mark relay-enter relay-enter-delay-1">
+            <div className="adm-chat-stage-mark">
               <ProviderAvatar provider="telegram" size="hero" />
             </div>
             <RelayEmptyState
               className="adm-chat-stage-empty"
               title={t("admin.v2.chat_stage_title")}
               body={t("admin.v2.chat_stage_body")}
-              animate={false}
               titleId="channels-stage-title"
             />
           </div>
-          <div className="adm-chat-stage-form relay-enter relay-enter-delay-3">
+          <div className="adm-chat-stage-form">
             <ChannelCreateForm {...createFormProps} idPrefix="chat" />
           </div>
         </div>
@@ -690,7 +693,7 @@ export function ChannelsView({
     <div className="adm-view adm-chat">
       {alerts}
 
-      <div className="adm-chat-toolbar relay-enter">
+      <div className="adm-chat-toolbar">
         <div className="adm-chat-metrics" role="group" aria-label={t("admin.v2.chat_metrics_label")}>
           <span className="adm-chat-metric">
             <span className="adm-chat-metric-label">{t("admin.v2.chat_metric_channels")}</span>
@@ -714,7 +717,7 @@ export function ChannelsView({
       </div>
 
       <div className="adm-chat-grid">
-        <section className="adm-chat-panel adm-chat-panel--list relay-enter relay-enter-delay-1">
+        <section className="adm-chat-panel adm-chat-panel--list">
           <header className="adm-chat-panel-head">
             <AdminChannel size={18} aria-hidden="true" />
             <div>
@@ -723,14 +726,14 @@ export function ChannelsView({
             </div>
           </header>
           <div className="adm-chat-integration-list">
-            {integrations.map((integration, index) => {
+            {integrations.map((integration) => {
               const active = selected?.id === integration.id;
               return (
                 <Button
                   variant="ghost"
                   key={integration.id}
                   type="button"
-                  className={`adm-chat-integration relay-enter relay-enter-delay-${Math.min(index + 2, 5)}`}
+                  className="adm-chat-integration"
                   data-active={active ? "true" : "false"}
                   onClick={() => setSelectedId(integration.id)}
                 >
@@ -742,16 +745,18 @@ export function ChannelsView({
                       {integration.tenantId ? ` · ${integration.tenantId}` : ""}
                     </span>
                   </span>
-                  <span className={`adm-status-pill tone-${statusTone(integration.status)}`}>
-                    {t(`admin.v2.chat_status_${integration.status}`, { defaultValue: integration.status })}
-                  </span>
+                  <TonePill
+                    tone={statusTone(integration.status)}
+                    label={t(`admin.v2.chat_status_${integration.status}`, { defaultValue: integration.status })}
+                    live={statusTone(integration.status) === "info"}
+                  />
                 </Button>
               );
             })}
           </div>
         </section>
 
-        <section className="adm-chat-panel adm-chat-panel--detail relay-enter relay-enter-delay-2">
+        <section className="adm-chat-panel adm-chat-panel--detail">
           {selected ? (
             <>
               <header className="adm-chat-panel-head adm-chat-panel-head--detail">
@@ -760,9 +765,11 @@ export function ChannelsView({
                   <h2>{selected.displayName}</h2>
                   <p>{selected.health.message}</p>
                 </div>
-                <span className={`adm-status-pill tone-${statusTone(selected.status)}`}>
-                  {t(`admin.v2.chat_status_${selected.status}`, { defaultValue: selected.status })}
-                </span>
+                <TonePill
+                  tone={statusTone(selected.status)}
+                  label={t(`admin.v2.chat_status_${selected.status}`, { defaultValue: selected.status })}
+                  live={statusTone(selected.status) === "info"}
+                />
               </header>
 
               <div className="adm-chat-readiness" role="list" aria-label={t("admin.v2.chat_readiness_label")}>

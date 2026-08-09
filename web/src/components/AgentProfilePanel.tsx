@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { ADMIN_AGENTS_KEY } from "../lib/adminHelpers";
 import { EMPLOYEE_AGENTS_QUERY_KEY } from "../hooks/useEmployeeAgents";
 import { formatRelativeTime, agentAvailabilityTone } from "./admin/helpers";
+import { TonePill } from "./StatusPill";
 import { IdentityMonogram } from "./IdentityMonogram";
 import { AgentPersonalityEditor } from "./AgentPersonalityEditor";
 import { PlacementList } from "./PlacementList";
@@ -604,10 +605,11 @@ export function AgentProfilePanel({
 
       <div className="adm-cred-row">
         <span className="adm-cred-label">{t("admin.v2.agent_availability_label")}</span>
-        <span className={`adm-status-pill tone-${agentAvailabilityTone(agent.availability)}`}>
-          <span className="adm-status-dot" aria-hidden="true" />
-          {t(`admin.v2.placement_status.${agent.availability}`, { defaultValue: agent.availability })}
-        </span>
+        <TonePill
+          tone={agentAvailabilityTone(agent.availability)}
+          label={t(`admin.v2.placement_status.${agent.availability}`, { defaultValue: agent.availability })}
+          live={agentAvailabilityTone(agent.availability) === "info"}
+        />
       </div>
 
       <p className="adm-cred-note">

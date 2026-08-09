@@ -3,8 +3,6 @@
 
    One visual language for transcript, board, and setup zero-data surfaces.
    No entrance choreography: monitoring and data surfaces render settled.
-   The .relay-enter / .relay-enter-delay-* classes remain on JSX call sites
-   as inert markers — they no longer carry motion.
    ===================================================================== */
 
 /* Bled "R" mark — the login signature extended to soft empty-state surfaces. */
@@ -89,7 +87,7 @@ html[data-theme="dark"] .relay-bleed-mark {
 .relay-empty-title {
   margin: 0;
   font: var(--type-title);
-  letter-spacing: var(--track-display);
+  letter-spacing: var(--type-title-track);
   color: var(--ink-1);
   text-wrap: balance;
 }

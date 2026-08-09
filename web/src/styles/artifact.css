@@ -36,16 +36,11 @@
   color: inherit;
 }
 
-.artifact-chip-main:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
-
 .artifact-chip-icon {
   display: grid;
   place-items: center;
   width: 28px;
-  height: 28px;
+  height: var(--control-h-xs);
   color: var(--ink-3);
 }
 
@@ -414,7 +409,7 @@
   display: grid;
   place-items: center;
   width: 28px;
-  height: 28px;
+  height: var(--control-h-xs);
   border-radius: var(--r-2);
   color: var(--artifact-accent, var(--info));
   background: color-mix(in srgb, var(--artifact-accent, var(--info)) 14%, transparent);
@@ -484,7 +479,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  height: 28px;
+  height: var(--control-h-xs);
   padding: 0 var(--sp-3);
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
@@ -521,10 +516,6 @@
   height: 100%;
   color: var(--ink-3);
   font: var(--type-label);
-}
-
-.artifact-preview-error {
-  color: var(--err);
 }
 
 /* Viewer status (reused by ArtifactBody loading/error states) */

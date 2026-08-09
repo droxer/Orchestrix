@@ -3,8 +3,8 @@ import type { RoutineState } from "../lib/routine";
 import { StateMark, type StateShape } from "./StateMark";
 
 /**
- * Schedule health for a routine, in the same pill grammar as `.task-status`
- * so "where does this stand?" reads identically on both boards.
+ * Schedule health for a routine, in the shared status-pill grammar so
+ * "where does this stand?" reads identically on both boards.
  *
  * Shape does the separating work (see StateMark): a paused routine is muted,
  * a missing next-run date is dashed, an overdue one is a hollow ring, and a

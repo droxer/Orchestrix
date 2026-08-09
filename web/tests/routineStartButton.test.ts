@@ -10,10 +10,12 @@ describe("routine start button", () => {
     const usages = source.match(/<RoutineStartButton\b/g) ?? [];
 
     assert.equal(usages.length, 2);
-    assert.match(source, /variant="ghost"/);
-    assert.match(source, /className="icon-button icon-button--sm icon-button--tinted backlog-action-icon"/);
+    assert.match(source, /variant="icon"/);
+    assert.match(source, /size="icon-r-sm"/);
+    assert.match(source, /tinted/);
+    assert.match(source, /className="backlog-action-icon"/);
     assert.doesNotMatch(source, /className="backlog-action-primary backlog-action-icon"/);
-    assert.match(styles, /\.backlog-task-actions button:not\(\.icon-button\)/);
-    assert.match(styles, /\.backlog-row-actions button:not\(\.icon-button\)/);
+    assert.match(styles, /\.backlog-task-actions button:not\(\[data-variant="icon"\]\)/);
+    assert.match(styles, /\.backlog-row-actions button:not\(\[data-variant="icon"\]\)/);
   });
 });

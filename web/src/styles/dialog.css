@@ -71,7 +71,7 @@
   margin: 0;
   min-width: 0;
   font: var(--type-title);
-  letter-spacing: var(--track-display);
+  letter-spacing: var(--type-title-track);
   color: var(--ink-1);
   overflow-wrap: anywhere;
 }
@@ -158,11 +158,6 @@
 .dialog-toast-close:hover {
   background: var(--surface-2);
   color: var(--ink-1);
-}
-
-.dialog-toast-close:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
 }
 
 .dialog-toast.dialog-toast--exit {

@@ -50,7 +50,7 @@
 .backlog-stat-value {
   font-family: var(--font-display);
   font-size: var(--fs-3);
-  font-weight: 550;
+  font-weight: 600;
   line-height: 1;
   letter-spacing: var(--track-display);
   font-variant-numeric: tabular-nums;
@@ -234,8 +234,9 @@
   display: flex;
   flex-direction: column;
   scroll-snap-align: start;
-  border-right: 1px solid var(--line-2);
-  background: var(--surface-0);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-3);
+  background: var(--surface-3);
 }
 
 /* Chip that trails the finger during a touch drag, standing in for the drag
@@ -335,13 +336,13 @@
   contain-intrinsic-size: auto 180px;
   border: 1px solid var(--line-1);
   border-radius: var(--r-3);
-  background: var(--surface-0);
+  background: var(--surface-3);
   padding: var(--sp-4);
   transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
 }
 
 .backlog-task:hover {
-  border-color: var(--line-strong);
+  border-color: color-mix(in srgb, var(--action) 28%, var(--line-1));
   background: var(--surface-1);
 }
 
@@ -554,7 +555,7 @@
   pointer-events: none;
 }
 
-/* ── Routine state — schedule health, in the .task-status pill grammar ───
+/* ── Routine state — schedule health, in the shared status-pill grammar ──
    A routine never moves through the board, so it gets its own vocabulary:
    running · overdue · due today · scheduled · unscheduled · paused. The two
    "not really scheduled" states are separated by *which* thing is dashed —
@@ -584,59 +585,6 @@
   --state-accent: var(--ink-4);
   border-style: dashed;
   color: var(--ink-3);
-}
-
-/* ── Task status — bordered pill + dot, accent map shared with lanes/rows ──
-   Used where status would otherwise be plain meta text (routine cards); the
-   board uses lanes and the list its own column, so they don't need it.
-   Border + inset match the Badge status-tone pill (ui/badge.tsx) so a
-   status reads as the same "pill" grammar wherever it appears. */
-.task-status {
-  --status-accent: var(--ink-4);
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: 1px var(--sp-2);
-  border: 1px solid color-mix(in srgb, var(--status-accent) 35%, transparent);
-  border-radius: var(--r-2);
-  color: var(--ink-2);
-  font: var(--type-label);
-}
-
-.task-status::before {
-  content: "";
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: var(--r-full);
-  background: var(--status-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-accent) 16%, transparent);
-}
-
-.task-status[data-status="backlog"] { --status-accent: var(--ink-4); }
-.task-status[data-status="assigned"] { --status-accent: var(--info); }
-.task-status[data-status="running"] { --status-accent: var(--live); }
-.task-status[data-status="waiting_for_human"] { --status-accent: var(--warn); }
-.task-status[data-status="review"] { --status-accent: color-mix(in srgb, var(--info) 70%, var(--ink-1)); }
-.task-status[data-status="blocked"] { --status-accent: var(--err); }
-.task-status[data-status="done"] { --status-accent: var(--ok); }
-
-/* Compositor-friendly pulse: the dot keeps its static 3px ring; a faint
-   outer-ring pseudo breathes via opacity instead of animating box-shadow
-   (same spread/fade cue, no per-frame paint). */
-.task-status[data-status="running"]::after {
-  content: "";
-  position: absolute;
-  left: calc(var(--sp-2) - 5px);
-  top: 50%;
-  width: 17px;
-  height: 17px;
-  transform: translateY(-50%);
-  border-radius: var(--r-full);
-  border: 2px solid color-mix(in srgb, var(--status-accent) 8%, transparent);
-  animation: blink var(--t-pulse) var(--ease) infinite;
-  pointer-events: none;
 }
 
 /* The title is a Button, so it arrives with the primitive's `whitespace-nowrap`
@@ -738,8 +686,8 @@
 }
 
 .backlog-task-actions select,
-.backlog-task-actions button:not(.icon-button) {
-  min-height: 28px;
+.backlog-task-actions button:not([data-variant="icon"]) {
+  min-height: var(--control-h-xs);
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-0);
@@ -755,7 +703,7 @@
   max-width: 96px;
 }
 
-.backlog-task-actions button:not(.icon-button):hover:not(:disabled) {
+.backlog-task-actions button:not([data-variant="icon"]):hover:not(:disabled) {
   background: var(--surface-1);
   border-color: var(--line-strong);
 }
@@ -875,7 +823,7 @@
   align-items: center;
   justify-content: center;
   width: 28px;
-  height: 28px;
+  height: var(--control-h-xs);
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
   background: color-mix(in srgb, var(--surface-2) 76%, transparent);
@@ -1084,28 +1032,6 @@
   color: var(--ink-3);
 }
 
-.task-drawer-assignee {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  min-height: var(--control-h);
-  padding: 0 var(--sp-3);
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-1);
-}
-
-.task-drawer-assignee:focus-within {
-  border-color: var(--ring, var(--action));
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
-
-.task-drawer-assignee svg {
-  flex: none;
-  color: var(--ink-3);
-}
-
 /* ── Task drawer read-only meta + form extras ─────────────────────── */
 
 .task-drawer-meta {
@@ -1246,7 +1172,7 @@
 .backlog-board-empty-title {
   margin: 0;
   font: var(--type-title);
-  letter-spacing: var(--track-display);
+  letter-spacing: var(--type-title-track);
   color: var(--ink-1);
 }
 
@@ -1666,11 +1592,11 @@
   padding-right: calc(2 * 28px + 4 * var(--sp-1) + var(--sp-2) + 1px);
 }
 
-.backlog-row-actions button:not(.icon-button) {
+.backlog-row-actions button:not([data-variant="icon"]) {
   min-height: 28px;
   /* Square the icon buttons (width is pinned to 28px) instead of stretching to
      the 40px control height — a lone action (routine) looked tall/narrow. */
-  height: 28px;
+  height: var(--control-h-xs);
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-0);
@@ -1682,7 +1608,7 @@
   transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
 }
 
-.backlog-row-actions button:not(.icon-button):hover:not(:disabled) {
+.backlog-row-actions button:not([data-variant="icon"]):hover:not(:disabled) {
   background: var(--surface-1);
   border-color: var(--line-strong);
 }
@@ -1775,23 +1701,23 @@
     justify-content: flex-start;
   }
 
-  .backlog-row-actions button:not(.icon-button),
-  .backlog-row-actions .backlog-action-icon:not(.icon-button) {
+  .backlog-row-actions button:not([data-variant="icon"]),
+  .backlog-row-actions .backlog-action-icon:not([data-variant="icon"]) {
     min-height: 36px;
     min-width: 36px;
     border-radius: var(--r-2);
   }
 
-  .backlog-row-actions .icon-button {
+  .backlog-row-actions [data-variant="icon"] {
     width: 36px;
-    height: 36px;
+    height: var(--control-h-sm);
   }
 
   /* Give every secondary action a visible chip surface. On the dark canvas the
      ghost buttons (with a faint hairline) all but vanished — worse when
      disabled — so they read as neither present nor tappable. The green primary
      (Start) keeps its own fill. */
-  .backlog-row-actions button:not(.backlog-action-primary, .icon-button) {
+  .backlog-row-actions button:not(.backlog-action-primary, [data-variant="icon"]) {
     background: var(--surface-1);
   }
 
@@ -1826,7 +1752,6 @@
 
   /* Pulse rings live on pseudos now — hide them outright under reduced
      motion (animation: none alone would leave the ring at full opacity). */
-  .task-status[data-status="running"]::after,
   .state-mark[data-shape="live"]::after {
     animation: none;
     opacity: 0;

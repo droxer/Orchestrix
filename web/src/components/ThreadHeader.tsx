@@ -27,9 +27,10 @@ export function ThreadHeader({ activeSession, artifactCount, spaceOpen, threadLi
       <div className="chat-tools">
         {spaceOpen ? (
           <Button
-            variant="ghost"
+            variant="icon"
+            size="icon-r"
             type="button"
-            className="icon-button chat-threadlist-button"
+            className="chat-threadlist-button"
             aria-label={t("space.toggle_threads")}
             title={t("space.toggle_threads")}
             aria-expanded={!threadListHidden}
@@ -43,7 +44,7 @@ export function ThreadHeader({ activeSession, artifactCount, spaceOpen, threadLi
           onOpenArtifacts={onToggleSpace}
           expanded={spaceOpen}
           disabled={!activeSession}
-          className="icon-button chat-artifacts-button"
+          className="chat-artifacts-button"
         />
       </div>
     </header>

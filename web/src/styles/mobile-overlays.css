@@ -128,7 +128,7 @@
 
   .pref-header-text h2 {
     font: var(--type-title);
-    letter-spacing: var(--track-display);
+    letter-spacing: var(--type-title-track);
   }
 
   .pref-content {
@@ -159,7 +159,7 @@
 
   .dialog-title {
     font: var(--type-heading);
-    letter-spacing: var(--track-display);
+    letter-spacing: var(--type-heading-track);
   }
 
   .dialog-input {

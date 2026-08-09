@@ -43,7 +43,6 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
           <KpiTile
             slot="sessions"
             hero
-            enterIndex={0}
             eyebrow={t("admin.v2.dash_kpi_sessions")}
             value={sessionsReady ? formatCompact(sessions.total, i18n.language) : dash}
             delta={
@@ -60,7 +59,6 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
           />
           <KpiTile
             slot="nodes"
-            enterIndex={1}
             eyebrow={t("admin.v2.dash_kpi_nodes")}
             value={nodesReady ? formatCompact(metrics.total, i18n.language) : dash}
             hint={
@@ -71,7 +69,6 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
           />
           <KpiTile
             slot="employees"
-            enterIndex={2}
             eyebrow={t("admin.v2.dash_kpi_employees")}
             value={nodesReady ? formatCompact(metrics.employeeTotal, i18n.language) : dash}
             hint={nodesReady ? t("admin.v2.dash_kpi_employees_hint", { count: employees.length }) : undefined}
@@ -79,7 +76,6 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
           {showTokens ? (
             <KpiTile
               slot="tokens"
-              enterIndex={3}
               eyebrow={t("admin.v2.dash_kpi_tokens")}
               value={formatCompact(tokens.total, i18n.language)}
               hint={t("admin.v2.dash_kpi_tokens_hint")}
@@ -96,19 +92,17 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
           <ActivityChart
             daily={sessions.dailyCounts}
             ready={sessionsReady}
-            className="relay-enter relay-enter-delay-5"
           />
           {showTokens ? (
-            <TokenUsageChart snapshot={tokens} compact className="relay-enter relay-enter-delay-7" />
+            <TokenUsageChart snapshot={tokens} compact />
           ) : null}
         </div>
         <div className="adm-dash-col">
-          <NodeStatusCard nodes={nodes} className="relay-enter relay-enter-delay-6" />
+          <NodeStatusCard nodes={nodes} />
           <TopEmployees
             employees={employees}
             nodes={nodes}
             ranked={sessions.topEmployees}
-            className="relay-enter relay-enter-delay-8"
           />
         </div>
       </div>

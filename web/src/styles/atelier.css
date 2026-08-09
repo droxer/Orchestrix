@@ -3,6 +3,15 @@
    chromatic split makes the navigation feel like a command deck, while active
    thinking remains deliberately calm and legible in the center.
 
+   OWNERSHIP RULE: this sheet may only define selectors that no other
+   stylesheet defines. Component chrome belongs in the component's own sheet
+   (thread.css, admin-v2-*.css, backlog.css, preferences.css, …) — do not
+   re-chrome another sheet's selector from here. What remains is atelier's
+   own grammar: the shared page-header material + `--surface-header-bg`
+   alias, the sidenav rail grammar (sidenav.css keeps only structure/focus),
+   messenger/chat/transcript surface washes, work-route page backgrounds,
+   and the workspace-pick selection treatment.
+
    All color/type/radius primitives live in tokens/ (the single source of
    truth); this file only reshapes component structure and layout —
    decorative motion, per-surface grammar — on top of those tokens.
@@ -37,59 +46,6 @@
   font: var(--type-micro);
   font-weight: 500;
   letter-spacing: var(--track-0);
-}
-
-.chat-title h2,
-.adm-drawer-title {
-  font-family: var(--font-display);
-  font-weight: 550;
-  letter-spacing: var(--track-display);
-  line-height: 1.1;
-}
-
-.segmented,
-.adm-view-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-0-5);
-  padding: var(--sp-0-5);
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-2);
-  background: var(--surface-1);
-}
-
-.segmented > button,
-.segmented > [role="tab"],
-.adm-view-toggle-btn {
-  border: 0;
-  border-radius: calc(var(--r-2) - 2px);
-  background: transparent;
-  color: var(--ink-3);
-  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
-}
-
-.segmented > button:hover:not(:disabled),
-.segmented > [role="tab"]:hover {
-  color: var(--ink-1);
-}
-
-.segmented > button.active,
-.segmented > button[aria-selected="true"],
-.segmented > button[data-active="true"],
-.segmented > [role="tab"][aria-selected="true"],
-.segmented > [role="tab"].is-active,
-.adm-view-toggle-btn[data-active="true"] {
-  background: var(--surface-3);
-  color: var(--ink-1);
-  box-shadow: inset 0 0 0 1px var(--line-1);
-}
-
-.segmented--brand > button.active,
-.segmented--brand > button[aria-selected="true"],
-.segmented--brand > button[data-active="true"] {
-  background: var(--action);
-  color: var(--on-action);
-  box-shadow: none;
 }
 
 body {
@@ -145,25 +101,6 @@ body {
 .sidenav-panel[data-expanded="true"] .sidenav-btn { justify-content: flex-start; width: 100%; padding-inline: var(--sp-3); gap: var(--sp-3); }
 .sidenav-panel[data-expanded="true"] .sidenav-brand { padding-left: var(--sp-2); }
 
-.thread-panel { padding-top: var(--sp-4); background: var(--surface-0); border-right-color: var(--line-1); }
-.conversation-heading h1 { font-family: var(--font-display);
-  letter-spacing: var(--track-display); font-size: var(--fs-title); font-weight: 550; }
-.conversation-list { border-top: 0; gap: var(--sp-0-5); padding: var(--sp-1) var(--sp-2) var(--sp-4); }
-.conversation-row { border: 0; border-radius: var(--r-2); overflow: hidden; }
-.conversation-row-inner { min-height: 64px; padding-inline: var(--sp-3); border-radius: inherit; }
-.conversation-row:hover { background: var(--surface-3); }
-.conversation-row.active { background: var(--action-soft); }
-.conversation-row.active::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 14px;
-  bottom: 14px;
-  width: 2px;
-  border-radius: calc(var(--r-1) / 2);
-  background: var(--action);
-}
-
 .chat-panel { background: transparent; }
 
 .transcript { background: transparent; }
@@ -185,9 +122,6 @@ body {
 
 /* Dark theme — token-level dark values live in tokens/palette.css;
    this block only adds structural rules for this file's components. */
-html[data-theme="dark"] .thread-panel { background: var(--surface-1); }
-html[data-theme="dark"] .conversation-row:hover { background: var(--surface-3); }
-html[data-theme="dark"] .conversation-row.active { background: var(--action-soft); }
 html[data-theme="dark"] .chat-header,
 html[data-theme="dark"] .page-header {
   --surface-header-bg: var(--surface-0);
@@ -221,33 +155,12 @@ html[data-theme="dark"] .rail-node { background: var(--surface-3); }
 
 .backlog-stat-value {
   font-family: var(--font-display);
-  font-weight: 550;
+  font-weight: 600;
   letter-spacing: var(--track-display);
 }
 
-/* agents-roster-row, adm-emp-row, and adm-dept-group are deliberately NOT
-   in this group — they own flat-list-row designs (bottom hairline, dept
-   headers, no enclosing card) in agents.css / admin-v2-views.css.
-   agents-detail is also excluded: it is a full split pane, not a card.
-   So are workspace-pane and workspace-profile-panel, for the same reason —
-   they are the tab bodies of the agent/team record surface, which runs
-   flush edge to edge. Carded, they floated as drawer-tier plates that
-   stopped at content height, so one record rendered in a different
-   container idiom on each of its three tabs. */
-.backlog-lane,
-.backlog-task,
-.adm-chat-panel,
-.adm-chat-stage {
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-3);
-  background: var(--surface-3);
-  box-shadow: none;
-}
+/* Node cards use admin-v2-views.css for tone rail, radius, and raised fill. */
 
-/* Node cards use admin-v2-views.css for tone rail, radius, and canvas fill. */
-
-.backlog-task:hover,
-.adm-node-card:hover,
 .workspace-pick:hover {
   border-color: color-mix(in srgb, var(--action) 28%, var(--line-1));
 }
@@ -267,20 +180,9 @@ html[data-theme="dark"] .rail-node { background: var(--surface-3); }
   border-color: var(--line-2);
 }
 
-.workspace-code-view,
 .code-view,
 .code-view-scroll {
   border-radius: var(--r-2);
-}
-
-/* Drawers and preferences use the same elevated-paper material as the
-   composer, creating a consistent transition from overview to editing. */
-.adm-drawer,
-.pref-modal,
-.artifact-library-drawer {
-  border: 1px solid var(--line-1);
-  background: var(--surface-3);
-  box-shadow: var(--shadow-2);
 }
 
 .adm-drawer-head,
@@ -316,7 +218,7 @@ html[data-theme="dark"] .rail-node { background: var(--surface-3); }
 
   .mobile-topbar-title {
     font-family: var(--font-display);
-    font-weight: 550;
+    font-weight: 600;
     letter-spacing: var(--track-display);
   }
 
@@ -333,18 +235,9 @@ html[data-theme="dark"] .rail-node { background: var(--surface-3); }
   letter-spacing: var(--track-0);
 }
 
-html[data-theme="dark"] .backlog-lane,
-html[data-theme="dark"] .backlog-task {
-  background: var(--surface-3);
-}
-
 html[data-theme="dark"] .workspace-pick[data-active="true"] {
   background: var(--action-soft);
 }
-
-html[data-theme="dark"] .adm-drawer,
-html[data-theme="dark"] .pref-modal,
-html[data-theme="dark"] .artifact-library-drawer { background: var(--surface-3); }
 
 html[data-theme="dark"] .adm-form-section,
 html[data-theme="dark"] .adm-assign-node,

@@ -47,7 +47,7 @@
 
 .thread-runtime-select {
   max-width: min(240px, 34vw);
-  height: 28px;
+  height: var(--control-h-xs);
   padding-inline: var(--sp-1);
   border-color: transparent;
   background: transparent;
@@ -218,11 +218,6 @@
 
 .mode-chip:active { transform: scale(0.97); }
 
-.mode-chip:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
-
 .mode-chip-icon {
   display: inline-flex;
   align-items: center;
@@ -327,7 +322,7 @@
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  min-height: 36px;
+  min-height: var(--control-h-sm);
   flex: 0 0 auto;
 }
 
@@ -341,7 +336,7 @@
   display: grid;
   place-items: center;
   width: 36px;
-  height: 36px;
+  height: var(--control-h-sm);
   border: 1px solid transparent;
   border-radius: var(--r-2);
   background: var(--action);

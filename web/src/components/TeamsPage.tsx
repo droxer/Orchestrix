@@ -89,7 +89,8 @@ export function TeamsPage({
                   const memberNames = team.members.map((member) => member.displayName).join(", ");
                   return (
                     <TableRow key={team.id} render={<li />} className="teams-list-row" data-selected={team.id === selectedTeam?.id ? "true" : "false"}>
-                      <button
+                      <Button
+                        variant="ghost"
                         type="button"
                         className="teams-list-row-select"
                         aria-current={team.id === selectedTeam?.id ? "page" : undefined}
@@ -115,7 +116,7 @@ export function TeamsPage({
                             <StatusPill value={teamAvailability(team)} />
                           ) : null}
                         </TableCell>
-                      </button>
+                      </Button>
                     </TableRow>
                   );
                 })}

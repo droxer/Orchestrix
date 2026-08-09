@@ -32,7 +32,7 @@
 
 .chat-title .employee-avatar {
   width: 36px;
-  height: 36px;
+  height: var(--control-h-sm);
   font-size: var(--fs-3);
 }
 
@@ -41,24 +41,6 @@
   display: flex;
   align-items: baseline;
   gap: var(--sp-2);
-}
-
-.chat-title-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  margin: 0;
-  flex: 0 1 auto;
-  min-width: 0;
-  color: var(--ink-3);
-}
-
-.chat-title-status {
-  flex: 0 0 auto;
-  padding: 1px var(--sp-2);
-  font: var(--type-label);
-  font-weight: 500;
-  text-transform: none;
 }
 
 .chat-title h2 {
@@ -70,7 +52,7 @@
   /* Reading line-height is kept — thread names wrap — but the old --track-0
      opt-out is dropped: it existed because Mona's optical-size axis handled
      display spacing, which a mono face does not. */
-  letter-spacing: var(--track-display);
+  letter-spacing: var(--type-title-track);
   line-height: var(--leading-normal);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -174,17 +156,6 @@
 .chat-agent-state-pip[data-availability="inactive"] {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--err);
-}
-
-.chat-header .icon-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.chat-header .icon-button:disabled:hover {
-  color: var(--ink-3);
-  background: transparent;
-  border-color: transparent;
 }
 
 .chat-artifacts-button {
@@ -553,7 +524,7 @@
 .msg-tokens {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--sp-1);
   height: 26px;
   padding: 0;
   border: none;

@@ -121,7 +121,6 @@
      preferences.css (swatches), workspace.css, artifact.css, a11y.css. */
   --dark-canvas: #0b0d0f;
   --dark-surface: #16181b;
-  --dark-surface-2: #1c1f23;
   --dark-elevated: #22262b;
   --dark-ink: #f2f4f6;
   --dark-ink-strong: #ffffff;
@@ -131,7 +130,6 @@
   --dark-line-soft: color-mix(in srgb, #f2f4f6 8%, transparent);
 
   --light-canvas: #f1f3f5;
-  --light-surface: #fafbfc;
   --light-ink: #16181b;
 
   /* Document paper — artifact/file previews assume a white page in every
@@ -163,10 +161,11 @@
   --sp-6: 24px;
   --sp-7: 32px;
   --sp-8: 48px;
-  --sp-9: 64px;
   --sp-row: var(--sp-3); /* dense row rhythm */
 
   --control-h: 40px;
+  --control-h-sm: 36px;
+  --control-h-xs: 28px;
 
   /* Measure — the reading-column cap for prose, descriptions, and empty-state
      copy. In ch, not px, so the column tracks the font rather than the layout:

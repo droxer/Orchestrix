@@ -6,7 +6,6 @@ interface KpiTileProps {
   eyebrow: string;
   value: ReactNode;
   hero?: boolean;
-  enterIndex?: number;
   slot?: "sessions" | "nodes" | "employees" | "tokens";
   delta?: {
     label: string;
@@ -15,13 +14,12 @@ interface KpiTileProps {
   hint?: string;
 }
 
-export function KpiTile({ eyebrow, value, hero, enterIndex = 0, slot, delta, hint }: KpiTileProps) {
+export function KpiTile({ eyebrow, value, hero, slot, delta, hint }: KpiTileProps) {
   const hasFoot = Boolean(delta || hint);
-  const enterDelay = Math.min(enterIndex + 1, 4);
   const slotClass = slot ? ` adm-dash-tile--${slot}` : "";
   return (
     <div
-      className={`adm-dash-tile relay-enter relay-enter-delay-${enterDelay}${hero ? " adm-dash-tile--hero" : ""}${slotClass}`}
+      className={`adm-dash-tile${hero ? " adm-dash-tile--hero" : ""}${slotClass}`}
     >
       <div className="adm-dash-tile-eyebrow">{eyebrow}</div>
       <div className="adm-dash-tile-value tnum">{value}</div>

@@ -62,7 +62,7 @@
   margin: 0;
   color: var(--ink-1);
   font: var(--type-heading);
-  letter-spacing: var(--track-display);
+  letter-spacing: var(--type-heading-track);
 }
 
 .thread-space-back {
@@ -127,7 +127,7 @@
   display: grid;
   place-items: center;
   width: 28px;
-  height: 28px;
+  height: var(--control-h-xs);
   border-radius: var(--r-2);
   background: color-mix(in srgb, var(--info) 12%, transparent);
   color: var(--info);

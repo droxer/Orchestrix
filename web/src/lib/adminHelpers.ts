@@ -107,11 +107,13 @@ export function isNodeOnline(node: ControlPanelDaemonNodeRecord): boolean {
   return Boolean(node.online) && !isStale(node);
 }
 
+// Canonical semantics (lib/statusTone.ts): active work → info, queued/paused
+// → warn, ready → good, failures/unreachable → bad, unknown → neutral.
 export function statusTone(status: string): Tone {
   if (status === "ready") return "good";
-  if (status === "running" || status === "provisioning") return "info";
+  if (status === "running" || status === "busy" || status === "provisioning") return "info";
+  if (status === "pending" || status === "stopped") return "warn";
   if (status === "failed" || status === "stale") return "bad";
-  if (status === "stopped") return "warn";
   return "neutral";
 }
 
@@ -123,14 +125,14 @@ export function agentAvailabilityTone(availability: LogicalAgentAvailability): T
   return "bad";
 }
 
-/** Runtime-mark tone for a node's agent. Unknown ("no signal yet") reads as
-    warn so it stays distinct from disabled — a deliberate operator choice
-    (calm neutral), passed via options.disabled by callers that know it. */
+/** Runtime-mark tone for a node's agent. Unknown ("no signal yet") falls
+    through to neutral — the canonical reading for an unrecognized state
+    (lib/statusTone.ts); deliberate "off" is passed via options.disabled by
+    callers that know it. */
 export function agentStatusTone(agentStatus: string, options?: { disabled?: boolean }): Tone {
   if (options?.disabled) return "neutral";
   if (agentStatus === "ready") return "good";
   if (agentStatus === "failed") return "bad";
-  if (agentStatus === "unknown") return "warn";
   return "neutral";
 }
 

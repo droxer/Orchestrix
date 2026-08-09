@@ -4,9 +4,15 @@
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: var(--sp-3);
+  min-width: 0;
+  min-height: 0;
   padding: var(--sp-4) 0 0;
   border-right: 1px solid var(--line-1);
   background: var(--surface-0);
+}
+
+html[data-theme="dark"] .thread-panel {
+  background: var(--surface-1);
 }
 
 .conversation-header {
@@ -29,7 +35,8 @@
   gap: var(--sp-2);
   color: var(--ink-1);
   font: var(--type-title);
-  letter-spacing: var(--track-display);
+  font-weight: 600;
+  letter-spacing: var(--type-title-track);
 }
 
 .conversation-heading-count {
@@ -43,7 +50,7 @@
   display: grid;
   place-items: center;
   width: 36px;
-  height: 36px;
+  height: var(--control-h-sm);
   border: 1px solid transparent;
   border-radius: var(--r-2);
   color: var(--ink-3);
@@ -57,6 +64,7 @@
 }
 
 .conversation-search {
+  grid-template-columns: auto minmax(0, 1fr) auto;
   background: var(--surface-2);
   margin: 0 var(--page-gutter);
   align-self: start;
@@ -67,8 +75,9 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 0;
-  border-top: 1px solid var(--line-2);
+  gap: var(--sp-0-5);
+  padding: var(--sp-1) var(--sp-2) var(--sp-4);
+  border-top: 0;
 }
 
 .conversation-row {
@@ -78,7 +87,9 @@
   width: 100%;
   content-visibility: auto;
   contain-intrinsic-size: auto 68px;
-  border-bottom: 1px solid var(--line-2);
+  border: 0;
+  border-radius: var(--r-2);
+  overflow: hidden;
   background: transparent;
   color: var(--ink-1);
   transition: background var(--t-fast) var(--ease);
@@ -92,27 +103,35 @@
   gap: var(--sp-3);
   flex: 1;
   min-width: 0;
-  min-height: 60px;
-  padding: var(--sp-row) var(--page-gutter);
+  min-height: 64px;
+  padding: var(--sp-row) var(--sp-3);
   border: 0;
-  border-radius: 0;
+  border-radius: inherit;
   background: transparent;
   color: inherit;
   text-align: left;
   cursor: pointer;
 }
 
-.conversation-row-inner:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
-
 .conversation-row:hover {
-  background: var(--surface-1);
+  background: var(--row-hover);
 }
 
 .conversation-row.active {
   background: var(--action-soft);
+}
+
+/* Active row reads as selected: a soft wash + a 2px left accent bar —
+   selection is calm, action is loud (one flat hierarchy). */
+.conversation-row.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 2px;
+  border-radius: calc(var(--r-1) / 2);
+  background: var(--action);
 }
 
 .conversation-empty {
@@ -248,7 +267,7 @@
   display: grid;
   place-items: center;
   width: 36px;
-  height: 36px;
+  height: var(--control-h-sm);
   padding: 0;
   border: 1px solid transparent;
   border-radius: var(--r-2);
@@ -279,57 +298,6 @@
 
 .conversation-row.active .conversation-stamp {
   color: var(--ink-3);
-}
-
-.icon-button {
-  display: grid;
-  place-items: center;
-  width: var(--control-h);
-  height: var(--control-h);
-  border: 1px solid transparent;
-  border-radius: var(--r-full);
-  color: var(--ink-3);
-  background: transparent;
-  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
-}
-
-.icon-button:hover,
-.icon-button.active {
-  color: var(--ink-1);
-  background: var(--surface-2);
-  border-color: var(--line-2);
-}
-
-.icon-button:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
-
-.icon-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Compact density — dense toolbars/card footers (admin node cards) packing
-   several icon buttons into a tight row. Same circular shape and hover
-   grammar as the default 40px icon-button, at a smaller footprint. */
-.icon-button--sm {
-  width: 28px;
-  height: 28px;
-}
-
-/* Tinted hover — the icon communicates a colored action (e.g. a scoped
-   settings/reveal affordance or a destructive delete) instead of the
-   neutral ink hover above. `.danger` swaps the tint to the status red. */
-.icon-button--tinted:hover {
-  color: var(--action);
-  background: color-mix(in srgb, var(--action) 10%, transparent);
-  border-color: transparent;
-}
-
-.icon-button--tinted.danger:hover {
-  color: var(--err);
-  background: color-mix(in srgb, var(--err) 10%, transparent);
 }
 
 /* ===================== state-grouped sections ===================== */

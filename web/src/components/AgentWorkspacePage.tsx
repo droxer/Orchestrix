@@ -651,7 +651,8 @@ function WorkspaceFileRow({
   const { t, i18n } = useTranslation();
   const isDirectory = entry.kind === "directory";
   return (
-    <button
+    <Button
+      variant="ghost"
       type="button"
       className={`workspace-pick workspace-file-pick${selected ? " is-active" : ""}`}
       aria-pressed={selected}
@@ -669,7 +670,7 @@ function WorkspaceFileRow({
         {" · "}
         {compactDate(entry.updatedAt, i18n.language)}
       </span>
-    </button>
+    </Button>
   );
 }
 

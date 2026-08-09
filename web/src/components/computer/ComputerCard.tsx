@@ -6,6 +6,7 @@ import type { AgentName, ControlPanelDaemonNodeRecord } from "../../types";
 import { AgentMark } from "../AgentMark";
 import { StateMark } from "../StateMark";
 import { NodePresence } from "../admin/NodePresence";
+import { TonePill } from "../StatusPill";
 import { nodeOwnershipIcon } from "../admin/NodeProfileBadges";
 import { Button } from "@/components/ui/button";
 import { ActionApprove, ActionCopy, ActionEdit, ActionRemove, AdminManageExecutors } from "../icons";
@@ -89,10 +90,11 @@ export function ComputerCard({
             <h2 className="computer-card-name" translate="no">{title}</h2>
             <NodePresence node={node} t={t} withLabel />
             {showStatus ? (
-              <span className={`adm-status-pill tone-${statusTone(status)}`}>
-                <i className="adm-status-dot" aria-hidden="true" />
-                {t(`status.${status}`, { defaultValue: status })}
-              </span>
+              <TonePill
+                tone={statusTone(status)}
+                label={t(`status.${status}`, { defaultValue: status })}
+                live={statusTone(status) === "info"}
+              />
             ) : null}
           </div>
           <p className="computer-card-sub">
@@ -151,16 +153,25 @@ export function ComputerCard({
               return (
                 <li key={run.runId} className="computer-run-row">
                   {onOpenThread ? (
-                    <button
+                    <Button
+                      variant="ghost"
                       type="button"
                       className="computer-run-open"
                       onClick={() => onOpenThread(run.sessionId)}
                       title={t("computer.open_run_thread")}
                     >
                       {row}
-                    </button>
+                    </Button>
                   ) : (
-                    <span className="computer-run-open" aria-disabled="true">{row}</span>
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      className="computer-run-open"
+                      disabled
+                      title={t("computer.open_run_thread")}
+                    >
+                      {row}
+                    </Button>
                   )}
                 </li>
               );
@@ -199,8 +210,9 @@ export function ComputerCard({
                 <span className="code" title={node.id} translate="no">{abbreviateNodeId(node.id)}</span>
                 <Button
                   type="button"
-                  variant="ghost"
-                  className="icon-button icon-button--sm icon-button--tinted"
+                  variant="icon"
+                  size="icon-r-sm"
+                  tinted
                   onClick={() => void handleCopyId()}
                   aria-label={copied ? t("admin.copied") : t("admin.copy_node_id")}
                 >

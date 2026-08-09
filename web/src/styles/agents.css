@@ -67,8 +67,8 @@
 .agents-roster-select {
   flex: none;
   max-width: 108px;
-  min-height: 28px;
-  height: 28px;
+  min-height: var(--control-h-xs);
+  height: var(--control-h-xs);
   background: var(--surface-2);
   padding: 0 var(--sp-2);
   color: var(--ink-2);
@@ -107,6 +107,9 @@
   gap: var(--sp-2);
   flex: 1;
   min-width: 0;
+  /* Geometry beats the Button base utilities (h-(--control-h)); the row sizes
+     itself to its content, focus ring comes from Button. */
+  height: auto;
   border: 0;
   background: transparent;
   padding: 0;
@@ -116,7 +119,7 @@
 }
 
 .agents-roster-row:hover {
-  background: color-mix(in srgb, var(--surface-1) 70%, transparent);
+  background: var(--row-hover);
 }
 
 /* Selection reads as the action-soft wash everywhere else in the app

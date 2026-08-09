@@ -15,6 +15,7 @@ import { NodeProfileBadges, nodeOwnershipIcon } from "./NodeProfileBadges";
 import { NodePresence } from "./NodePresence";
 import { NodeRuntimeMarks } from "./NodeRuntimeMarks";
 import { AdminEmployees } from "../icons";
+import { TonePill } from "../StatusPill";
 
 interface NodeRowProps {
   node: ControlPanelDaemonNodeRecord;
@@ -59,10 +60,7 @@ export function NodeRow({ node, employeeName, storedTokens, colocated, onReveal,
             </span>
             <NodePresence node={node} t={t} withLabel />
             {showStatusPill ? (
-              <span className={`adm-status-pill tone-${tone}`}>
-                <i className="adm-status-dot" aria-hidden="true" />
-                {statusLabel}
-              </span>
+              <TonePill tone={tone} label={statusLabel} live={tone === "info"} />
             ) : null}
           </span>
           <span className="adm-node-card-handle code" translate="no">{node.id}</span>

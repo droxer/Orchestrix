@@ -10,6 +10,7 @@ import {
   type EmployeeNodeSummary,
 } from "./helpers";
 import { EmployeeComputers } from "./EmployeeComputers";
+import { TonePill } from "../StatusPill";
 
 interface EmployeeCardProps {
   member: EmployeeNodeSummary;
@@ -46,10 +47,11 @@ export function EmployeeCard({
           {/* "Ready" is the default healthy state — the good tone on the card
               already carries it; only running / idle / no-nodes get named. */}
           {key !== "ready" ? (
-            <span className={`adm-status-pill tone-${tone}`}>
-              <i className="adm-status-dot" aria-hidden="true" />
-              {t(`admin.v2.emp_state_${key}`, { defaultValue: key })}
-            </span>
+            <TonePill
+              tone={tone === "muted" ? "neutral" : tone}
+              label={t(`admin.v2.emp_state_${key}`, { defaultValue: key })}
+              live={tone === "info"}
+            />
           ) : null}
           {member.departmentName ? (
             <span className="adm-emp-card-dept">{member.departmentName}</span>
@@ -93,10 +95,11 @@ export function EmployeeCard({
             {/* The palette is monochrome, so a colour cannot say "over" — the
                 pill carries a word, like every other state on this card. */}
             {isOverLocalComputerLimit(member) ? (
-              <span className="adm-status-pill tone-bad" title={t("admin.v2.emp_limit_over")}>
-                <i className="adm-status-dot" aria-hidden="true" />
-                {t("admin.v2.emp_limit_over_short")}
-              </span>
+              <TonePill
+                tone="bad"
+                label={t("admin.v2.emp_limit_over_short")}
+                title={t("admin.v2.emp_limit_over")}
+              />
             ) : null}
           </span>
         </div>
@@ -104,9 +107,11 @@ export function EmployeeCard({
           <div className="adm-node-card-actions">
             {onEdit ? (
               <Button
-                variant="ghost"
+                variant="icon"
+                size="icon-r-sm"
+                tinted
                 type="button"
-                className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn"
+                className="adm-node-card-icon-btn"
                 onClick={() => onEdit(member.id)}
                 aria-label={t("admin.v2.edit_employee_action")}
                 title={t("admin.v2.edit_employee_action")}
@@ -116,9 +121,11 @@ export function EmployeeCard({
             ) : null}
             {onDelete ? (
             <Button
-              variant="ghost"
+              variant="icon"
+              size="icon-r-sm"
+              tinted
               type="button"
-              className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn danger"
+              className="adm-node-card-icon-btn danger"
               onClick={() => onDelete(member.id)}
               disabled={deletePending}
               aria-label={t("admin.v2.delete_employee_action")}

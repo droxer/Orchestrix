@@ -190,9 +190,11 @@ function RoutineStartButton({
 
   return (
     <Button
-      variant="ghost"
+      variant="icon"
+      size="icon-r-sm"
+      tinted
       type="button"
-      className="icon-button icon-button--sm icon-button--tinted backlog-action-icon"
+      className="backlog-action-icon"
       onClick={onStart}
       disabled={disabled}
       aria-label={t("backlog.start")}

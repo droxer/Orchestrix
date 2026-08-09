@@ -56,7 +56,7 @@
   margin: 0;
   font: var(--type-heading);
   color: var(--ink-1);
-  letter-spacing: var(--track-display);
+  letter-spacing: var(--type-heading-track);
 }
 
 .pref-header-sub {

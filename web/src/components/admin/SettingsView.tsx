@@ -203,7 +203,7 @@ function NumberSettingCard({
             </Button>
           ) : null}
           {savedAt !== null && !isDirty ? (
-            <span className="adm-settings-saved relay-enter" role="status">
+            <span className="adm-settings-saved" role="status">
               <CheckIcon size={14} aria-hidden="true" />
               {t("admin.v2.settings_saved")}
             </span>

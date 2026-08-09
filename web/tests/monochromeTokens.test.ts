@@ -80,7 +80,6 @@ describe("monochrome palette tokens", () => {
     assert.equal(declared(darkRegister, "--dark-body"), declared(darkRegister, "--ink-2"));
     assert.equal(declared(darkRegister, "--dark-ink-soft"), declared(darkRegister, "--ink-3"));
     assert.equal(declared(darkRegister, "--light-canvas"), declared(lightRegister, "--surface-0"));
-    assert.equal(declared(darkRegister, "--light-surface"), declared(lightRegister, "--surface-1"));
     assert.equal(declared(darkRegister, "--light-ink"), declared(lightRegister, "--ink-1"));
   });
 

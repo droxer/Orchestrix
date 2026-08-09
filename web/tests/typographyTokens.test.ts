@@ -139,6 +139,12 @@ describe("application typography roles", () => {
     // shorthand roles, and rules that opt into `font-family: var(--font-display)`
     // by hand (login's headline, drawer titles, stat values, …). Missing the
     // second shape is exactly how the login screen shipped untracked once.
+    //
+    // A role rule must name its OWN paired track token
+    // (`font: var(--type-title)` → `letter-spacing: var(--type-title-track)`):
+    // `var(--track-display)` resolves to the same value but severs the
+    // greppable font/track pairing that roles.css legislates. Hand-rolled
+    // display rules carry no role, so they read the shared value directly.
     const stylesDir = path.join(repoRoot, "web", "src", "styles");
     const files = readdirSync(stylesDir).filter((f) => f.endsWith(".css"));
     const problems: string[] = [];
@@ -146,22 +152,26 @@ describe("application typography roles", () => {
       const source = readFileSync(path.join(stylesDir, file), "utf8");
       for (const rule of source.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
         const [, selector, body] = rule;
-        const isRole = /font:\s*var\(--type-(display|title|heading|number)\)/.test(body);
+        const role = body.match(/font:\s*var\(--type-(display|title|heading|number)\)/)?.[1];
         const isHandRolled = /font-family:\s*var\(--font-display\)/.test(body);
-        if (!isRole && !isHandRolled) continue;
+        if (!role && !isHandRolled) continue;
         // A single decorative glyph has no inter-character spacing to track.
         if (/relay-bleed-mark/.test(selector)) continue;
         const spacing = [...body.matchAll(/letter-spacing:\s*([^;]+);/g)].map((m) => m[1].trim());
-        // Either the shared value or the role's paired token — both resolve to
-        // --track-display, and the paired form is the one that names its role.
-        const accepted = /^var\(--(?:track-display|type-(?:display|title|heading|number)-track)\)$/;
+        const accepted = role
+          ? new RegExp(`^var\\(--type-${role}-track\\)$`)
+          : /^var\(--(?:track-display|type-(?:display|title|heading|number)-track)\)$/;
         if (spacing.length !== 1 || !accepted.test(spacing[0])) {
           const line = source.slice(0, rule.index).split("\n").length;
-          problems.push(`${file}:${line} → [${spacing.join(" | ") || "no letter-spacing"}]`);
+          problems.push(
+            `${file}:${line} → [${spacing.join(" | ") || "no letter-spacing"}]${
+              role ? ` (font: var(--type-${role}) requires var(--type-${role}-track))` : ""
+            }`
+          );
         }
       }
     }
-    assert.deepEqual(problems, [], `display-tier rules missing or overriding --track-display:\n${problems.join("\n")}`);
+    assert.deepEqual(problems, [], `display-tier rules missing, overriding, or mispairing display tracking:\n${problems.join("\n")}`);
   });
 
   it("keeps CJK typography internally coherent and display tracking restrained", () => {

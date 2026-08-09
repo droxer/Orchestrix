@@ -68,7 +68,7 @@
 }
 
 .team-member-option:hover {
-  background: var(--surface-2);
+  background: var(--row-hover);
 }
 
 .team-member-option small {
@@ -86,32 +86,6 @@
 }
 
 /* ── Employees view ───────────────────────────────────────────────── */
-.adm-dept-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.adm-dept-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: var(--sp-4) 0 var(--sp-3);
-  border-bottom: 1px solid var(--line-1);
-}
-
-.adm-dept-label {
-  font: var(--type-micro);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-  color: var(--ink-1);
-}
-
-.adm-dept-count {
-  font-size: var(--fs-2);
-  color: var(--ink-3);
-}
-
 .adm-emp-list {
   list-style: none;
   margin: 0;
@@ -156,10 +130,6 @@
   transition: background var(--t-fast) var(--ease);
 }
 
-.adm-emp-row:hover {
-  background: var(--row-hover);
-}
-
 .adm-emp-row.is-pulse::after {
   content: "";
   position: absolute;
@@ -188,7 +158,7 @@
 .adm-emp-name {
   margin: 0;
   font: var(--type-title);
-  letter-spacing: var(--track-display);
+  letter-spacing: var(--type-title-track);
   color: var(--ink-1);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -220,7 +190,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  height: 28px;
+  height: var(--control-h-xs);
   padding: 0 var(--sp-3);
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
@@ -277,19 +247,6 @@
   color: var(--ink-4);
 }
 
-.adm-node-chip--button {
-  font-family: inherit;
-}
-
-.adm-node-chip--button:disabled {
-  cursor: default;
-}
-
-.adm-node-chip--button:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
-
 .adm-emp-metrics {
   display: flex;
   align-items: center;
@@ -316,7 +273,7 @@
 
 .adm-emp-running {
   font: var(--type-number);
-  letter-spacing: var(--track-display);
+  letter-spacing: var(--type-number-track);
 }
 
 .adm-emp-ratio {
@@ -338,19 +295,6 @@
 }
 
 @media (max-width: 719px) {
-  .adm-node-agent-head {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .adm-node-agent-count {
-    grid-column: 2;
-    justify-self: start;
-  }
-
-  .adm-node-agent-list {
-    grid-template-columns: 1fr;
-  }
-
   /* Employee rows: the 3-column grid (minmax(220px,…)) can't fit a phone, so
      stack identity → agents → metrics. The column-label header is meaningless
      stacked, so hide it. */
@@ -414,14 +358,7 @@
   color: var(--ink-3);
 }
 
-/* ── Fleet view — profile hint + filter chips ─────────────────────── */
-.adm-fleet-profile-hint {
-  margin: 0 0 var(--sp-3);
-  font-size: var(--fs-2);
-  color: var(--ink-3);
-  line-height: 1.45;
-}
-
+/* ── Fleet view — filter chips ────────────────────────────────────── */
 .adm-fleet-filters {
   display: flex;
   flex-wrap: wrap;
@@ -735,10 +672,6 @@
   transition: background var(--t-fast) var(--ease);
 }
 
-.adm-node-row:hover {
-  background: var(--row-hover);
-}
-
 .adm-node-row-id {
   display: flex;
   align-items: center;
@@ -866,11 +799,15 @@
   padding: var(--sp-4);
   border: 1px solid var(--line-1);
   border-radius: var(--r-3);
-  background: var(--surface-0);
+  background: var(--surface-1);
   transition: border-color var(--t-fast) var(--ease);
   overflow: hidden;
   content-visibility: auto;
   contain-intrinsic-size: auto 240px;
+}
+
+.adm-node-card:hover {
+  border-color: color-mix(in srgb, var(--action) 28%, var(--line-1));
 }
 
 .adm-node-profile {
@@ -968,15 +905,6 @@
   color: var(--ink-3);
 }
 
-.adm-agents-label {
-  display: block;
-  width: 100%;
-  color: var(--ink-3);
-  font: var(--type-label);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-}
-
 .adm-cred-hint {
   display: block;
   margin-top: 0.15rem;
@@ -991,13 +919,6 @@
   gap: var(--sp-3);
 }
 
-/* Status pill anchors the top-right of the card; the identity block (flex:1)
-   pushes it to the edge. Never let the label shrink or wrap. */
-.adm-node-card-head .adm-status-pill {
-  flex: none;
-  margin-top: var(--sp-0-5);
-}
-
 /* Neutral owner monogram — the identity anchor. Node health is carried
    by the status pill's tone dot, not by tinting the avatar (semantic
    colors are text/dot only, never background fills). */
@@ -1008,7 +929,7 @@
   justify-content: center;
   flex: none;
   width: 36px;
-  height: 36px;
+  height: var(--control-h-sm);
   border-radius: var(--r-2);
   color: var(--ink-3);
   background: var(--surface-2);
@@ -1117,57 +1038,6 @@
   visibility: hidden;
 }
 
-/* Ink text on a quiet hairline pill; the leading dot carries the tone
-   hue (tone-* sets --tone). No coloured fills or borders — status hues
-   appear only as the dot, never as action fills. */
-.adm-status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  height: 22px;
-  padding: 0 var(--sp-2);
-  color: var(--ink-1);
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  font-size: var(--fs-1);
-  font-weight: 600;
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-  background: transparent;
-}
-
-.adm-status-dot {
-  flex: none;
-  width: 6px;
-  height: 6px;
-  border-radius: var(--r-full);
-  background: var(--tone, var(--ink-4));
-}
-
-/* Failed/stale drop out of the brightness race. A bright --err fill is
-   byte-identical to --action white, so it read as "primary/selected" rather
-   than "problem". The bad dot becomes a hollow ring instead — the same
-   "dark / broken" shape the offline presence dot uses. Shape now carries the
-   alarm, not brightness. (inset shadow, not border, keeps the 6px box.) */
-.adm-status-pill.tone-bad .adm-status-dot {
-  background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--err);
-}
-
-/* Running/provisioning stay hue-free on the dot — the accent is reserved for
-   action, selection, and focus, never a passive status indicator — but they
-   breathe: the same slow pulse-ring the presence dot uses, so live execution
-   reads as active at a glance without borrowing an accent hue. */
-.adm-status-pill.tone-info .adm-status-dot {
-  background: var(--ink-4);
-  --pulse-color: var(--ink-4);
-  animation: pulse-ring var(--t-pulse-calm) var(--ease) infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .adm-status-pill.tone-info .adm-status-dot { animation: none; }
-}
-
 /* ---- Computer presence (online / offline) --------------------------------
    Monochrome liveness cue reused on the fleet card, list row, and assign
    drawer. Online = a filled, calm dot (--ok, the quiet tier) with a slow
@@ -1258,31 +1128,6 @@
   min-width: 0;
 }
 
-.adm-node-row-nameline .adm-status-pill {
-  flex: none;
-}
-
-.adm-node-id {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  padding: var(--sp-0-5) var(--sp-1);
-  border: none;
-  background: transparent;
-  color: var(--ink-3);
-  font-size: var(--fs-2);
-  cursor: pointer;
-  transition: color var(--t-fast) var(--ease);
-}
-
-.adm-node-id:hover { color: var(--ink-1); }
-
-.adm-node-id:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-  border-radius: var(--r-1);
-}
-
 .adm-node-card-body {
   display: flex;
   flex-direction: column;
@@ -1335,7 +1180,7 @@
 .adm-runtime-mark.tone-warn .adm-agent-dot { background: var(--warn); }
 .adm-runtime-mark.tone-bad .adm-agent-dot {
   background: transparent;
-  box-shadow: inset 0 0 0 1.25px var(--err);
+  box-shadow: inset 0 0 0 1.5px var(--err);
 }
 
 .adm-runtime-mark.is-disabled {
@@ -1608,13 +1453,6 @@
   font-size: var(--fs-2);
 }
 
-.adm-node-card-meta {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Queued-commands count is secondary meta, so it sits at the muted ink tier
    like the node handle above it. */
 .adm-node-card-queued {
@@ -1642,9 +1480,8 @@
 .adm-node-card-actions > .adm-node-action--agents { grid-column: 4; }
 .adm-node-card-actions > .adm-node-action--delete { grid-column: 5; }
 
-/* Node card icon actions (reveal/manage/delete) share the .icon-button
-   base (thread.css) at the --sm/--tinted modifiers instead of a bespoke
-   implementation — see .icon-button--sm / .icon-button--tinted. */
+/* Node card icon actions (reveal/manage/delete) use Button variant="icon"
+   size="icon-r-sm" tinted instead of a bespoke implementation. */
 .adm-node-card-icon-btn:disabled { cursor: progress; }
 
 .adm-node-card-error {
@@ -1742,7 +1579,7 @@
 
 .adm-chat-stage-empty .relay-empty-title {
   font: var(--type-title);
-  letter-spacing: var(--track-display);
+  letter-spacing: var(--type-title-track);
 }
 
 .adm-chat-stage-form {
@@ -1840,7 +1677,9 @@
   align-items: center;
 }
 
-.adm-chat-panel-head--detail .adm-status-pill {
+/* The status pill anchors the right edge of the detail header. Spelled on
+   the Badge slot (TonePill) — never revive the retired pill class. */
+.adm-chat-panel-head--detail > [data-slot="badge"] {
   margin-left: auto;
   align-self: flex-start;
 }
@@ -1887,7 +1726,7 @@
 
 .adm-chat-avatar--hero svg {
   width: 28px;
-  height: 28px;
+  height: var(--control-h-xs);
 }
 
 .adm-chat-panel-head h2,
@@ -1895,7 +1734,7 @@
   margin: 0;
   color: var(--ink-1);
   font: var(--type-heading);
-  letter-spacing: var(--track-display);
+  letter-spacing: var(--type-heading-track);
 }
 
 .adm-chat-section {
@@ -2132,7 +1971,7 @@
   justify-content: center;
   flex: none;
   width: 28px;
-  height: 28px;
+  height: var(--control-h-xs);
   border: none;
   border-radius: var(--r-1);
   background: transparent;

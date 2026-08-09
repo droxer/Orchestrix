@@ -20,6 +20,7 @@ import {
 } from "./helpers";
 import { EmployeeCard } from "./EmployeeCard";
 import { EmployeeComputers } from "./EmployeeComputers";
+import { TonePill } from "../StatusPill";
 import { AdminLayoutToggle, type AdminLayout } from "./AdminLayoutToggle";
 
 interface EmployeesViewProps {
@@ -222,10 +223,11 @@ export function EmployeesView({
                   <div className="adm-emp-id" role="cell">
                     <div className="adm-emp-id-line">
                       <p className="adm-emp-name" translate="no">{member.displayName}</p>
-                      <span className={`adm-status-pill tone-${tone}`}>
-                        <i className="adm-status-dot" aria-hidden="true" />
-                        {t(`admin.v2.emp_state_${key}`, { defaultValue: key })}
-                      </span>
+                      <TonePill
+                        tone={tone === "muted" ? "neutral" : tone}
+                        label={t(`admin.v2.emp_state_${key}`, { defaultValue: key })}
+                        live={tone === "info"}
+                      />
                     </div>
                     <p className="adm-emp-meta code">
                       <span translate="no">@{member.id}</span>
@@ -243,10 +245,11 @@ export function EmployeesView({
                         {localComputerUsageLabel(member)}
                       </span>
                       {isOverLocalComputerLimit(member) ? (
-                        <span className="adm-status-pill tone-bad" title={t("admin.v2.emp_limit_over")}>
-                          <i className="adm-status-dot" aria-hidden="true" />
-                          {t("admin.v2.emp_limit_over_short")}
-                        </span>
+                        <TonePill
+                          tone="bad"
+                          label={t("admin.v2.emp_limit_over_short")}
+                          title={t("admin.v2.emp_limit_over")}
+                        />
                       ) : null}
                     </div>
                   </div>
@@ -274,9 +277,11 @@ export function EmployeesView({
                   </div>
                   <div className="adm-emp-actions" role="cell">
                     {onEditEmployee ? (
-                      <Button variant="ghost"
+                      <Button variant="icon"
+                        size="icon-r-sm"
+                        tinted
                         type="button"
-                        className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn"
+                        className="adm-node-card-icon-btn"
                         onClick={() => {
                           const employee = employeesById.get(member.id);
                           if (employee) onEditEmployee(employee);
@@ -288,9 +293,11 @@ export function EmployeesView({
                       </Button>
                     ) : null}
                     {onDeleteEmployee ? (
-                      <Button variant="ghost"
+                      <Button variant="icon"
+                        size="icon-r-sm"
+                        tinted
                         type="button"
-                        className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn danger"
+                        className="adm-node-card-icon-btn danger"
                         onClick={() => void handleDeleteEmployee(member.id)}
                         disabled={pendingDelete !== null}
                         aria-label={t("admin.v2.delete_employee_action")}

@@ -30,6 +30,12 @@ const buttonVariants = cva(
         destructive:
           "border-destructive/45 text-destructive hover:border-destructive hover:bg-destructive hover:text-on-primary focus-visible:border-destructive focus-visible:[outline:var(--focus-outline-danger)] focus-visible:[outline-offset:var(--focus-offset)]",
         link: "text-primary underline-offset-4 hover:underline",
+        /* Circular icon-only action — the retired thread.css icon recipe,
+           ported 1:1: ink-3 idle; surface-2 + line-2 + ink-1 on hover.
+           Always paired with the round `icon-r` (40px) / `icon-r-sm`
+           (28px) sizes. `tinted` swaps the hover to an --action wash;
+           a `danger` className re-tints it to --err. */
+        icon: "text-(--ink-3) hover:border-(--line-2) hover:bg-(--surface-2) hover:text-(--ink-1)",
       },
       size: {
         default:
@@ -57,6 +63,17 @@ const buttonVariants = cva(
         "icon-sm":
           "size-7 rounded-md in-data-[slot=button-group]:rounded-md",
         "icon-lg": "size-11",
+        /* Round footprints for the `icon` variant: 40px tracks --control-h;
+           28px is the dense card-footer/toolbar tier. */
+        "icon-r": "size-(--control-h) rounded-full",
+        "icon-r-sm": "size-7 rounded-full",
+      },
+      /* Tinted hover for the `icon` variant — the icon communicates a colored
+         action instead of the neutral ink hover. Declared after `variant` so
+         these classes win the tailwind-merge conflict. */
+      tinted: {
+        true: "hover:border-transparent hover:bg-[color-mix(in_srgb,var(--action)_10%,transparent)] hover:text-(--action) [&.danger]:hover:bg-[color-mix(in_srgb,var(--err)_10%,transparent)] [&.danger]:hover:text-(--err)",
+        false: "",
       },
     },
     defaultVariants: {

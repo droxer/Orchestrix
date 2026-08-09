@@ -17,10 +17,6 @@
   transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
 }
 
-.conversation-search {
-  grid-template-columns: auto minmax(0, 1fr) auto;
-}
-
 .relay-search svg,
 .adm-search svg {
   color: var(--ink-3);
@@ -66,29 +62,6 @@
   background: var(--surface-0);
   outline: var(--focus-outline);
   outline-offset: var(--focus-offset);
-}
-
-.search-connect-btn {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--r-full);
-  background: var(--action);
-  color: var(--on-action);
-  flex-shrink: 0;
-  touch-action: manipulation;
-  transition: background var(--t-fast) var(--ease);
-}
-
-.search-connect-btn:hover { background: var(--action-hover); }
-
-/* Coarse pointers get the full touch-target hit area; desktop stays 26px. */
-@media (pointer: coarse) {
-  .search-connect-btn {
-    width: var(--touch-target);
-    height: var(--touch-target);
-  }
 }
 
 .employee-avatar,

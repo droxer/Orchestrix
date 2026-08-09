@@ -103,11 +103,6 @@
   color: var(--ink-1);
 }
 
-.workspace-page .workspace-page-tab:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
-
 .workspace-page .workspace-page-tab[aria-selected="true"],
 .workspace-page .workspace-page-tab.is-active {
   background: var(--surface-3);
@@ -292,7 +287,7 @@
   white-space: nowrap;
 }
 
-.workspace-pane-head > span:not(.workspace-files-path) {
+.workspace-pane-head > span {
   color: var(--ink-3);
   font-size: var(--fs-2);
   font-variant-numeric: tabular-nums;
@@ -314,7 +309,7 @@
 
 .workspace-preview-close {
   width: 28px;
-  height: 28px;
+  height: var(--control-h-xs);
   color: var(--ink-3);
 }
 
@@ -805,6 +800,8 @@
   gap: var(--sp-3);
   width: 100%;
   min-width: 0;
+  /* Geometry beats the Button base utilities (h-(--control-h)). */
+  height: auto;
   border: 0;
   border-bottom: 1px solid var(--line-2);
   background: transparent;
@@ -816,7 +813,7 @@
 }
 
 .workspace-pick:hover {
-  background: color-mix(in srgb, var(--surface-1) 72%, transparent);
+  background: var(--row-hover);
 }
 
 .workspace-pick.is-active {
@@ -889,10 +886,6 @@
   display: flex;
   flex-direction: column;
   padding: var(--sp-4);
-}
-
-.workspace-preview-viewport--artifact .artifact-viewer-body {
-  overflow: auto;
 }
 
 .workspace-preview-viewport.is-bleed .artifact-viewer-body {
@@ -1031,13 +1024,6 @@
 
 /* ---- empty + error states ------------------------------------------- */
 
-.workspace-empty {
-  margin: 0;
-  padding: var(--sp-6) var(--sp-4);
-  color: var(--ink-3);
-  font: var(--type-body-sm);
-}
-
 .workspace-empty-state {
   display: flex;
   flex-direction: column;
@@ -1065,7 +1051,7 @@
   margin: 0;
   color: var(--ink-1);
   font: var(--type-title);
-  letter-spacing: var(--track-display);
+  letter-spacing: var(--type-title-track);
 }
 
 .workspace-empty-state-hint {
@@ -1277,7 +1263,7 @@
   margin: 0;
   color: var(--ink-1);
   font: var(--type-title);
-  letter-spacing: var(--track-display);
+  letter-spacing: var(--type-title-track);
 }
 
 .agent-personality-state {
@@ -1611,7 +1597,7 @@
   justify-content: center;
   gap: var(--sp-1);
   min-width: 28px;
-  height: 28px;
+  height: var(--control-h-xs);
   padding: 0 var(--sp-2);
   border: 1px solid var(--line-2);
   border-radius: var(--r-2);

@@ -50,8 +50,6 @@
 @import "./styles/pills.css" layer(relay);
 
 @import "./styles/login.css" layer(relay);
-@import "./styles/mcp.css" layer(relay);
-@import "./styles/skills.css" layer(relay);
 @import "./styles/workspace.css" layer(relay);
 @import "./styles/backlog.css" layer(relay);
 @import "./styles/agents.css" layer(relay);

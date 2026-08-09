@@ -203,6 +203,13 @@ select:focus-visible {
 .tone-warn    { --tone: var(--warn); }
 .tone-neutral { --tone: var(--ink-4); }
 
+/* Hollow-ring "bad/dead" dot — shape carries the alarm, not brightness.
+   One ring width (1.5px) for every surface. */
+.dot-ring {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--tone, var(--err));
+}
+
 /* Shared cross-surface utilities. */
 :root {
   /* WCAG 2.5.5 / Apple HIG minimum touch target. */

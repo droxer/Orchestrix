@@ -115,31 +115,30 @@
 
 .page-header-title--display {
   font: var(--type-title);
-  letter-spacing: var(--track-display);
+  letter-spacing: var(--type-title-track);
 }
 
 .page-header-title--inline {
   font: var(--type-heading);
-  letter-spacing: var(--track-display);
+  letter-spacing: var(--type-heading-track);
 }
 
 .page-header-count {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--font-sans);
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
   font-feature-settings: "tnum" 1;
   font-variant-numeric: tabular-nums;
-  font-size: var(--fs-2);
-  font-weight: 500;
   color: var(--ink-3);
 }
 
 .page-header-subtitle {
   margin: 0;
   max-width: var(--measure);
-  font-size: var(--fs-3);
-  line-height: 1.45;
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
 }
 

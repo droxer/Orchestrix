@@ -15,6 +15,7 @@ import { NodeActions } from "./NodeActions";
 import { NodeProfileBadges, nodeOwnershipIcon } from "./NodeProfileBadges";
 import { NodePresence } from "./NodePresence";
 import { NodeRuntimeMarks } from "./NodeRuntimeMarks";
+import { TonePill } from "../StatusPill";
 import { Button } from "@/components/ui/button";
 import { ActionApprove, ActionCopy, AdminEmployees } from "../icons";
 import { isNodeOnline, nodeOwnershipProfile } from "../../lib/adminHelpers";
@@ -96,10 +97,7 @@ export function NodeCard({
           </span>
         </div>
         {showStatusPill ? (
-          <span className={`adm-status-pill tone-${tone}`}>
-            <i className="adm-status-dot" aria-hidden="true" />
-            {statusLabel}
-          </span>
+          <TonePill tone={tone} label={statusLabel} live={tone === "info"} />
         ) : null}
       </header>
 
@@ -131,9 +129,11 @@ export function NodeCard({
           <span className="adm-node-card-queued tnum">{node.queuedCommandCount} {t("admin.queued")}</span>
         ) : null}
         <div className="adm-node-card-actions">
-          <Button variant="ghost"
+          <Button variant="icon"
+            size="icon-r-sm"
+            tinted
             type="button"
-            className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn adm-node-action--copy"
+            className="adm-node-card-icon-btn adm-node-action--copy"
             onClick={() => void handleCopyId()}
             aria-label={copied ? t("admin.copied") : t("admin.copy_node_id")}
             title={node.id}

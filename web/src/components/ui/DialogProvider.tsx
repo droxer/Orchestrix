@@ -15,7 +15,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { readAnimationDurationMs } from "@/lib/animationDuration";
-import { acquireBodyScrollLock } from "@/lib/bodyScrollLock";
+import { useModalDrawer } from "@/hooks/useModalDrawer";
 import { ActionRemove } from "../icons";
 
 // Promise-based confirm/prompt that replaces the native window.confirm /
@@ -83,8 +83,6 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [toastExiting, setToastExiting] = useState(false);
   const [inputValue, setInputValue] = useState("");
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const previouslyFocused = useRef<HTMLElement | null>(null);
   const announcementId = useRef(0);
   const requestRef = useRef<Request | null>(null);
   const requestQueue = useRef<Request[]>([]);
@@ -149,57 +147,28 @@ export function DialogProvider({ children }: { children: ReactNode }) {
 
   const dialogOpen = Boolean(request);
 
+  // Modal contract — Escape, Tab trap, autofocus, focus restore, scroll lock —
+  // comes from the shared hook. Escape settles with the request's cancel value
+  // (false / null, same as the cancel button); `active` drops during the exit
+  // animation so the trap detaches while the modal is inert.
+  const dialogRef = useModalDrawer<HTMLDivElement>(
+    useCallback(() => {
+      const current = requestRef.current;
+      if (current) settle(cancelValue(current));
+    }, [settle]),
+    dialogOpen,
+    !dialogClosing,
+  );
+
+  // Prompt-only extras the hook doesn't cover: seed the input from
+  // defaultValue and pre-select it (window.prompt parity — typing replaces
+  // the default). Declared after the hook, so its autofocus has already run.
   useEffect(() => {
-    if (!dialogOpen) return;
-    previouslyFocused.current = document.activeElement as HTMLElement | null;
-    const releaseScrollLock = acquireBodyScrollLock();
-
-    return () => {
-      releaseScrollLock();
-      previouslyFocused.current?.focus?.();
-      previouslyFocused.current = null;
-    };
-  }, [dialogOpen]);
-
-  useEffect(() => {
-    if (!request || dialogClosing) return;
-    if (request.kind === "prompt") setInputValue(request.opts.defaultValue ?? "");
-    const focusTarget = dialogRef.current?.querySelector<HTMLElement>("[data-dialog-default]");
-    focusTarget?.focus();
-    if (focusTarget instanceof HTMLInputElement) focusTarget.select();
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (!request) return;
-      if (event.key === "Escape") {
-        event.preventDefault();
-        settle(cancelValue(request));
-        return;
-      }
-      // Minimal focus trap — cycle Tab within the modal's focusables.
-      if (event.key === "Tab") {
-        const focusables = dialogRef.current?.querySelectorAll<HTMLElement>(
-          'input:not([disabled]), button:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
-        );
-        if (!focusables || focusables.length === 0) return;
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
-        const active = document.activeElement as HTMLElement | null;
-        const focusInside = active ? dialogRef.current?.contains(active) : false;
-        if (event.shiftKey) {
-          if (active === first || !focusInside) {
-            event.preventDefault();
-            last.focus();
-          }
-        } else if (active === last || !focusInside) {
-          event.preventDefault();
-          first.focus();
-        }
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [dialogClosing, request, settle]);
+    if (!request || dialogClosing || request.kind !== "prompt") return;
+    setInputValue(request.opts.defaultValue ?? "");
+    const target = dialogRef.current?.querySelector("[data-modal-initial-focus]");
+    if (target instanceof HTMLInputElement) target.select();
+  }, [dialogClosing, request, dialogRef]);
 
   useEffect(() => () => {
     if (dialogCloseTimer.current !== null) window.clearTimeout(dialogCloseTimer.current);
@@ -295,7 +264,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                     }}
                   >
                     <Input
-                      data-dialog-default
+                      data-modal-initial-focus
                       className="dialog-input"
                       name="dialog-prompt"
                       autoComplete="off"
@@ -311,7 +280,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                   <Button
                     type="button"
                     variant="secondary"
-                    data-dialog-default={request.kind === "confirm" && request.opts.tone === "danger" ? "" : undefined}
+                    data-modal-initial-focus={request.kind === "confirm" && request.opts.tone === "danger" ? "" : undefined}
                     disabled={dialogClosing}
                     onClick={() => settle(cancelValue(request))}
                   >
@@ -321,7 +290,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                     <Button
                       type="button"
                       variant={request.opts.tone === "danger" ? "destructive" : "default"}
-                      data-dialog-default={request.opts.tone === "danger" ? undefined : ""}
+                      data-modal-initial-focus={request.opts.tone === "danger" ? undefined : ""}
                       disabled={dialogClosing}
                       onClick={() => settle(true)}
                     >
