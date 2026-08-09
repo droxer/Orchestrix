@@ -95,6 +95,44 @@ def test_daemon_run_events_leave_the_async_event_loop(monkeypatch) -> None:
         assert ran_on_event_loop == [False]
 
 
+def test_daemon_output_batch_preserves_order(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        handled: list[dict[str, Any]] = []
+        monkeypatch.setattr(
+            app.state.registry,
+            "handle_event",
+            lambda _sandbox_id, event, _token: handled.append(event),
+        )
+
+        response = client.post(
+            "/api/v1/daemon-nodes/sbx_test/events",
+            json={
+                "type": "run.output.batch",
+                "commandId": "cmd_1",
+                "sessionId": "ses_1",
+                "runId": "run_1",
+                "agent": "codex",
+                "entries": [
+                    {"stream": "stdout", "text": "out-1", "sequence": 0},
+                    {"stream": "stderr", "text": "err-1", "sequence": 1},
+                    {"stream": "stdout", "text": "out-2", "sequence": 2},
+                ],
+            },
+            headers={"Authorization": "Bearer node_token"},
+        )
+
+        assert response.status_code == 200
+        assert handled[0]["type"] == "run.output.batch"
+        assert [entry["stream"] for entry in handled[0]["entries"]] == [
+            "stdout",
+            "stderr",
+            "stdout",
+        ]
+
+
 def test_workspace_event_is_authorized_and_resolves_query_broker(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

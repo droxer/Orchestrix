@@ -166,6 +166,19 @@ export type RelayEvent =
     }
   | {
       id: string;
+      type: "agent.output.batch";
+      sessionId: string;
+      timestamp: string;
+      runId: string;
+      agent: AgentName;
+      entries: Array<{
+        stream: "stdout" | "stderr";
+        text: string;
+        sequence: number;
+      }>;
+    }
+  | {
+      id: string;
       type: "agent.collaboration";
       sessionId: string;
       timestamp: string;

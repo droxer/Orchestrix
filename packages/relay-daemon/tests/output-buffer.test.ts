@@ -5,8 +5,8 @@ import { OutputEventBuffer } from "../src/output-event-buffer.js";
 
 describe("OutputEventBuffer", () => {
   it("coalesces adjacent chunks from the same stream", () => {
-    const emitted: Array<{ stream: "stdout" | "stderr"; text: string }> = [];
-    const buffer = new OutputEventBuffer((stream, text) => emitted.push({ stream, text }), {
+    const emitted: Array<Array<{ stream: "stdout" | "stderr"; text: string }>> = [];
+    const buffer = new OutputEventBuffer((entries) => emitted.push(entries), {
       delayMs: 1_000,
       maxChars: 32_768,
     });
@@ -15,13 +15,13 @@ describe("OutputEventBuffer", () => {
     buffer.push("stdout", " two");
     buffer.flush();
 
-    assert.deepEqual(emitted, [{ stream: "stdout", text: "one two" }]);
+    assert.deepEqual(emitted, [[{ stream: "stdout", text: "one two" }]]);
     buffer.close();
   });
 
   it("bounds emissions when stdout and stderr alternate", () => {
-    const emitted: Array<{ stream: "stdout" | "stderr"; text: string }> = [];
-    const buffer = new OutputEventBuffer((stream, text) => emitted.push({ stream, text }), {
+    const emitted: Array<Array<{ stream: "stdout" | "stderr"; text: string }>> = [];
+    const buffer = new OutputEventBuffer((entries) => emitted.push(entries), {
       delayMs: 1_000,
       maxChars: 32_768,
     });
@@ -31,16 +31,17 @@ describe("OutputEventBuffer", () => {
     buffer.push("stdout", "out-2");
     buffer.flush();
 
-    assert.deepEqual(emitted, [
-      { stream: "stdout", text: "out-1out-2" },
+    assert.deepEqual(emitted, [[
+      { stream: "stdout", text: "out-1" },
       { stream: "stderr", text: "err" },
-    ]);
+      { stream: "stdout", text: "out-2" },
+    ]]);
     buffer.close();
   });
 
   it("flushes immediately at the bounded character budget", () => {
     const emitted: string[] = [];
-    const buffer = new OutputEventBuffer((_stream, text) => emitted.push(text), {
+    const buffer = new OutputEventBuffer((entries) => emitted.push(entries.map((entry) => entry.text).join("")), {
       delayMs: 1_000,
       maxChars: 5,
     });
@@ -51,9 +52,36 @@ describe("OutputEventBuffer", () => {
     buffer.close();
   });
 
+  it("splits a single oversized renderer chunk at the character budget", () => {
+    const emitted: string[] = [];
+    const buffer = new OutputEventBuffer((entries) => emitted.push(entries.map((entry) => entry.text).join("")), {
+      delayMs: 1_000,
+      maxChars: 5,
+    });
+
+    buffer.push("stdout", "abcdefghij");
+
+    assert.deepEqual(emitted, ["abcde", "fghij"]);
+    buffer.close();
+  });
+
+  it("never splits a Unicode surrogate pair across batches", () => {
+    const emitted: string[] = [];
+    const buffer = new OutputEventBuffer((entries) => emitted.push(entries.map((entry) => entry.text).join("")), {
+      delayMs: 1_000,
+      maxChars: 3,
+    });
+
+    buffer.push("stdout", "ab😀cd");
+    buffer.close();
+
+    assert.equal(emitted.join(""), "ab😀cd");
+    assert.equal(emitted.some((text) => /[\uD800-\uDBFF]$|^[\uDC00-\uDFFF]/u.test(text)), false);
+  });
+
   it("flushes after the latency window", async () => {
     const emitted: string[] = [];
-    const buffer = new OutputEventBuffer((_stream, text) => emitted.push(text), {
+    const buffer = new OutputEventBuffer((entries) => emitted.push(entries.map((entry) => entry.text).join("")), {
       delayMs: 5,
       maxChars: 32_768,
     });

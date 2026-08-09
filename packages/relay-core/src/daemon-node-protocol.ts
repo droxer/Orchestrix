@@ -48,8 +48,10 @@ export interface DaemonAgentInventory {
   mcpServers: DaemonAgentMcpServer[];
 }
 
-export const DAEMON_NODE_PROTOCOL_VERSION = 1 as const;
-export const DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS: readonly number[] = [1];
+/** Version 2 adds ordered run.output.batch delivery. */
+export const DAEMON_NODE_PROTOCOL_VERSION = 2 as const;
+/** The backend remains able to receive legacy version-1 run.output events. */
+export const DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS: readonly number[] = [2, 1];
 
 /**
  * Daemon-advertised optional behaviors. "generated-files" means the daemon
@@ -235,6 +237,19 @@ export type DaemonNodeEvent =
       stream: "stdout" | "stderr";
       text: string;
       sequence: number;
+    }
+  | {
+      type: "run.output.batch";
+      commandId: string;
+      leaseId?: string;
+      sessionId: string;
+      runId: string;
+      agent: AgentName;
+      entries: Array<{
+        stream: "stdout" | "stderr";
+        text: string;
+        sequence: number;
+      }>;
     }
   | {
       type: "run.collaboration";

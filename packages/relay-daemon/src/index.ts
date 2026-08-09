@@ -65,7 +65,7 @@ import {
 } from "relay-core";
 import { workspaceCommandEvent } from "./workspace-read.js";
 import { ThreadWorkspaceManager } from "./thread-workspace.js";
-import { OutputEventBuffer } from "./output-event-buffer.js";
+import { OutputEventBuffer, type BufferedOutput } from "./output-event-buffer.js";
 
 export type DaemonSandboxMode = DaemonNodeSandboxMode;
 const DEFAULT_DAEMON_SANDBOX_MODE: DaemonSandboxMode = "boxlite";
@@ -793,71 +793,72 @@ async function executeCommand(
   }
   logger.info("agent ready", commandLogFields(sandboxId, command));
   let outputSequence = 0;
-  let outputPostChain: Promise<void> = Promise.resolve();
   let outputPostFailure: Error | undefined;
-  let pendingOutputPosts = 0;
-  const maxPendingOutputPosts = 256;
+  const outputPostQueue: Array<{ post: () => Promise<void>; fields: DaemonLogFields }> = [];
+  let outputPostHead = 0;
+  let outputPostDrain: Promise<void> | undefined;
+  const drainOutputPosts = async (): Promise<void> => {
+    while (outputPostHead < outputPostQueue.length && !outputPostFailure) {
+      const item = outputPostQueue[outputPostHead++];
+      try {
+        await item.post();
+      } catch (error) {
+        outputPostFailure = error instanceof Error ? error : new Error(String(error));
+        logger.error("event post exhausted retries", {
+          ...commandLogFields(sandboxId, command),
+          ...item.fields,
+          error: outputPostFailure.message,
+        });
+      }
+    }
+    outputPostQueue.length = 0;
+    outputPostHead = 0;
+  };
+  const startOutputDrain = (): void => {
+    if (outputPostDrain || outputPostFailure || outputPostQueue.length === 0) return;
+    outputPostDrain = drainOutputPosts().finally(() => {
+      outputPostDrain = undefined;
+      startOutputDrain();
+    });
+  };
   const enqueueOutputPost = (
     post: () => Promise<void>,
     fields: DaemonLogFields,
   ): void => {
     if (outputPostFailure) return;
-    if (pendingOutputPosts >= maxPendingOutputPosts) {
-      outputPostFailure = new Error(
-        `Daemon output post backlog exceeded ${maxPendingOutputPosts} events.`,
-      );
-      logger.error("event post backlog circuit opened", {
-        ...commandLogFields(sandboxId, command),
-        ...fields,
-        error: outputPostFailure.message,
-      });
-      return;
-    }
-    pendingOutputPosts += 1;
-    outputPostChain = outputPostChain
-      .then(async () => {
-        if (outputPostFailure) return;
-        try {
-          await post();
-        } catch (error) {
-          outputPostFailure = error instanceof Error ? error : new Error(String(error));
-          logger.error("event post exhausted retries", {
-            ...commandLogFields(sandboxId, command),
-            ...fields,
-            error: outputPostFailure.message,
-          });
-        }
-      })
-      .finally(() => {
-        pendingOutputPosts -= 1;
-      });
+    outputPostQueue.push({ post, fields });
+    startOutputDrain();
   };
-  const emitOutput = (agent: AgentName, stream: "stdout" | "stderr", text: string): void => {
-    const sequence = outputSequence++;
-    logger.output({
-      ...commandLogFields(sandboxId, command),
-      agent,
-      stream,
-      text,
-      sequence,
+  const waitForOutputPosts = async (): Promise<void> => {
+    while (outputPostDrain) await outputPostDrain;
+  };
+  const emitOutputBatch = (agent: AgentName, buffered: BufferedOutput[]): void => {
+    const entries = buffered.map(({ stream, text }) => {
+      const sequence = outputSequence++;
+      logger.output({
+        ...commandLogFields(sandboxId, command),
+        agent,
+        stream,
+        text,
+        sequence,
+      });
+      return { stream, text, sequence };
     });
     enqueueOutputPost(
       () => postJsonWithRetry(fetchFn, eventUrl, {
-          type: "run.output",
+          type: "run.output.batch",
           commandId: command.id,
           ...commandLeaseEventFields(command),
           sessionId: command.sessionId,
           runId: command.runId,
           agent,
-          stream,
-          text,
-          sequence,
+          entries,
         } satisfies DaemonNodeEvent, token, signal),
-      { agent, stream, sequence },
+      { agent, sequence: entries[0]?.sequence },
     );
   };
   const outputBuffer = new OutputEventBuffer(
-    (stream, text) => emitOutput(command.agent, stream, text),
+    (entries) => emitOutputBatch(command.agent, entries),
   );
   const eventSink = {
     agentOutput: (_runId: string, _agent: AgentName, stream: "stdout" | "stderr", text: string): void => {
@@ -914,7 +915,7 @@ async function executeCommand(
     patch = await runAgentNode(command.agent, command.mode, runState, options);
   } finally {
     outputBuffer.close();
-    await outputPostChain;
+    await waitForOutputPosts();
   }
   const next = mergeAgentState(state, patch);
   const agentLog = next.agent_logs.slice(-1)[0] ?? "";

@@ -17,7 +17,6 @@ import { MarkdownContent } from "./Markdown";
 import { buildCollaborationTree } from "../lib/collaborationTree";
 import { SubagentTree } from "./SubagentTree";
 import { useDebouncedStreamingAnnouncement, useSmoothStreamingText } from "../hooks/useSmoothStreamingText";
-import { splitStreamingMarkdown } from "../lib/streamingMarkdown";
 
 function StreamActivity({ label }: { label: string }) {
   return (
@@ -214,23 +213,14 @@ function TextSegment({ text, live }: { text: string; live: boolean }) {
   const announcement = useDebouncedStreamingAnnouncement(text, live);
   return (
     <div className={`agent-text ${live ? "is-live" : ""}`}>
-      <StreamingProse text={visibleText} live={live} />
+      <div className="agent-prose" aria-hidden={live || undefined}>
+        <MarkdownContent text={visibleText} />
+      </div>
       {live ? (
         <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
           {announcement}
         </span>
       ) : null}
-    </div>
-  );
-}
-
-function StreamingProse({ text, live }: { text: string; live: boolean }) {
-  const parts = splitStreamingMarkdown(text, live);
-  return (
-    <div className={`agent-prose ${live ? "agent-prose-live" : ""}`} aria-hidden={live || undefined}>
-      {parts.map((part, index) => part.kind === "markdown"
-        ? <MarkdownContent key={`markdown-${index}`} text={part.text} />
-        : <p key={`text-${index}`}>{part.text}</p>)}
     </div>
   );
 }

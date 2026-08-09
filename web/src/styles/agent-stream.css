@@ -105,13 +105,6 @@
   overflow-wrap: anywhere;
 }
 
-/* Parsing a growing Markdown document on every token is expensive. Complete
-   code fences render as stable highlighted blocks; the unfinished tail stays
-   whitespace-preserving text until the run settles. */
-.agent-prose-live {
-  white-space: pre-wrap;
-}
-
 .agent-prose p {
   margin: 0 0 var(--sp-2);
 }

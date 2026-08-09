@@ -836,7 +836,7 @@ test("relay daemon preserves final agent log and generated files when output eve
       if (path.endsWith("/events")) {
         const event = await jsonBody<DaemonNodeEvent>(init);
         events.push(event);
-        if (event.type === "run.output") return jsonResponse({ error: "bad output event" }, 400);
+        if (event.type === "run.output.batch") return jsonResponse({ error: "bad output event" }, 400);
         if (event.type === "run.failed" || event.type === "run.completed") setTimeout(() => stop.abort(), 0);
         return jsonResponse({ ok: true }, 202);
       }
@@ -857,12 +857,20 @@ test("relay daemon preserves final agent log and generated files when output eve
   assert.deepEqual(failed.generatedFiles?.map((file) => file.relativePath), ["agent-loop-guide.md"]);
 });
 
-test("relay daemon coalesces burst output before posting it", async () => {
+test("relay daemon batches large alternating output without losing order", async () => {
   const stop = new AbortController();
   const command = runCommand("cmd_output_backlog");
+  const rawChunks = Array.from(
+    { length: 300 },
+    (_, index) => `${String(index).padStart(3, "0")}:${"x".repeat(32_760)}\n`,
+  );
   let commandServed = false;
   let terminalType = "";
-  const outputEvents: Extract<DaemonNodeEvent, { type: "run.output" }>[] = [];
+  let registration: DaemonNodeRegistration | undefined;
+  const outputBatches: Array<{
+    type: "run.output.batch";
+    entries: Array<{ stream: "stdout" | "stderr"; text: string; sequence: number }>;
+  }> = [];
   await runRelayDaemon({
     backendUrl: "http://relay.test",
     sandboxId: "sbx_test",
@@ -877,11 +885,11 @@ test("relay daemon coalesces burst output before posting it", async () => {
     environment: fakeEnvironment({
       exec: async (_cmd, args, options) => {
         if (!isInventoryProbe(args)) {
-          for (let index = 0; index < 300; index += 1) {
+          for (let index = 0; index < rawChunks.length; index += 1) {
             const render = index % 2 === 0
               ? options?.stdoutRenderer
               : options?.stderrRenderer;
-            render?.(`chunk-${index}\n`);
+            render?.(rawChunks[index]);
           }
         }
         return { exit_code: 0, stdout: "done", stderr: "" };
@@ -890,7 +898,10 @@ test("relay daemon coalesces burst output before posting it", async () => {
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
       if (path === "/api") return jsonResponse({ name: "Relay backend" });
-      if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
+      if (path === "/api/v1/daemon-node-registrations") {
+        registration = await jsonBody<DaemonNodeRegistration>(init);
+        return jsonResponse({ ok: true });
+      }
       if (path.endsWith("/commands")) {
         if (!commandServed) {
           commandServed = true;
@@ -899,8 +910,8 @@ test("relay daemon coalesces burst output before posting it", async () => {
         return jsonResponse({ commands: [] });
       }
       if (path.endsWith("/events")) {
-        const event = await jsonBody<DaemonNodeEvent>(init);
-        if (event.type === "run.output") outputEvents.push(event);
+        const event = await jsonBody<DaemonNodeEvent | typeof outputBatches[number]>(init);
+        if (event.type === "run.output.batch") outputBatches.push(event);
         if (event.type === "run.failed" || event.type === "run.completed") {
           terminalType = event.type;
           setTimeout(() => stop.abort(), 0);
@@ -912,9 +923,24 @@ test("relay daemon coalesces burst output before posting it", async () => {
   });
 
   assert.equal(terminalType, "run.completed");
-  assert.equal(outputEvents.length, 2);
-  assert.match(outputEvents.find((event) => event.stream === "stdout")?.text ?? "", /chunk-0\n[\s\S]*chunk-298\n/);
-  assert.match(outputEvents.find((event) => event.stream === "stderr")?.text ?? "", /chunk-1\n[\s\S]*chunk-299\n/);
+  assert.equal(registration?.protocolVersion, 2);
+  assert.ok(outputBatches.length < 64, `expected bounded HTTP batches, received ${outputBatches.length}`);
+  const entries = outputBatches.flatMap((event) => event.entries);
+  assert.equal(entries.map((entry) => entry.text).join(""), rawChunks.join(""));
+  assert.equal(
+    entries.filter((entry) => entry.stream === "stdout").map((entry) => entry.text).join(""),
+    rawChunks.filter((_, index) => index % 2 === 0).join(""),
+  );
+  assert.equal(
+    entries.filter((entry) => entry.stream === "stderr").map((entry) => entry.text).join(""),
+    rawChunks.filter((_, index) => index % 2 === 1).join(""),
+  );
+  assert.deepEqual(
+    entries.map((entry) => entry.sequence),
+    Array.from({ length: entries.length }, (_, index) => index),
+  );
+  assert.match(entries[0]?.text ?? "", /^000:/);
+  assert.match(entries.at(-1)?.text ?? "", /^299:/);
 });
 
 test("daemon logger flushes non-blocking node and run logs", async (t) => {
@@ -1750,7 +1776,7 @@ test("relay daemon can register, poll, execute, and report through a local backe
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 
-  assert.equal(events.some((event) => event.type === "run.output"), true);
+  assert.equal(events.some((event) => event.type === "run.output.batch"), true);
   assert.equal(events.some((event) => event.type === "run.completed"), true);
 });
 

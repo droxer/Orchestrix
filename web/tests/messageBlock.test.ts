@@ -74,6 +74,27 @@ describe("ProjectMessagesAccumulator", () => {
     assert.notEqual(second[1], first[1]);
     assert.equal(second[1]?.kind === "agent" ? second[1].stdout : "", "hello");
   });
+
+  it("projects an ordered output batch in one update", () => {
+    const projected = new ProjectMessagesAccumulator().update(session([
+      {
+        id: "ev_output_batch",
+        type: "agent.output.batch",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "codex",
+        entries: [
+          { stream: "stdout", text: "out-1", sequence: 0 },
+          { stream: "stderr", text: "err-1", sequence: 1 },
+          { stream: "stdout", text: "out-2", sequence: 2 },
+        ],
+      },
+    ]), t);
+
+    assert.equal(projected[1]?.kind === "agent" ? projected[1].stdout : "", "out-1out-2");
+    assert.equal(projected[1]?.kind === "agent" ? projected[1].stderr : "", "err-1");
+  });
 });
 
 describe("memoized transcript messages", () => {

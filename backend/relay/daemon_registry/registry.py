@@ -1599,7 +1599,8 @@ class DaemonNodeRegistry:
         self._hydrate_node(sandbox_id)
         lock = (
             self.dispatch_scope([sandbox_id])
-            if event.get("type") in {"run.output", "run.collaboration"}
+            if event.get("type")
+            in {"run.output", "run.output.batch", "run.collaboration"}
             else self.dispatch_lock
         )
         with lock:
@@ -1702,7 +1703,8 @@ class DaemonNodeRegistry:
                 "Unauthorized daemon node event: command lease does not match the active command."
             )
         if active["agent"] != event["agent"] or (
-            event["type"] != "run.output" and active["mode"] != event.get("mode")
+            event["type"] not in {"run.output", "run.output.batch"}
+            and active["mode"] != event.get("mode")
         ):
             logger.warning(
                 "Daemon node event command metadata mismatch",
@@ -1734,6 +1736,36 @@ class DaemonNodeRegistry:
             )
             seen[event["stream"]] = event["sequence"]
             self._append_run_output(event["runId"], event["text"])
+            self._note_run_progress(command)
+            return
+        if event["type"] == "run.output.batch":
+            seen = self._output_sequences_for_run(event["sessionId"], event["runId"])
+            candidate_seen = dict(seen)
+            accepted_entries: list[dict[str, Any]] = []
+            for entry in event["entries"]:
+                stream = entry["stream"]
+                if entry["sequence"] <= candidate_seen.get(stream, -1):
+                    continue
+                accepted_entries.append(entry)
+                candidate_seen[stream] = entry["sequence"]
+            if not accepted_entries:
+                return
+            self.store.append_event(
+                event["sessionId"],
+                relay_event(
+                    "agent.output.batch",
+                    event["sessionId"],
+                    {
+                        "runId": event["runId"],
+                        "agent": event["agent"],
+                        "entries": accepted_entries,
+                    },
+                ),
+                hydrate_events=False,
+            )
+            seen.update(candidate_seen)
+            for entry in accepted_entries:
+                self._append_run_output(event["runId"], entry["text"])
             self._note_run_progress(command)
             return
         if event["type"] == "run.collaboration":
@@ -3156,6 +3188,13 @@ class DaemonNodeRegistry:
             return {}
         seen: dict[str, int] = {}
         for event in session.get("events", []):
+            if event.get("type") == "agent.output.batch" and event.get("runId") == run_id:
+                for entry in event.get("entries", []):
+                    stream = entry.get("stream") if isinstance(entry, dict) else None
+                    sequence = entry.get("sequence") if isinstance(entry, dict) else None
+                    if isinstance(stream, str) and isinstance(sequence, int):
+                        seen[stream] = max(seen.get(stream, -1), sequence)
+                continue
             if (
                 event.get("type") not in ("agent.output", "agent.collaboration")
                 or event.get("runId") != run_id

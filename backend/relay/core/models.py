@@ -21,8 +21,10 @@ CommandStatus = Literal["queued", "dispatched", "completed", "failed", "cancelle
 
 AGENT_NAMES: tuple[str, ...] = ("claude", "pi", "codex", "kimi")
 AGENT_ROLES: tuple[str, ...] = ("implementer", "reviewer", "planner", "tester", "fixer")
-DAEMON_NODE_PROTOCOL_VERSION = 1
-DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS = (1,)
+# Version 2 adds ordered run.output.batch delivery. Keep version 1 accepted so
+# existing daemons can finish upgrading with their legacy run.output events.
+DAEMON_NODE_PROTOCOL_VERSION = 2
+DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS = (2, 1)
 
 
 def to_camel(value: str) -> str:

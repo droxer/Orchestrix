@@ -495,6 +495,39 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
             "text": value["text"],
             "sequence": int(value["sequence"]),
         }
+    if event_type == "run.output.batch":
+        raw_entries = value.get("entries")
+        if not isinstance(raw_entries, list) or not raw_entries or len(raw_entries) > 1024:
+            raise ValueError("invalid daemon node run.output.batch event.")
+        entries: list[dict[str, Any]] = []
+        total_text = 0
+        for raw_entry in raw_entries:
+            if (
+                not isinstance(raw_entry, dict)
+                or raw_entry.get("stream") not in ("stdout", "stderr")
+                or not isinstance(raw_entry.get("sequence"), (int, float))
+                or not isinstance(raw_entry.get("text"), str)
+            ):
+                raise ValueError("invalid daemon node run.output.batch entry.")
+            total_text += len(raw_entry["text"])
+            if total_text > 512 * 1024:
+                raise ValueError("daemon node run.output.batch text is too large.")
+            entries.append(
+                {
+                    "stream": raw_entry["stream"],
+                    "text": raw_entry["text"],
+                    "sequence": int(raw_entry["sequence"]),
+                }
+            )
+        return {
+            "type": event_type,
+            "commandId": command_id,
+            **lease_field,
+            "sessionId": session_id,
+            "runId": run_id,
+            "agent": agent,
+            "entries": entries,
+        }
     if event_type == "run.collaboration":
         collaboration = value.get("collaboration")
         if not isinstance(collaboration, dict) or not isinstance(value.get("sequence"), (int, float)):

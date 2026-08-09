@@ -356,6 +356,21 @@ export class ProjectMessagesAccumulator {
         }
         return ensured.created;
       }
+      case "agent.output.batch": {
+        const ensured = this.ensureRun(event.runId, event.agent, event.timestamp);
+        const state = this.runState.get(event.runId);
+        if (!state) return ensured.created;
+        for (const entry of event.entries) {
+          if (entry.stream === "stdout") state.stdout += entry.text;
+          else state.stderr += entry.text;
+        }
+        const block = this.out[ensured.index];
+        if (block.kind === "agent") {
+          this.out[ensured.index] = { ...block, stdout: state.stdout, stderr: state.stderr };
+          return true;
+        }
+        return ensured.created;
+      }
       case "agent.collaboration": {
         const ensured = this.ensureRun(event.runId, event.agent, event.timestamp, event.mode);
         const state = this.runState.get(event.runId);

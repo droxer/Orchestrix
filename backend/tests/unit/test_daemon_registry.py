@@ -679,6 +679,94 @@ def test_staged_command_is_relinked_after_dispatcher_crash_before_link() -> None
     asyncio.run(run_flow())
 
 
+def test_daemon_output_batch_is_persisted_in_order_and_deduplicated_after_restart(
+    monkeypatch,
+) -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            registry.register(
+                {
+                    "sandboxId": "sbx_alice",
+                    "employeeId": "alice",
+                    "token": "node_token",
+                    "workspacePath": "/workspace/alice",
+                    "protocolVersion": 2,
+                    "supportedAgents": ["codex"],
+                    "capabilities": ["thread-workspaces"],
+                    "status": "ready",
+                },
+                "ui_token",
+            )
+            session = await ServerDaemonNodeBackend(registry).run(
+                "sbx_alice",
+                {
+                    "taskGoal": "stream ordered output",
+                    "assignments": [{"agent": "codex", "mode": "action"}],
+                },
+            )
+            [command] = registry.take_commands("sbx_alice", "node_token")
+            batch = {
+                "type": "run.output.batch",
+                "commandId": command["id"],
+                "sessionId": command["sessionId"],
+                "runId": command["runId"],
+                "agent": "codex",
+                "entries": [
+                    {"stream": "stdout", "text": "out-1", "sequence": 0},
+                    {"stream": "stderr", "text": "err-1", "sequence": 1},
+                    {"stream": "stdout", "text": "out-2", "sequence": 2},
+                ],
+            }
+            original_append = session_store.append_event
+            failed_once = False
+
+            def append_with_one_failure(
+                session_id: str,
+                event: dict[str, object],
+                **kwargs: object,
+            ) -> dict[str, object]:
+                nonlocal failed_once
+                if event.get("type") == "agent.output.batch" and not failed_once:
+                    failed_once = True
+                    raise RuntimeError("disk unavailable")
+                return original_append(session_id, event, **kwargs)
+
+            monkeypatch.setattr(session_store, "append_event", append_with_one_failure)
+            with pytest.raises(RuntimeError, match="disk unavailable"):
+                registry.handle_event("sbx_alice", batch, "node_token")
+            registry.handle_event("sbx_alice", batch, "node_token")
+
+            persisted_before_restart = [
+                event
+                for event in session_store.get_session(session["id"])["events"]
+                if event.get("type") == "agent.output.batch"
+            ]
+            assert len(persisted_before_restart) == 1
+            assert registry.output_for_run(command["runId"]) == "out-1err-1out-2"
+
+            restarted = DaemonNodeRegistry(
+                LocalSessionStore(root), LocalDaemonStore(root)
+            )
+            restarted.handle_event("sbx_alice", batch, "node_token")
+
+            output_batches = [
+                event
+                for event in session_store.get_session(session["id"])["events"]
+                if event.get("type") == "agent.output.batch"
+            ]
+            assert len(output_batches) == 1
+            assert [entry["text"] for entry in output_batches[0]["entries"]] == [
+                "out-1",
+                "err-1",
+                "out-2",
+            ]
+
+    asyncio.run(run_flow())
+
+
 def test_daemon_output_dedupe_hydrates_existing_sequences_once_after_restart(
     monkeypatch,
 ) -> None:
