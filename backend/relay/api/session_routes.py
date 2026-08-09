@@ -734,7 +734,14 @@ _STREAM_EVENT_PAGE_LIMIT = max(
     1, min(1000, int(os.environ.get("RELAY_STREAM_EVENT_PAGE_LIMIT", "256")))
 )
 _STREAM_HEARTBEAT_SECONDS = 15.0
-_STREAM_MAX_SECONDS = 60 * 30
+# Upper bound on a single SSE connection. The client reconnects with
+# Last-Event-ID, so capping the connection only costs a reconnect. Configurable
+# because a CDN or platform proxy in front of the backend may cut a stream at
+# its own (shorter) limit; setting this below that limit turns an opaque proxy
+# disconnect into a clean, resumable `done` frame.
+_STREAM_MAX_SECONDS = max(
+    5.0, float(os.environ.get("RELAY_STREAM_MAX_SECONDS", str(60 * 30)))
+)
 
 
 def _sse_frame(data: dict[str, Any], *, event: str | None = None) -> str:

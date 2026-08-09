@@ -10,6 +10,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -44,6 +45,7 @@ from .chat import (
     probe_chat_integration,
     provision_chat_integration,
 )
+from .core import deploy_config
 from .core.environment import load_backend_env
 from .core.storage_config import database_url_from_env, use_postgres_storage
 from .daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
@@ -194,6 +196,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
         redoc_url=API_REDOC_PATH,
     )
     app.add_middleware(ServerTimingMiddleware)
+    _configure_cors(app)
     app.state.session_store = session_store
     app.state.task_store = task_store
     app.state.daemon_store = daemon_store
@@ -225,6 +228,13 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     for node in registry.monitor_nodes():
         if node.get("managedNodeId") and not node.get("retiredAt"):
             sync_node_agents(app.state, node)
+
+    # Platform health checks run before the app has a database session and must
+    # never require auth, so this stays outside the versioned API namespace and
+    # reports only liveness.
+    @app.get("/healthz", tags=["api"], include_in_schema=False)
+    async def healthz() -> dict[str, str]:
+        return {"status": "ok", "version": API_VERSION}
 
     @app.get("/api", tags=["api"])
     async def api_info() -> dict[str, Any]:
@@ -269,6 +279,36 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     # shadow the explicit API routes above.
     app.include_router(web_routes.router)
     return app
+
+
+def _configure_cors(app: FastAPI) -> None:
+    """Allow a separately hosted web UI to call the API with session cookies.
+
+    A no-op unless origins are configured, which keeps the single-origin
+    deployment free of CORS headers it does not need. ``allow_credentials`` is
+    required because Relay authenticates with a cookie, and it is what forces
+    the exact-origin rule enforced in ``deploy_config.cors_allow_origins``.
+    """
+    if not deploy_config.cors_enabled():
+        return
+    origins = deploy_config.cors_allow_origins()
+    origin_regex = deploy_config.cors_allow_origin_regex()
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_origin_regex=origin_regex,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        # The web client reads Last-Event-ID off SSE frames, not headers, but
+        # Server-Timing is read by the browser devtools panel on every request.
+        expose_headers=["Server-Timing"],
+    )
+    logger.info(
+        "CORS enabled for cross-origin web UI",
+        origins=origins,
+        origin_regex=origin_regex,
+    )
 
 
 def daemon_store_from_env(root_dir: Path) -> Any:

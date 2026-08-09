@@ -1,0 +1,47 @@
+# The backend image builds from the repo root as its context (see
+# railway.json). Everything the backend does not need is excluded here so the
+# uploaded context stays small — node_modules and .git alone are most of it.
+.git/
+.github/
+.worktrees/
+
+node_modules/
+**/node_modules/
+dist/
+web/.next/
+web/out/
+
+.venv/
+backend/.venv/
+.uv-cache/
+**/__pycache__/
+*.py[cod]
+
+# Local state and caches, never part of an image.
+.relay/
+.oci/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Secrets must come from the platform's variable store, never a build context.
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+
+# Editor and OS noise.
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.swo
+daemon.log
+
+# Docs and assets the backend image does not serve.
+docs/
+assets/
+devbox/

@@ -1,4 +1,4 @@
-import { relayApiPath } from "relay-core/api-url";
+import { relayApiEndpoint } from "./apiOrigin.js";
 import type { RelaySession, SessionStatus } from "../types.js";
 
 const TERMINAL_SESSION_STATUSES: ReadonlySet<SessionStatus> = new Set(["completed", "failed", "cancelled"]);
@@ -17,6 +17,6 @@ export function lastSessionEventId(sessions: readonly RelaySession[] | undefined
 }
 
 export function sessionEventsUrl(sessionId: string, afterEventId?: string): string {
-  const base = relayApiPath(`/threads/${encodeURIComponent(sessionId)}/events`);
+  const base = relayApiEndpoint(`/threads/${encodeURIComponent(sessionId)}/events`);
   return afterEventId ? `${base}?after=${encodeURIComponent(afterEventId)}` : base;
 }

@@ -111,6 +111,10 @@ The repository map, state ownership, and engineering invariants are maintained i
 
 Target architecture and implementation details live in [`docs/system-architecture.md`](docs/system-architecture.md) and [`docs/implementation-plan.md`](docs/implementation-plan.md).
 
+## Deployment
+
+To host Relay rather than run it locally, [`docs/deployment.md`](docs/deployment.md) covers the web UI on Vercel and the backend plus Postgres on Railway. Daemons stay off both platforms — they run wherever the sandbox lives and connect out to the backend URL.
+
 ## Documentation
 
 Start with the [`docs/` index](docs/README.md) for the canonical setup, API, product, architecture, design, decision, and operations documents.

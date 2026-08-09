@@ -8,6 +8,7 @@ import uvicorn
 from loguru import logger
 
 from .app import create_app
+from .core import deploy_config
 from .core.environment import load_backend_env
 from .core.logging_config import setup_logging
 from .core.storage_config import database_url_from_env
@@ -25,10 +26,8 @@ def main(argv: list[str] | None = None) -> None:
         default="relay",
         choices=["relay", "serve", "migrate-local-sessions"],
     )
-    parser.add_argument("--host", default=os.environ.get("BACKEND_HOST", "127.0.0.1"))
-    parser.add_argument(
-        "--port", type=int, default=int(os.environ.get("BACKEND_PORT", "8790"))
-    )
+    parser.add_argument("--host", default=deploy_config.bind_host())
+    parser.add_argument("--port", type=int, default=deploy_config.bind_port())
     parser.add_argument("--data-dir", default=os.environ.get("RELAY_DATA_DIR"))
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
@@ -60,4 +59,15 @@ def main(argv: list[str] | None = None) -> None:
     logger.info("Relay backend listening on http://{}:{}", args.host, args.port)
     logger.info("Relay backend control panel: http://{}:{}/admin", args.host, args.port)
     logger.info("Relay web UI: http://{}:{}/", args.host, args.port)
-    uvicorn.run(app, host=args.host, port=args.port, log_config=None)
+    trust_proxy = deploy_config.trust_proxy_headers()
+    uvicorn.run(
+        app,
+        host=args.host,
+        port=args.port,
+        log_config=None,
+        # Behind a platform load balancer the socket peer is the edge, not the
+        # client: without this every request reads as plain http from the
+        # proxy's address, and session cookies would never be marked Secure.
+        proxy_headers=trust_proxy,
+        forwarded_allow_ips="*" if trust_proxy else None,
+    )

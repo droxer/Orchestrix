@@ -25,6 +25,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError
 
+from ..core import deploy_config
 from ..core.ids import new_database_id, now_iso
 from ..core.storage_config import database_url_from_env, use_postgres_storage
 from ..persistence.store_common import (
@@ -1148,10 +1149,35 @@ def user_session_cookie_attrs(
     attrs: dict[str, Any] = {
         "key": USER_COOKIE_NAME,
         "httponly": True,
-        "samesite": "lax",
+        "samesite": deploy_config.session_cookie_samesite(),
         "max_age": max_age_seconds,
         "path": "/",
+        **user_session_cookie_scope(),
     }
     if secure is not None:
         attrs["secure"] = secure
+    # A SameSite=None cookie is dropped by the browser unless it is also
+    # Secure, so never let the request scheme downgrade a cross-site cookie
+    # into one that silently fails to set.
+    if attrs["samesite"] == "none":
+        attrs["secure"] = True
     return attrs
+
+
+def user_session_cookie_scope() -> dict[str, Any]:
+    """Cookie attributes shared by ``set_cookie`` and ``delete_cookie``.
+
+    A cookie is only deleted when the delete call repeats the domain and path
+    it was written with, so both sides read the scope from one place.
+    """
+    domain = deploy_config.session_cookie_domain()
+    return {"domain": domain} if domain else {}
+
+
+def user_session_cookie_attrs_for_request(
+    request: Request, *, max_age_seconds: int
+) -> dict[str, Any]:
+    return user_session_cookie_attrs(
+        max_age_seconds=max_age_seconds,
+        secure=deploy_config.cookie_is_secure(request.url.scheme),
+    )

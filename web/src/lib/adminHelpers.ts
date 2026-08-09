@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next";
+import { backendPublicOrigin } from "./apiOrigin.js";
 import type { AgentName, ControlPanelDaemonNodeRecord, EmployeeAgent, EmployeeRecord, LogicalAgentAvailability, Tone } from "../types.js";
 
 export const ADMIN_AGENTS_KEY = ["admin", "agents"] as const;
@@ -28,11 +29,11 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
+// A daemon connects to the backend directly, never through the web host, so
+// the copied start command must name the backend origin even when the UI is
+// hosted separately.
 export function defaultBackendUrl(): string {
-  if (typeof window !== "undefined" && window.location?.origin) {
-    return window.location.origin;
-  }
-  return "http://127.0.0.1:8790";
+  return backendPublicOrigin();
 }
 
 /** Mirror backend daemon_start_command so cached node tokens stay usable after restart. */
