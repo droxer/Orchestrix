@@ -8,17 +8,18 @@ import {
   ArrowUp,
   Bot,
   Check,
-  CheckCircle2,
   CircleAlert,
   CircleCheck,
-  CircleDot,
   CircleStop,
+  Coins,
   Copy,
   CalendarClock,
   CalendarDays,
   Cloud,
   Columns3,
   CircleDashed,
+  File,
+  FileDiff,
   FileText,
   FolderClosed,
   Rows3,
@@ -39,10 +40,9 @@ import {
   Palette,
   LogOut,
   MessageCircleQuestion,
-  MessageSquare,
-  MessageSquarePlus,
   MessagesSquare,
   MoreHorizontal,
+  Network,
   PanelLeftClose,
   PanelLeftOpen,
   Paperclip,
@@ -61,15 +61,14 @@ import {
   SquarePen,
   Terminal,
   Trash2,
+  UserRound,
   Users,
   WifiOff,
   Zap,
   TriangleAlert,
   UserCog,
   UserPlus,
-  Wrench,
   X,
-  XCircle,
   Check as LucideCheck,
   ChevronDown as LucideChevronDown,
   ChevronUp as LucideChevronUp,
@@ -100,21 +99,26 @@ function withStandardStroke(Icon: LucideIcon, displayName: string) {
 
 // Semantic exports. Anywhere we want to swap the underlying glyph, do it
 // here — no caller in the app has to know which lucide picture we chose.
+// This module is the only place allowed to import lucide-react: a glyph
+// reached for directly ships lucide's default stroke (2) next to our 1.75
+// chrome, and a second component can then pick a different picture for a
+// meaning that already has one.
 export const NavThreads = withStandardStroke(MessagesSquare, "NavThreads");
-export const NavWorkspace = withStandardStroke(Terminal, "NavWorkspace");
 export const NavAdmin = withStandardStroke(UserCog, "NavAdmin");
 export const NavBacklog = withStandardStroke(ListTodo, "NavBacklog");
 export const NavChannels = withStandardStroke(Hash, "NavChannels");
 export const NavRoutine = withStandardStroke(CalendarClock, "NavRoutine");
 export const NavAgents = withStandardStroke(Bot, "NavAgents");
-export const NavTeams = withStandardStroke(Users, "NavTeams");
+// A team is a dispatch lead fanning out to members — the same idea the
+// bespoke TeamMark draws. `Users` stays with employees (actual people), so
+// the roster chip and the teams nav are no longer the same silhouette.
+export const NavTeams = withStandardStroke(Network, "NavTeams");
 export const NavPreferences = withStandardStroke(Settings, "NavPreferences");
 export const NavLogout = withStandardStroke(LogOut, "NavLogout");
 export const NavRefresh = withStandardStroke(RefreshCw, "NavRefresh");
 export const NavSidebarCollapse = withStandardStroke(PanelLeftClose, "NavSidebarCollapse");
 export const NavSidebarExpand = withStandardStroke(PanelLeftOpen, "NavSidebarExpand");
 export const NavMore = withStandardStroke(MoreHorizontal, "NavMore");
-export const NavNewThread = withStandardStroke(Plus, "NavNewThread");
 export const NavComputer = withStandardStroke(Server, "NavComputer");
 // Compose a new thread (pencil-in-square), the messaging-app convention.
 export const ActionCompose = withStandardStroke(SquarePen, "ActionCompose");
@@ -141,7 +145,10 @@ export const ActionRemove = withStandardStroke(X, "ActionRemove");
 export const NavBack = withStandardStroke(ArrowLeft, "NavBack");
 export const ActionSearch = withStandardStroke(Search, "ActionSearch");
 export const ActionCalendar = withStandardStroke(CalendarDays, "ActionCalendar");
-export const WorkspaceFile = withStandardStroke(FileText, "WorkspaceFile");
+// A file is a blank sheet wherever it appears — the workspace tree and the
+// artifact strip must not picture the same object two ways. `FileText`
+// (ruled lines) is reserved for written prose, i.e. the summary artifact.
+export const WorkspaceFile = withStandardStroke(File, "WorkspaceFile");
 export const WorkspaceFolder = withStandardStroke(FolderClosed, "WorkspaceFolder");
 export const ViewBoard = withStandardStroke(Columns3, "ViewBoard");
 export const ViewList = withStandardStroke(Rows3, "ViewList");
@@ -161,36 +168,44 @@ export const NodePending = withStandardStroke(CircleDashed, "NodePending");
 export const NodeOffline = withStandardStroke(WifiOff, "NodeOffline");
 
 // Agent mode (智能体): a zap glyph reads as "execute work" without reusing
-// the Bot mark reserved for preferences and artifact output types.
+// the Bot mark, which means "an agent" and nothing else. One mode = one
+// glyph everywhere it appears — the composer toggle and the transcript
+// phase divider must not picture the same mode two different ways.
 export const ModeAction = withStandardStroke(Zap, "ModeAction");
 export const ModeReview = withStandardStroke(ScanEye, "ModeReview");
 export const ModeAsk = withStandardStroke(MessageCircleQuestion, "ModeAsk");
 
 // Preferences category glyphs.
 export const PrefAppearance = withStandardStroke(Palette, "PrefAppearance");
-export const PrefAgents = withStandardStroke(Bot, "PrefAgents");
 export const PrefLanguage = withStandardStroke(Languages, "PrefLanguage");
 
-// Stream markers form a deliberate geometric family: circle / triangle /
-// circle for check / warn / error so they read as a system at a glance.
-export const StreamTool = withStandardStroke(Wrench, "StreamTool");
-export const StreamCommand = withStandardStroke(Terminal, "StreamCommand");
-export const StreamCheck = withStandardStroke(CircleCheck, "StreamCheck");
-export const StreamInfo = withStandardStroke(Info, "StreamInfo");
-export const StreamWarn = withStandardStroke(TriangleAlert, "StreamWarn");
-export const StreamError = withStandardStroke(CircleAlert, "StreamError");
+// Outcome markers, shared by every surface that reports one (stream status
+// lines, destructive dialogs). A deliberate geometric family: circle /
+// circle / triangle / circle for info / ok / warn / error, so severity is
+// carried by the enclosing shape and not by colour alone.
+export const StatusOk = withStandardStroke(CircleCheck, "StatusOk");
+export const StatusInfo = withStandardStroke(Info, "StatusInfo");
+export const StatusWarn = withStandardStroke(TriangleAlert, "StatusWarn");
+export const StatusError = withStandardStroke(CircleAlert, "StatusError");
 export const StreamAttachment = withStandardStroke(Paperclip, "StreamAttachment");
 
-// Artifact library glyphs. These deliberately reuse the existing semantic
-// family so generated outputs scan by kind without adding a second icon style.
+// Identity and metrics inside a transcript.
+export const IdentityUser = withStandardStroke(UserRound, "IdentityUser");
+export const MetricTokens = withStandardStroke(Coins, "MetricTokens");
+
+// Artifact library glyphs. The artifact strip is a kind *filter*, so every
+// kind needs its own picture: diff, summary and workspace file used to share
+// one FileText, collapsing three of the eight kinds into one silhouette. The
+// three paper-shaped kinds now separate by their mark — plus/minus for a
+// diff, ruled lines for written prose, blank sheet for a produced file.
 export const ArtifactPlan = withStandardStroke(ListTodo, "ArtifactPlan");
-export const ArtifactDiff = withStandardStroke(FileText, "ArtifactDiff");
+export const ArtifactDiff = withStandardStroke(FileDiff, "ArtifactDiff");
 export const ArtifactReview = withStandardStroke(ScanEye, "ArtifactReview");
 export const ArtifactTest = withStandardStroke(CircleCheck, "ArtifactTest");
 export const ArtifactCommand = withStandardStroke(Terminal, "ArtifactCommand");
 export const ArtifactSummary = withStandardStroke(FileText, "ArtifactSummary");
 export const ArtifactOutput = withStandardStroke(Bot, "ArtifactOutput");
-export const ArtifactFile = withStandardStroke(FileText, "ArtifactFile");
+export const ArtifactFile = withStandardStroke(File, "ArtifactFile");
 
 // shadcn primitives (sheet, select) reach for these by their original
 // names; wrap them so they share ICON_STROKE with the rest of the app.
@@ -213,13 +228,9 @@ export const AdminDashboard = withStandardStroke(LayoutDashboard, "AdminDashboar
 export const AdminEmployees = withStandardStroke(Users, "AdminEmployees");
 export const AdminConnect = withStandardStroke(Link2, "AdminConnect");
 export const AdminLocked = withStandardStroke(LockKeyhole, "AdminLocked");
-export const AdminChannel = withStandardStroke(MessageSquare, "AdminChannel");
+// Same glyph as NavChannels — admin channel setup and the channels nav are
+// the same object seen from two surfaces.
+export const AdminChannel = withStandardStroke(Hash, "AdminChannel");
 export const AdminVerified = withStandardStroke(ShieldCheck, "AdminVerified");
 export const AdminInbox = withStandardStroke(Inbox, "AdminInbox");
 export const AdminSettings = withStandardStroke(Settings, "AdminSettings");
-
-// Dashboard activity feed markers.
-export const ActivitySuccess = withStandardStroke(CheckCircle2, "ActivitySuccess");
-export const ActivityPending = withStandardStroke(CircleDot, "ActivityPending");
-export const ActivityNewMessage = withStandardStroke(MessageSquarePlus, "ActivityNewMessage");
-export const ActivityFailed = withStandardStroke(XCircle, "ActivityFailed");

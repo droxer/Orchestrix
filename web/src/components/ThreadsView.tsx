@@ -2,7 +2,7 @@
 
 import { useMemo, type Dispatch, RefObject, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowRightLeft, MessageCircleQuestion, Scan } from "lucide-react";
+import { ActionRoute, ModeAsk, ModeReview } from "./icons";
 import { RelayMark } from "./RelayMark";
 import type { AgentName, AgentTaskMode, DaemonNodeMonitorRecord, EmployeeAgent, RelayArtifact, RelaySession } from "../types";
 import {
@@ -204,11 +204,11 @@ export function ThreadsView({
                   const PhaseIcon =
                     msg.kind === "agent"
                       ? isHandoff
-                        ? ArrowRightLeft
+                        ? ActionRoute
                         : msg.mode === "ask"
-                          ? MessageCircleQuestion
+                          ? ModeAsk
                           : msg.mode === "review"
-                            ? Scan
+                            ? ModeReview
                             : null
                       : null;
                   return (

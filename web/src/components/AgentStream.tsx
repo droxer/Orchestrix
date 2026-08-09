@@ -1,4 +1,4 @@
-import { StreamCheck, StreamError, StreamInfo, StreamWarn } from "./icons";
+import { StatusError, StatusInfo, StatusOk, StatusWarn } from "./icons";
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { CodexCollaborationEvent } from "relay-core";
@@ -240,10 +240,10 @@ function StreamingProse({ text }: { text: string }) {
 }
 
 function StatusIcon({ tone }: { tone: "good" | "bad" | "warn" | "info" }) {
-  if (tone === "good") return <StreamCheck size={13} aria-hidden="true" />;
-  if (tone === "bad") return <StreamError size={13} aria-hidden="true" />;
-  if (tone === "warn") return <StreamWarn size={13} aria-hidden="true" />;
-  return <StreamInfo size={13} aria-hidden="true" />;
+  if (tone === "good") return <StatusOk size={13} aria-hidden="true" />;
+  if (tone === "bad") return <StatusError size={13} aria-hidden="true" />;
+  if (tone === "warn") return <StatusWarn size={13} aria-hidden="true" />;
+  return <StatusInfo size={13} aria-hidden="true" />;
 }
 
 function renderProse(text: string): ReactNode {

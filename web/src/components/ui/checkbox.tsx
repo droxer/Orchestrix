@@ -1,7 +1,7 @@
 import { Checkbox as CheckboxPrimitive } from "@base-ui/react/checkbox"
 
 import { cn } from "@/lib/utils"
-import { CheckIcon } from "lucide-react"
+import { CheckIcon } from "../icons"
 
 /* Checkbox — base-ui primitive on the shared focus/invalid contract, so
    option rows stop hand-rolling native <input type="checkbox"> (OS chrome,
