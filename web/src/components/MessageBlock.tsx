@@ -1,8 +1,7 @@
-import { StreamAttachment } from "./icons";
+import { IdentityUser, MetricTokens, StreamAttachment } from "./icons";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { UserRound, Coins } from "lucide-react";
 import { AgentMark } from "./AgentMark";
 import { AgentStream } from "./AgentStream";
 import { MessageTurnActions } from "./MessageTurnActions";
@@ -197,7 +196,7 @@ export function MessageBlock({
     return (
       <article className="msg msg-user" aria-label={t("message.user_label")}>
         <span className="rail-node rail-node-user" aria-hidden="true">
-          <UserRound size={13} strokeWidth={1.9} />
+          <IdentityUser size={13} />
         </span>
         <div className="turn-body">
           <p className="user-text">{message.text}</p>
@@ -259,7 +258,7 @@ export function MessageBlock({
                   cache: numberFormat.format(message.tokenUsage.cache),
                 })}
               >
-                <Coins size={14} aria-hidden="true" />
+                <MetricTokens size={14} aria-hidden="true" />
                 <span className="msg-turn-action-label">
                   {formatCompactTokens(message.tokenUsage.total, i18n.language)} {t("thread.tokens_short")}
                 </span>
