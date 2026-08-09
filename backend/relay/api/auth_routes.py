@@ -4,11 +4,13 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
+from ..core import deploy_config
 from ..security.auth import (
     USER_COOKIE_NAME,
     require_admin_session,
     require_user_session,
-    user_session_cookie_attrs,
+    user_session_cookie_attrs_for_request,
+    user_session_cookie_scope,
     user_session_token_from_request,
 )
 from ..services.computer_limits import decorate_user_limits
@@ -66,9 +68,8 @@ async def auth_bootstrap(request: Request, response: Response, ctx: AppContextDe
     except ValueError as error:
         raise HTTPException(400, str(error)) from error
     session = ctx.auth_store.create_session(user["id"])
-    attrs = user_session_cookie_attrs(
-        max_age_seconds=ctx.auth_store.session_ttl_seconds,
-        secure=request.url.scheme == "https",
+    attrs = user_session_cookie_attrs_for_request(
+        request, max_age_seconds=ctx.auth_store.session_ttl_seconds
     )
     response.set_cookie(value=session["token"], **attrs)
     return {"user": user}
@@ -81,9 +82,8 @@ async def auth_login(request: Request, response: Response, ctx: AppContextDep) -
     if not user:
         raise HTTPException(401, "Invalid username or password.")
     session = ctx.auth_store.create_session(user["id"])
-    attrs = user_session_cookie_attrs(
-        max_age_seconds=ctx.auth_store.session_ttl_seconds,
-        secure=request.url.scheme == "https",
+    attrs = user_session_cookie_attrs_for_request(
+        request, max_age_seconds=ctx.auth_store.session_ttl_seconds
     )
     response.set_cookie(value=session["token"], **attrs)
     return {"user": decorate_user_limits(ctx, ctx.auth_store._public_user(user))}
@@ -94,12 +94,15 @@ async def auth_logout(request: Request, response: Response, ctx: AppContextDep) 
     token = user_session_token_from_request(request)
     if token:
         ctx.auth_store.delete_session(token)
+    # Deleting a cookie only works when the attributes match the ones it was
+    # written with, so mirror the configured scope and SameSite here.
     response.delete_cookie(
         key=USER_COOKIE_NAME,
         path="/",
         httponly=True,
-        samesite="lax",
-        secure=request.url.scheme == "https",
+        samesite=deploy_config.session_cookie_samesite(),
+        secure=deploy_config.cookie_is_secure(request.url.scheme),
+        **user_session_cookie_scope(),
     )
     return {"ok": True}
 

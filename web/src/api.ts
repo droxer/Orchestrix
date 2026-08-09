@@ -1,4 +1,4 @@
-import { relayApiPath } from "relay-core/api-url";
+import { relayApiEndpoint, relayBackendPath } from "./lib/apiOrigin.js";
 import type {
   AgentName,
   AgentRole,
@@ -97,7 +97,7 @@ export async function apiJson<T>(
     versioned?: boolean;
   } = {},
 ): Promise<T> {
-  const response = await fetch(options.versioned === false ? path : relayApiPath(path), {
+  const response = await fetch(options.versioned === false ? relayBackendPath(path) : relayApiEndpoint(path), {
     method: options.method ?? "GET",
     signal: options.signal,
     credentials: options.credentials ?? "include",
@@ -660,7 +660,7 @@ export async function readArtifactText(
   signal?: AbortSignal,
 ): Promise<string> {
   const response = await fetch(
-    relayApiPath(`/threads/${encodeURIComponent(sessionId)}/artifacts/${encodeURIComponent(artifactId)}`),
+    relayApiEndpoint(`/threads/${encodeURIComponent(sessionId)}/artifacts/${encodeURIComponent(artifactId)}`),
     { credentials: "include", signal },
   );
   const text = await response.text();

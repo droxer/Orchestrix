@@ -7,6 +7,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from relay.core.environment import load_backend_env
+from relay.core.storage_config import normalize_database_url
 from relay.persistence.schema import metadata as relay_metadata
 
 load_backend_env()
@@ -20,7 +21,8 @@ target_metadata = relay_metadata
 
 
 def database_url() -> str:
-    return os.environ.get("RELAY_DATABASE_URL") or os.environ.get("DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+    url = os.environ.get("RELAY_DATABASE_URL") or os.environ.get("DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+    return normalize_database_url(url) if url else url
 
 
 def run_migrations_offline() -> None:

@@ -36,9 +36,9 @@ describe("My Computer route shell", () => {
     assert.match(block, /\.computer-page/);
   });
 
-  it("has a dev rewrite so a direct load does not 404", async () => {
+  it("has a client-route rewrite so a direct load does not 404", async () => {
     const config = await read("web/next.config.ts");
-    assert.match(config, /source: "\/computer"/);
+    assert.match(config, /"\/computer"/);
   });
 
   it("keeps the connect action reachable on mobile", async () => {

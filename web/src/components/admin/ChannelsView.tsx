@@ -40,6 +40,7 @@ import {
   updateChatIntegration,
 } from "../../api";
 import { agentsOnNodes } from "../../lib/adminHelpers";
+import { backendPublicOrigin } from "../../lib/apiOrigin";
 import { useUrlSearchState } from "../../hooks/useUrlSearchState";
 import type { ChatIntegration, ChatProvider } from "../../types";
 
@@ -289,9 +290,9 @@ export function ChannelsView({
   const { confirm } = useDialogs();
   const [displayName, setDisplayName] = useState("Telegram Bot");
   const [tenantId, setTenantId] = useState("");
-  const [publicBaseUrl, setPublicBaseUrl] = useState(() =>
-    typeof window === "undefined" ? "" : window.location.origin,
-  );
+  // Chat providers post webhooks straight to the backend, so this defaults to
+  // the backend origin rather than the page origin.
+  const [publicBaseUrl, setPublicBaseUrl] = useState(() => backendPublicOrigin(""));
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [editPublicBaseUrl, setEditPublicBaseUrl] = useState("");
   const [editCredentials, setEditCredentials] = useState<Record<string, string>>({});
