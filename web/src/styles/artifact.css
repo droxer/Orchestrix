@@ -540,6 +540,18 @@
   min-width: 0;
 }
 
+/* The rendered readings (Markdown prose, highlighted source) carry no padding
+   of their own, unlike the .artifact-plain / .artifact-terminal blocks they
+   stand in for — inset them here so every artifact body shares one gutter. */
+.artifact-viewer-body > .agent-prose {
+  padding: var(--sp-4);
+  max-width: var(--measure-wide);
+}
+
+.artifact-viewer-body > .code-view {
+  margin: var(--sp-4);
+}
+
 @media (max-width: 820px) {
   .artifact-library-shell {
     grid-template-columns: minmax(0, 1fr);

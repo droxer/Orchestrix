@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { artifactRenderMode } from "../../lib/artifactPreview";
 import {
   clampSpaceWidth,
   isThreadSpaceEmpty,
@@ -14,6 +15,7 @@ import {
 } from "../../lib/threadSpace";
 import { ArtifactBody } from "../artifact/ArtifactBody";
 import { ArtifactPreviewHeader } from "../artifact/ArtifactPreviewHeader";
+import { ArtifactViewToggle, type ArtifactView } from "../artifact/ArtifactViewToggle";
 import { ThreadSpaceList } from "./ThreadSpaceList";
 import { NavBack } from "../icons";
 import { Button } from "@/components/ui/button";
@@ -62,6 +64,14 @@ export function ThreadSpacePanel({
   const selected = resolveSelectedSpaceItem(items, selectedArtifactId);
   const isOverlay = useMediaQuery(OVERLAY_QUERY);
   const panelRef = useModalDrawer<HTMLElement>(onClose, isOverlay);
+
+  // Each artifact opens on its rendered reading; the choice is per-artifact,
+  // so selecting another one starts from preview again rather than carrying a
+  // source view onto a file the user has not looked at yet.
+  const [view, setView] = useState<ArtifactView>("preview");
+  const selectedId = selected?.artifact.id ?? null;
+  useEffect(() => setView("preview"), [selectedId]);
+  const renderMode = selected ? artifactRenderMode(selected.artifact) : "none";
 
   // A drag registers listeners outside React; this releases them if the panel
   // unmounts (or the thread changes) mid-gesture, which would otherwise leak
@@ -164,13 +174,16 @@ export function ThreadSpacePanel({
           ) : (
             <h2 className="thread-space-title">{t("space.title")}</h2>
           )}
+          {selected && renderMode !== "none" ? (
+            <ArtifactViewToggle view={view} onChange={setView} className="thread-space-view-toggle" />
+          ) : null}
           <OverlayCloseButton label={t("sheet.close")} onClick={onClose} />
         </header>
         {selected ? (
           <div className="thread-space-preview">
             <ArtifactPreviewHeader artifact={selected.artifact} sessionId={sessionId} />
             <div className="artifact-preview-body">
-              <ArtifactBody artifact={selected.artifact} sessionId={sessionId} />
+              <ArtifactBody artifact={selected.artifact} sessionId={sessionId} view={view} />
             </div>
           </div>
         ) : isThreadSpaceEmpty(items) ? (

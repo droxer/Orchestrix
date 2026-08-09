@@ -2,8 +2,16 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { RelayArtifact } from "relay-core";
 
-import { artifactRawHref, workspaceFilePreviewMode } from "../../lib/artifactPreview";
+import {
+  artifactFileName,
+  artifactRawHref,
+  artifactRenderMode,
+  workspaceFilePreviewMode,
+} from "../../lib/artifactPreview";
 import { useArtifactBody } from "../../lib/useArtifactBody";
+import { CodeView, languageForFile } from "../CodeView";
+import { Markdown } from "../Markdown";
+import type { ArtifactView } from "./ArtifactViewToggle";
 
 type DiffLineKind = "add" | "del" | "meta" | "hunk" | "context";
 
@@ -52,15 +60,21 @@ function PlainBody({ text }: { text: string }) {
   return <pre className="artifact-plain">{text}</pre>;
 }
 
-function renderBody(kind: RelayArtifact["kind"], text: string) {
-  switch (kind) {
+function renderBody(artifact: RelayArtifact, text: string, view: ArtifactView) {
+  switch (artifact.kind) {
     case "diff":
       return <DiffView text={text} />;
     case "command_log":
     case "test_output":
       return <TerminalBlock text={text} />;
     default:
-      return <PlainBody text={text} />;
+      // Agent-authored plans, reviews, and summaries are Markdown; source view
+      // keeps the plain monospace reading they have always had.
+      return view === "preview" && artifactRenderMode(artifact) === "markdown" ? (
+        <Markdown text={text} />
+      ) : (
+        <PlainBody text={text} />
+      );
   }
 }
 
@@ -70,7 +84,37 @@ function SandboxedHtml({ html, title }: { html: string; title: string }) {
   return <iframe className="artifact-frame-preview" title={title} sandbox="" srcDoc={html} />;
 }
 
-function WorkspaceFileBody({ artifact, sessionId }: { artifact: RelayArtifact; sessionId: string }) {
+/** Text body of a generated workspace file. Renderable types (Markdown, HTML)
+ *  answer to the view switch; everything else has only its source reading. */
+function WorkspaceFileContent({
+  artifact,
+  text,
+  view,
+}: {
+  artifact: RelayArtifact;
+  text: string;
+  view: ArtifactView;
+}) {
+  const name = artifactFileName(artifact);
+  const renderMode = artifactRenderMode(artifact);
+  if (renderMode === "none") return <pre className="artifact-plain">{text}</pre>;
+  if (view === "source") return <CodeView code={text} language={languageForFile(name)} />;
+  return renderMode === "html" ? (
+    <SandboxedHtml html={text} title={artifact.title} />
+  ) : (
+    <Markdown text={text} />
+  );
+}
+
+function WorkspaceFileBody({
+  artifact,
+  sessionId,
+  view,
+}: {
+  artifact: RelayArtifact;
+  sessionId: string;
+  view: ArtifactView;
+}) {
   const { t } = useTranslation();
   const mode = workspaceFilePreviewMode(artifact.contentType);
   const rawHref = artifactRawHref(sessionId, artifact.id);
@@ -99,11 +143,7 @@ function WorkspaceFileBody({ artifact, sessionId }: { artifact: RelayArtifact; s
     if (query.isSuccess && query.data?.trim()) {
       return (
         <div className="artifact-viewer-body">
-          {mode === "html" ? (
-            <SandboxedHtml html={query.data} title={artifact.title} />
-          ) : (
-            <pre className="artifact-plain">{query.data}</pre>
-          )}
+          <WorkspaceFileContent artifact={artifact} text={query.data} view={view} />
         </div>
       );
     }
@@ -117,13 +157,23 @@ function WorkspaceFileBody({ artifact, sessionId }: { artifact: RelayArtifact; s
   );
 }
 
-export function ArtifactBody({ artifact, sessionId }: { artifact: RelayArtifact; sessionId: string }) {
+export function ArtifactBody({
+  artifact,
+  sessionId,
+  view = "preview",
+}: {
+  artifact: RelayArtifact;
+  sessionId: string;
+  /** Defaults to the rendered reading; callers that offer a view switch pass
+   *  the user's choice through. */
+  view?: ArtifactView;
+}) {
   const { t } = useTranslation();
   const isWorkspaceFile = artifact.kind === "workspace_file";
   const query = useArtifactBody(sessionId, artifact.id, { enabled: !isWorkspaceFile });
 
   if (isWorkspaceFile) {
-    return <WorkspaceFileBody artifact={artifact} sessionId={sessionId} />;
+    return <WorkspaceFileBody artifact={artifact} sessionId={sessionId} view={view} />;
   }
 
   if (query.isLoading) {
@@ -141,5 +191,5 @@ export function ArtifactBody({ artifact, sessionId }: { artifact: RelayArtifact;
   if (!text.trim()) {
     return <p className="artifact-viewer-status" role="status">{t("artifact.preview_empty")}</p>;
   }
-  return <div className="artifact-viewer-body">{renderBody(artifact.kind, text)}</div>;
+  return <div className="artifact-viewer-body">{renderBody(artifact, text, view)}</div>;
 }

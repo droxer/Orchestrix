@@ -181,6 +181,12 @@
   line-height: 1.45;
 }
 
+/* The header is space-between (title ↔ close); the view switch joins the
+   close button on the trailing edge rather than floating in the middle. */
+.thread-space-view-toggle {
+  margin-inline-start: auto;
+}
+
 .thread-space-preview {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
