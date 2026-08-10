@@ -157,6 +157,16 @@ export interface DaemonNodeRunCommand {
   placementId?: string;
   agentVersion?: number;
   mode: AgentTaskMode;
+  assignmentId?: string;
+  phase?: "discussion" | "execution" | "review";
+  role?: "implementer" | "reviewer" | "planner" | "tester" | "fixer";
+  delivery?: {
+    type: "assignment-attempt";
+    attemptId: string;
+    collaborationId: string;
+    roundId: string;
+    assignmentId: string;
+  };
   workspacePath?: string;
   /** Missing means node-root for compatibility with commands from older backends. */
   workspaceLayout?: DaemonWorkspaceLayout;

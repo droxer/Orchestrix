@@ -35,19 +35,33 @@ export class RelayChatGateway {
       if (!sessionId && !request.forceNew) {
         sessionId = (await this.backend.resolveConversationSession?.(request, signal))?.id;
       }
-      const agentId = await this.resolveAgentId(identity, request.agentId, signal);
-      if (!agentId || !this.backend.startAgentRun) {
-        throw new Error(`No ready Relay agent is configured for ${identity.employeeId}.`);
-      }
-      const session = await this.backend.startAgentRun({
+      let session: RelaySession;
+      if (sessionId) {
+        if (!this.backend.continueThread) {
+          throw new Error("The Relay backend does not support semantic thread continuation.");
+        }
+        session = await this.backend.continueThread({
+          sessionId,
+          taskGoal: request.taskGoal,
+          mode: request.mode,
+          employeeId: identity.employeeId,
+          idempotencyKey: request.idempotencyKey,
+          signal,
+        });
+      } else {
+        const agentId = await this.resolveAgentId(identity, request.agentId, signal);
+        if (!agentId || !this.backend.startAgentRun) {
+          throw new Error(`No ready Relay agent is configured for ${identity.employeeId}.`);
+        }
+        session = await this.backend.startAgentRun({
             agentId,
             taskGoal: request.taskGoal,
             mode: request.mode,
-            sessionId,
             employeeId: identity.employeeId,
             idempotencyKey: request.idempotencyKey,
             signal,
           });
+      }
       // Persist the thread -> session binding so follow-ups, status, and cancel
       // resume the same conversation after a bot restart.
       const run: ChatRun = { session, conversation: request, recovery: "persisted" };

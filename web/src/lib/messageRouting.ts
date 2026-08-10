@@ -88,6 +88,7 @@ export function teamMessageInput({ text, teamMembers, mode, userMessageId }: {
     text,
     intent: collaborationIntent(mode),
     userMessageId,
+    idempotencyKey: userMessageId,
     ...(mentioned ? { addressAgentId: mentioned.agentId } : {}),
   };
 }
@@ -98,5 +99,10 @@ export function threadMessageInput({ text, mode, userMessageId }: {
   mode: AgentTaskMode;
   userMessageId: string;
 }): ThreadMessageInput {
-  return { text, intent: collaborationIntent(mode), userMessageId };
+  return {
+    text,
+    intent: collaborationIntent(mode),
+    userMessageId,
+    idempotencyKey: userMessageId,
+  };
 }

@@ -86,6 +86,13 @@ def assignment_reports_round_result(
         return False
     if (assignments[index].get("mode") or "action") == "ask":
         return False
+    synthesizers = [
+        position
+        for position, assignment in enumerate(assignments)
+        if assignment.get("synthesizer") is True
+    ]
+    if synthesizers:
+        return index == synthesizers[-1]
     return not any(
         (assignment.get("mode") or "action") != "ask"
         for assignment in assignments[index + 1 :]

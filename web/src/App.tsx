@@ -746,37 +746,38 @@ export function App() {
       reportMutationError("Computer required", null, t("errors.thread_computer_required"));
       return;
     }
-    const defaultLogicalAgent = activeLogicalAgent
-      && selectableLogicalAgents.some((agent) => agent.id === activeLogicalAgent.id)
-      && isEmployeeAgentRoutable(activeLogicalAgent)
-      ? activeLogicalAgent
-      : selectableLogicalAgents.find(isEmployeeAgentRoutable);
-    if (!defaultLogicalAgent) {
-      reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: activeAgent }));
-      return;
-    }
-    const routed = routeComposerMessage(
-      raw,
-      {
-        id: defaultLogicalAgent.id,
-        executorKind: defaultLogicalAgent.executorKind,
-      },
-    );
-    const goal = routed.goal;
-    const routedAgent = routed.agent;
-    if (!goal) return;
-    const routedLogicalAgent = selectableLogicalAgents.find(
-      (agent) => agent.id === routed.agentId && isEmployeeAgentRoutable(agent),
-    );
-    if (!routedLogicalAgent) {
-      reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: routedAgent }));
-      return;
-    }
     // When staging a new thread, always create; otherwise continue the
     // open one. composingNew forces a fresh owner-scoped session here.
     const action = composingNew ? { kind: "create" as const } : chooseSendAction({ activeSessionId: activeSession?.id ?? null, session: activeSession });
     const sessionId = action.kind === "append" ? action.sessionId : undefined;
     const creatingSession = suppressActiveSessionDuringPendingSend(action);
+    let goal = raw;
+    let newThreadAgentId: string | undefined;
+    if (!sessionId) {
+      const defaultLogicalAgent = activeLogicalAgent
+        && selectableLogicalAgents.some((agent) => agent.id === activeLogicalAgent.id)
+        && isEmployeeAgentRoutable(activeLogicalAgent)
+        ? activeLogicalAgent
+        : selectableLogicalAgents.find(isEmployeeAgentRoutable);
+      if (!defaultLogicalAgent) {
+        reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: activeAgent }));
+        return;
+      }
+      const routed = routeComposerMessage(raw, {
+        id: defaultLogicalAgent.id,
+        executorKind: defaultLogicalAgent.executorKind,
+      });
+      goal = routed.goal;
+      if (!goal) return;
+      const routedLogicalAgent = selectableLogicalAgents.find(
+        (agent) => agent.id === routed.agentId && isEmployeeAgentRoutable(agent),
+      );
+      if (!routedLogicalAgent) {
+        reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: routed.agent }));
+        return;
+      }
+      newThreadAgentId = routedLogicalAgent.id;
+    }
     // Echo the turn immediately. For a continued session we mint the message id
     // here and hand it to the backend so the persisted event reconciles by id.
     const userMessageId = `evt_${crypto.randomUUID()}`;
@@ -813,7 +814,7 @@ export function App() {
         : await runLogicalAgentsMutation.mutateAsync({
             taskGoal: goal,
             ...(selectedThreadNodeId ? { daemonNodeId: selectedThreadNodeId } : {}),
-            assignments: [{ agentId: routedLogicalAgent.id, mode: composerMode }],
+            assignments: [{ agentId: newThreadAgentId!, mode: composerMode }],
           });
       setActiveSessionId(done.id);
       setSelectedSessionId(done.id);

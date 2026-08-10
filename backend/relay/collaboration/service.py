@@ -217,6 +217,20 @@ class CollaborationConductor:
                     status=400,
                 )
             raw_assignments = [{"agentId": owner_agent_id, "mode": intent.mode}]
+        elif (
+            session
+            and not team_id
+            and intent.source == "message"
+            and raw_assignments
+            and any(
+                item.get("agentId") != session.get("ownerAgentId")
+                for item in raw_assignments
+            )
+        ):
+            raise CollaborationError(
+                "agent_forbidden",
+                "A normal message may only address the solo room's agent.",
+            )
         if not raw_assignments:
             raise CollaborationError(
                 "participants_required",
@@ -402,6 +416,11 @@ class CollaborationConductor:
                         and item["agentId"] == team_snapshot.get("leadAgentId")
                         else {}
                     ),
+                    **(
+                        {"synthesizer": True}
+                        if item.get("synthesizer") is True
+                        else {}
+                    ),
                     **({"teamSnapshot": team_snapshot} if team_snapshot else {}),
                 }
             )
@@ -477,6 +496,7 @@ def create_round_manifest(
                     "role",
                     "brief",
                     "coordinator",
+                    "synthesizer",
                 )
                 if assignment.get(key) is not None
             }

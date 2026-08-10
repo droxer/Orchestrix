@@ -143,12 +143,13 @@ def team_member_assignments(
         if team
         else None
     )
+    synthesis_round = mode in ("ask", "review")
     ordered_agents = (
         [
             *(agent for agent in agents if agent["id"] != lead_agent_id),
             *(agent for agent in agents if agent["id"] == lead_agent_id),
         ]
-        if mode == "ask" and lead_agent_id
+        if synthesis_round and lead_agent_id
         else agents
     )
     return [
@@ -157,6 +158,9 @@ def team_member_assignments(
             mode=mode,
             coordinator=(
                 agent["id"] == lead_agent_id if lead_agent_id else index == 0
+            ),
+            synthesizer=bool(
+                synthesis_round and lead_agent_id and agent["id"] == lead_agent_id
             ),
             team_snapshot=snapshot,
         )
@@ -183,6 +187,7 @@ def _team_member_assignment(
     *,
     mode: str = "action",
     coordinator: bool = False,
+    synthesizer: bool = False,
     team_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     role = agent.get("defaultRole")
@@ -193,12 +198,20 @@ def _team_member_assignment(
         "phase": _member_phase(role, mode),
         **({"role": role} if role else {}),
         **({"coordinator": True} if coordinator else {}),
-        "brief": _member_brief(role, coordinator),
+        **({"synthesizer": True} if synthesizer else {}),
+        "brief": _member_brief(role, coordinator, synthesizer),
         **({"teamSnapshot": team_snapshot} if team_snapshot else {}),
     }
 
 
-def _member_brief(role: str | None, coordinator: bool) -> str:
+def _member_brief(
+    role: str | None, coordinator: bool, synthesizer: bool = False
+) -> str:
+    if synthesizer:
+        return (
+            "Synthesize the room's evidence into one coherent final response, "
+            "including disagreements, risks, and the recommended next step."
+        )
     if role == "planner":
         return "Develop the plan, dependencies, risks, and open questions for the shared goal."
     if role == "reviewer":
