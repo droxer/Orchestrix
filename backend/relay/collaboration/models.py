@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 CollaborationPurpose = Literal["accomplish", "discuss", "review"]
+RecoveryKind = Literal["rerun", "handoff"]
 
 
 @dataclass(frozen=True)
@@ -14,6 +15,16 @@ class MessageIntent:
     address_agent_id: str | None = None
     idempotency_key: str | None = None
     user_message_id: str | None = None
+
+
+@dataclass(frozen=True)
+class RecoveryIntent:
+    thread_id: str
+    kind: RecoveryKind
+    target_agent_id: str
+    mode: str = "action"
+    note: str | None = None
+    idempotency_key: str | None = None
 
 
 @dataclass(frozen=True)

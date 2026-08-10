@@ -11,7 +11,7 @@ from ..services.agent_routing import (
 )
 from ..services.team_dispatch import TeamDispatchError, team_agents, team_member_assignments
 from ..sessions.controller import SessionController
-from .models import MessageIntent, RunIntent
+from .models import MessageIntent, RecoveryIntent, RunIntent
 
 ASSIGNMENT_BRIEF_MAX_CHARS = 4000
 VALID_MODES = frozenset({"action", "ask", "review"})
@@ -51,7 +51,7 @@ class CollaborationConductor:
         self.ctx = ctx
 
     async def submit(
-        self, intent: MessageIntent | RunIntent, actor: dict[str, Any]
+        self, intent: MessageIntent | RecoveryIntent | RunIntent, actor: dict[str, Any]
     ) -> dict[str, Any]:
         prepared = self._prepare(intent)
         if prepared.idempotency_key:
@@ -74,7 +74,9 @@ class CollaborationConductor:
             raise CollaborationError("collaboration_conflict", str(error)) from error
 
     @staticmethod
-    def _prepare(intent: MessageIntent | RunIntent) -> _PreparedRound:
+    def _prepare(
+        intent: MessageIntent | RecoveryIntent | RunIntent,
+    ) -> _PreparedRound:
         if isinstance(intent, MessageIntent):
             purpose_modes = {
                 "accomplish": "action",
@@ -103,6 +105,30 @@ class CollaborationConductor:
                 source="message",
                 purpose=intent.purpose,
                 address=address,
+            )
+        if isinstance(intent, RecoveryIntent):
+            mode = _mode(intent.mode)
+            return _PreparedRound(
+                task_goal="",
+                session_id=intent.thread_id,
+                raw_assignments=[
+                    {"agentId": intent.target_agent_id, "mode": mode}
+                ],
+                mode=mode,
+                requested_node_id=None,
+                idempotency_key=intent.idempotency_key,
+                user_message_id=None,
+                decision={
+                    "kind": intent.kind,
+                    "targetAgentId": intent.target_agent_id,
+                    **({"note": intent.note} if intent.note else {}),
+                },
+                source="recovery",
+                purpose=_purpose_for_mode(mode),
+                address={
+                    "kind": "members",
+                    "agentIds": [intent.target_agent_id],
+                },
             )
         raw_assignments = intent.raw_assignments
         addressed = [
@@ -133,6 +159,13 @@ class CollaborationConductor:
     ) -> dict[str, Any]:
         session = self._session_for_actor(intent.session_id, actor)
         session = self._backfill_runtime_affinity(session)
+        task_goal = (
+            session.get("taskGoal")
+            if intent.source == "recovery" and session
+            else intent.task_goal
+        )
+        if not isinstance(task_goal, str) or not task_goal:
+            raise CollaborationError("task_goal_required", status=400)
         raw_assignments = intent.raw_assignments
         team_id = session.get("teamId") if session else None
         team_member_ids: set[str] = set()
@@ -229,7 +262,7 @@ class CollaborationConductor:
             round_id=round_id,
         )
         parsed: dict[str, Any] = {
-            "taskGoal": intent.task_goal,
+            "taskGoal": task_goal,
             "assignments": resolved,
             "actorEmployeeId": actor["employeeId"],
             "actorIsAdmin": actor["isAdmin"],
@@ -435,13 +468,13 @@ def _validated_decision(
 ) -> dict[str, Any]:
     kind = decision.get("kind")
     target_agent = decision.get("targetAgent")
-    if kind not in ("rerun", "handoff") or not isinstance(target_agent, str):
+    if kind not in ("rerun", "handoff"):
         raise CollaborationError(
             "decision_invalid",
-            "decision requires rerun or handoff and targetAgent.",
+            "decision requires rerun or handoff.",
             status=400,
         )
-    if target_agent != target_assignment["executorKind"]:
+    if target_agent is not None and target_agent != target_assignment["executorKind"]:
         raise CollaborationError(
             "decision_invalid", "decision targetAgent does not match participant.", status=400
         )

@@ -109,6 +109,7 @@ export function App() {
     recordDecisionMutation,
     runLogicalAgentsMutation,
     submitThreadMessageMutation,
+    requestThreadRecoveryMutation,
     invalidateRelay,
   } = useRelayMutations();
   const selectedEmployee = useRelayStore((s) => s.selectedEmployee);
@@ -885,12 +886,14 @@ export function App() {
         setSelectedSessionId(activeSession.id);
         navigateToRoute("main");
         atBottomRef.current = true;
-        const done = await runLogicalAgentsMutation.mutateAsync({
-            taskGoal: activeSession.taskGoal,
-            assignments: [{ agentId: logicalAgent.id, mode: assignment.mode }],
-            sessionId: activeSession.id,
-            decision: { kind: "rerun", targetAgent: assignment.agent },
-          });
+        const done = await requestThreadRecoveryMutation.mutateAsync({
+          sessionId: activeSession.id,
+          input: {
+            kind: "rerun",
+            targetAgentId: logicalAgent.id,
+            mode: assignment.mode,
+          },
+        });
         setSelectedSessionId(done.id);
         syncThreadUrl(done.id, true);
       } catch (error) {
@@ -940,12 +943,10 @@ export function App() {
       setSelectedSessionId(activeSession.id);
       navigateToRoute("main");
       atBottomRef.current = true;
-      const done = await runLogicalAgentsMutation.mutateAsync({
-          taskGoal: activeSession.taskGoal,
-          assignments: [{ agentId: logicalAgent.id, mode }],
-          sessionId: activeSession.id,
-          decision: { kind: "rerun", targetAgent: agent },
-        });
+      const done = await requestThreadRecoveryMutation.mutateAsync({
+        sessionId: activeSession.id,
+        input: { kind: "rerun", targetAgentId: logicalAgent.id, mode },
+      });
       setSelectedSessionId(done.id);
       syncThreadUrl(done.id, true);
     } catch (error) {
@@ -973,17 +974,15 @@ export function App() {
     setIsRunning(true);
     try {
       const note = handoffNote.trim();
-      const done = await runLogicalAgentsMutation.mutateAsync({
-          taskGoal: activeSession.taskGoal,
-          assignments: [{ agentId: logicalAgent.id, mode: handoffMode }],
-          sessionId: activeSession.id,
-          decision: {
-            kind: "handoff",
-            targetAgent: logicalAgent.executorKind,
-            targetAgentId: logicalAgent.id,
-            ...(note ? { note } : {}),
-          },
-        });
+      const done = await requestThreadRecoveryMutation.mutateAsync({
+        sessionId: activeSession.id,
+        input: {
+          kind: "handoff",
+          targetAgentId: logicalAgent.id,
+          mode: handoffMode,
+          ...(note ? { note } : {}),
+        },
+      });
       setSelectedSessionId(done.id); setHandoffNote(""); setHandoffMode("action"); setHandoffOpen(false); setActiveAgent(logicalAgent.executorKind); setActiveLogicalAgentId(logicalAgent.id);
       syncThreadUrl(done.id, true);
     } catch (error) {

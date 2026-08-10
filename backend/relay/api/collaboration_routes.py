@@ -4,13 +4,20 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from ..collaboration import CollaborationConductor, CollaborationError, MessageIntent
+from ..collaboration import (
+    CollaborationConductor,
+    CollaborationError,
+    MessageIntent,
+    RecoveryIntent,
+)
 from .deps import AppContextDep
 from .helpers import json_body, request_actor, string_field
 
 router = APIRouter()
 
 PURPOSES = frozenset({"accomplish", "discuss", "review"})
+RECOVERY_KINDS = frozenset({"rerun", "handoff"})
+MODES = frozenset({"action", "ask", "review"})
 
 
 @router.post("/threads/{thread_id}/messages", status_code=202)
@@ -35,6 +42,39 @@ async def submit_thread_message(
                 address_agent_id=address_agent_id,
                 idempotency_key=string_field(body, "idempotencyKey") or None,
                 user_message_id=string_field(body, "userMessageId") or None,
+            ),
+            actor,
+        )
+    except CollaborationError as error:
+        raise HTTPException(
+            error.status, {"code": error.code, "message": str(error)}
+        ) from error
+
+
+@router.post("/threads/{thread_id}/recoveries", status_code=202)
+async def request_thread_recovery(
+    thread_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    actor = request_actor(request, ctx.auth_store)
+    body = await json_body(request)
+    kind = string_field(body, "kind")
+    if kind not in RECOVERY_KINDS:
+        raise HTTPException(400, "kind must be rerun or handoff.")
+    target_agent_id = string_field(body, "targetAgentId")
+    if not target_agent_id:
+        raise HTTPException(400, "targetAgentId is required.")
+    mode = string_field(body, "mode") or "action"
+    if mode not in MODES:
+        raise HTTPException(400, "mode must be action, ask, or review.")
+    try:
+        return await CollaborationConductor(ctx).submit(
+            RecoveryIntent(
+                thread_id=thread_id,
+                kind=kind,  # type: ignore[arg-type]
+                target_agent_id=target_agent_id,
+                mode=mode,
+                note=string_field(body, "note") or None,
+                idempotency_key=string_field(body, "idempotencyKey") or None,
             ),
             actor,
         )

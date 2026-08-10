@@ -49,6 +49,7 @@ import type {
   TaskDeletionResponse,
   TaskMutationInput,
   ThreadMessageInput,
+  ThreadRecoveryInput,
   TasksResponse,
   WorkspaceBriefResponse,
   AgentWorkspaceFilesResponse,
@@ -857,6 +858,22 @@ export function submitThreadMessage(
       intent: input.intent,
       ...(input.addressAgentId ? { addressAgentId: input.addressAgentId } : {}),
       ...(input.userMessageId ? { userMessageId: input.userMessageId } : {}),
+      ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+    },
+  });
+}
+
+export function requestThreadRecovery(
+  sessionId: string,
+  input: ThreadRecoveryInput,
+): Promise<RelaySession> {
+  return apiJson<RelaySession>(`/threads/${encodeURIComponent(sessionId)}/recoveries`, {
+    method: "POST",
+    body: {
+      kind: input.kind,
+      targetAgentId: input.targetAgentId,
+      mode: input.mode,
+      ...(input.note ? { note: input.note } : {}),
       ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
     },
   });

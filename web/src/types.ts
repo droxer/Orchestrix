@@ -543,6 +543,14 @@ export interface ThreadMessageInput {
   idempotencyKey?: string;
 }
 
+export interface ThreadRecoveryInput {
+  kind: "rerun" | "handoff";
+  targetAgentId: string;
+  mode: AgentTaskMode;
+  note?: string;
+  idempotencyKey?: string;
+}
+
 export interface RunInput {
   sandboxId: string;
   taskGoal: string;
