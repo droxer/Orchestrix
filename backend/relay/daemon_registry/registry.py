@@ -24,6 +24,7 @@ from ..collaboration.policy import (
     decide_failure,
     validate_round_result,
 )
+from ..collaboration.models import COLLABORATION_MANIFEST_STATE_KEY
 from ..core.environment import load_backend_env
 from ..core.ids import new_database_id, new_relay_id, new_sandbox_id, now_iso
 from ..core.models import (
@@ -153,6 +154,7 @@ CARRIED_RUN_REQUEST_STATE_KEYS = frozenset(
         REPAIR_NOTE_STATE_KEY,
         ROUND_RESULT_STATE_KEY,
         PARTICIPANT_FAILURES_STATE_KEY,
+        COLLABORATION_MANIFEST_STATE_KEY,
     }
 )
 # Mirrors ROUND_RESULT_RELATIVE_PATH in relay-daemon: `.relay/` is excluded
@@ -2264,6 +2266,17 @@ class DaemonNodeRegistry:
             "_runRequestId": run_request["id"],
             "_nodeId": node_id,
         }
+        collaboration_manifest = request_state.get(
+            COLLABORATION_MANIFEST_STATE_KEY
+        )
+        if isinstance(collaboration_manifest, dict):
+            command["delivery"] = {
+                "type": "assignment-attempt",
+                "attemptId": run_id,
+                "collaborationId": collaboration_manifest.get("collaborationId"),
+                "roundId": collaboration_manifest.get("roundId"),
+                "assignmentId": assignment["assignmentId"],
+            }
         # Daemons that report generated files themselves make the backend-side
         # workspace walk unnecessary (and it only works on a shared filesystem).
         artifact_snapshot = (

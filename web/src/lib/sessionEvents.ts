@@ -52,6 +52,7 @@ function applySessionEventProjection(session: RelaySession, event: RelayEvent): 
       return {
         ...next,
         collaborationRounds,
+        collaborationRevision: collaborationRounds.length,
         activeCollaborationId: event.manifest.collaborationId,
         activeRoundId: event.manifest.roundId,
       };

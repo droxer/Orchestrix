@@ -300,6 +300,7 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         "artifacts": [],
         "decisions": [],
         "collaborationRounds": [],
+        "collaborationRevision": 0,
         "events": [],
         "archived": False,
     }
@@ -354,6 +355,7 @@ def _apply_collaboration_round_started(
     round_id = manifest.get("roundId")
     if not any(item.get("roundId") == round_id for item in rounds):
         rounds.append(manifest)
+    session["collaborationRevision"] = len(rounds)
     if isinstance(manifest.get("collaborationId"), str):
         session["activeCollaborationId"] = manifest["collaborationId"]
     if isinstance(round_id, str):

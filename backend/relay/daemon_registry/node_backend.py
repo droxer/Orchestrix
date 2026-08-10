@@ -6,6 +6,7 @@ from uuid import UUID, uuid5
 
 from starlette.concurrency import run_in_threadpool
 
+from ..collaboration.models import COLLABORATION_MANIFEST_STATE_KEY
 from ..core.ids import new_sandbox_id, now_iso
 from ..core.models import AGENT_NAMES, DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS
 from ..persistence.protocols import AgentPlacementStore, AgentStore, SessionStore
@@ -538,12 +539,18 @@ class ServerDaemonNodeBackend:
         node_id = sandbox_id
         if request["assignments"]:
             node_id = request["assignments"][0].get("daemonNodeId") or sandbox_id
+        state = initial_agent_state(task_goal)
+        collaboration = request.get("collaboration")
+        if isinstance(collaboration, dict) and isinstance(
+            collaboration.get("manifest"), dict
+        ):
+            state[COLLABORATION_MANIFEST_STATE_KEY] = collaboration["manifest"]
         self.registry.start_run_request(
             sandbox_id,
             session_id,
             task_goal,
             request["assignments"],
-            initial_agent_state(task_goal),
+            state,
             task_id,
             active_runs=active_runs_by_node[node_id],
             request_id=run_request_id,

@@ -123,6 +123,8 @@ export interface RelaySession {
   artifacts: RelayArtifact[];
   decisions: HumanDecision[];
   collaborationRounds: CollaborationRoundManifest[];
+  /** Monotonic count of authoritative collaboration rounds. */
+  collaborationRevision?: number;
   activeCollaborationId?: string;
   activeRoundId?: string;
   events: RelayEvent[];
@@ -337,6 +339,7 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
     artifacts: [],
     decisions: [],
     collaborationRounds: [],
+    collaborationRevision: 0,
     events: [],
     archived: false,
   };
@@ -354,6 +357,7 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
       if (!session.collaborationRounds.some((round) => round.roundId === event.manifest.roundId)) {
         session.collaborationRounds.push(event.manifest);
       }
+      session.collaborationRevision = session.collaborationRounds.length;
       session.activeCollaborationId = event.manifest.collaborationId;
       session.activeRoundId = event.manifest.roundId;
     } else if (event.type === "agent.started") {

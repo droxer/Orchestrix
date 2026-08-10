@@ -5,6 +5,7 @@ from typing import Any, Literal
 
 CollaborationPurpose = Literal["accomplish", "discuss", "review"]
 RecoveryKind = Literal["rerun", "handoff"]
+COLLABORATION_MANIFEST_STATE_KEY = "_relay_collaboration_manifest"
 
 
 @dataclass(frozen=True)
