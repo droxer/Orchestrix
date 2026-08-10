@@ -33,7 +33,6 @@ type ChatAgentRequest = {
   tenantId?: string;
   sessionId?: string;
   agentId?: string;
-  mode: "action" | "review" | "ask";
   taskGoal: string;
 };
 ```
@@ -257,8 +256,8 @@ Prefer stable organization-wide IDs:
 Support the same logical commands everywhere:
 
 ```text
-/relay run --agent agent_alice_builder --mode action fix the auth flow
-/relay run --agent agent_alice_reviewer --mode review review this diff
+/relay run --agent agent_alice_builder fix the auth flow
+/relay run --agent agent_alice_reviewer review this diff
 /relay status sess_123
 /relay cancel sess_123 no longer needed
 ```
@@ -269,7 +268,6 @@ The current shared parser supports:
 - `status`
 - `cancel`
 - `--agent`
-- `--mode`
 - `--session`
 
 Provider adapters can expose richer native controls, but should normalize them
@@ -391,7 +389,7 @@ Recommended flow:
 Use slash-command options for structured input:
 
 ```text
-/relay run agent:agent_alice_builder mode:action prompt:"fix auth"
+/relay run agent:agent_alice_builder prompt:"fix auth"
 /relay status session:sess_123
 /relay cancel session:sess_123 reason:"no longer needed"
 ```

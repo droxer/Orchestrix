@@ -152,8 +152,8 @@ export function CommandMenu({
           <p className="command-empty" role="status">{t("command.empty")}</p>
         ) : (
           <ul className="command-list" id="command-list" role="listbox" ref={listRef} aria-label={t("command.title")}>
-            {rows.map((row) => row.kind === "header" ? (
-              <li key={`header-${row.group}`} className="command-group-label" role="presentation">
+            {rows.map((row, i) => row.kind === "header" ? (
+              <li key={`header-${row.group}-${i}`} className="command-group-label" role="presentation">
                 {t(GROUP_LABEL_KEYS[row.group])}
               </li>
             ) : (

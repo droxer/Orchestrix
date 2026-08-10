@@ -15,7 +15,6 @@ import type {
   DaemonNodeRunCommand,
   DaemonNodeSandboxMode,
   AgentName,
-  AgentTaskMode,
   StreamExecResult,
   CodexCollaborationEvent,
 } from "relay-core";
@@ -100,7 +99,6 @@ export interface DaemonRuntimeOptions {
   shutdownGraceMs?: number;
   agentHome?: string;
   maxConcurrentRuns?: number;
-  runCapacityByMode?: Partial<Record<AgentTaskMode, number>>;
   environment?: DaemonExecutionEnvironment;
   preflight?: boolean;
 }
@@ -124,7 +122,6 @@ export interface DaemonLogFields {
   sessionId?: string;
   runId?: string;
   agent?: AgentName;
-  mode?: AgentTaskMode;
   stream?: "stdout" | "stderr";
   sequence?: number;
   exitCode?: number;
@@ -204,7 +201,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     ?? positiveIntEnv("RELAY_DAEMON_LIVENESS_HEARTBEAT_MS");
   const inventoryDiscoveryTimeoutMs = options.inventoryDiscoveryTimeoutMs ?? positiveIntEnv("RELAY_DAEMON_INVENTORY_TIMEOUT_MS") ?? 10_000;
   const environment = options.environment ?? createExecutionEnvironment(sandboxMode, sandboxId, workspacePath, logger);
-  if (sandboxMode === "boxlite") {
+  if (sandboxMode === "boxlite" && !options.environment) {
     await verifyBoxlitePrerequisites(sandboxId);
   }
   const threadWorkspaces = new ThreadWorkspaceManager(workspacePath, environment.sandboxMode);
@@ -216,8 +213,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   };
   logger.info("daemon starting", { sandboxId, employeeId: effectiveEmployeeId, workspacePath, backendUrl, sandboxMode });
   setHealth("starting", { employeeId: effectiveEmployeeId, workspacePath, backendUrl, sandboxMode });
-  const runCapacityByMode = resolveRunCapacityByMode(options.runCapacityByMode);
-  const maxConcurrentRuns = options.maxConcurrentRuns ?? positiveIntEnv("RELAY_DAEMON_MAX_CONCURRENT_RUNS") ?? Math.max(...Object.values(runCapacityByMode));
+  const maxConcurrentRuns = options.maxConcurrentRuns ?? positiveIntEnv("RELAY_DAEMON_MAX_CONCURRENT_RUNS") ?? 1;
   const activeRuns = new Map<string, { command: DaemonNodeRunCommand; controller: AbortController; promise: Promise<void> }>();
   const shutdownGraceMs = options.shutdownGraceMs ?? positiveIntEnv("RELAY_DAEMON_SHUTDOWN_GRACE_MS") ?? 10_000;
   const shutdownController = new AbortController();
@@ -265,7 +261,6 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     agentHealth,
     ...(Object.keys(agentInventory).length > 0 ? { agentInventory } : {}),
     maxConcurrentRuns,
-    runCapacityByMode,
     status: status ?? (activeRuns.size > 0 ? "busy" : "ready"),
   });
   const register = async (): Promise<DaemonNodeHeartbeatSettings | undefined> => {
@@ -471,7 +466,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
             });
             continue;
           }
-          if (!canStartCommand(command, activeRuns, maxConcurrentRuns, runCapacityByMode)) {
+          if (!canStartCommand(activeRuns, maxConcurrentRuns)) {
             const detail = "Daemon node has no available execution slot for this run.";
             logger.warn("command rejected while daemon busy", { ...commandLogFields(sandboxId, command), error: detail });
             await postJsonWithRetry(fetchFn, relayApiUrl(backendUrl, `/daemon-nodes/${encodeURIComponent(sandboxId)}/events`), {
@@ -481,7 +476,6 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
               sessionId: command.sessionId,
               runId: command.runId,
               agent: command.agent,
-              mode: command.mode,
               error: detail,
               exitCode: 1,
             } satisfies DaemonNodeEvent, token, runtimeSignal);
@@ -516,7 +510,6 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
                   sessionId: command.sessionId,
                   runId: command.runId,
                   agent: command.agent,
-                  mode: command.mode,
                   reason: typeof controller.signal.reason === "string" ? controller.signal.reason : "Daemon run cancelled.",
                 } satisfies DaemonNodeEvent
               : {
@@ -526,7 +519,6 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
                   sessionId: command.sessionId,
                   runId: command.runId,
                   agent: command.agent,
-                  mode: command.mode,
                   error: message,
                 } satisfies DaemonNodeEvent;
             await postJsonWithRetry(
@@ -553,7 +545,6 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
             sessionId: command.sessionId,
             runId: command.runId,
             agent: command.agent,
-            mode: command.mode,
           });
           activeRuns.get(command.commandId)?.controller.abort(command.reason);
         } else if (command.type === "workspace.list" || command.type === "workspace.read") {
@@ -877,7 +868,6 @@ async function executeCommand(
             sessionId: command.sessionId,
             runId: command.runId,
             agent,
-            mode: command.mode,
             collaboration,
             sequence,
           } satisfies DaemonNodeEvent, token, signal),
@@ -886,9 +876,8 @@ async function executeCommand(
     },
   };
   // Runs in one thread collaborate through that thread's directory. Different
-  // threads never share a writable cwd, even when the node runs concurrent ask
-  // commands. Each logical agent keeps a private subdirectory inside the
-  // thread workspace.
+  // threads never share a writable cwd. Each logical agent keeps a private
+  // subdirectory inside the thread workspace.
   const agentHomeSubdir = command.logicalAgentId
     ? agentWorkspaceSubpath(command.logicalAgentId).split(sep).join("/")
     : undefined;
@@ -912,7 +901,7 @@ async function executeCommand(
   const workspaceSnapshot = snapshotGeneratedFiles(threadWorkspace.hostPath, scanOptions);
   let patch;
   try {
-    patch = await runAgentNode(command.agent, command.mode, runState, options);
+    patch = await runAgentNode(command.agent, runState, options);
   } finally {
     outputBuffer.close();
     await waitForOutputPosts();
@@ -946,7 +935,6 @@ async function executeCommand(
       sessionId: command.sessionId,
       runId: command.runId,
       agent: command.agent,
-      mode: command.mode,
       error: `Daemon lost agent output: ${outputPostFailure.message}`,
       agentLog,
       exitCode: next.last_exit_code || 1,
@@ -971,7 +959,6 @@ async function executeCommand(
     sessionId: command.sessionId,
     runId: command.runId,
     agent: command.agent,
-    mode: command.mode,
     exitCode: next.last_exit_code,
     agentLog,
     tokenUsage: next.token_usage,
@@ -995,7 +982,6 @@ async function postRunCancelled(
     sessionId: command.sessionId,
     runId: command.runId,
     agent: command.agent,
-    mode: command.mode,
     reason: typeof reason === "string" && reason ? reason : "Cancelled by human.",
   } satisfies DaemonNodeEvent, token, signal);
 }
@@ -1267,30 +1253,11 @@ function formatQueryNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
 }
 
-function resolveRunCapacityByMode(input?: Partial<Record<AgentTaskMode, number>>): Record<AgentTaskMode, number> {
-  return {
-    action: positiveCapacity(input?.action) ?? positiveIntEnv("RELAY_DAEMON_MAX_CONCURRENT_ACTION_RUNS") ?? 1,
-    review: positiveCapacity(input?.review) ?? positiveIntEnv("RELAY_DAEMON_MAX_CONCURRENT_REVIEW_RUNS") ?? 1,
-    ask: positiveCapacity(input?.ask) ?? positiveIntEnv("RELAY_DAEMON_MAX_CONCURRENT_ASK_RUNS") ?? 2,
-  };
-}
-
-function positiveCapacity(value: number | undefined): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
-}
-
 function canStartCommand(
-  command: DaemonNodeRunCommand,
   activeRuns: Map<string, { command: DaemonNodeRunCommand }>,
   maxConcurrentRuns: number,
-  runCapacityByMode: Record<AgentTaskMode, number>,
 ): boolean {
-  const active = [...activeRuns.values()].map((run) => run.command);
-  const activeExclusive = active.some((run) => run.mode !== "ask");
-  if (command.mode !== "ask") return active.length === 0;
-  if (activeExclusive) return false;
-  const activeAsk = active.filter((run) => run.mode === "ask").length;
-  return active.length < maxConcurrentRuns && activeAsk < runCapacityByMode.ask;
+  return activeRuns.size < maxConcurrentRuns;
 }
 
 export function createDaemonLogger(input: {
@@ -1365,7 +1332,6 @@ function commandLogFields(sandboxId: string, command: DaemonNodeRunCommand): Dae
     sessionId: command.sessionId,
     runId: command.runId,
     agent: command.agent,
-    mode: command.mode,
   };
 }
 

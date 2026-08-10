@@ -10,12 +10,14 @@ import { TEAMS_QUERY_KEY } from "../hooks/useTeams";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { agentLabel } from "../lib/plan";
+import { describeAgentPlacements } from "../lib/agentPlacements";
 import { teamAvailability, teamReady } from "../lib/taskAssignment";
 import { teamMutationInput } from "../lib/teamForm";
 import { teamWorkspaceAgentId } from "../lib/teamWorkspace";
 import type { AgentTeam } from "../types";
 import { ActionEdit, AdminDelete } from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
+import { OWNERSHIP_ICON } from "./AgentPlacementBadge";
 import { PageHeader } from "./PageHeader";
 import { IdentityMonogram } from "./IdentityMonogram";
 import { TeamMark } from "./TeamMark";
@@ -40,7 +42,7 @@ const TEAM_PAGE_TABS: readonly TeamPageTab[] = ["profile", "workspace", "activit
 const TEAM_BRIEF_POLL_MS = 3000;
 
 function parseTeamTab(value: string | null): TeamPageTab {
-  return TEAM_PAGE_TABS.includes(value as TeamPageTab) ? value as TeamPageTab : "activities";
+  return TEAM_PAGE_TABS.includes(value as TeamPageTab) ? value as TeamPageTab : "profile";
 }
 
 function TeamProfile({
@@ -257,6 +259,7 @@ function TeamProfile({
                           agentId={agent.id}
                           displayName={agent.displayName}
                           executorKind={agent.executorKind}
+                          placements={agent.placements}
                           selected={selected}
                           disabled={busy}
                           onToggle={toggleMember}
@@ -275,6 +278,15 @@ function TeamProfile({
                 <ul className="team-profile-members">
                   {team.members.map((member) => {
                     const ready = member.enabled && member.availability === "ready";
+                    // TeamMemberSummary carries no placements; the roster's
+                    // full agent record knows the member's home computer.
+                    const computer = describeAgentPlacements(
+                      agents.find((agent) => agent.id === member.id)?.placements ?? [],
+                    )[0] ?? null;
+                    const ComputerIcon = computer ? OWNERSHIP_ICON[computer.ownership] : null;
+                    const computerTitle = computer
+                      ? `${t(`admin.v2.node_ownership_${computer.ownership}`)} · ${computer.nodeName}`
+                      : undefined;
                     return (
                       <li key={member.id} className="team-profile-member">
                         <AgentStateBadge
@@ -285,10 +297,24 @@ function TeamProfile({
                           name={member.displayName}
                         />
                         <span className="team-profile-member-copy">
-                          <strong>{member.displayName}</strong>
-                          <small>{agentLabel(member.executorKind)}</small>
+                          <span className="team-profile-member-title">
+                            <strong>{member.displayName}</strong>
+                            {member.id === team.leadAgentId ? (
+                              <span className="team-profile-member-lead">{t("teams.lead_badge")}</span>
+                            ) : null}
+                          </span>
+                          <span className="team-profile-member-meta">
+                            <span>{agentLabel(member.executorKind)}</span>
+                            {computer && ComputerIcon ? (
+                              <span className="team-profile-member-computer" translate="no" title={computerTitle}>
+                                <ComputerIcon size={12} aria-hidden="true" />
+                                {computer.nodeName}
+                              </span>
+                            ) : (
+                              <span>{t("agents_page.no_placements")}</span>
+                            )}
+                          </span>
                         </span>
-                        {member.id === team.leadAgentId ? <Badge variant="outline">{t("teams.lead_badge")}</Badge> : null}
                       </li>
                     );
                   })}
@@ -446,7 +472,7 @@ export function TeamWorkspacePage({
   onDeleted: () => void;
 }) {
   const { t } = useTranslation();
-  const [pageTab, setPageTab] = useUrlSearchState("tab", "activities" as TeamPageTab, parseTeamTab, (value) => value === "activities" ? null : value, "push");
+  const [pageTab, setPageTab] = useUrlSearchState("tab", "profile" as TeamPageTab, parseTeamTab, (value) => value === "profile" ? null : value, "push");
   const briefQuery = useQuery({
     queryKey: ["team-workspace-brief", team.id],
     queryFn: ({ signal }) => getWorkspaceBrief({ teamId: team.id }, signal),

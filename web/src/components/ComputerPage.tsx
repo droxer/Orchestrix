@@ -14,6 +14,7 @@ import { useMutationError } from "../hooks/useMutationError";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { ComputerCard } from "./computer/ComputerCard";
 import { ConnectComputerDrawer } from "./computer/ConnectComputerDrawer";
+import { ComputerTokenDrawer } from "./computer/ComputerTokenDrawer";
 import { ManageExecutorsDrawer } from "./admin/ManageExecutorsDrawer";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "./PageHeader";
@@ -36,6 +37,7 @@ export function ComputerPage({
   const { reportMutationError } = useMutationError();
   const [overrides, setOverrides] = useState<Record<string, ControlPanelDaemonNodeRecord>>({});
   const [manageExecutorsNodeId, setManageExecutorsNodeId] = useState<string | null>(null);
+  const [tokenNodeId, setTokenNodeId] = useState<string | null>(null);
   const [connectDrawerOpen, setConnectDrawerOpen] = useState(false);
   // Removed ids are held locally so the row disappears on confirm instead of
   // lingering until the next 3s poll catches up with the delete.
@@ -70,6 +72,7 @@ export function ComputerPage({
     return [...newlyConnected, ...merged].filter((node) => !removed.has(node.id));
   }, [nodes, currentUser.employeeId, overrides, removedIds]);
   const manageExecutorsNode = myNodes.find((node) => node.id === manageExecutorsNodeId) ?? null;
+  const tokenNode = myNodes.find((node) => node.id === tokenNodeId) ?? null;
 
   // Gate the connect CTA on the caller's resolved local-computer limit. The
   // backend stays the authority (a new enrollment that races the poll still
@@ -187,6 +190,7 @@ export function ComputerPage({
                   node={node}
                   onRename={(target) => void handleRenameNode(target)}
                   onManageExecutors={(target) => setManageExecutorsNodeId(target.id)}
+                  onShowToken={(target) => setTokenNodeId(target.id)}
                   onDisconnect={(target) => void handleDisconnectNode(target)}
                   onOpenThread={onOpenThread}
                   t={t}
@@ -207,6 +211,11 @@ export function ComputerPage({
         open={connectDrawerOpen}
         onClose={() => setConnectDrawerOpen(false)}
         onConnected={handleConnected}
+      />
+      <ComputerTokenDrawer
+        open={tokenNodeId !== null}
+        onClose={() => setTokenNodeId(null)}
+        node={tokenNode}
       />
     </section>
   );

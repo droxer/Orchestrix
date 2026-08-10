@@ -98,10 +98,6 @@ def _record_result(
     return _result(task, state, code=code, message=message)
 
 
-def _task_mode(value: Any) -> str:
-    return value if value in ("action", "review", "ask") else "action"
-
-
 def _unclaimable_dispatch(task: dict[str, Any], agent: str | None) -> DispatchInfo:
     """Explain why a task could not be claimed for dispatch.
 
@@ -162,7 +158,6 @@ def implicit_group_assignments_for_task(
         candidate = {
             "agentId": agent["id"],
             "agent": agent["executorKind"],
-            "mode": "ask",
             **({"role": agent["defaultRole"]} if agent.get("defaultRole") else {}),
         }
         try:
@@ -187,14 +182,12 @@ class TaskDispatcher:
         task: dict[str, Any],
         actor: dict[str, Any],
         *,
-        mode: str,
         assignments: list[dict[str, Any]] | None,
         record_pending: bool,
     ) -> None:
         self.ctx = ctx
         self.task = task
         self.actor = actor
-        self.mode = mode
         self.run_assignments = assignments or []
         self.record_pending = record_pending
         self.team_assignment_resolved = False
@@ -246,7 +239,6 @@ class TaskDispatcher:
                 agent_store=self.ctx.agent_store,
                 placement_store=self.ctx.agent_placement_store,
                 daemon_nodes=self.ctx.registry.monitor_nodes(),
-                mode=_task_mode(self.mode),
             )
             self.team_assignment_resolved = True
             return None
@@ -285,7 +277,6 @@ class TaskDispatcher:
             self.run_assignments = [
                 {
                     "agent": self.agent,
-                    "mode": _task_mode(self.mode),
                     **(
                         {"agentId": self.task["assignedAgentId"]}
                         if self.task.get("assignedAgentId")
@@ -423,12 +414,7 @@ class TaskDispatcher:
         self.ctx.task_store.update_task(self.task["id"], {"status": "running"})
         if self.claim_id:
             self.ctx.task_store.release_dispatch_claim(self.task["id"], self.claim_id)
-        message = (
-            "Discussion started."
-            if all(item.get("mode") == "ask" for item in self.run_assignments)
-            and len(self.run_assignments) > 1
-            else f"{self.agent} started the task."
-        )
+        message = f"{self.agent} started the task."
         self.ctx.task_store.record_activity(
             self.task["id"],
             message,
@@ -494,7 +480,6 @@ async def start_task_on_ready_node(
     task: dict[str, Any],
     actor: dict[str, Any],
     *,
-    mode: str = "action",
     assignments: list[dict[str, Any]] | None = None,
     record_pending: bool = True,
 ) -> DispatchResult | None:
@@ -502,7 +487,6 @@ async def start_task_on_ready_node(
         ctx,
         task,
         actor,
-        mode=mode,
         assignments=assignments,
         record_pending=record_pending,
     ).start()
@@ -514,7 +498,6 @@ async def start_routine_occurrence_on_ready_node(
     actor: dict[str, Any],
     *,
     agent: str | None,
-    mode: str = "action",
     assignments: list[dict[str, Any]] | None = None,
     run_date: date | None = None,
 ) -> DispatchResult | None:
@@ -558,7 +541,7 @@ async def start_routine_occurrence_on_ready_node(
             message="The current routine occurrence is already active.",
         )
     result = await start_task_on_ready_node(
-        ctx, occurrence, actor, mode=mode, assignments=assignments
+        ctx, occurrence, actor, assignments=assignments
     )
     if result and result.get("session"):
         ctx.task_store.link_session(routine["id"], result["session"]["id"])

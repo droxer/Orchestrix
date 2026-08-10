@@ -139,7 +139,8 @@ sales_followup:
 Responsibilities:
 
 - Convert tasks and session state into agent-specific prompts.
-- Select agent role and mode: implementer, reviewer, tester, planner, fixer.
+- Select the agent and supply its role context: implementer, reviewer, tester,
+  planner, or fixer.
 - Launch Claude/Codex/Pi or other agents through the execution plane.
 - Parse structured outputs and normalize them into Relay events.
 - Enforce per-agent failure limits and handoff rules.
@@ -149,7 +150,8 @@ Implementation rules:
 - Agent CLIs run inside the execution plane.
 - Agent prompts must not contain long-lived secrets.
 - JSON/JSONL output must be rendered into human-readable streams and captured as raw events.
-- Review mode is informational: agents emit prose review notes; no machine-readable verdict marker is required.
+- A review role may emit prose review notes; task-closing assignments use the
+  same machine-readable round-result contract as other roles.
 - Agent-specific command builders should stay separate from workflow policy.
 
 ### 2.5 Execution Plane
@@ -290,7 +292,7 @@ The implementation should preserve an event-sourced task/session model. Local `.
 | Workspace | repo, project, business workspace, or mounted execution context |
 | Task | durable work item |
 | Session | one execution thread or handoff chain |
-| Assignment | one agent role/mode step in a session |
+| Assignment | one agent role step in a session |
 | Artifact | command logs, diffs, reports, plans, summaries |
 | Approval | human gate and decision record |
 | ToolCall | governed external/internal tool invocation |

@@ -1,9 +1,8 @@
-import { forwardRef, memo, useEffect, useImperativeHandle, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { forwardRef, memo, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { AgentName, AgentTaskMode, DaemonNodeMonitorRecord, EmployeeAgent } from "../../types";
+import type { AgentTeam, DaemonNodeMonitorRecord, EmployeeAgent } from "../../types";
 import { sendShortcutLabel } from "../../lib/sendShortcut";
 import { ActionSend, ComposerStop } from "../icons";
-import { ModeToggle } from "./ModeToggle";
 import { AgentSelect } from "./AgentSelect";
 import { useComposer } from "../../hooks/useComposer";
 import { ThreadRuntimeReadout, ThreadRuntimeSelect } from "./ThreadRuntimeSelect";
@@ -17,15 +16,20 @@ export type ComposerHandle = {
   setText: (text: string) => void;
 };
 
-// Message composer: textarea, agent and mode controls, and the send/cancel
+// Message composer: textarea, agent control, and the send/cancel
 // control. Draft state stays inside this component so every
 // keystroke does not re-render the full application shell and transcript.
 const ComposerView = forwardRef<ComposerHandle, {
-  composerMode: AgentTaskMode;
-  setComposerMode: Dispatch<SetStateAction<AgentTaskMode>>;
   logicalAgents: EmployeeAgent[];
   activeLogicalAgentId: string | null;
   onLogicalAgentPicked: (agent: EmployeeAgent) => void;
+  /** Teams offered while staging a new thread; empty for a started one. */
+  teams?: AgentTeam[];
+  /** The picked team, or the team a started thread belongs to. */
+  activeTeamId?: string | null;
+  onTeamPicked?: (team: AgentTeam) => void;
+  /** A started team thread keeps its team for life — the picker locks. */
+  teamLocked?: boolean;
   activeAgentDisplayName: string;
   selectedEmployee: string;
   initializingThread: boolean;
@@ -40,7 +44,7 @@ const ComposerView = forwardRef<ComposerHandle, {
   running: boolean;
   onSend: () => void;
   onCancelRun: () => void;
-}>(function Composer({ composerMode, setComposerMode, logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, activeAgentDisplayName, selectedEmployee, initializingThread, runtimeNodes, runtimeNodeId, selectedRuntimeNode, activeRuntimeNode, onRuntimeNodeChange, running, onSend, onCancelRun }, ref) {
+}>(function Composer({ logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, teams, activeTeamId, onTeamPicked, teamLocked, activeAgentDisplayName, selectedEmployee, initializingThread, runtimeNodes, runtimeNodeId, selectedRuntimeNode, activeRuntimeNode, onRuntimeNodeChange, running, onSend, onCancelRun }, ref) {
   const { t } = useTranslation();
   const composer = useComposer();
   const {
@@ -118,8 +122,12 @@ const ComposerView = forwardRef<ComposerHandle, {
                 logicalAgents={logicalAgents}
                 activeLogicalAgentId={activeLogicalAgentId}
                 onLogicalAgentPicked={onLogicalAgentPicked}
+                teams={teams}
+                activeTeamId={activeTeamId}
+                onTeamPicked={onTeamPicked}
+                teamLocked={teamLocked}
+                teamOptionsEnabled={initializingThread}
               />
-              <ModeToggle mode={composerMode} setMode={setComposerMode} />
             </div>
             <div className="composer-footer-right">
               {/* One mounted element for send↔stop so keyboard focus survives

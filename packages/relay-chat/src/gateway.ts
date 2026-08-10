@@ -42,7 +42,6 @@ export class RelayChatGateway {
       const session = await this.backend.startAgentRun({
             agentId,
             taskGoal: request.taskGoal,
-            mode: request.mode,
             sessionId,
             employeeId: identity.employeeId,
             idempotencyKey: request.idempotencyKey,

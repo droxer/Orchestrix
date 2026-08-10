@@ -102,38 +102,15 @@ def daemon_command_queue_limit() -> int:
     return limit
 
 
-def _run_request_mode(request: dict[str, Any]) -> str:
-    assignments = request.get("assignments") or []
-    index = int(request.get("currentIndex") or 0)
-    if index >= len(assignments):
-        return "action"
-    return assignments[index].get("mode") or "action"
-
-
 def _assert_node_run_request_capacity(
     node: dict[str, Any],
     active_requests: list[dict[str, Any]],
     request: dict[str, Any],
 ) -> None:
-    requested_mode = _run_request_mode(request)
-    active_modes = [_run_request_mode(item) for item in active_requests]
-    if requested_mode != "ask":
-        available = not active_requests
-    elif any(mode != "ask" for mode in active_modes):
-        available = False
-    else:
-        raw_by_mode = node.get("runCapacityByMode")
-        by_mode = raw_by_mode if isinstance(raw_by_mode, dict) else {}
-        ask_limit = by_mode.get("ask")
-        if not isinstance(ask_limit, int) or ask_limit <= 0:
-            ask_limit = 1
-        max_concurrent = node.get("maxConcurrentRuns")
-        if not isinstance(max_concurrent, int) or max_concurrent <= 0:
-            max_concurrent = max(1, ask_limit)
-        available = (
-            len(active_requests) < max_concurrent
-            and sum(mode == "ask" for mode in active_modes) < ask_limit
-        )
+    max_concurrent = node.get("maxConcurrentRuns")
+    if not isinstance(max_concurrent, int) or max_concurrent <= 0:
+        max_concurrent = 1
+    available = len(active_requests) < max_concurrent
     if not available:
         raise ValueError("Runtime node capacity is exhausted.")
 
@@ -141,6 +118,13 @@ def _assert_node_run_request_capacity(
 def _node_for_storage(node: dict[str, Any]) -> dict[str, Any]:
     stored = {**node, "token": None}
     stored.pop("nodeToken", None)
+    return stored
+
+
+def _node_for_event(node: dict[str, Any]) -> dict[str, Any]:
+    """The stored node minus secrets: daemon events are audit, never pruned."""
+    stored = _node_for_storage(node)
+    stored.pop("nodeTokenSecret", None)
     return stored
 
 
@@ -363,7 +347,7 @@ class LocalDaemonStore:
             # an event. See node_registration_changed.
             if changed:
                 self.append_daemon_event(
-                    daemon_event("daemon.node.registered", {"node": node})
+                    daemon_event("daemon.node.registered", {"node": _node_for_event(node)})
                 )
             return node
 
@@ -582,7 +566,6 @@ class LocalDaemonStore:
                             if command.get("placementId")
                             else {}
                         ),
-                        "mode": command["mode"],
                         "taskGoal": command["taskGoal"],
                         **(
                             {"workspacePath": command["workspacePath"]}
@@ -1179,7 +1162,6 @@ class LocalDaemonStore:
                 "sessionId": event["sessionId"],
                 "runId": event["runId"],
                 "agent": event["agent"],
-                "mode": event["mode"],
                 "taskGoal": "",
                 "startedAt": now,
             }
@@ -1321,9 +1303,11 @@ class DatabaseDaemonStore:
         Column("retired_at", DateTime(timezone=True), nullable=True),
         Column("status", Text, nullable=False),
         Column("max_concurrent_runs", Integer, nullable=False, default=1),
-        Column("run_capacity_by_mode", json_type(), nullable=False, default=dict),
         Column("ui_token_hash", Text, nullable=True),
         Column("node_token_hash", Text, nullable=True),
+        # Plaintext launch token for control-panel computers, so the owner can
+        # reveal it again for a reconnect. Managed nodes leave this NULL.
+        Column("node_token_secret", Text, nullable=True),
         Column("last_error", Text, nullable=True),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
@@ -1356,8 +1340,7 @@ class DatabaseDaemonStore:
     # One row per agent a node knows about, replacing five parallel JSON maps
     # (agents, agent_details, disabled_agents, agent_role_defaults,
     # agent_role_overrides) that all keyed off the same agent name and had to be
-    # kept aligned by convention. `run_capacity_by_mode` stays on the node: it
-    # is keyed by run mode, not by agent.
+    # kept aligned by convention.
     node_agents = Table(
         "daemon_node_agents",
         metadata,
@@ -1424,7 +1407,6 @@ class DatabaseDaemonStore:
         Column("agent", Text, nullable=False),
         Column("logical_agent_id", entity_uuid_type(), nullable=True),
         Column("placement_id", entity_uuid_type(), nullable=True),
-        Column("mode", Text, nullable=False),
         Column("task_goal", Text, nullable=False),
         Column("workspace_path", Text, nullable=True),
         Column("status", Text, nullable=False),
@@ -1455,7 +1437,6 @@ class DatabaseDaemonStore:
         Column("current_command_id", entity_uuid_type(), nullable=True),
         Column("current_run_id", entity_uuid_type(), nullable=True),
         Column("current_agent", Text, nullable=True),
-        Column("current_mode", Text, nullable=True),
         Column("current_started_at", DateTime(timezone=True), nullable=True),
         Column("current_progress_at", DateTime(timezone=True), nullable=True),
         Column("error", Text, nullable=True),
@@ -1622,7 +1603,7 @@ class DatabaseDaemonStore:
             # an event. See node_registration_changed.
             if changed:
                 self._append_daemon_event(
-                    conn, daemon_event("daemon.node.registered", {"node": node})
+                    conn, daemon_event("daemon.node.registered", {"node": _node_for_event(node)})
                 )
         return node
 
@@ -1922,7 +1903,6 @@ class DatabaseDaemonStore:
                             if command.get("placementId")
                             else {}
                         ),
-                        "mode": command["mode"],
                         "taskGoal": command["taskGoal"],
                         **(
                             {"workspacePath": command["workspacePath"]}
@@ -2863,7 +2843,6 @@ class DatabaseDaemonStore:
                     "sessionId": event["sessionId"],
                     "runId": event["runId"],
                     "agent": event["agent"],
-                    "mode": event["mode"],
                     "taskGoal": "",
                     "startedAt": now,
                 }
@@ -2940,10 +2919,11 @@ def node_to_row(
         "status": node["status"],
         # The per-agent maps live in daemon_node_agents; see node_agent_rows.
         "max_concurrent_runs": int(node.get("maxConcurrentRuns") or 1),
-        "run_capacity_by_mode": node.get("runCapacityByMode") or {},
-        # Only hashes are persisted; plaintext node tokens stay process-local.
+        # Hashes authenticate; the secret (control-panel nodes only) lets the
+        # owner reveal the token again. Managed nodes persist neither.
         "ui_token_hash": node.get("uiTokenHash"),
         "node_token_hash": node.get("nodeTokenHash"),
+        "node_token_secret": node.get("nodeTokenSecret"),
         "last_error": node.get("lastError"),
         "created_at": _parse_iso(node["createdAt"]),
         "updated_at": _parse_iso(node["updatedAt"]),
@@ -3060,7 +3040,6 @@ def row_to_node(row: Any) -> dict[str, Any]:
         ),
         "status": row["status"],
         "maxConcurrentRuns": int(row.get("max_concurrent_runs") or 1),
-        "runCapacityByMode": row.get("run_capacity_by_mode") or {},
         # `agents` and the other per-agent keys are merged in by
         # `apply_node_agents` from the daemon_node_agents rows.
         "agents": {},
@@ -3069,6 +3048,11 @@ def row_to_node(row: Any) -> dict[str, Any]:
         **(
             {"nodeTokenHash": row["node_token_hash"]}
             if row.get("node_token_hash")
+            else {}
+        ),
+        **(
+            {"nodeTokenSecret": row["node_token_secret"]}
+            if row.get("node_token_secret")
             else {}
         ),
         **({"lastError": row["last_error"]} if row.get("last_error") else {}),
@@ -3164,7 +3148,6 @@ def run_to_row(
         "agent": run["agent"],
         "logical_agent_id": run.get("logicalAgentId"),
         "placement_id": run.get("placementId"),
-        "mode": run["mode"],
         "task_goal": run["taskGoal"],
         "workspace_path": run.get("workspacePath"),
         "status": run["status"],
@@ -3188,7 +3171,6 @@ def row_to_run(row: Any) -> dict[str, Any]:
             else {}
         ),
         **({"placementId": row["placement_id"]} if row.get("placement_id") else {}),
-        "mode": row["mode"],
         "taskGoal": row["task_goal"],
         **(
             {"workspacePath": row["workspace_path"]}
@@ -3226,7 +3208,6 @@ def run_request_to_row(
         "current_command_id": record.get("currentCommandId"),
         "current_run_id": record.get("currentRunId"),
         "current_agent": record.get("currentAgent"),
-        "current_mode": record.get("currentMode"),
         "current_started_at": _parse_iso(record.get("currentStartedAt")),
         "current_progress_at": _parse_iso(record.get("currentProgressAt")),
         "error": record.get("error"),
@@ -3256,7 +3237,6 @@ def row_to_run_request(row: Any) -> dict[str, Any]:
             {"currentRunId": row["current_run_id"]} if row.get("current_run_id") else {}
         ),
         **({"currentAgent": row["current_agent"]} if row.get("current_agent") else {}),
-        **({"currentMode": row["current_mode"]} if row.get("current_mode") else {}),
         **(
             {"currentStartedAt": _format_iso(row["current_started_at"])}
             if row.get("current_started_at")

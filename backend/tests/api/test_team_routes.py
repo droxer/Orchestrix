@@ -271,7 +271,6 @@ def test_employee_reads_team_profile_and_activity(monkeypatch) -> None:
                             "logicalAgentId": lead["id"],
                             "taskGoal": "Ship together",
                             "agent": "codex",
-                            "mode": "action",
                             "startedAt": "2026-07-23T00:00:00Z",
                         },
                         {
@@ -280,7 +279,6 @@ def test_employee_reads_team_profile_and_activity(monkeypatch) -> None:
                             "logicalAgentId": lead["id"],
                             "taskGoal": "Work alone",
                             "agent": "codex",
-                            "mode": "action",
                             "startedAt": "2026-07-23T00:00:01Z",
                         },
                     ],
@@ -696,7 +694,7 @@ def test_task_assigned_to_team_starts_all_members_lead_first_in_assignee_thread(
         assert "assignedAgentId" not in task
         started = client.post(
             f"/api/v1/tasks/{task['id']}/runs",
-            json={"assignments": [{"agent": "pi", "mode": "ask"}]},
+            json={"assignments": [{"agent": "pi"}]},
         )
 
         assert started.status_code == 202
@@ -721,7 +719,6 @@ def test_task_assigned_to_team_starts_all_members_lead_first_in_assignee_thread(
                 "sessionId": lead_command["sessionId"],
                 "runId": lead_command["runId"],
                 "agent": "codex",
-                "mode": "action",
                 "exitCode": 0,
                 "agentLog": "lead result",
             },
@@ -732,7 +729,7 @@ def test_task_assigned_to_team_starts_all_members_lead_first_in_assignee_thread(
         assert support_command["agent"] == "claude"
 
 
-def test_team_task_start_propagates_review_mode_to_every_member(monkeypatch) -> None:
+def test_team_task_start_has_no_execution_mode(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
@@ -779,13 +776,11 @@ def test_team_task_start_propagates_review_mode_to_every_member(monkeypatch) -> 
             },
         ).json()
 
-        started = client.post(
-            f"/api/v1/tasks/{task['id']}/runs", json={"mode": "review"}
-        )
+        started = client.post(f"/api/v1/tasks/{task['id']}/runs", json={})
 
         assert started.status_code == 202
         [lead_command] = app.state.registry.take_commands("node_alice", "node_token")
-        assert lead_command["mode"] == "review"
+        assert "mode" not in lead_command
         app.state.registry.handle_event(
             "node_alice",
             {
@@ -794,14 +789,13 @@ def test_team_task_start_propagates_review_mode_to_every_member(monkeypatch) -> 
                 "sessionId": lead_command["sessionId"],
                 "runId": lead_command["runId"],
                 "agent": "codex",
-                "mode": "review",
                 "exitCode": 0,
                 "agentLog": "lead review",
             },
             "node_token",
         )
         [support_command] = app.state.registry.take_commands("node_alice", "node_token")
-        assert support_command["mode"] == "review"
+        assert "mode" not in support_command
 
 
 def test_unroutable_team_start_requests_capacity_and_queues_scheduler_retry(
@@ -949,7 +943,7 @@ def test_team_reviewer_reviews_the_leads_work_and_carries_its_role(monkeypatch) 
 
         assert started.status_code == 202
         [lead_command] = app.state.registry.take_commands("node_alice", "node_token")
-        assert lead_command["mode"] == "action"
+        assert lead_command["phase"] == "execution"
         assert lead_command["role"] == "implementer"
         assert lead_command["state"]["agent_role"] == "implementer"
         app.state.registry.handle_event(
@@ -960,7 +954,6 @@ def test_team_reviewer_reviews_the_leads_work_and_carries_its_role(monkeypatch) 
                 "sessionId": lead_command["sessionId"],
                 "runId": lead_command["runId"],
                 "agent": "codex",
-                "mode": "action",
                 "exitCode": 0,
                 "agentLog": "built it",
             },
@@ -968,8 +961,8 @@ def test_team_reviewer_reviews_the_leads_work_and_carries_its_role(monkeypatch) 
         )
 
         [review_command] = app.state.registry.take_commands("node_alice", "node_token")
-        # A reviewer asked to "do the work" reviews it instead of redoing it.
-        assert review_command["mode"] == "review"
+        # The role shapes the contribution without switching execution modes.
+        assert review_command["phase"] == "review"
         assert review_command["role"] == "reviewer"
         assert review_command["state"]["agent_role"] == "reviewer"
         app.state.registry.handle_event(
@@ -980,15 +973,15 @@ def test_team_reviewer_reviews_the_leads_work_and_carries_its_role(monkeypatch) 
                 "sessionId": review_command["sessionId"],
                 "runId": review_command["runId"],
                 "agent": "claude",
-                "mode": "review",
                 "exitCode": 0,
                 "agentLog": "looks fine",
             },
             "node_token",
         )
 
-        # A round containing a review ends with a human in the loop.
-        assert client.get(f"/api/v1/tasks/{task['id']}").json()["status"] == "review"
+        # The reviewer role contributes to the same adaptive round; the role
+        # does not force a separate task mode or terminal status.
+        assert client.get(f"/api/v1/tasks/{task['id']}").json()["status"] == "done"
         session = client.get(f"/api/v1/threads/{lead_command['sessionId']}").json()
         assert [run["role"] for run in session["agentRuns"]] == [
             "implementer",
@@ -1479,6 +1472,7 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
         started = client.post(f"/api/v1/tasks/{task['id']}/runs", json={})
         session_id = started.json()["session"]["id"]
         first = app.state.registry.take_commands("node_alice", "node_token")[0]
+        assert "mode" not in first
         app.state.registry.handle_event(
             "node_alice",
             {
@@ -1487,7 +1481,6 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
                 "sessionId": session_id,
                 "runId": first["runId"],
                 "agent": "codex",
-                "mode": "action",
                 "exitCode": 0,
                 "agentLog": "lead result",
             },
@@ -1502,7 +1495,6 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
                 "sessionId": session_id,
                 "runId": second["runId"],
                 "agent": "claude",
-                "mode": "action",
                 "exitCode": 0,
                 "agentLog": "support result",
             },
@@ -1527,6 +1519,7 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
             support["id"],
         ]
         assert request["assignments"][0]["coordinator"] is True
+        assert "adaptive" not in request["assignments"][0]
         assert request["assignments"][0]["phase"] == "execution"
         assert request["assignments"][0]["brief"]
         assert request["assignments"][0]["teamSnapshot"] == {
@@ -1540,6 +1533,7 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
             == (request["assignments"][0]["brief"])
         )
         assert room_command["state"]["team_phase"] == "execution"
+        assert "adaptive_execution" not in room_command["state"]
 
 
 def test_message_to_a_team_thread_reports_a_disabled_team(monkeypatch) -> None:
@@ -1598,7 +1592,6 @@ def test_message_to_a_team_thread_reports_a_disabled_team(monkeypatch) -> None:
                 "sessionId": session_id,
                 "runId": command["runId"],
                 "agent": "codex",
-                "mode": "action",
                 "exitCode": 0,
                 "agentLog": "done",
             },
@@ -1673,7 +1666,6 @@ def test_explicit_assignment_to_a_disabled_team_requires_a_recovery_decision(
                 "sessionId": session_id,
                 "runId": command["runId"],
                 "agent": "codex",
-                "mode": "action",
                 "exitCode": 0,
                 "agentLog": "done",
             },
@@ -1721,6 +1713,134 @@ def test_agent_runs_still_requires_an_assignment_for_a_solo_thread(monkeypatch) 
         refused = client.post("/api/v1/agent-runs", json={"taskGoal": "do something"})
 
         assert refused.status_code == 400
+
+
+def test_agent_runs_creates_a_team_thread_from_a_team_id(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        _employee(client, "alice")
+        app.state.registry.register(
+            {
+                "sandboxId": "node_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex", "claude"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        lead = _agent(client, "alice", "Lead", "codex")
+        support = _agent(client, "alice", "Support", "claude")
+        for agent in (lead, support):
+            assert (
+                client.post(
+                    f"/api/v1/admin/agents/{agent['id']}/placements",
+                    json={"daemonNodeId": "node_alice"},
+                ).status_code
+                == 201
+            )
+        team = client.post(
+            "/api/v1/admin/teams",
+            json={
+                "ownerEmployeeId": "alice",
+                "name": "Delivery",
+                "leadAgentId": lead["id"],
+                "memberAgentIds": [lead["id"], support["id"]],
+            },
+        ).json()["team"]
+        _login(client, "alice")
+
+        started = client.post(
+            "/api/v1/agent-runs",
+            json={
+                "taskGoal": "ship the release",
+                "teamId": team["id"],
+                "daemonNodeId": "node_alice",
+            },
+        )
+
+        assert started.status_code == 202
+        session = started.json()
+        assert session["teamId"] == team["id"]
+        assert session["ownerEmployeeId"] == "alice"
+        request = (
+            app.state.registry.daemon_store.active_run_request_for_session_any_node(
+                session["id"]
+            )
+        )
+        assert [item["agentId"] for item in request["assignments"]] == [
+            lead["id"],
+            support["id"],
+        ]
+        assert request["assignments"][0]["coordinator"] is True
+        assert request["assignments"][0]["teamSnapshot"]["teamId"] == team["id"]
+        [command] = app.state.registry.take_commands("node_alice", "node_token")
+        assert command["logicalAgentId"] == lead["id"]
+
+
+def test_agent_runs_rejects_a_team_id_that_does_not_match_the_thread(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        _employee(client, "alice")
+        app.state.registry.register(
+            {
+                "sandboxId": "node_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex", "claude"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        lead = _agent(client, "alice", "Lead", "codex")
+        assert (
+            client.post(
+                f"/api/v1/admin/agents/{lead['id']}/placements",
+                json={"daemonNodeId": "node_alice"},
+            ).status_code
+            == 201
+        )
+        team = client.post(
+            "/api/v1/admin/teams",
+            json={
+                "ownerEmployeeId": "alice",
+                "name": "Delivery",
+                "leadAgentId": lead["id"],
+                "memberAgentIds": [lead["id"]],
+            },
+        ).json()["team"]
+        _login(client, "alice")
+        solo = client.post(
+            "/api/v1/agent-runs",
+            json={
+                "taskGoal": "solo thread",
+                "assignments": [{"agentId": lead["id"]}],
+            },
+        )
+        assert solo.status_code == 202
+
+        mismatched = client.post(
+            "/api/v1/agent-runs",
+            json={
+                "taskGoal": "keep going",
+                "sessionId": solo.json()["id"],
+                "teamId": team["id"],
+            },
+        )
+
+        assert mismatched.status_code == 400
 
 
 def test_a_team_thread_refuses_an_assignment_outside_the_room(monkeypatch) -> None:
@@ -1781,7 +1901,6 @@ def test_a_team_thread_refuses_an_assignment_outside_the_room(monkeypatch) -> No
                 "sessionId": session_id,
                 "runId": command["runId"],
                 "agent": "codex",
-                "mode": "action",
                 "exitCode": 0,
                 "agentLog": "done",
             },
@@ -1793,7 +1912,7 @@ def test_a_team_thread_refuses_an_assignment_outside_the_room(monkeypatch) -> No
             json={
                 "taskGoal": "you handle it",
                 "sessionId": session_id,
-                "assignments": [{"agentId": outsider["id"], "mode": "action"}],
+                "assignments": [{"agentId": outsider["id"]}],
             },
         )
 
@@ -1860,7 +1979,6 @@ def test_a_team_thread_accepts_an_assignment_naming_one_member(monkeypatch) -> N
                     "sessionId": session_id,
                     "runId": command["runId"],
                     "agent": executor,
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "done",
                 },
@@ -1872,7 +1990,7 @@ def test_a_team_thread_accepts_an_assignment_naming_one_member(monkeypatch) -> N
             json={
                 "taskGoal": "just you, Support",
                 "sessionId": session_id,
-                "assignments": [{"agentId": support["id"], "mode": "action"}],
+                "assignments": [{"agentId": support["id"]}],
             },
         )
 
@@ -1955,7 +2073,6 @@ def test_message_to_a_team_thread_runs_every_member_as_the_owning_employee(
                 "sessionId": session_id,
                 "runId": first["runId"],
                 "agent": "codex",
-                "mode": "action",
                 "exitCode": 0,
                 "agentLog": "lead result",
             },
@@ -1970,7 +2087,6 @@ def test_message_to_a_team_thread_runs_every_member_as_the_owning_employee(
                 "sessionId": session_id,
                 "runId": second["runId"],
                 "agent": "claude",
-                "mode": "action",
                 "exitCode": 0,
                 "agentLog": "support result",
             },
@@ -2062,7 +2178,6 @@ def test_a_team_thread_narrows_to_one_member_for_the_owning_employee(
                     "sessionId": session_id,
                     "runId": command["runId"],
                     "agent": executor,
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "done",
                 },
@@ -2075,7 +2190,7 @@ def test_a_team_thread_narrows_to_one_member_for_the_owning_employee(
             json={
                 "taskGoal": "just you, Support",
                 "sessionId": session_id,
-                "assignments": [{"agentId": support["id"], "mode": "action"}],
+                "assignments": [{"agentId": support["id"]}],
             },
         )
 

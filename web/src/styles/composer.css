@@ -17,7 +17,7 @@
   background: transparent;
 }
 
-/* Runtime control: environment stays visible beside agent and mode. Keeping
+/* Runtime control: environment stays visible beside the agent. Keeping
    it in the footer removes a second floating card above the composer. */
 .thread-runtime-rail {
   display: flex;
@@ -179,72 +179,9 @@
   .thread-runtime-select { max-width: 100%; }
 }
 
-.mode-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  height: var(--sp-6);
-  padding: 0 var(--sp-3);
-  border: 0;
-  border-radius: var(--r-2);
-  background: var(--surface-2);
-  color: var(--ink-1);
-  font: var(--type-label-strong);
-  letter-spacing: var(--track-0);
-  cursor: pointer;
-  white-space: nowrap;
-  transition:
-    background var(--t-fast) var(--ease),
-    box-shadow var(--t-fast) var(--ease);
-}
-
-.mode-chip[data-mode="action"] {
-  --mode-icon: var(--action);
-  background: var(--action-soft);
-}
-
-/* Ask is the read-only counterpart to Agent: no green work-fill, a quiet
-   slate outline instead. The filled-green vs outlined-slate asymmetry is the
-   signal — "does work" vs "just asks". */
-.mode-chip[data-mode="ask"] {
-  --mode-icon: var(--info);
-  background: var(--surface-3);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--info) 24%, transparent);
-}
-
-.mode-chip:hover {
-  background: color-mix(in srgb, var(--mode-icon) 12%, var(--surface-2));
-}
-
-.mode-chip:active { transform: scale(0.97); }
-
-.mode-chip-icon {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
-  animation: mode-chip-icon-in var(--t-fast) var(--ease);
-}
-
-.mode-chip-icon svg {
-  color: var(--mode-icon);
-  flex-shrink: 0;
-}
-
-@keyframes mode-chip-icon-in {
+@keyframes composer-icon-in {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-.mode-chip-label {
-  flex: 0 1 auto;
-  text-align: left;
-  color: var(--ink-1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mode-chip:active { transform: none; }
-
-  .mode-chip-icon { animation: none; }
 }
 
 .composer-input-wrap {
@@ -389,11 +326,10 @@
   outline-offset: var(--focus-offset);
 }
 
-/* Send↔stop glyph swap — same fade the mode chip's icon gets, so the
-   composer's most important state change doesn't snap. */
+/* Send↔stop glyph swap keeps the composer's primary state change calm. */
 .send-button-icon {
   display: inline-flex;
-  animation: mode-chip-icon-in var(--t-fast) var(--ease);
+  animation: composer-icon-in var(--t-fast) var(--ease);
 }
 
 @media (prefers-reduced-motion: reduce) {

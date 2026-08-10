@@ -15,8 +15,10 @@ import {
   listSessionSummaries,
   listTaskArtifacts,
   readAgentWorkspaceFile,
+  reissueComputerToken,
   RelayApiError,
   renameSession,
+  revealComputerToken,
   runLogicalAgents,
   startTask,
   updateAgentProfileImage,
@@ -60,6 +62,46 @@ describe("apiJson", () => {
     assert.equal(requestInit?.method, "PATCH");
     assert.deepEqual(JSON.parse(String(requestInit?.body)), { displayName: "Office Mac" });
     assert.equal(result.node.displayName, "Office Mac");
+  });
+
+  it("reveals a computer token through the owner-facing token subresource", async () => {
+    let requestPath = "";
+    let requestInit: RequestInit | undefined;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      requestPath = String(input);
+      requestInit = init;
+      return new Response(JSON.stringify({
+        nodeToken: "tok_secret",
+        daemonEnv: { RELAY_DAEMON_NODE_TOKEN: "tok_secret" },
+        daemonCommand: "relay-daemon …",
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+
+    const result = await revealComputerToken("sbx_alice");
+
+    assert.equal(requestPath, "/api/v1/daemon-nodes/sbx_alice/token");
+    assert.equal(requestInit?.method ?? "GET", "GET");
+    assert.equal(result.nodeToken, "tok_secret");
+  });
+
+  it("reissues a computer token with a POST to the token subresource", async () => {
+    let requestPath = "";
+    let requestInit: RequestInit | undefined;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      requestPath = String(input);
+      requestInit = init;
+      return new Response(JSON.stringify({
+        nodeToken: "tok_rotated",
+        daemonEnv: { RELAY_DAEMON_NODE_TOKEN: "tok_rotated" },
+        daemonCommand: "relay-daemon …",
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+
+    const result = await reissueComputerToken("sbx_alice");
+
+    assert.equal(requestPath, "/api/v1/daemon-nodes/sbx_alice/token/reissue");
+    assert.equal(requestInit?.method, "POST");
+    assert.equal(result.nodeToken, "tok_rotated");
   });
 
   it("persists a changed user preference without resending the other setting", async () => {
@@ -274,7 +316,7 @@ describe("apiJson", () => {
     await runLogicalAgents({
       taskGoal: "Build it",
       daemonNodeId: "node_selected",
-      assignments: [{ agentId: "agent_builder", mode: "action" }],
+      assignments: [{ agentId: "agent_builder" }],
       sessionId: "ses_existing",
       userMessageId: "evt_user",
       decision: { kind: "handoff", targetAgent: "codex", note: "Continue here" },
@@ -284,7 +326,7 @@ describe("apiJson", () => {
     assert.deepEqual(requestBody, {
       taskGoal: "Build it",
       daemonNodeId: "node_selected",
-      assignments: [{ agentId: "agent_builder", mode: "action" }],
+      assignments: [{ agentId: "agent_builder" }],
       sessionId: "ses_existing",
       userMessageId: "evt_user",
       decision: { kind: "handoff", targetAgent: "codex", note: "Continue here" },
@@ -502,7 +544,7 @@ describe("agent run payloads", () => {
       });
     }) as typeof fetch;
     try {
-      await runLogicalAgents({ taskGoal: "one more pass", sessionId: "ses_1", mode: "action" });
+      await runLogicalAgents({ taskGoal: "one more pass", sessionId: "ses_1" });
     } finally {
       globalThis.fetch = original;
     }
@@ -511,7 +553,6 @@ describe("agent run payloads", () => {
     assert.deepEqual(calls[0].body, {
       taskGoal: "one more pass",
       sessionId: "ses_1",
-      mode: "action",
     });
   });
 });

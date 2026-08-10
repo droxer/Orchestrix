@@ -1,7 +1,4 @@
-import type { AgentTaskMode } from "relay-core";
 import type { ChatAgentRequest, ChatCommand, ChatConversationRef } from "./types.js";
-
-const DEFAULT_MODE: AgentTaskMode = "action";
 
 export function parseChatCommand(text: string): ChatCommand | undefined {
   const tokens = splitCommand(text.trim());
@@ -38,7 +35,6 @@ export function commandToAgentRequest(ref: ChatConversationRef, command: ChatCom
       ...ref,
       taskGoal: command.taskGoal,
       agentId: command.agentId,
-      mode: command.mode,
       sessionId: command.sessionId,
     };
   }
@@ -47,7 +43,6 @@ export function commandToAgentRequest(ref: ChatConversationRef, command: ChatCom
       ...ref,
       taskGoal: command.taskGoal,
       agentId: command.agentId,
-      mode: command.mode,
       forceNew: true,
     };
   }
@@ -55,22 +50,18 @@ export function commandToAgentRequest(ref: ChatConversationRef, command: ChatCom
 }
 
 function parseRunCommand(tokens: string[], kind: "run" | "new"): ChatCommand | undefined {
-  if (tokens.some((token) => /^--?sandbox(?:=|$)/.test(token))) return undefined;
-  const parsed = parseKnownOptions(tokens, new Set(["agent", "mode", "session"]));
+  if (tokens.some((token) => /^--?(?:sandbox|mode)(?:=|$)/.test(token))) return undefined;
+  const parsed = parseKnownOptions(tokens, new Set(["agent", "session"]));
   const agentId = stringOption(parsed.options, "agent");
-  const rawMode = stringOption(parsed.options, "mode");
-  const mode = rawMode ? modeOption(parsed.options) : DEFAULT_MODE;
-  if (!mode) return undefined;
   const taskGoal = parsed.rest.join(" ").trim();
   if (!taskGoal) return undefined;
   if (kind === "new") {
-    return { kind: "new", taskGoal, agentId, mode };
+    return { kind: "new", taskGoal, agentId };
   }
   return {
     kind: "run",
     taskGoal,
     agentId,
-    mode,
     sessionId: stringOption(parsed.options, "session"),
   };
 }
@@ -131,13 +122,6 @@ function splitCommand(text: string): string[] {
 
 function stripCommandSuffix(value: string): string {
   return value.replace(/^\/+/, "").split("@", 1)[0];
-}
-
-function modeOption(options: Map<string, string>): AgentTaskMode | undefined {
-  const value = stringOption(options, "mode");
-  if (value === "action" || value === "review" || value === "ask") return value;
-  if (value === "implement") return "action";
-  return undefined;
 }
 
 function stringOption(options: Map<string, string>, name: string): string | undefined {

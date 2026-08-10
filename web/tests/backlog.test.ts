@@ -48,9 +48,11 @@ function node(input: Partial<DaemonNodeMonitorRecord> & { id: string }): DaemonN
     agents: input.agents ?? { claude: "ready", pi: "ready", codex: "ready", kimi: "ready" },
     disabledAgents: input.disabledAgents,
     maxConcurrentRuns: input.maxConcurrentRuns,
-    runCapacityByMode: input.runCapacityByMode,
     activeRuns: input.activeRuns ?? [],
     queuedCommandCount: input.queuedCommandCount ?? 0,
+    stale: input.stale ?? false,
+    createdAt: input.createdAt ?? "2026-06-01T00:00:00.000Z",
+    updatedAt: input.updatedAt ?? "2026-06-01T00:00:00.000Z",
   } as DaemonNodeMonitorRecord;
 }
 
@@ -106,7 +108,7 @@ describe("agentReadyForTask", () => {
       id: "n4",
       employeeId: "alice",
       status: "running",
-      activeRuns: [{ commandId: "cmd_1", sessionId: "ses_1", runId: "run_1", agent: "codex", mode: "ask", taskGoal: "question", startedAt: "2026-06-28T00:00:00.000Z" }],
+      activeRuns: [{ commandId: "cmd_1", sessionId: "ses_1", runId: "run_1", agent: "codex", taskGoal: "question", startedAt: "2026-06-28T00:00:00.000Z" }],
     })]), false);
   });
 

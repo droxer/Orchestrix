@@ -80,6 +80,34 @@ export function agentsForThreadNode<T extends ThreadAgent>(
   ));
 }
 
+type ThreadTeam = {
+  id: string;
+  deletedAt?: string;
+  memberAgentIds: string[];
+};
+
+/**
+ * Teams align with the picked computer the same way agents do: a team can
+ * only take a thread on a computer that hosts its whole roster, since team
+ * dispatch is a lead-first pipeline across every member. Members are matched
+ * by id against the employee's agents, which carry the placements.
+ */
+export function teamsForThreadNode<T extends ThreadTeam>(
+  teams: readonly T[],
+  agents: readonly ThreadAgent[],
+  daemonNodeId: string | null | undefined,
+): T[] {
+  if (!daemonNodeId) return [];
+  const hostedAgentIds = new Set(
+    agentsForThreadNode(agents, daemonNodeId).map((agent) => agent.id),
+  );
+  return teams.filter(
+    (team) => !team.deletedAt
+      && team.memberAgentIds.length > 0
+      && team.memberAgentIds.every((agentId) => hostedAgentIds.has(agentId)),
+  );
+}
+
 export function threadRuntimeNodeId(
   session: ThreadRuntimeSession | undefined,
   agents: readonly ThreadAgent[] = [],

@@ -57,7 +57,7 @@ describe("CodexCollaborationStream", () => {
       },
     });
 
-    await runAgentNode("codex", "action", initialAgentState("Coordinate work"), {
+    await runAgentNode("codex", initialAgentState("Coordinate work"), {
       runId: "run-1",
       eventSink: {
         agentOutput: () => undefined,

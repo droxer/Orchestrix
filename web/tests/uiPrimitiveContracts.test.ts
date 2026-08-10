@@ -84,6 +84,14 @@ describe("UI primitive contracts", () => {
     assert.doesNotMatch(base, /button\[data-slot="button"\]\[data-variant=/);
   });
 
+  it("consumes button variant props before spreading DOM props", async () => {
+    const source = await readFile(resolve("web/src/components/ui/button.tsx"), "utf8");
+    const signature = source.match(/function Button\(\{([\s\S]*?)\}: ButtonProps\)/)?.[1] ?? "";
+
+    assert.match(signature, /\btinted\b/);
+    assert.match(source, /buttonVariants\(\{ variant, size, tinted, className \}\)/);
+  });
+
   it("wraps long select options instead of silently clipping them", async () => {
     const source = await readFile(resolve("web/src/components/ui/select.tsx"), "utf8");
     assert.match(source, /whitespace-normal/);

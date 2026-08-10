@@ -85,7 +85,6 @@ function runCommand(id = "cmd_1"): DaemonNodeRunCommand {
     runId: "run_1",
     taskGoal: "do work",
     agent: "codex",
-    mode: "action",
     workspacePath: process.cwd(),
     workspaceLayout: "thread",
   };
@@ -852,7 +851,7 @@ test("relay daemon preserves final agent log and generated files when output eve
   const failed = events.find((event) => event.type === "run.failed");
   assert.equal(failed?.type, "run.failed");
   if (!failed || failed.type !== "run.failed") throw new Error("missing run.failed event");
-  assert.equal(failed.agentLog, "[Codex Action Exit 0]\nstdout:\n  done\n\n");
+  assert.equal(failed.agentLog, "[Codex Exit 0]\nstdout:\n  done\n\n");
   assert.match(failed.error, /Daemon lost agent output/);
   assert.deepEqual(failed.generatedFiles?.map((file) => file.relativePath), ["agent-loop-guide.md"]);
 });
@@ -1485,7 +1484,6 @@ test("relay daemon retries normal run.cancel terminal event while running", asyn
     sessionId: command.sessionId,
     runId: command.runId,
     agent: command.agent,
-    mode: command.mode,
     reason: "Cancelled from UI.",
   } satisfies DaemonNodeCommand;
   const daemon = runRelayDaemon({
@@ -1601,13 +1599,13 @@ test("relay daemon rejects a second distinct run while busy", async () => {
   assert.equal(events.some((event) => event.type === "run.completed" && event.commandId === "cmd_busy_1"), true);
 });
 
-test("relay daemon runs concurrent ask commands within capacity", async () => {
+test("relay daemon runs concurrent commands within capacity", async () => {
   const stop = new AbortController();
   const events: DaemonNodeEvent[] = [];
   const started = new Set<string>();
   let commandServed = false;
-  const first = { ...runCommand("cmd_ask_1"), mode: "ask" as const };
-  const second = { ...runCommand("cmd_ask_2"), mode: "ask" as const, runId: "run_2", sessionId: "ses_2" };
+  const first = runCommand("cmd_1");
+  const second = { ...runCommand("cmd_2"), runId: "run_2", sessionId: "ses_2" };
   const daemon = runRelayDaemon({
     backendUrl: "http://relay.test",
     sandboxId: "sbx_test",
@@ -1616,7 +1614,7 @@ test("relay daemon runs concurrent ask commands within capacity", async () => {
     token: "node_token",
     pollIntervalMs: 5,
     shutdownGraceMs: 100,
-    runCapacityByMode: { ask: 2, action: 1, review: 1 },
+    maxConcurrentRuns: 2,
     logger: testLogger(),
     signal: stop.signal,
     environment: fakeEnvironment({
@@ -1656,7 +1654,7 @@ test("relay daemon runs concurrent ask commands within capacity", async () => {
 
   assert.deepEqual(
     events.filter((event) => event.type === "run.completed").map((event) => event.commandId).sort(),
-    ["cmd_ask_1", "cmd_ask_2"],
+    ["cmd_1", "cmd_2"],
   );
   assert.equal(events.some((event) => event.type === "run.failed"), false);
 });

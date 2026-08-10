@@ -95,6 +95,7 @@ function Button({
   className,
   variant = "default",
   size = "default",
+  tinted = false,
   loading = false,
   loadingLabel,
   disabled,
@@ -105,7 +106,7 @@ function Button({
     <ButtonPrimitive
       data-slot="button"
       data-variant={variant}
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(buttonVariants({ variant, size, tinted, className }))}
       aria-busy={loading || undefined}
       disabled={disabled || loading}
       {...props}

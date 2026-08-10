@@ -1,7 +1,6 @@
 import type {
   AgentName,
   AgentRole,
-  AgentTaskMode,
   ControlPanelDaemonNodeRecord,
   DaemonAgentInventory,
   DaemonAgentMcpServer,
@@ -26,7 +25,6 @@ import type { Language, Theme } from "./lib/appStorage.js";
 export type {
   AgentName,
   AgentRole,
-  AgentTaskMode,
   ControlPanelDaemonNodeRecord,
   DaemonAgentInventory,
   DaemonAgentMcpServer,
@@ -286,6 +284,8 @@ export interface OrgSettingsResponse {
     /** False when the auth store cannot hold employee edits (name, email, limit). */
     employeeEdits?: boolean;
   };
+  /** Admin bearer token for bootstrap/supervisor use. */
+  adminToken?: string | null;
 }
 
 export interface UpdateControlPanelEmployeeInput {
@@ -368,9 +368,16 @@ export interface CreateLocalDeviceEnrollmentInput {
 }
 
 export interface CreateLocalDeviceEnrollmentResponse extends CreateControlPanelDaemonNodeResponse {
-  /** True when an existing computer was adopted instead of a new one created —
-      its token was issued once and cannot be reproduced. */
+  /** True when an existing computer was adopted instead of a new one created. */
   reused?: boolean;
+}
+
+/** Owner-scoped answer to a reveal or reissue: the plaintext launch token plus
+    the env and command that start the daemon with it. */
+export interface ComputerTokenResponse {
+  nodeToken: string;
+  daemonEnv: Record<string, string>;
+  daemonCommand?: string;
 }
 
 export type ManagedNodePhase =
@@ -516,15 +523,15 @@ export interface AgentRunInput {
   taskGoal: string;
   /** Computer selected as the immutable runtime for a new thread. */
   daemonNodeId?: string;
+  /** Team a brand-new thread belongs to; the backend expands it to the
+   *  roster (lead first) and stamps the session with the team id. */
+  teamId?: string;
   /** Absent means "this thread's participants" — the whole team for a team thread. */
   assignments?: Array<{
     agentId: string;
-    mode: AgentTaskMode;
     role?: AgentRole;
     brief?: string;
   }>;
-  /** Mode applied to every member when addressing the room. */
-  mode?: AgentTaskMode;
   sessionId?: string;
   userMessageId?: string;
   decision?: {
@@ -541,7 +548,6 @@ export interface RunInput {
   assignments: Array<{
     agentId?: string;
     agent: AgentName;
-    mode: AgentTaskMode;
     role?: AgentRole;
     brief?: string;
   }>;

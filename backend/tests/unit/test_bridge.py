@@ -28,6 +28,18 @@ def test_extract_last_assistant_text_falls_back_when_segments_are_empty() -> Non
     assert extract_last_assistant_text("●   \n   \n") is None
 
 
+def test_extract_last_assistant_text_reads_claude_stream_json_result() -> None:
+    transcript = (
+        "[Claude Code Exit 0]\n"
+        "stdout:\n"
+        '{"type":"stream_event","event":{"type":"message_start"}}\n'
+        '{"type":"assistant","message":{"content":[{"type":"text","text":"draft"}]}}\n'
+        '{"type":"result","subtype":"success","result":"final team handoff"}'
+    )
+
+    assert extract_last_assistant_text(transcript) == "final team handoff"
+
+
 class _FakeStore:
     def __init__(self, bodies: dict[str, str]) -> None:
         self._bodies = bodies

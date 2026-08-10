@@ -3,7 +3,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { logout, updateUserPreferences } from "./api";
-import type { AgentName, AgentTaskMode, CurrentUser, DaemonNodeMonitorRecord, EmployeeAgent, RelayArtifact, RelaySession } from "./types";
+import type { AgentName, AgentTeam, CurrentUser, DaemonNodeMonitorRecord, EmployeeAgent, RelayArtifact, RelaySession } from "./types";
 import { LoginScreen } from "./components/LoginScreen";
 import { type Theme, type Language } from "./components/PreferencesPanel";
 import type { ThreadItem } from "./components/ThreadRow";
@@ -50,6 +50,7 @@ import {
   agentsForThreadNode,
   resolveNewThreadComputer,
   selectableThreadComputers,
+  teamsForThreadNode,
   threadComputerSignature,
   threadNeedsRuntimeSelection,
   threadNodeOffline,
@@ -119,7 +120,9 @@ export function App() {
   const [hydrated, setHydrated] = useState(false);
   const [activeAgent, setActiveAgent] = useState<AgentName>("claude");
   const [activeLogicalAgentId, setActiveLogicalAgentId] = useState<string | null>(null);
-  const [composerMode, setComposerMode] = useState<AgentTaskMode>("action");
+  // Team picked in the composer while staging a brand-new thread; cleared the
+  // moment an existing thread opens or the pick is sent.
+  const [pendingThreadTeamId, setPendingThreadTeamId] = useState<string | null>(null);
   const [threadQuery, setThreadQuery] = useState("");
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [sidenavExpanded, setSidenavExpanded] = useState(false);
@@ -144,7 +147,6 @@ export function App() {
   const [spaceWidth, setSpaceWidth] = useState(SPACE_WIDTH_DEFAULT);
   const [spaceResizing, setSpaceResizing] = useState(false);
   const [handoffAgentId, setHandoffAgentId] = useState<string>("");
-  const [handoffMode, setHandoffMode] = useState<AgentTaskMode>("action");
   const [handoffNote, setHandoffNote] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [newThreadNodeId, setNewThreadNodeId] = useState<string | null>(null);
@@ -259,6 +261,21 @@ export function App() {
     () => agentsForThreadNode(logicalAgents, selectedThreadNodeId),
     [logicalAgents, selectedThreadNodeId],
   );
+  // Teams follow the same rule as agents: only offer a team whose whole
+  // roster is placed on the picked computer. A started team thread keeps its
+  // team listed so the locked picker still names it even if a placement moved.
+  const startedThreadTeamId = activeSession?.teamId ?? null;
+  const composerTeams = useMemo(
+    () => {
+      const nodeTeams = teamsForThreadNode(teams, logicalAgents, selectedThreadNodeId);
+      if (startedThreadTeamId && !nodeTeams.some((team) => team.id === startedThreadTeamId)) {
+        const started = teams.find((team) => team.id === startedThreadTeamId && !team.deletedAt);
+        if (started) return [started, ...nodeTeams];
+      }
+      return nodeTeams;
+    },
+    [teams, logicalAgents, selectedThreadNodeId, startedThreadTeamId],
+  );
   const visibleArtifacts = useMemo(() => visibleThreadArtifacts(activeSession), [activeSession]);
 
   useEffect(() => {
@@ -269,8 +286,18 @@ export function App() {
     });
   }, [initializingThread, runtimeNodes, threadComputers]);
 
+  // A team picked while staging only holds while the picked computer hosts
+  // the whole roster; switching computers drops the pick back to an agent.
+  useEffect(() => {
+    if (!pendingThreadTeamId) return;
+    if (!composerTeams.some((team) => team.id === pendingThreadTeamId)) {
+      setPendingThreadTeamId(null);
+    }
+  }, [composerTeams, pendingThreadTeamId]);
+
   const applySessionFromHash = useCallback((sessionId: string) => {
     setComposingNew(false);
+    setPendingThreadTeamId(null);
     setSelectedSessionId(sessionId);
     setActiveSessionId(sessionId);
   }, [setActiveSessionId, setSelectedSessionId]);
@@ -638,6 +665,7 @@ export function App() {
   function openThread(sessionId: string, replace = false) {
     setComposingNew(false);
     setPendingUserMessage(null);
+    setPendingThreadTeamId(null);
     setSelectedSessionId(sessionId);
     setActiveSessionId(sessionId);
     syncThreadUrl(sessionId, replace);
@@ -664,7 +692,7 @@ export function App() {
     navigateToAgentWorkspace(agent.id);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
-      if (tab && tab !== "activities") url.searchParams.set("tab", tab);
+      if (tab && tab !== "profile") url.searchParams.set("tab", tab);
       else url.searchParams.delete("tab");
       window.history.replaceState(window.history.state, "", url);
     }
@@ -744,35 +772,43 @@ export function App() {
       reportMutationError("Computer required", null, t("errors.thread_computer_required"));
       return;
     }
-    const defaultLogicalAgent = activeLogicalAgent
-      && selectableLogicalAgents.some((agent) => agent.id === activeLogicalAgent.id)
-      && isEmployeeAgentRoutable(activeLogicalAgent)
-      ? activeLogicalAgent
-      : selectableLogicalAgents.find(isEmployeeAgentRoutable);
-    if (!defaultLogicalAgent) {
-      reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: activeAgent }));
-      return;
-    }
-    const routed = routeComposerMessage(
-      raw,
-      {
-        id: defaultLogicalAgent.id,
-        executorKind: defaultLogicalAgent.executorKind,
-      },
-    );
-    const goal = routed.goal;
-    const routedAgent = routed.agent;
-    if (!goal) return;
-    const routedLogicalAgent = selectableLogicalAgents.find(
-      (agent) => agent.id === routed.agentId && isEmployeeAgentRoutable(agent),
-    );
-    if (!routedLogicalAgent) {
-      reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: routedAgent }));
-      return;
-    }
     // When staging a new thread, always create; otherwise continue the
     // open one. composingNew forces a fresh owner-scoped session here.
     const action = composingNew ? { kind: "create" as const } : chooseSendAction({ activeSessionId: activeSession?.id ?? null, session: activeSession });
+    // A team picked while staging a new thread turns the message into a team
+    // thread: no single-agent routing, the backend expands the roster.
+    const pendingTeam = action.kind === "create" && pendingThreadTeamId
+      ? composerTeams.find((team) => team.id === pendingThreadTeamId)
+      : undefined;
+    let goal = raw;
+    let routedLogicalAgent: EmployeeAgent | undefined;
+    if (!pendingTeam) {
+      const defaultLogicalAgent = activeLogicalAgent
+        && selectableLogicalAgents.some((agent) => agent.id === activeLogicalAgent.id)
+        && isEmployeeAgentRoutable(activeLogicalAgent)
+        ? activeLogicalAgent
+        : selectableLogicalAgents.find(isEmployeeAgentRoutable);
+      if (!defaultLogicalAgent) {
+        reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: activeAgent }));
+        return;
+      }
+      const routed = routeComposerMessage(
+        raw,
+        {
+          id: defaultLogicalAgent.id,
+          executorKind: defaultLogicalAgent.executorKind,
+        },
+      );
+      goal = routed.goal;
+      if (!goal) return;
+      routedLogicalAgent = selectableLogicalAgents.find(
+        (agent) => agent.id === routed.agentId && isEmployeeAgentRoutable(agent),
+      );
+      if (!routedLogicalAgent) {
+        reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: routed.agent }));
+        return;
+      }
+    }
     const sessionId = action.kind === "append" ? action.sessionId : undefined;
     const creatingSession = suppressActiveSessionDuringPendingSend(action);
     // Echo the turn immediately. For a continued session we mint the message id
@@ -807,17 +843,23 @@ export function App() {
               taskGoal: goal,
               sessionId,
               teamMembers,
-              mode: composerMode,
               userMessageId,
             })
-          : {
-              taskGoal: goal,
-              ...(selectedThreadNodeId ? { daemonNodeId: selectedThreadNodeId } : {}),
-              assignments: [{ agentId: routedLogicalAgent.id, mode: composerMode }],
-              sessionId,
-              ...(sessionId ? { userMessageId } : {}),
-            },
+          : pendingTeam
+            ? {
+                taskGoal: goal,
+                ...(selectedThreadNodeId ? { daemonNodeId: selectedThreadNodeId } : {}),
+                teamId: pendingTeam.id,
+              }
+            : {
+                taskGoal: goal,
+                ...(selectedThreadNodeId ? { daemonNodeId: selectedThreadNodeId } : {}),
+                assignments: [{ agentId: routedLogicalAgent!.id }],
+                sessionId,
+                ...(sessionId ? { userMessageId } : {}),
+              },
       );
+      setPendingThreadTeamId(null);
       setActiveSessionId(done.id);
       setSelectedSessionId(done.id);
       setComposingNew(false);
@@ -858,8 +900,16 @@ export function App() {
 
   const handleComposerSend = useStableEvent(() => { void sendMessage(); });
   const handleCancelRun = useStableEvent(() => { void cancelActiveRun(); });
-  const handleRetryAgent = useStableEvent((agent: AgentName, mode: AgentTaskMode, agentId?: string) => { void retryAgentMessage(agent, mode, agentId); });
+  const handleRetryAgent = useStableEvent((agent: AgentName, agentId?: string) => { void retryAgentMessage(agent, agentId); });
   const handleOpenThreadSpace = useStableEvent((artifact?: RelayArtifact) => openThreadSpace(artifact));
+  const handleLogicalAgentPicked = useStableEvent((agent: EmployeeAgent) => {
+    setPendingThreadTeamId(null);
+    setActiveLogicalAgentId(agent.id);
+    setActiveAgent(agent.executorKind);
+  });
+  const handleTeamPicked = useStableEvent((team: AgentTeam) => {
+    setPendingThreadTeamId(team.id);
+  });
 
   async function sendDecision(kind: "approve" | "reject" | "rerun" | "mark_done") {
     if (!activeSession) return;
@@ -868,7 +918,7 @@ export function App() {
       if (threadRunning) return;
       setIsRunning(true);
       try {
-        const assignment = rerunAssignmentForSession(activeSession, activeAgent, composerMode);
+        const assignment = rerunAssignmentForSession(activeSession, activeAgent);
         // The last run's own agent first; its executor kind is only a fallback
         // for legacy runs that recorded no logical agent.
         const logicalAgent = selectableLogicalAgents.find(
@@ -891,7 +941,7 @@ export function App() {
         atBottomRef.current = true;
         const done = await runLogicalAgentsMutation.mutateAsync({
             taskGoal: activeSession.taskGoal,
-            assignments: [{ agentId: logicalAgent.id, mode: assignment.mode }],
+            assignments: [{ agentId: logicalAgent.id }],
             sessionId: activeSession.id,
             decision: { kind: "rerun", targetAgent: assignment.agent },
           });
@@ -921,7 +971,7 @@ export function App() {
     }
   }
 
-  async function retryAgentMessage(agent: AgentName, mode: AgentTaskMode, agentId?: string) {
+  async function retryAgentMessage(agent: AgentName, agentId?: string) {
     if (!activeSession) return;
     if (!selectedEmployee) return;
     if (threadRunning) return;
@@ -940,13 +990,12 @@ export function App() {
       }
       setActiveAgent(logicalAgent.executorKind);
       setActiveLogicalAgentId(logicalAgent.id);
-      setComposerMode(mode);
       setSelectedSessionId(activeSession.id);
       navigateToRoute("main");
       atBottomRef.current = true;
       const done = await runLogicalAgentsMutation.mutateAsync({
           taskGoal: activeSession.taskGoal,
-          assignments: [{ agentId: logicalAgent.id, mode }],
+          assignments: [{ agentId: logicalAgent.id }],
           sessionId: activeSession.id,
           decision: { kind: "rerun", targetAgent: agent },
         });
@@ -979,7 +1028,7 @@ export function App() {
       const note = handoffNote.trim();
       const done = await runLogicalAgentsMutation.mutateAsync({
           taskGoal: activeSession.taskGoal,
-          assignments: [{ agentId: logicalAgent.id, mode: handoffMode }],
+          assignments: [{ agentId: logicalAgent.id }],
           sessionId: activeSession.id,
           decision: {
             kind: "handoff",
@@ -988,7 +1037,7 @@ export function App() {
             ...(note ? { note } : {}),
           },
         });
-      setSelectedSessionId(done.id); setHandoffNote(""); setHandoffMode("action"); setHandoffOpen(false); setActiveAgent(logicalAgent.executorKind); setActiveLogicalAgentId(logicalAgent.id);
+      setSelectedSessionId(done.id); setHandoffNote(""); setHandoffOpen(false); setActiveAgent(logicalAgent.executorKind); setActiveLogicalAgentId(logicalAgent.id);
       syncThreadUrl(done.id, true);
     } catch (error) {
       reportMutationError(
@@ -1123,10 +1172,11 @@ export function App() {
             logicalAgents={logicalAgents}
             selectableLogicalAgents={selectableLogicalAgents}
             activeLogicalAgentId={activeLogicalAgentId}
-            onLogicalAgentPicked={(agent: EmployeeAgent) => {
-              setActiveLogicalAgentId(agent.id);
-              setActiveAgent(agent.executorKind);
-            }}
+            onLogicalAgentPicked={handleLogicalAgentPicked}
+            composerTeams={composerTeams}
+            activeTeamId={activeSession?.teamId ?? (initializingThread ? pendingThreadTeamId : null)}
+            onTeamPicked={handleTeamPicked}
+            teamLocked={Boolean(activeSession?.teamId)}
             artifactCount={visibleArtifacts.length}
             visibleArtifacts={visibleArtifacts}
             spaceOpen={spaceVisible}
@@ -1149,14 +1199,10 @@ export function App() {
             activeRuntimeNode={activeRuntimeNode}
             onRuntimeNodeChange={setNewThreadNodeId}
             agentDescriptors={agentDescriptors}
-            composerMode={composerMode}
-            setComposerMode={setComposerMode}
             handoffOpen={handoffOpen}
             setHandoffOpen={setHandoffOpen}
             handoffAgentId={handoffAgentId}
             setHandoffAgentId={setHandoffAgentId}
-            handoffMode={handoffMode}
-            setHandoffMode={setHandoffMode}
             handoffNote={handoffNote}
             setHandoffNote={setHandoffNote}
             sendDecision={sendDecision}

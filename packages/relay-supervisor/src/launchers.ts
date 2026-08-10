@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import type { DaemonLaunchRequest, DaemonLauncher, ManagedDaemon, SupervisorLogger } from "./types.js";
+import { finished } from "stream";
 
 export interface LocalDaemonLauncherOptions {
   backendUrl: string;
@@ -10,7 +11,7 @@ export interface LocalDaemonLauncherOptions {
   command?: string;
   logger?: SupervisorLogger;
 }
-
+finished
 export interface CommandTemplateLauncherOptions {
   name?: string;
   command: string;

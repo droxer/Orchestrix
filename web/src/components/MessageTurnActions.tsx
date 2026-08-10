@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionCopy, ActionRetry, CheckIcon } from "./icons";
-import type { AgentName, AgentTaskMode } from "../types";
+import type { AgentName } from "../types";
 import { agentMessagePlainText } from "../lib/agentStream";
 import { Button } from "@/components/ui/button";
 import { useDialogs } from "@/components/ui/DialogProvider";
@@ -10,18 +10,16 @@ type MessageTurnActionsProps = {
   agent: AgentName;
   /** Logical agent that produced the turn, so a retry goes back to it. */
   agentId?: string;
-  mode: AgentTaskMode;
   stdout: string;
   stderr: string;
   streaming: boolean;
   retryDisabled?: boolean;
-  onRetry?: (agent: AgentName, mode: AgentTaskMode, agentId?: string) => void;
+  onRetry?: (agent: AgentName, agentId?: string) => void;
 };
 
 export function MessageTurnActions({
   agent,
   agentId,
-  mode,
   stdout,
   stderr,
   streaming,
@@ -61,8 +59,8 @@ export function MessageTurnActions({
 
   const handleRetry = useCallback(() => {
     if (retryDisabled || streaming || !onRetry) return;
-    onRetry(agent, mode, agentId);
-  }, [agent, agentId, mode, onRetry, retryDisabled, streaming]);
+    onRetry(agent, agentId);
+  }, [agent, agentId, onRetry, retryDisabled, streaming]);
 
   const canCopy = Boolean(plainText);
   const showRetry = Boolean(onRetry) && !streaming;

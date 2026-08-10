@@ -607,11 +607,6 @@
   color: var(--ink-1);
 }
 
-.artifact-plan-mode {
-  font: var(--type-label);
-  color: var(--ink-3);
-}
-
 /* System lifecycle line. Tone is carried by the rail node; label and detail
    stay neutral. No horizontal rule — the calm transcript flow is the point. */
 .msg-system {

@@ -65,7 +65,7 @@ def materialize_legacy_agent_assignment(
     employee_id = task_execution_employee_id(task)
     if not employee_id:
         return None
-    assignment = {"agent": executor_kind, "mode": "action"}
+    assignment = {"agent": executor_kind}
     node = ready_node_for_task(registry, task, [assignment])
     if not node:
         return None
@@ -302,7 +302,6 @@ class TaskScheduler:
                     assignments = [
                         {
                             "agent": agent,
-                            "mode": "action",
                             "agentId": task["assignedAgentId"],
                         }
                     ]
@@ -585,7 +584,6 @@ def ready_node_for_task(
             node.get("agents", {}).get(agent) == "ready" for agent in requested_agents
         ) and node_accepts_run(
             node,
-            assignments=assignments,
             active_runs=active_runs,
         ):
             return node

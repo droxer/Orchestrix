@@ -7,6 +7,7 @@ import {
   employeeSummaryStatus,
   isOverLocalComputerLimit,
   localComputerUsageLabel,
+  nodeOwnershipProfile,
   type EmployeeNodeSummary,
 } from "./helpers";
 import { EmployeeComputers } from "./EmployeeComputers";
@@ -64,7 +65,10 @@ export function EmployeeCard({
           <p className="adm-emp-card-email code tone-muted" translate="no">{member.email}</p>
         ) : null}
         <div className="adm-agents adm-emp-nodes">
-          <EmployeeComputers nodes={member.nodes} t={t} />
+          <EmployeeComputers
+            nodes={member.nodes.filter((node) => nodeOwnershipProfile(node) === "local")}
+            t={t}
+          />
         </div>
       </div>
 

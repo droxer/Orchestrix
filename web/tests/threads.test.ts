@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import {
@@ -126,7 +127,6 @@ describe("web thread helpers", () => {
             id: "run_a",
             agent: "codex",
             logicalAgentId: "agent_a",
-            mode: "action",
             status: "completed",
             startedAt: "2026-06-20T00:00:00.000Z",
             artifactIds: [],
@@ -152,7 +152,6 @@ describe("web thread helpers", () => {
         agentRuns: [{
           id: "run_b",
           agent: "codex",
-          mode: "action",
           status: "completed",
           startedAt: "2026-06-20T00:00:00.000Z",
           artifactIds: [],
@@ -173,7 +172,6 @@ describe("web thread helpers", () => {
       id: `run_${logicalAgentId}`,
       agent: "claude",
       logicalAgentId,
-      mode: "action",
       status: "completed",
       startedAt: "2026-06-20T00:00:00.000Z",
       artifactIds: [],
@@ -304,20 +302,19 @@ describe("web thread helpers", () => {
     })), false);
   });
 
-  it("reruns the latest session agent and mode", () => {
+  it("reruns the latest session agent", () => {
     const assignment = rerunAssignmentForSession(session({
       currentAgent: "claude",
       agentRuns: [{
         id: "run_1",
         agent: "codex",
         role: "reviewer",
-        mode: "review",
         status: "failed",
         startedAt: "2026-06-20T00:00:00.000Z",
         artifactIds: [],
       }],
-    }), "claude", "action");
-    assert.deepEqual(assignment, { agent: "codex", mode: "review" });
+    }), "claude");
+    assert.deepEqual(assignment, { agent: "codex" });
   });
 });
 
@@ -367,12 +364,10 @@ describe("team thread run input", () => {
       taskGoal: "one more pass",
       sessionId: "ses_1",
       teamMembers,
-      mode: "action",
       userMessageId: "evt_1",
     });
 
     assert.equal(input.assignments, undefined);
-    assert.equal(input.mode, "action");
     assert.equal(input.sessionId, "ses_1");
     assert.equal(input.userMessageId, "evt_1");
   });
@@ -382,12 +377,10 @@ describe("team thread run input", () => {
       taskGoal: "@Support take this",
       sessionId: "ses_1",
       teamMembers,
-      mode: "action",
       userMessageId: "evt_1",
     });
 
-    assert.deepEqual(input.assignments, [{ agentId: "agent_support", mode: "action" }]);
-    assert.equal(input.mode, undefined);
+    assert.deepEqual(input.assignments, [{ agentId: "agent_support" }]);
   });
 });
 
@@ -421,13 +414,21 @@ describe("team mention candidates", () => {
       taskGoal: "@Scout can you look at this?",
       sessionId: "ses_1",
       teamMembers: members,
-      mode: "action",
       userMessageId: "evt_1",
     });
 
     // Unknown to the room, so the message runs the whole room instead of
     // narrowing to (and being rejected for) an outsider.
     assert.equal(input.assignments, undefined);
-    assert.equal(input.mode, "action");
+  });
+});
+
+describe("adaptive composer contract", () => {
+  it("does not expose execution modes in the composer or handoff controls", () => {
+    const composer = readFileSync("web/src/components/composer/Composer.tsx", "utf8");
+    const handoff = readFileSync("web/src/components/composer/DecisionBar.tsx", "utf8");
+
+    assert.doesNotMatch(composer, /ModeToggle|composerMode|setComposerMode/);
+    assert.doesNotMatch(handoff, /handoffMode|setHandoffMode|modeOptions/);
   });
 });

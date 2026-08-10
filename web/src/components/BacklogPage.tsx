@@ -752,7 +752,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     const discussionAgents = discussionAgentsForTask(task, nodes, logicalAgents);
     const discussionAssignments = logicalAgents
       .filter((agent) => agent.enabled && agent.availability === "ready")
-      .map((agent) => ({ agentId: agent.id, agent: agent.executorKind, mode: "ask" as const }));
+      .map((agent) => ({ agentId: agent.id, agent: agent.executorKind }));
     return {
       onEdit: () => editTask(task),
       onAssign: () => assignTask(task),

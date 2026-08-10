@@ -1,4 +1,4 @@
-import type { AgentName, AgentTaskMode } from "./state.js";
+import type { AgentName } from "./state.js";
 import type { DaemonAgentAdapter, DaemonAgentInventory, DaemonNodeSandboxMode } from "./daemon-node-protocol.js";
 import type { AgentRole } from "./session-store.js";
 
@@ -28,7 +28,6 @@ export interface SandboxRecord {
   agentRoleDefaults?: Partial<Record<AgentName, AgentRole>>;
   agentRoleOverrides?: Partial<Record<AgentName, AgentRole>>;
   maxConcurrentRuns?: number;
-  runCapacityByMode?: Partial<Record<AgentTaskMode, number>>;
   token?: string;
   tokenHash?: string;
   uiTokenHash?: string;
@@ -43,7 +42,6 @@ export interface SandboxRecord {
 export interface SandboxRunAssignment {
   agentId?: string;
   agent: AgentName;
-  mode?: AgentTaskMode;
   role?: AgentRole;
 }
 
@@ -54,7 +52,6 @@ export interface DaemonNodeActiveRun {
   agent: AgentName;
   logicalAgentId?: string;
   placementId?: string;
-  mode: AgentTaskMode;
   taskGoal: string;
   workspacePath?: string;
   startedAt: string;

@@ -2,12 +2,12 @@ import { relayApiEndpoint, relayBackendPath } from "./lib/apiOrigin.ts";
 import type {
   AgentName,
   AgentRole,
-  AgentTaskMode,
   ArtifactsResponse,
   AssignControlPanelDaemonNodeResponse,
   ChatIntegration,
   ChatIntegrationsResponse,
   ChatProvider,
+  ComputerTokenResponse,
   CreateControlPanelEmployeeInput,
   CreateControlPanelEmployeeResponse,
   CreateControlPanelDaemonNodeInput,
@@ -326,6 +326,14 @@ export function getOrgSettings(signal?: AbortSignal): Promise<OrgSettingsRespons
   return apiJson<OrgSettingsResponse>("/admin/settings", { signal });
 }
 
+/** Rotates the persisted admin token; the previous value stops working
+    immediately. Refused (409) while the token is env-managed. */
+export function reissueAdminToken(): Promise<{ adminToken: string }> {
+  return apiJson<{ adminToken: string }>("/admin/admin-token/reissue", {
+    method: "POST",
+  });
+}
+
 /** Each field is optional: the backend leaves out what is not sent, so saving
     one card never overwrites the other with a stale value read earlier. */
 export function updateOrgSettings(
@@ -366,9 +374,20 @@ export function disconnectComputer(nodeId: string): Promise<void> {
   return apiJson<void>(`/daemon-nodes/${encodeURIComponent(nodeId)}`, { method: "DELETE" });
 }
 
-/** Self-service: register the caller's own device as a computer, no admin involved.
-    Always direct-run — the isolated runtime is provisioned on admin hardware,
-    so the mode is stated on the wire rather than left to a server default. */
+/** Self-service: reveal the caller's own computer's launch token, for reconnecting. */
+export function revealComputerToken(nodeId: string): Promise<ComputerTokenResponse> {
+  return apiJson<ComputerTokenResponse>(`/daemon-nodes/${encodeURIComponent(nodeId)}/token`);
+}
+
+/** Self-service: rotate the caller's own computer's launch token. The old one
+    stops working immediately; the daemon must be restarted with the new one. */
+export function reissueComputerToken(nodeId: string): Promise<ComputerTokenResponse> {
+  return apiJson<ComputerTokenResponse>(`/daemon-nodes/${encodeURIComponent(nodeId)}/token/reissue`, {
+    method: "POST",
+  });
+}
+
+/** Self-service: register the caller's own device as a computer, no admin involved. */
 export function createLocalDeviceEnrollment(
   input: CreateLocalDeviceEnrollmentInput,
 ): Promise<CreateLocalDeviceEnrollmentResponse> {
@@ -643,7 +662,7 @@ export function assignTaskToTeam(taskId: string, teamId: string): Promise<RelayT
   });
 }
 
-export function startTask(taskId: string, input: { mode?: AgentTaskMode; assignments?: RunInput["assignments"] } = {}): Promise<StartTaskResponse> {
+export function startTask(taskId: string, input: { assignments?: RunInput["assignments"] } = {}): Promise<StartTaskResponse> {
   return apiJson<StartTaskResponse>(`/tasks/${encodeURIComponent(taskId)}/runs`, {
     method: "POST",
     body: input,
@@ -836,8 +855,8 @@ export function runLogicalAgents(input: AgentRunInput): Promise<RelaySession> {
     body: {
       taskGoal: input.taskGoal,
       ...(input.daemonNodeId ? { daemonNodeId: input.daemonNodeId } : {}),
+      ...(input.teamId ? { teamId: input.teamId } : {}),
       ...(input.assignments ? { assignments: input.assignments } : {}),
-      ...(input.mode ? { mode: input.mode } : {}),
       sessionId: input.sessionId,
       ...(input.userMessageId ? { userMessageId: input.userMessageId } : {}),
       ...(input.decision ? { decision: input.decision } : {}),
@@ -869,7 +888,7 @@ export function recordDecision(
 
 export function appendAssignment(
   sessionId: string,
-  assignment: { agent: AgentName; mode: AgentTaskMode },
+  assignment: { agent: AgentName },
   token?: string,
 ): Promise<RelaySession> {
   return apiJson<RelaySession>(`/threads/${encodeURIComponent(sessionId)}/assignments`, {
@@ -905,13 +924,12 @@ export function renameSession(sessionId: string, title: string, token?: string):
 export function recordHandoff(
   sessionId: string,
   targetAgent: AgentName,
-  mode: AgentTaskMode,
   note?: string,
   token?: string,
 ): Promise<RelaySession> {
   return apiJson<RelaySession>(`/threads/${encodeURIComponent(sessionId)}/handoffs`, {
     method: "POST",
     token,
-    body: { targetAgent, mode, note },
+    body: { targetAgent, note },
   });
 }

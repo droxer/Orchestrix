@@ -16,7 +16,7 @@ The Python backend never executes an agent CLI. Daemons run Claude Code, Codex, 
 
 ## What you can do
 
-- Start a thread with an explicit agent, computer, and Ask, Action, or Review mode. Stream tool output, approve decisions, cancel or retry work, and hand the thread to another agent.
+- Start a thread with an explicit agent and computer. The agent decides whether the goal needs an answer, investigation, workspace changes, validation, review, or a clarifying question. Stream tool output, approve decisions, cancel or retry work, and hand the thread to another agent.
 - Plan work in a backlog, schedule recurring routines, assign agents or teams, set due dates, and follow dispatch and event history.
 - Create named agents and teams with profiles, computer placements, workspace files, generated artifacts, and recent activity.
 - Enroll employee computers or reconcile managed computers while tracking health, capacity, command leases, and restart-safe identity.
@@ -27,7 +27,7 @@ The Python backend never executes an agent CLI. Daemons run Claude Code, Codex, 
 
 ### Start and direct a thread
 
-Choose where work runs, which named agent handles it, and whether the turn asks, acts, or reviews.
+Choose where work runs and which named agent or team handles it; Relay gives the goal to the selected participants and lets them choose the appropriate execution path.
 
 <p align="center">
   <img src="docs/images/relay-threads-phosphor.png" alt="Relay thread composer with agent and computer selection" width="960">

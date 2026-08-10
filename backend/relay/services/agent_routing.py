@@ -219,7 +219,6 @@ def resolve_agent_assignments(
                 continue
             if not node_accepts_run(
                 node,
-                assignments=[assignment],
                 active_runs=node.get("activeRuns") or [],
             ):
                 rejection_reasons.add("capacity_exhausted")

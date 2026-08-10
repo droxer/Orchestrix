@@ -52,7 +52,6 @@ from .credentials import (
     sandbox_ui_auth_error as sandbox_ui_auth_error,
 )
 from .scheduling import (
-    AGENT_TASK_MODES,
     effective_role_for_assignment,
     node_accepts_run,
     node_status_for_active_runs,
@@ -202,7 +201,15 @@ def public_sandbox_record(sandbox: dict[str, Any]) -> dict[str, Any]:
     return {
         k: v
         for k, v in sandbox.items()
-        if k not in ("token", "tokenHash", "uiTokenHash", "nodeTokenHash", "nodeToken")
+        if k
+        not in (
+            "token",
+            "tokenHash",
+            "uiTokenHash",
+            "nodeTokenHash",
+            "nodeToken",
+            "nodeTokenSecret",
+        )
         and v is not None
     }
 
@@ -496,17 +503,9 @@ class DaemonNodeRegistry:
                 and "maxConcurrentRuns" not in payload
                 else {}
             ),
-            **(
-                {"runCapacityByMode": (existing or {}).get("runCapacityByMode")}
-                if (existing or {}).get("runCapacityByMode")
-                and "runCapacityByMode" not in payload
-                else {}
-            ),
             **payload,
         }
-        max_concurrent_runs, run_capacity_by_mode = normalize_run_capacity(
-            capacity_input
-        )
+        max_concurrent_runs = normalize_run_capacity(capacity_input)
         capabilities = sorted(
             {
                 value
@@ -587,10 +586,16 @@ class DaemonNodeRegistry:
             ),
             **({"retiredAt": retired_at} if retired_at else {}),
             "maxConcurrentRuns": max_concurrent_runs,
-            "runCapacityByMode": run_capacity_by_mode,
             "uiTokenHash": next_ui_hash,
             "nodeTokenHash": hash_daemon_node_token(payload.get("token"))
             or (existing or {}).get("nodeTokenHash"),
+            # The reveal-anytime secret survives daemon re-registrations; the
+            # registration payload only ever proves knowledge of the token.
+            **(
+                {"nodeTokenSecret": existing["nodeTokenSecret"]}
+                if (existing or {}).get("nodeTokenSecret")
+                else {}
+            ),
             "createdAt": (existing or {}).get("createdAt", now),
             "updatedAt": now,
             "lastSeenAt": now,
@@ -809,6 +814,46 @@ class DaemonNodeRegistry:
             if plain:
                 node["nodeToken"] = plain
         return nodes
+
+    def reveal_node_token(self, sandbox_id: str) -> str | None:
+        """The persisted launch token for a live node, if it is recoverable.
+
+        Managed runtime credentials are never persisted, and nodes provisioned
+        before the secret column existed have none — both answer None, and the
+        caller offers a reissue instead.
+        """
+        sandbox = self._live_node(sandbox_id)
+        if not sandbox:
+            raise KeyError(sandbox_id)
+        return sandbox.get("nodeTokenSecret") or self.plain_node_tokens.get(sandbox_id)
+
+    def reissue_node_token(self, sandbox_id: str) -> tuple[dict[str, Any], str]:
+        """Rotate a live node's launch token and return the new plaintext once.
+
+        The old token stops authenticating as soon as the new hash lands, so a
+        daemon still running with it must be restarted with the reissued one.
+        """
+        with self.dispatch_scope([sandbox_id]):
+            sandbox = self._live_node(sandbox_id)
+            if not sandbox:
+                raise KeyError(sandbox_id)
+            if sandbox.get("managedNodeId"):
+                raise ValueError(
+                    "Managed node credentials are rotated by the managed node lifecycle."
+                )
+            node_token = new_daemon_node_token()
+            updated = {
+                **sandbox,
+                "nodeTokenHash": hash_daemon_node_token(node_token),
+                "nodeTokenSecret": node_token,
+                "credentialVersion": int(sandbox.get("credentialVersion") or 1) + 1,
+                "updatedAt": now_iso(),
+            }
+            self.sandboxes[sandbox_id] = updated
+            self.daemon_store.register_node(updated)
+            self.plain_node_tokens[sandbox_id] = node_token
+            logger.info("Daemon node token reissued", sandbox_id=sandbox_id)
+            return updated, node_token
 
     def count_employee_device_nodes(self, employee_id: str) -> int:
         """Live personal computers owned by an employee.
@@ -1038,11 +1083,11 @@ class DaemonNodeRegistry:
             "status": DAEMON_NODE_DELETED_STATUS,
             "updatedAt": deleted_at,
         }
+        # A tombstone exists to reject re-registration, not to keep a working
+        # credential around: the reveal-anytime secret dies with the node.
+        updated.pop("nodeTokenSecret", None)
         self.sandboxes[sandbox_id] = updated
-        self.daemon_store.mark_node_seen(
-            sandbox_id,
-            {"retiredAt": deleted_at, "status": DAEMON_NODE_DELETED_STATUS},
-        )
+        self.daemon_store.register_node(updated)
         self.plain_node_tokens.pop(sandbox_id, None)
         self._last_seen_persisted_at.pop(sandbox_id, None)
         for command_id, command in list(self.active_commands.items()):
@@ -1069,7 +1114,9 @@ class DaemonNodeRegistry:
         if employee_id:
             existing = self.find_by_employee(employee_id, workspace_path)
             if existing:
-                node_token = self.plain_node_tokens.get(existing["id"])
+                node_token = existing.get("nodeTokenSecret") or self.plain_node_tokens.get(
+                    existing["id"]
+                )
                 updates: dict[str, Any] = {}
                 if not existing.get("sandboxMode"):
                     updates["sandboxMode"] = sandbox_mode
@@ -1097,13 +1144,13 @@ class DaemonNodeRegistry:
                     and existing.get("status") == "provisioning"
                     and not node_token
                 ):
-                    # Plaintext launch credentials are intentionally volatile.
-                    # Reissuing an unfinished enrollment after restart rotates
-                    # the old credential instead of creating a duplicate node.
+                    # Reissuing an unfinished enrollment rotates the old
+                    # credential instead of creating a duplicate node.
                     node_token = new_daemon_node_token()
                     existing = {
                         **existing,
                         "nodeTokenHash": hash_daemon_node_token(node_token),
+                        "nodeTokenSecret": node_token,
                         "updatedAt": now_iso(),
                     }
                     self.sandboxes[existing["id"]] = existing
@@ -1128,9 +1175,9 @@ class DaemonNodeRegistry:
             "status": "provisioning",
             "agents": {agent: "unknown" for agent in AGENT_NAMES},
             "maxConcurrentRuns": 1,
-            "runCapacityByMode": {mode: 1 for mode in AGENT_TASK_MODES},
             "uiTokenHash": hash_daemon_node_token(ui_token),
             "nodeTokenHash": hash_daemon_node_token(node_token),
+            "nodeTokenSecret": node_token,
             "createdAt": now,
             "updatedAt": now,
             "lastError": "Waiting for daemon node registration.",
@@ -1183,7 +1230,6 @@ class DaemonNodeRegistry:
             "status": "provisioning",
             "agents": {agent: "unknown" for agent in AGENT_NAMES},
             "maxConcurrentRuns": 1,
-            "runCapacityByMode": {mode: 1 for mode in AGENT_TASK_MODES},
             "nodeTokenHash": hash_daemon_node_token(node_token),
             "createdAt": now,
             "updatedAt": now,
@@ -1252,9 +1298,7 @@ class DaemonNodeRegistry:
         return (
             0
             if liveness["online"]
-            and node_accepts_run(
-                sandbox, assignments=[{"mode": "ask"}], active_runs=active_runs
-            )
+            and node_accepts_run(sandbox, active_runs=active_runs)
             else 1,
             0 if liveness["online"] else 1,
             -seen_at,
@@ -1288,7 +1332,6 @@ class DaemonNodeRegistry:
                 "sessionId": command["sessionId"],
                 "runId": command["runId"],
                 "agent": command["agent"],
-                "mode": command["mode"],
                 "taskGoal": command["taskGoal"],
                 **(
                     {"workspacePath": command["workspacePath"]}
@@ -1401,7 +1444,6 @@ class DaemonNodeRegistry:
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": command["agent"],
-                    "mode": command["mode"],
                     "taskGoal": command["taskGoal"],
                     **(
                         {"workspacePath": command["workspacePath"]}
@@ -1587,7 +1629,6 @@ class DaemonNodeRegistry:
                 "sessionId": active["sessionId"],
                 "runId": active["runId"],
                 "agent": active["agent"],
-                "mode": active["mode"],
                 "reason": reason,
             },
         )
@@ -1631,7 +1672,6 @@ class DaemonNodeRegistry:
                 and command.get("sessionId") == event.get("sessionId")
                 and command.get("runId") == event.get("runId")
                 and command.get("agent") == event.get("agent")
-                and command.get("mode") == event.get("mode")
                 and (
                     not record.get("leaseId")
                     or not event.get("leaseId")
@@ -1663,7 +1703,6 @@ class DaemonNodeRegistry:
             "sessionId": command["sessionId"],
             "runId": command["runId"],
             "agent": command["agent"],
-            "mode": command["mode"],
             "taskGoal": command.get("taskGoal", ""),
             **(
                 {"workspacePath": command["workspacePath"]}
@@ -1702,10 +1741,7 @@ class DaemonNodeRegistry:
             raise PermissionError(
                 "Unauthorized daemon node event: command lease does not match the active command."
             )
-        if active["agent"] != event["agent"] or (
-            event["type"] not in {"run.output", "run.output.batch"}
-            and active["mode"] != event.get("mode")
-        ):
+        if active["agent"] != event["agent"]:
             logger.warning(
                 "Daemon node event command metadata mismatch",
                 sandbox_id=sandbox_id,
@@ -1780,7 +1816,6 @@ class DaemonNodeRegistry:
                     {
                         "runId": event["runId"],
                         "agent": event["agent"],
-                        "mode": event["mode"],
                         "sequence": event["sequence"],
                         "collaboration": event["collaboration"],
                         "collaborationScope": "assignment",
@@ -1809,7 +1844,6 @@ class DaemonNodeRegistry:
                 command_id=event["commandId"],
                 run_id=event["runId"],
                 agent=event["agent"],
-                mode=event["mode"],
                 exit_code=event.get("exitCode"),
             )
             accepted = self.daemon_store.mark_command_completed(sandbox_id, event)
@@ -1820,7 +1854,6 @@ class DaemonNodeRegistry:
                 command_id=event["commandId"],
                 run_id=event["runId"],
                 agent=event["agent"],
-                mode=event["mode"],
             )
             accepted = self.daemon_store.mark_command_cancelled(sandbox_id, event)
         else:
@@ -1830,7 +1863,6 @@ class DaemonNodeRegistry:
                 command_id=event["commandId"],
                 run_id=event["runId"],
                 agent=event["agent"],
-                mode=event["mode"],
                 error=event.get("error"),
             )
             accepted = self.daemon_store.mark_command_failed(sandbox_id, event)
@@ -1889,7 +1921,6 @@ class DaemonNodeRegistry:
                         "runId": run["runId"],
                         "sessionId": run.get("sessionId", ""),
                         "agent": run.get("agent", "unknown"),
-                        "mode": run.get("mode", "action"),
                         "error": "Runtime node was retired or deleted while the run was active.",
                     },
                 )
@@ -2112,7 +2143,6 @@ class DaemonNodeRegistry:
             run_request = self.daemon_store.update_run_request(
                 run_request["id"], {"nodeId": node_id}
             )
-        mode = assignment.get("mode") or "action"
         run_id = new_database_id()
         sandbox = self.sandboxes.get(node_id)
         if not sandbox:
@@ -2136,7 +2166,6 @@ class DaemonNodeRegistry:
                 )
             if not node_accepts_run(
                 sandbox,
-                assignments=[assignment],
                 active_runs=(
                     active_runs
                     if active_runs is not None
@@ -2200,7 +2229,7 @@ class DaemonNodeRegistry:
         if assignment.get("brief"):
             state["assignment_brief"] = assignment["brief"]
         state["assignment_id"] = assignment["assignmentId"]
-        state["team_phase"] = assignment.get("phase") or self._assignment_phase(mode)
+        state["team_phase"] = assignment.get("phase") or "execution"
         request_state = run_request["state"] or {}
         if request_state.get(REPAIR_NOTE_STATE_KEY) and index == 0:
             state["repair_note"] = request_state[REPAIR_NOTE_STATE_KEY]
@@ -2216,7 +2245,7 @@ class DaemonNodeRegistry:
         # The role was recorded on the thread but never reached the agent, so a
         # team of specialists all received the same prompt. Carry it in the run
         # state the way the display name and instructions travel.
-        role = effective_role_for_assignment(sandbox, assignment, mode)
+        role = effective_role_for_assignment(sandbox, assignment)
         if role:
             state["agent_role"] = role
         command = {
@@ -2226,7 +2255,6 @@ class DaemonNodeRegistry:
             "runId": run_id,
             "taskGoal": run_request["taskGoal"],
             "agent": assignment["executorKind"],
-            "mode": mode,
             "phase": state["team_phase"],
             "assignmentId": assignment["assignmentId"],
             "workspaceLayout": workspace_layout,
@@ -2321,7 +2349,7 @@ class DaemonNodeRegistry:
         # The command already carries the role the agent was told to play; the
         # thread must record that one, not a second resolution of it.
         role = command.get("role") or effective_role_for_assignment(
-            sandbox, assignment, command["mode"]
+            sandbox, assignment
         )
         controller.record_agent_started(
             run_request["sessionId"],
@@ -2330,7 +2358,6 @@ class DaemonNodeRegistry:
                 "assignmentId": assignment["assignmentId"],
                 "agent": command["agent"],
                 **({"role": role} if role else {}),
-                "mode": command["mode"],
                 "teamPhase": command["phase"],
                 **(
                     {"logicalAgentId": command["logicalAgentId"]}
@@ -2384,7 +2411,6 @@ class DaemonNodeRegistry:
             "currentCommandId": command["id"],
             "currentRunId": command["runId"],
             "currentAgent": command["agent"],
-            "currentMode": command["mode"],
             "currentStartedAt": now_iso(),
             "currentProgressAt": None,
             "state": state,
@@ -2458,7 +2484,6 @@ class DaemonNodeRegistry:
         )
         assignments = run_request["assignments"]
         assignment = assignments[run_request.get("currentIndex", 0)]
-        mode = assignment.get("mode") or "action"
         state = dict(run_request["state"])
         artifact_snapshot = state.pop(ARTIFACT_SNAPSHOT_STATE_KEY, None)
         state.pop(TERMINAL_EVENT_STATE_KEY, None)
@@ -2474,7 +2499,6 @@ class DaemonNodeRegistry:
                     {
                         "runId": event["runId"],
                         "agent": event["agent"],
-                        "mode": mode,
                         "status": "failed",
                         "exitCode": event.get("exitCode", 1),
                         "agentLog": agent_log,
@@ -2510,7 +2534,6 @@ class DaemonNodeRegistry:
                     {
                         "runId": event["runId"],
                         "agent": event["agent"],
-                        "mode": mode,
                         "status": "cancelled",
                         "exitCode": 130,
                         "agentLog": "",
@@ -2548,7 +2571,6 @@ class DaemonNodeRegistry:
                 {
                     "runId": event["runId"],
                     "agent": event["agent"],
-                    "mode": mode,
                     "status": "completed" if event["exitCode"] == 0 else "failed",
                     "exitCode": event["exitCode"],
                     "agentLog": agent_log,
@@ -2585,22 +2607,13 @@ class DaemonNodeRegistry:
                 or assignment.get("agent")
                 or "Agent"
             )
-            outcome = f"{agent_label} {mode} failed with exit code {event['exitCode']}."
+            outcome = f"{agent_label} failed with exit code {event['exitCode']}."
             if self._send_back_for_repair(
                 run_request,
                 terminal_claim_id,
                 next_state,
                 outcome,
                 agent_label,
-            ):
-                return
-            if self._continue_after_non_action_failure(
-                run_request,
-                terminal_claim_id,
-                next_state,
-                outcome,
-                agent_label,
-                mode,
             ):
                 return
             if session_before.get("status") != "failed":
@@ -2627,7 +2640,6 @@ class DaemonNodeRegistry:
                 "currentCommandId": None,
                 "currentRunId": None,
                 "currentAgent": None,
-                "currentMode": None,
                 "currentStartedAt": None,
                 "currentProgressAt": None,
             },
@@ -2693,7 +2705,6 @@ class DaemonNodeRegistry:
             or len(assignments) < 2
             or repairs >= DAEMON_RUN_MAX_REPAIRS
             or assignments[0].get("coordinator") is not True
-            or (assignments[0].get("mode") or "action") != "action"
         ):
             return False
         state[REPAIR_COUNT_STATE_KEY] = repairs + 1
@@ -2713,7 +2724,6 @@ class DaemonNodeRegistry:
                 "currentCommandId": None,
                 "currentRunId": None,
                 "currentAgent": None,
-                "currentMode": None,
                 "currentStartedAt": None,
                 "currentProgressAt": None,
             },
@@ -2743,80 +2753,14 @@ class DaemonNodeRegistry:
         state.pop(REPAIR_NOTE_STATE_KEY, None)
         return resume_index, state
 
-    def _continue_after_non_action_failure(
-        self,
-        run_request: dict[str, Any],
-        terminal_claim_id: str,
-        next_state: dict[str, Any],
-        outcome: str,
-        agent_label: str,
-        mode: str,
-    ) -> bool:
-        """Keep collecting discussion/review results after one member fails."""
-        if mode not in ("ask", "review"):
-            return False
-        assignments = run_request["assignments"]
-        index = run_request.get("currentIndex", 0)
-        state = dict(next_state)
-        failures = list(state.get(PARTICIPANT_FAILURES_STATE_KEY) or [])
-        failures.append(
-            {
-                "assignmentId": assignments[index].get("assignmentId"),
-                "agent": agent_label,
-                "mode": mode,
-                "outcome": outcome,
-            }
-        )
-        state[PARTICIPANT_FAILURES_STATE_KEY] = failures
-        next_index = index + 1
-        updated = self.daemon_store.update_run_request_if_claimed(
-            run_request["id"],
-            TERMINAL_CLAIM_ID_STATE_KEY,
-            terminal_claim_id,
-            {
-                "status": "running",
-                "currentIndex": next_index,
-                "state": state,
-                "currentCommandId": None,
-                "currentRunId": None,
-                "currentAgent": None,
-                "currentMode": None,
-                "currentStartedAt": None,
-                "currentProgressAt": None,
-            },
-        )
-        if not updated:
-            return False
-        if next_index < len(assignments):
-            self._enqueue_current_assignment(updated)
-        else:
-            self._complete_run_request(
-                updated,
-                "The round completed with one or more participant failures.",
-            )
-        return True
-
     @staticmethod
     def _assignment_reports_round_result(
         assignments: list[dict[str, Any]], index: int
     ) -> bool:
-        """Only the last writable member may publish the aggregate verdict."""
+        """Only the last member may publish the aggregate verdict."""
         if index < 0 or index >= len(assignments):
             return False
-        if (assignments[index].get("mode") or "action") == "ask":
-            return False
-        return not any(
-            (assignment.get("mode") or "action") != "ask"
-            for assignment in assignments[index + 1 :]
-        )
-
-    @staticmethod
-    def _assignment_phase(mode: str) -> str:
-        if mode == "ask":
-            return "discussion"
-        if mode == "review":
-            return "review"
-        return "execution"
+        return index == len(assignments) - 1
 
     def _node_reports_generated_files(self, sandbox: dict[str, Any]) -> bool:
         return DAEMON_CAPABILITY_GENERATED_FILES in (sandbox.get("capabilities") or [])
@@ -2911,18 +2855,7 @@ class DaemonNodeRegistry:
                 task_id=run_request.get("taskId"),
             )
         )
-        modes = [
-            (assignment.get("mode") or "action")
-            for assignment in run_request.get("assignments", [])
-        ]
-        # ask-only discussions and review pipelines both end with a human in
-        # the loop; only pure action work is closed out automatically.
-        if all(mode == "ask" for mode in modes):
-            task_status = "waiting_for_human"
-        elif any(mode == "review" for mode in modes):
-            task_status = "review"
-        else:
-            task_status = "done"
+        task_status = "done"
         round_result = (run_request.get("state") or {}).get(ROUND_RESULT_STATE_KEY)
         if isinstance(round_result, dict):
             task_status, outcome = self._round_outcome(
@@ -2965,8 +2898,7 @@ class DaemonNodeRegistry:
     ) -> tuple[str, str]:
         """Let the round's own verdict decide whether the task is finished.
 
-        Only the agent knows whether the work is actually complete; mode alone
-        cannot tell "finished" from "got through one pass". An unfinished round
+        Only the agent knows whether the work is actually complete. An unfinished round
         goes back to the queue for another one, and a blocked round stops for a
         human — neither may close the task out as done.
         """
@@ -3013,10 +2945,7 @@ class DaemonNodeRegistry:
         node = self.sandboxes.get(run_request["nodeId"]) or {}
         if DAEMON_CAPABILITY_ROUND_RESULT not in (node.get("capabilities") or []):
             return False
-        return any(
-            (assignment.get("mode") or "action") != "ask"
-            for assignment in run_request.get("assignments", [])
-        )
+        return bool(run_request.get("assignments"))
 
     def _record_round_result(
         self,
@@ -3062,7 +2991,6 @@ class DaemonNodeRegistry:
                 "sessionId": run_request["sessionId"],
                 "runId": run_id or "",
                 "agent": run_request.get("currentAgent") or "codex",
-                "mode": run_request.get("currentMode") or "action",
                 "error": outcome,
                 "exitCode": 1,
             }
@@ -3095,7 +3023,6 @@ class DaemonNodeRegistry:
         if (
             run_id
             and run_request.get("currentAgent")
-            and run_request.get("currentMode")
         ):
             controller.record_agent_completed(
                 run_request["sessionId"],
@@ -3103,7 +3030,6 @@ class DaemonNodeRegistry:
                 {
                     "runId": run_id,
                     "agent": run_request["currentAgent"],
-                    "mode": run_request["currentMode"],
                     "status": "failed",
                     "exitCode": 1,
                     "agentLog": outcome,
@@ -3391,7 +3317,6 @@ def daemon_active_run(run: dict[str, Any]) -> dict[str, Any]:
             "sessionId",
             "runId",
             "agent",
-            "mode",
             "taskGoal",
             "workspacePath",
             "startedAt",

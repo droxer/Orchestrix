@@ -68,11 +68,11 @@ describe("app pathname routes", () => {
     );
     assert.equal(
       canonicalBrowserUrl("/agents/agent-1", "?tab=profile&scope=shared&path=src&item=file%3Aa.ts"),
-      "/agents/agent-1?tab=profile",
+      "/agents/agent-1",
     );
     assert.equal(
       canonicalBrowserUrl("/teams/team-1", "?tab=profile&artifact=art-1&dialog=create"),
-      "/teams/team-1?tab=profile",
+      "/teams/team-1",
     );
     assert.equal(
       canonicalBrowserUrl("/teams/team-1", "?tab=workspace&scope=shared&path=src&item=file%3Aa.ts"),

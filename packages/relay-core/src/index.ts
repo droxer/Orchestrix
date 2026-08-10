@@ -60,7 +60,6 @@ export {
   type AgentExecutor,
   type AgentRunOptions,
   type AgentState,
-  type AgentTaskMode,
   type StreamExecResult,
 } from "./state.js";
 
@@ -163,28 +162,19 @@ export { buildBridgedPrompt } from "./bridged-prompt.js";
 export { extractLastAssistantText } from "./last-assistant-text.js";
 
 export {
-  askPrompt,
+  agentTaskPrompt,
   claudeTaskPrompt,
-  codexActionPrompt,
-  reviewPrompt,
+  codexTaskPrompt,
   kimiTaskPrompt,
   piTaskPrompt,
 } from "./prompts.js";
 
 export {
-  buildClaudeActionCommand,
-  buildClaudeAskCommand,
-  buildClaudeReviewCommand,
-  buildCodexActionCommand,
-  buildCodexAskCommand,
-  buildCodexReviewCommand,
-  buildKimiActionCommand,
-  buildKimiAskCommand,
-  buildKimiReviewCommand,
-  buildPiActionCommand,
-  buildPiAskCommand,
+  buildClaudeCommand,
+  buildCodexCommand,
+  buildKimiCommand,
+  buildPiCommand,
   buildPiPreflightCommand,
-  buildPiReviewCommand,
 } from "./commands.js";
 
 export {
@@ -212,9 +202,9 @@ export {
 } from "./codex-collaboration.js";
 
 export {
-  claudeActionNode,
-  codexActionNode,
-  piActionNode,
+  claudeNode,
+  codexNode,
+  piNode,
   runAgentNode,
 } from "./nodes.js";
 

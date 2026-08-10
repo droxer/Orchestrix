@@ -3,10 +3,6 @@ import type { TokenUsage } from "./token-usage.js";
 import type { CodexCollaborationEvent } from "./codex-collaboration.js";
 
 export type AgentName = "claude" | "pi" | "codex" | "kimi";
-// "action" runs the agent with write access (UI label: "Action"); "ask" is a
-// read-only Q&A pass enforced via each CLI's read-only flag; "review" is the
-// default-workflow Codex review pass and is not user-selectable in the composer.
-export type AgentTaskMode = "action" | "review" | "ask";
 export type { AgentOutputSink };
 
 export const AGENT_USER = "agent";
@@ -29,11 +25,7 @@ export interface AgentState {
   agent_display_name?: string;
   /** Durable personality profile for the selected logical agent identity. */
   agent_instructions?: string;
-  /**
-   * The job this run is doing within its team, e.g. "reviewer". Distinct from
-   * the task mode: the mode decides what the agent may touch, the role decides
-   * what it is here to contribute.
-   */
+  /** The job this run is doing within its team, e.g. "reviewer". */
   agent_role?: string;
   /** Concrete scope owned by this member within the shared team goal. */
   assignment_brief?: string;

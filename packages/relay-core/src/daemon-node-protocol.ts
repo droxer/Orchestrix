@@ -1,4 +1,4 @@
-import type { AgentName, AgentState, AgentTaskMode } from "./state.js";
+import type { AgentName, AgentState } from "./state.js";
 import type { TokenUsage } from "./token-usage.js";
 import type { CodexCollaborationEvent } from "./codex-collaboration.js";
 import type { WorkspaceLayout } from "./session-store.js";
@@ -115,7 +115,6 @@ export interface DaemonNodeRegistration {
   agentHealth?: Partial<Record<AgentName, DaemonAgentHealth>>;
   agentInventory?: Partial<Record<AgentName, DaemonAgentInventory>>;
   maxConcurrentRuns?: number;
-  runCapacityByMode?: Partial<Record<AgentTaskMode, number>>;
   status?: DaemonNodeStatus;
 }
 
@@ -156,7 +155,6 @@ export interface DaemonNodeRunCommand {
   logicalAgentId?: string;
   placementId?: string;
   agentVersion?: number;
-  mode: AgentTaskMode;
   workspacePath?: string;
   /** Missing means node-root for compatibility with commands from older backends. */
   workspaceLayout?: DaemonWorkspaceLayout;
@@ -173,7 +171,6 @@ export interface DaemonNodeCancelCommand {
   sessionId: string;
   runId: string;
   agent: AgentName;
-  mode: AgentTaskMode;
   reason: string;
 }
 
@@ -258,7 +255,6 @@ export type DaemonNodeEvent =
       sessionId: string;
       runId: string;
       agent: AgentName;
-      mode: AgentTaskMode;
       collaboration: CodexCollaborationEvent;
       sequence: number;
     }
@@ -269,7 +265,6 @@ export type DaemonNodeEvent =
       sessionId: string;
       runId: string;
       agent: AgentName;
-      mode: AgentTaskMode;
       exitCode: number;
       agentLog: string;
       tokenUsage?: TokenUsage;
@@ -283,7 +278,6 @@ export type DaemonNodeEvent =
       sessionId: string;
       runId: string;
       agent: AgentName;
-      mode: AgentTaskMode;
       error: string;
       agentLog?: string;
       exitCode?: number;
@@ -297,7 +291,6 @@ export type DaemonNodeEvent =
       sessionId: string;
       runId: string;
       agent: AgentName;
-      mode: AgentTaskMode;
       reason: string;
     }
   | {

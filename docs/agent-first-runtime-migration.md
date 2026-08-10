@@ -222,7 +222,7 @@ Route new work by logical agent rather than by employee node.
 - [x] Implement a pure placement candidate evaluator.
 - [ ] Apply hard filters in this order: authorization, enabled state, desired
   placement state, agent version, executor compatibility, protocol version,
-  heartbeat, workspace access, requested mode, and capacity.
+  heartbeat, workspace access, and capacity.
 - [ ] Rank candidates by session affinity, placement priority, available
   capacity, most recent healthy heartbeat, and stable placement ID.
 - [x] Revalidate the selected candidate atomically immediately before command

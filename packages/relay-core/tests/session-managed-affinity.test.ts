@@ -31,7 +31,6 @@ describe("managed Computer session affinity", () => {
       relayEvent("agent.started", sessionId, {
         runId: "run_1",
         agent: "codex",
-        mode: "action",
         daemonNodeId: "runtime_old",
         managedNodeId: "computer_one",
       }),

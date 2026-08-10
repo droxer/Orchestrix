@@ -222,7 +222,6 @@ export function WorkspaceActivities({
                     title={run.taskGoal}
                     meta={[
                       agentLabel(run.agent),
-                      t(`mode.${run.mode}`, { defaultValue: run.mode }),
                       compactDate(run.startedAt, i18n.language),
                     ].filter(Boolean).join(" · ")}
                     onClick={() => onOpenThread(run.sessionId)}

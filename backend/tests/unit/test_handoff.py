@@ -93,7 +93,7 @@ def test_rejected_handoff_does_not_append_a_decision(tmp_path: Path) -> None:
         controller.handoff_session(
             session["id"],
             "codex",
-            [{"agent": "codex", "mode": "action"}],
+            [{"agent": "codex"}],
             "verify the fix",
         )
 

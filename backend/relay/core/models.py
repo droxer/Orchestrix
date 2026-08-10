@@ -5,7 +5,6 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict
 
 AgentName = Literal["claude", "pi", "codex", "kimi"]
-AgentTaskMode = Literal["action", "review", "ask"]
 SessionStatus = Literal[
     "running", "waiting_for_human", "completed", "failed", "cancelled"
 ]
@@ -57,5 +56,4 @@ class DaemonNodeRegistration(RelayModel):
     executor_capabilities: list[dict[str, Any]] | None = None
     agent_health: dict[str, dict[str, Any]] | None = None
     max_concurrent_runs: int | None = None
-    run_capacity_by_mode: dict[AgentTaskMode, int] | None = None
     status: Literal["ready", "busy", "stopped"] = "ready"

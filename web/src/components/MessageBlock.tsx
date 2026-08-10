@@ -5,7 +5,7 @@ import type { TFunction } from "i18next";
 import { AgentMark } from "./AgentMark";
 import { AgentStream } from "./AgentStream";
 import { MessageTurnActions } from "./MessageTurnActions";
-import type { AgentName, AgentTaskMode } from "../types";
+import type { AgentName } from "../types";
 import { AGENT_NAMES } from "../types";
 import { imageForAgentRun, labelForAgentRun, labelForExecutor } from "../lib/agentDisplayNames";
 import { IdentityMonogram } from "./IdentityMonogram";
@@ -65,12 +65,11 @@ function PlanSummary({ steps, agentDisplayNames }: { steps: PlanStep[]; agentDis
   return (
     <ol className="artifact-plan-summary">
       {steps.map((step, index) => (
-        <li key={`${step.agent}-${step.mode}-${index}`} className="artifact-plan-item">
+        <li key={`${step.agent}-${index}`} className="artifact-plan-item">
           {index > 0 ? <span className="artifact-plan-arrow" aria-hidden="true">→</span> : null}
           <span className="artifact-plan-step">
             <AgentMark agent={step.agent} size={14} />
             <span className="artifact-plan-agent">{labelForExecutor(step.agent, agentDisplayNames)}</span>
-            <span className="artifact-plan-mode">{t(`mode.${step.mode}`)}</span>
           </span>
         </li>
       ))}
@@ -175,7 +174,7 @@ type MessageBlockProps = {
    * back to the name monogram, so this map only carries the exceptions. */
   logicalAgentImages?: Record<string, string>;
   onOpenArtifact?: (artifact: RelayArtifact) => void;
-  onRetryAgent?: (agent: AgentName, mode: AgentTaskMode, agentId?: string) => void;
+  onRetryAgent?: (agent: AgentName, agentId?: string) => void;
   retryDisabled?: boolean;
 };
 
@@ -221,14 +220,6 @@ export const MessageBlock = memo(function MessageBlock({
           />
         </span>
         <div className="turn-body">
-          <header>
-            <span className="agent-title" translate="no">
-              {agentName}
-            </span>
-            {message.streaming ? (
-              <span className="agent-live-pulse" role="status" aria-label={t("agent_stream.empty_working")} />
-            ) : null}
-          </header>
           <AgentStream
             agent={message.agent}
             stdout={message.stdout}
@@ -267,7 +258,6 @@ export const MessageBlock = memo(function MessageBlock({
             <MessageTurnActions
               agent={message.agent}
               agentId={message.agentId}
-              mode={message.mode}
               stdout={message.stdout}
               stderr={message.stderr}
               streaming={message.streaming}

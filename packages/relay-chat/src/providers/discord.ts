@@ -110,7 +110,7 @@ function discordCommandText(data: any): string {
     if (action === "cancel" && values.get("reason")) parts.push(JSON.stringify(values.get("reason")));
     return parts.join(" ");
   }
-  for (const name of ["agent", "mode"]) {
+  for (const name of ["agent"]) {
     const value = values.get(name);
     if (value) parts.push(`--${name}`, JSON.stringify(value));
   }

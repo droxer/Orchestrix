@@ -6,11 +6,11 @@ Date: 2026-08-09
 
 - A team member receives a bounded, role-aware assignment brief and phase.
 - The coordinator and dispatch-time roster are explicit and auditable.
-- Only the final writable assignment may publish the aggregate verdict.
+- Only the final assignment may publish the aggregate verdict.
 - A missing, malformed, or failed-publisher verdict cannot close a task.
-- Action repair requires an explicit writable coordinator and remains bounded.
-- Discussion/review continues after a participant failure and reports the
-  incomplete participation.
+- Repair requires an explicit coordinator and remains bounded.
+- Every participant uses the same adaptive execution path; role and phase
+  guide its contribution.
 - Normal team messages respect current team state; only explicit recovery may
   address a surviving member of a disabled team.
 - Provider-native subagents remain scoped to their parent Relay assignment.

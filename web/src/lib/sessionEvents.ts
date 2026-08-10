@@ -61,12 +61,12 @@ function applySessionEventProjection(session: RelaySession, event: RelayEvent): 
       }
     case "agent.started": {
       if (next.agentRuns.some((run) => run.id === event.runId)) {
-        return { ...next, status: "running", phase: `${event.agent}:${event.mode}`, currentAgent: event.agent };
+        return { ...next, status: "running", phase: event.agent, currentAgent: event.agent };
       }
       return {
         ...next,
         status: "running",
-        phase: `${event.agent}:${event.mode}`,
+        phase: event.agent,
         currentAgent: event.agent,
         agentRuns: [
           ...next.agentRuns,
@@ -84,7 +84,6 @@ function applySessionEventProjection(session: RelaySession, event: RelayEvent): 
             ...(event.coordinator ? { coordinator: true } : {}),
             ...(event.teamSnapshot ? { teamSnapshot: event.teamSnapshot } : {}),
             ...(event.teamPhase ? { teamPhase: event.teamPhase } : {}),
-            mode: event.mode,
             status: "running",
             startedAt: event.timestamp,
             artifactIds: [],

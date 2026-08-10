@@ -31,10 +31,6 @@ def merge_agent_state(state: dict[str, Any], patch: dict[str, Any]) -> dict[str,
     }
 
 
-def is_review_assignment(mode: str) -> bool:
-    return mode == "review"
-
-
 class SessionArchivedError(Exception):
     def __init__(self, session_id: str) -> None:
         super().__init__(f"Session {session_id} is archived.")
@@ -377,7 +373,7 @@ class SessionController:
             "Session assignments updated",
             session_id=session_id,
             assignments=[
-                {"executorKind": a.get("executorKind") or a["agent"], "mode": a["mode"]}
+                {"executorKind": a.get("executorKind") or a["agent"]}
                 for a in assignments
             ],
         )
@@ -436,7 +432,6 @@ class SessionController:
             session_id=session_id,
             run_id=step["runId"],
             agent=step["agent"],
-            mode=step["mode"],
             role=role,
         )
         session = self._append(
@@ -453,7 +448,6 @@ class SessionController:
                     ),
                     "agent": step["agent"],
                     **({"role": role} if role else {}),
-                    "mode": step["mode"],
                     **(
                         {"teamPhase": step["teamPhase"]}
                         if step.get("teamPhase")
@@ -502,8 +496,8 @@ class SessionController:
             ),
         )
         self._update_task_status(
-            "review" if step["mode"] == "review" else "running",
-            f"{step['agent']} {step['mode']} started.",
+            "running",
+            f"{step['agent']} started.",
             {
                 "agent": step["agent"],
                 "sessionId": session_id,
@@ -536,7 +530,6 @@ class SessionController:
             session_id=session_id,
             run_id=step_result["runId"],
             agent=step_result["agent"],
-            mode=step_result["mode"],
             status=step_result["status"],
             exit_code=step_result["exitCode"],
         )
@@ -565,7 +558,7 @@ class SessionController:
         if step_result["status"] == "failed":
             self._update_task_status(
                 "blocked",
-                f"{step_result['agent']} {step_result['mode']} failed with exit code {step_result['exitCode']}.",
+                f"{step_result['agent']} failed with exit code {step_result['exitCode']}.",
                 {
                     "agent": step_result["agent"],
                     "sessionId": session_id,
@@ -576,22 +569,16 @@ class SessionController:
             # instead of flapping through waiting_for_human/review between steps.
             self._update_task_status(
                 "running",
-                f"{step_result['agent']} {step_result['mode']} completed.",
+                f"{step_result['agent']} completed.",
                 {
                     "agent": step_result["agent"],
                     "sessionId": session_id,
                 },
             )
-        elif step_result["mode"] == "review":
-            self._update_task_status(
-                "review",
-                f"{step_result['agent']} review completed.",
-                {"agent": step_result["agent"], "sessionId": session_id},
-            )
         else:
             self._update_task_status(
                 "waiting_for_human",
-                f"{step_result['agent']} {step_result['mode']} completed.",
+                f"{step_result['agent']} completed.",
                 {
                     "agent": step_result["agent"],
                     "sessionId": session_id,

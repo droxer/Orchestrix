@@ -22,7 +22,6 @@ from ..services.team_membership import remove_agent_from_teams
 from ..sessions.controller import SessionController
 from .deps import AppContextDep
 from .helpers import (
-    agent_task_mode,
     get_session_for_actor,
     json_body,
     request_actor,
@@ -288,7 +287,14 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             session = SessionController(ctx.session_store).record_runtime_affinity(
                 session["id"], managed_node_id
             )
-    team_id = session.get("teamId") if session else None
+    requested_team_id = string_field(body, "teamId") or string_field(body, "team_id")
+    if (
+        requested_team_id
+        and session
+        and session.get("teamId") != requested_team_id
+    ):
+        raise HTTPException(400, "teamId does not match this thread's team.")
+    team_id = (session.get("teamId") if session else None) or requested_team_id or None
     team_member_ids: set[str] = set()
     team_snapshot: dict[str, Any] | None = None
     decision = body.get("decision")
@@ -298,7 +304,7 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
     )
     if team_id and not raw_assignments:
         team_employee_id = (
-            (session.get("ownerEmployeeId") or actor["employeeId"])
+            ((session.get("ownerEmployeeId") if session else None) or actor["employeeId"])
             if actor["isAdmin"]
             else actor["employeeId"]
         )
@@ -320,12 +326,10 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             "memberAgentIds": [agent["id"] for agent in members],
             "leadAgentId": team.get("leadAgentId"),
         }
-        raw_assignments = team_member_assignments(
-            members, mode=agent_task_mode(body.get("mode")), team=team
-        )
+        raw_assignments = team_member_assignments(members, team=team)
     elif team_id and raw_assignments:
         team_employee_id = (
-            (session.get("ownerEmployeeId") or actor["employeeId"])
+            ((session.get("ownerEmployeeId") if session else None) or actor["employeeId"])
             if actor["isAdmin"]
             else actor["employeeId"]
         )
@@ -414,15 +418,16 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
                     "message": "This thread belongs to a team; only its members can answer it.",
                 },
             )
-        mode = agent_task_mode(item.get("mode"))
         role = role_name(item.get("role"))
-        phase = (
-            "discussion"
-            if mode == "ask"
-            else "review"
-            if mode == "review" or role == "reviewer"
-            else "execution"
-        )
+        phase = item.get("phase")
+        if phase not in ("discussion", "execution", "review"):
+            phase = (
+                "discussion"
+                if role == "planner"
+                else "review"
+                if role == "reviewer"
+                else "execution"
+            )
         assignments.append(
             {
                 "agentId": item["agentId"],
@@ -432,7 +437,6 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
                     and item["executorKind"]
                     else {}
                 ),
-                "mode": mode,
                 "phase": phase,
                 **({"role": role} if role else {}),
                 **(
@@ -471,6 +475,8 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
         }
         if session_id:
             parsed["sessionId"] = session_id
+        if team_id:
+            parsed["teamId"] = team_id
         user_message_id = string_field(body, "userMessageId") or string_field(
             body, "user_message_id"
         )
@@ -578,9 +584,8 @@ def _agent_with_placements(ctx: AppContextDep, agent: dict[str, Any]) -> dict[st
         availability = "busy"
     elif any(placement["status"] == "pending" for placement in placements):
         availability = "pending"
-    # defaultRole used to be withheld because nothing acted on it. It now
-    # decides what a team member is told to do and which mode it runs in, so
-    # the people who own the agent need to see it.
+    # The role shapes what a team member is told to contribute, so the people
+    # who own the agent need to see it.
     return {
         **agent,
         "availability": availability,

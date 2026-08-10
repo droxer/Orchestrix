@@ -19,7 +19,7 @@ import {
   updateTask,
   updateTeam,
 } from "../api";
-import type { AgentRunInput, AgentTaskMode, CreateTaskInput, RelaySession, RelayTask, RelayTaskSummary, RunInput, TaskMutationInput, TeamMutationInput } from "../types";
+import type { AgentRunInput, CreateTaskInput, RelaySession, RelayTask, RelayTaskSummary, RunInput, TaskMutationInput, TeamMutationInput } from "../types";
 import { NODES_QUERY_KEY, RELAY_QUERY_KEY, SESSIONS_QUERY_KEY, TASKS_QUERY_KEY } from "./useRelayData";
 import { useMutationError } from "./useMutationError";
 import { useDialogs } from "../components/ui/DialogProvider";
@@ -193,7 +193,6 @@ export function useRelayMutations() {
       ...input
     }: {
       taskId: string;
-      mode?: AgentTaskMode;
       assignments?: RunInput["assignments"];
     }) => startTask(taskId, input),
     onSuccess: (result) => {

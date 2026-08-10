@@ -353,7 +353,6 @@ def _apply_agent_started(session: dict[str, Any], event: dict[str, Any]) -> None
     run = {
         "id": event["runId"],
         "agent": event["agent"],
-        "mode": event["mode"],
         "status": "running",
         "startedAt": event["timestamp"],
         "artifactIds": [],
@@ -374,7 +373,7 @@ def _apply_agent_started(session: dict[str, Any], event: dict[str, Any]) -> None
         if event.get(key) is not None:
             run[key] = event[key]
     session["status"] = "running"
-    session["phase"] = f"{event['agent']}:{event['mode']}"
+    session["phase"] = event["agent"]
     session["currentAgent"] = event["agent"]
     session["agentRuns"].append(run)
 

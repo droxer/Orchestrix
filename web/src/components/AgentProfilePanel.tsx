@@ -154,8 +154,7 @@ export function AgentProfilePanel({
   }
 
   async function handleRoleChange(next: string) {
-    // Empty means "no role": the agent goes back to taking the round's mode as
-    // given rather than specializing.
+    // Empty means "no role": the agent contributes without a specialization.
     const role = next ? (next as AgentRole) : undefined;
     if ((agent.defaultRole ?? "") === (role ?? "")) return;
     setSaving(true);

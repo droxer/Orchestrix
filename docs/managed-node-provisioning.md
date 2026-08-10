@@ -366,12 +366,7 @@ Content-Type: application/json
     "instanceId": "relay-managed-node-..."
   },
   "supportedAgents": ["claude", "codex", "pi", "kimi"],
-  "maxConcurrentRuns": 1,
-  "runCapacityByMode": {
-    "ask": 1,
-    "action": 1,
-    "review": 1
-  }
+  "maxConcurrentRuns": 1
 }
 ```
 

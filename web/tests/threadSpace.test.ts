@@ -27,7 +27,6 @@ function artifact(input: Partial<RelayArtifact> & Pick<RelayArtifact, "id" | "cr
 
 function run(input: Partial<AgentRun> & Pick<AgentRun, "id" | "agent">): AgentRun {
   return {
-    mode: "action",
     status: "completed",
     startedAt: "2026-08-08T10:00:00.000Z",
     artifactIds: [],

@@ -39,7 +39,6 @@ import {
   LockKeyhole,
   Palette,
   LogOut,
-  MessageCircleQuestion,
   MessagesSquare,
   MoreHorizontal,
   Network,
@@ -65,7 +64,6 @@ import {
   UserRound,
   Users,
   WifiOff,
-  Zap,
   TriangleAlert,
   UserCog,
   UserPlus,
@@ -167,14 +165,6 @@ export const NodeManaged = withStandardStroke(Cloud, "NodeManaged");
 export const NodeLocal = withStandardStroke(Laptop, "NodeLocal");
 export const NodePending = withStandardStroke(CircleDashed, "NodePending");
 export const NodeOffline = withStandardStroke(WifiOff, "NodeOffline");
-
-// Agent mode (智能体): a zap glyph reads as "execute work" without reusing
-// the Bot mark, which means "an agent" and nothing else. One mode = one
-// glyph everywhere it appears — the composer toggle and the transcript
-// phase divider must not picture the same mode two different ways.
-export const ModeAction = withStandardStroke(Zap, "ModeAction");
-export const ModeReview = withStandardStroke(ScanEye, "ModeReview");
-export const ModeAsk = withStandardStroke(MessageCircleQuestion, "ModeAsk");
 
 // Preferences category glyphs.
 export const PrefAppearance = withStandardStroke(Palette, "PrefAppearance");

@@ -25,7 +25,6 @@ from ..services.team_dispatch import (
 from ..sessions import SessionArchivedError, SessionController, SessionRunInFlightError
 from .deps import AppContext, AppContextDep
 from .helpers import (
-    agent_task_mode,
     artifact_index_item,
     assignment_list,
     get_session_for_actor,
@@ -700,7 +699,6 @@ async def handoff(
         raise HTTPException(
             400, f"targetAgent must be one of: {', '.join(AGENT_NAMES)}."
         )
-    mode = agent_task_mode(body.get("mode"))
     controller = SessionController(
         ctx.session_store,
         task_store=ctx.task_store,
@@ -709,14 +707,13 @@ async def handoff(
     result = controller.handoff_session(
         session_id,
         target_agent,
-        [{"agent": target_agent, "mode": mode, "role": role_name(body.get("role"))}],
+        [{"agent": target_agent, "role": role_name(body.get("role"))}],
         string_field(body, "note") or None,
     )
     logger.info(
         "Session handoff recorded",
         session_id=session_id,
         target_agent=target_agent,
-        mode=mode,
     )
     return result
 

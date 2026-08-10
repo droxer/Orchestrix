@@ -4,38 +4,31 @@ export function prependPriorAgentBridge(prompt: string, state: AgentState): stri
   return state.prior_agent_bridge ? `${state.prior_agent_bridge}\n\n[User]\n${prompt}` : prompt;
 }
 
-export function reviewPrompt(state: AgentState): string {
-  const preludes = promptPreludes(state);
-  return [
-    "Review the current workspace changes for the user's task.",
-    "",
-    "Focus on blocking bugs, regressions, unsafe behavior, and missing tests.",
-    "If changes are acceptable, say so briefly.",
-    "If changes are not acceptable, list the blocking issues clearly.",
-    ...(preludes.length > 0 ? ["", preludes.join("\n\n")] : []),
-    "",
-    "User task:",
-    state.task_goal,
-  ].join("\n");
-}
-
-export function actionPrompt(state: AgentState, options: PreludeOptions = {}): string {
+export function agentTaskPrompt(state: AgentState): string {
   const task = state.task_goal;
   // Order: earlier conversation history first, then any within-run bridge from
   // sibling agents, then handoff notes, then the current user turn. All
   // preludes are optional.
-  const preludes = promptPreludes(state, options);
+  const preludes = promptPreludes(state);
   if (preludes.length === 0) return task;
   return `${preludes.join("\n\n")}\n\n[User]\n${task}`;
 }
 
-interface PreludeOptions {
-  /** Read-only passes must not be told to write the progress log. */
-  readOnly?: boolean;
-}
-
-function promptPreludes(state: AgentState, options: PreludeOptions = {}): string[] {
-  const preludes: string[] = [];
+function promptPreludes(state: AgentState): string[] {
+  const preludes: string[] = [
+    [
+      "[Execution policy]",
+      "Decide the smallest useful way to handle the user's goal.",
+      "You may answer directly, investigate, plan, modify the workspace, validate, or ask for missing input.",
+      "Do not change files merely because write access is available; do change them when that is needed to complete the goal.",
+      ...(state.team_phase
+        ? [
+            "Respond to the prior teammates' work directly: refine it, challenge it, implement the next distinct part, or validate it.",
+            "Avoid repeating completed work and leave the shared thread and workspace clearer for the next teammate.",
+          ]
+        : []),
+    ].join("\n"),
+  ];
   if (state.agent_display_name) {
     preludes.push(
       ["[Agent identity]", `Your name is ${state.agent_display_name}.`].join("\n"),
@@ -80,7 +73,7 @@ function promptPreludes(state: AgentState, options: PreludeOptions = {}): string
       ].join("\n"),
     );
   }
-  if (state.round_result_file && !options.readOnly) {
+  if (state.round_result_file) {
     preludes.push(
       [
         "[Finishing]",
@@ -99,11 +92,7 @@ function promptPreludes(state: AgentState, options: PreludeOptions = {}): string
         "[Progress log]",
         `\`${state.progress_file}\` in the workspace is this task's durable record across turns and agents.`,
         "Read it before you start; the conversation below may be truncated, but this file is not.",
-        ...(options.readOnly
-          ? []
-          : [
-              "Before you finish, update it: what you decided, what is done, what is left, and anything the next agent would otherwise have to rediscover.",
-            ]),
+        "Before you finish, update it: what you decided, what is done, what is left, and anything the next agent would otherwise have to rediscover.",
       ].join("\n"),
     );
   }
@@ -113,31 +102,18 @@ function promptPreludes(state: AgentState, options: PreludeOptions = {}): string
   return preludes;
 }
 
-// Read-only Q&A prompt. CLI read-only flags are the hard guarantee; this
-// instruction reinforces the intent and covers agents lacking a native flag.
-export function askPrompt(state: AgentState): string {
-  const guard = [
-    "Participate in a read-only planning discussion about the user's goal or question.",
-    "Do NOT modify, create, or delete any files, and do NOT run commands that change state.",
-    "If the request would require making changes, explain what you would do instead of doing it.",
-    "When prior agent messages are present, respond to them directly: agree, disagree, identify risks, refine the plan, and call out open questions.",
-    "Prefer a concrete plan or recommendation over independent brainstorming.",
-  ].join("\n");
-  return `${guard}\n\n${actionPrompt(state, { readOnly: true })}`;
-}
-
 export function claudeTaskPrompt(state: AgentState): string {
-  return actionPrompt(state);
+  return agentTaskPrompt(state);
 }
 
 export function piTaskPrompt(state: AgentState): string {
-  return actionPrompt(state);
+  return agentTaskPrompt(state);
 }
 
-export function codexActionPrompt(state: AgentState): string {
-  return actionPrompt(state);
+export function codexTaskPrompt(state: AgentState): string {
+  return agentTaskPrompt(state);
 }
 
 export function kimiTaskPrompt(state: AgentState): string {
-  return actionPrompt(state);
+  return agentTaskPrompt(state);
 }

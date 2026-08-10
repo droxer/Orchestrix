@@ -129,8 +129,8 @@ export function canonicalSearchForPath(pathname: string, search = ""): string {
     }
   } else if (head === "agents" && entityId && rest.length === 0) {
     const requestedTab = source.get("tab");
-    const tab = requestedTab && AGENT_TABS.has(requestedTab) ? requestedTab : "activities";
-    if (tab !== "activities") target.set("tab", tab);
+    const tab = requestedTab && AGENT_TABS.has(requestedTab) ? requestedTab : "profile";
+    if (tab !== "profile") target.set("tab", tab);
     if (tab === "workspace") {
       if (source.get("scope") === "shared") target.set("scope", "shared");
       copyParam(source, target, "path");
@@ -140,8 +140,8 @@ export function canonicalSearchForPath(pathname: string, search = ""): string {
     if (source.get("dialog") === "create") target.set("dialog", "create");
   } else if (head === "teams" && entityId && rest.length === 0) {
     const requestedTab = source.get("tab");
-    const tab = requestedTab && TEAM_TABS.has(requestedTab) ? requestedTab : "activities";
-    if (tab !== "activities") target.set("tab", tab);
+    const tab = requestedTab && TEAM_TABS.has(requestedTab) ? requestedTab : "profile";
+    if (tab !== "profile") target.set("tab", tab);
     if (tab === "workspace") {
       copyParam(source, target, "path");
       copyParam(source, target, "item");

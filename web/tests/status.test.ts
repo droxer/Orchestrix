@@ -54,7 +54,6 @@ describe("Relay web thread status", () => {
       sessionId: "ses_1",
       runId: "run_1",
       agent: "codex",
-      mode: "review",
       taskGoal: "review daemon status",
       startedAt: "2026-06-12T00:00:00.000Z",
     } as const;

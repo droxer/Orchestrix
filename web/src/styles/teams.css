@@ -183,7 +183,7 @@
 
 .team-profile-member {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: var(--sp-3);
   padding: var(--sp-3) 0;
@@ -208,14 +208,60 @@
   white-space: nowrap;
 }
 
-.team-profile-member-copy strong {
+.team-profile-member-title {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.team-profile-member-title strong {
   color: var(--ink-1);
   font: var(--type-label-strong);
+}
+
+/* Lead rides the name as a quiet micro-caps marker — a bordered chip in a
+   trailing column read as a button and orphaned the row. */
+.team-profile-member-lead {
+  flex: none;
+  color: var(--action);
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
 }
 
 .team-profile-member-copy small {
   color: var(--ink-3);
   font: var(--type-label);
+}
+
+/* Same meta voice as the picker row: kind · home computer on one quiet
+   mono line, generated middot separator. */
+.team-profile-member-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2);
+  letter-spacing: var(--type-code-track);
+  white-space: nowrap;
+}
+
+.team-profile-member-meta > * + *::before {
+  content: "·";
+  margin-right: var(--sp-1);
+  color: var(--ink-4);
+}
+
+.team-profile-member-computer {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--sp-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .team-profile-member-fieldset {
@@ -225,9 +271,14 @@
   border: 0;
 }
 
-.team-profile-member-options {
+/* Chained with .team-member-options so the scroll override wins over the
+   base rule's `overflow: hidden` (admin-v2-views.css) regardless of import
+   order — equal-specificity single classes would otherwise resolve by source
+   order, and admin-v2-views.css loads after this file. */
+.team-member-options.team-profile-member-options {
   max-height: 280px;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .team-profile-lead-field {

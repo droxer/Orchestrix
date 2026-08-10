@@ -17,8 +17,8 @@ const timestamp = "2026-06-19T12:00:00.000Z";
 const t = ((key: string, options?: Record<string, unknown>) => {
   if (key === "message.artifact") return `Artifact - ${String(options?.kind)}`;
   if (key.startsWith("artifact.kind.")) return String(options?.defaultValue ?? key.split(".").at(-1));
-  if (key === "transcript.phase_agent") return String(options?.mode);
-  if (key === "transcript.phase_handoff") return `Handoff · ${String(options?.mode)}`;
+  if (key === "transcript.phase_agent") return "Agent";
+  if (key === "transcript.phase_handoff") return "Handoff";
   if (key.startsWith("mode.")) return String(key.split(".").at(-1));
   return key;
 }) as unknown as TFunction;
@@ -52,7 +52,6 @@ describe("ProjectMessagesAccumulator", () => {
       timestamp,
       runId: "run_1",
       agent: "codex" as const,
-      mode: "action" as const,
     };
     const first = projector.update(session([started]), t);
     const second = projector.update(session([
@@ -130,7 +129,6 @@ describe("projectMessages artifact projection", () => {
         runId: "run_1",
         agent: "codex",
         role: "implementer",
-        mode: "action",
       },
       {
         id: "ev_collab",
@@ -139,7 +137,6 @@ describe("projectMessages artifact projection", () => {
         timestamp,
         runId: "run_1",
         agent: "codex",
-        mode: "action",
         sequence: 1,
         collaboration,
       },
@@ -169,7 +166,6 @@ describe("projectMessages artifact projection", () => {
         runId: "run_a",
         agent: "claude",
         role: "implementer",
-        mode: "action",
       },
       {
         id: "ev_plan",
@@ -194,7 +190,6 @@ describe("projectMessages artifact projection", () => {
         runId: "run_b",
         agent: "codex",
         role: "reviewer",
-        mode: "review",
       },
       {
         id: "ev_review",
@@ -251,10 +246,6 @@ describe("projectMessages artifact projection", () => {
       ["art_plan"],
       ["art_review", "art_deck"],
     ]);
-    // The agent-turn eyebrow shows the agent name only; the mode is still
-    // carried from agent.started so downstream behavior can distinguish action
-    // and review turns even though it is not rendered in the header.
-    assert.deepEqual(agentMessages.map((message) => message.mode), ["action", "review"]);
   });
 
   it("renders runless artifacts as standalone system rows", () => {
@@ -374,7 +365,6 @@ describe("projectMessages artifact projection", () => {
         runId: "run_1",
         agent: "codex",
         role: "implementer",
-        mode: "action",
       },
       {
         id: "ev_output",
@@ -427,7 +417,6 @@ describe("projectMessages artifact projection", () => {
         runId: "run_1",
         agent: "claude",
         role: "implementer",
-        mode: "action",
       },
       {
         id: "ev_completed",
@@ -464,7 +453,6 @@ describe("projectMessages artifact projection", () => {
         runId: "run_1",
         agent: "claude",
         role: "implementer",
-        mode: "action",
       },
       {
         id: "ev_completed",
@@ -496,7 +484,6 @@ describe("projectMessages artifact projection", () => {
         runId: "run_1",
         agent: "claude",
         role: "implementer",
-        mode: "action",
       },
       {
         id: "ev_completed",
@@ -530,7 +517,6 @@ describe("projectMessages artifact projection", () => {
         runId: "run_1",
         agent: "codex",
         role: "implementer",
-        mode: "action",
       },
       {
         id: "ev_output",
@@ -570,7 +556,6 @@ describe("projectMessages artifact projection", () => {
         runId: "run_1",
         agent: "claude",
         role: "implementer",
-        mode: "action",
       },
       {
         id: "ev_completed",
@@ -602,12 +587,11 @@ describe("phaseDividerLabel", () => {
         runId: "run_1",
         agent: "claude",
         role: "implementer",
-        mode: "action",
       },
     ]), t);
 
     const agentIndex = messages.findIndex((message) => message.kind === "agent");
-    assert.equal(phaseDividerLabel(messages, agentIndex, t), "action");
+    assert.equal(phaseDividerLabel(messages, agentIndex, t), "Agent");
   });
 
   it("labels agent handoffs across different agents", () => {
@@ -620,7 +604,6 @@ describe("phaseDividerLabel", () => {
         runId: "run_a",
         agent: "claude",
         role: "implementer",
-        mode: "action",
       },
       {
         id: "ev_run_b",
@@ -630,14 +613,13 @@ describe("phaseDividerLabel", () => {
         runId: "run_b",
         agent: "codex",
         role: "reviewer",
-        mode: "review",
       },
     ]), t);
 
     const codexIndex = messages.findIndex(
       (message) => message.kind === "agent" && message.agent === "codex",
     );
-    assert.equal(phaseDividerLabel(messages, codexIndex, t), "Handoff · review");
+    assert.equal(phaseDividerLabel(messages, codexIndex, t), "Handoff");
   });
 });
 
@@ -684,7 +666,6 @@ describe("logical agent identity in the transcript", () => {
         timestamp,
         runId: "run_1",
         agent: "claude",
-        mode: "action",
         logicalAgentId: "agt_zoe",
       },
     ]), t);
@@ -713,7 +694,6 @@ describe("logical agent identity in the transcript", () => {
         timestamp,
         runId: "run_1",
         agent: "claude",
-        mode: "action",
         logicalAgentId: "agt_zoe",
       },
     ]), t);
@@ -751,7 +731,6 @@ describe("logical agent identity in the transcript", () => {
         timestamp,
         runId: "run_a",
         agent: "claude",
-        mode: "action",
         logicalAgentId: "agt_ada",
       },
       {
@@ -761,7 +740,6 @@ describe("logical agent identity in the transcript", () => {
         timestamp,
         runId: "run_b",
         agent: "claude",
-        mode: "action",
         logicalAgentId: "agt_zoe",
       },
     ]), t);
@@ -770,7 +748,7 @@ describe("logical agent identity in the transcript", () => {
       (message) => message.kind === "agent" && message.agentId === "agt_zoe",
     );
     assert.equal(isGroupedContinuation(messages, zoeIndex), false);
-    assert.equal(phaseDividerLabel(messages, zoeIndex, t), "Handoff · action");
+    assert.equal(phaseDividerLabel(messages, zoeIndex, t), "Handoff");
   });
 
   it("reruns the logical agent that produced the last turn", () => {
@@ -781,7 +759,6 @@ describe("logical agent identity in the transcript", () => {
           {
             id: "run_1",
             agent: "claude",
-            mode: "action",
             status: "completed",
             startedAt: timestamp,
             artifactIds: [],
@@ -791,6 +768,6 @@ describe("logical agent identity in the transcript", () => {
       },
       "codex",
     );
-    assert.deepEqual(rerun, { agent: "claude", agentId: "agt_zoe", mode: "action" });
+    assert.deepEqual(rerun, { agent: "claude", agentId: "agt_zoe" });
   });
 });

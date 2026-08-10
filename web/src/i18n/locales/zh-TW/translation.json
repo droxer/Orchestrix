@@ -88,6 +88,7 @@
     "choose_computer": "選擇執行電腦",
     "no_computers": "沒有可用電腦",
     "talk_to_agent": "選擇 Agent",
+    "talk_to_agent_or_team": "選擇智能體或團隊",
     "no_available_agent": "暫無可用 Agent",
     "agent_disabled_title": "{{agent}} 在此節點已被管理員停用。",
     "agent_failed_title": "{{agent}} 在此節點尚未就緒。",
@@ -133,9 +134,9 @@
     "send": "傳送",
     "cancel_run": "取消執行",
     "choose_agent": "選擇 Agent",
-    "choose_mode": "選擇模式",
-    "send_shortcut": "{{shortcut}} 傳送",
-    "mode_toggle_label": "模式：{{mode}}——切換到{{next}}"
+    "agents_group": "智能體",
+    "teams_group": "團隊",
+    "send_shortcut": "{{shortcut}} 傳送"
   },
   "decision": {
     "approve": "核准",
@@ -149,7 +150,6 @@
   "handoff": {
     "title": "轉交此回合",
     "route_to": "路由至",
-    "mode": "模式",
     "note_label": "備註",
     "note_placeholder": "選填備註…",
     "send": "傳送移交",
@@ -408,8 +408,20 @@
     "connect_success": "這台電腦已註冊。執行下面的命令以啟動守護行程。",
     "connect_success_existing": "這台電腦已連接。執行下面的命令即可啟動其守護行程。",
     "connect_success_sub": "複製下面的憑證以完成設定。",
-    "connect_token_once": "該權杖僅顯示一次，請立即複製。",
-    "connect_token_on_device": "權杖在首次連接時已簽發，不會再次顯示——那台電腦上的守護行程已保存了它。"
+    "connect_token_once": "請立即複製該權杖——之後也可以隨時在電腦的「權杖」面板中再次檢視。",
+    "connect_token_on_device": "它的權杖早於權杖儲存功能，無法顯示——請在電腦上開啟「權杖」並重新簽發以取得新權杖。",
+    "token_button": "權杖",
+    "token_title": "電腦權杖",
+    "token_hidden_note": "啟動權杖在你主動檢視前保持隱藏。任何持有它的人都能執行這台電腦的守護行程。",
+    "token_reveal_action": "顯示權杖",
+    "token_revealing": "正在顯示…",
+    "token_reissue_action": "重新簽發權杖",
+    "token_reissuing": "正在重新簽發…",
+    "token_reissue_title": "重新簽發權杖",
+    "token_reissue_message": "目前權杖將立即失效。已在這台電腦上執行的守護行程必須使用新權杖重新啟動。",
+    "token_reissued_note": "已簽發新權杖——舊權杖已失效。請使用此權杖重新啟動守護行程。",
+    "token_unrecoverable": "這台電腦的權杖早於權杖儲存功能，無法顯示。請重新簽發以取得新權杖。",
+    "token_error": "無法載入權杖：{{message}}"
   },
   "routine": {
     "title": "例行任務",
@@ -910,6 +922,14 @@
       "settings_rounds_label": "每個任務的預設輪次",
       "settings_rounds_hint": "取值範圍 {{min}} 到 {{max}}。用完預算仍未完成的任務會等待人工處理，而不會繼續執行。",
       "settings_save": "儲存",
+      "settings_admin_token_title": "管理員權杖",
+      "settings_admin_token_sub": "用於引導建立首位管理員與 supervisor 的 Bearer 權杖。首次啟動時從 RELAY_ADMIN_TOKEN 匯入，未設定則自動產生。重新簽發後舊權杖立即失效。",
+      "settings_admin_token_label": "管理員權杖",
+      "settings_admin_token_copy": "複製管理員權杖",
+      "settings_admin_token_reissue": "重新簽發權杖",
+      "settings_admin_token_reissuing": "正在重新簽發…",
+      "settings_admin_token_reissue_confirm": "確定重新簽發管理員權杖？目前權杖將立即失效，請同步更新使用它的 supervisor 或腳本。",
+      "settings_admin_token_unset": "後端未設定管理員權杖。",
       "settings_saving": "儲存中…",
       "settings_saved": "已儲存",
       "settings_reset": "重設",
@@ -952,8 +972,8 @@
     "ready_for": "傳送訊息。",
     "ready_no_employee": "為 {{agent}} 選擇員工工作區。",
     "awaiting_first": "等待首則訊息",
-    "phase_agent": "{{mode}}",
-    "phase_handoff": "移交 · {{mode}}"
+    "phase_agent": "Agent",
+    "phase_handoff": "移交"
   },
   "login": {
     "username": "使用者名稱",
@@ -989,11 +1009,6 @@
     "blocked": "已封鎖",
     "cancelled": "已取消",
     "unknown": "未知"
-  },
-  "mode": {
-    "action": "行動",
-    "ask": "問答",
-    "review": "審查"
   },
   "artifact": {
     "action_copy": "複製",
@@ -1091,7 +1106,7 @@
     "user_label": "你",
     "user_avatar": "我",
     "agent_header": "{{employee}}",
-    "started": "{{agent}} · {{mode}} 已啟動",
+    "started": "{{agent}} 已啟動",
     "artifact": "產物 · {{kind}}",
     "decision": "你 · {{kind}}",
     "agent_completed": "{{agent}} · {{status}}",

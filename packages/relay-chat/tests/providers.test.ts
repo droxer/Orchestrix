@@ -207,7 +207,6 @@ describe("provider webhook handlers", () => {
         name: "relay",
         options: [{ name: "run", options: [
           { name: "agent", value: "agent_builder" },
-          { name: "mode", value: "action" },
           { name: "prompt", value: "ship it" },
         ] }],
       },

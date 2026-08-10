@@ -178,6 +178,7 @@ export function TeamDrawer({
                   agentId={agent.id}
                   displayName={agent.displayName}
                   executorKind={agent.executorKind}
+                  placements={agent.placements}
                   selected={selected}
                   onToggle={toggleMember}
                 />
