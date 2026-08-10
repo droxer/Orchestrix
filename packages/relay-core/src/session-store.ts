@@ -66,6 +66,31 @@ export interface HumanDecision {
   actorEmployeeId?: string;
 }
 
+export type CollaborationPurpose = "accomplish" | "discuss" | "review";
+export type CollaborationStrategy = "direct" | "room" | "review" | "coordinate";
+
+export interface CollaborationRoundManifest {
+  collaborationId: string;
+  roundId: string;
+  source: string;
+  purpose: CollaborationPurpose;
+  strategy: CollaborationStrategy;
+  address:
+    | { kind: "room" }
+    | { kind: "members"; agentIds: string[] };
+  teamSnapshot?: AgentRun["teamSnapshot"];
+  assignments: Array<{
+    assignmentId: string;
+    agentId: string;
+    mode?: AgentTaskMode;
+    phase?: AgentRun["teamPhase"];
+    role?: AgentRole;
+    brief?: string;
+    coordinator?: boolean;
+  }>;
+  completionPolicy: string;
+}
+
 export interface RelaySession {
   id: string;
   workspacePath: string;
@@ -92,6 +117,9 @@ export interface RelaySession {
   agentRuns: AgentRun[];
   artifacts: RelayArtifact[];
   decisions: HumanDecision[];
+  collaborationRounds: CollaborationRoundManifest[];
+  activeCollaborationId?: string;
+  activeRoundId?: string;
   events: RelayEvent[];
   finalOutcome?: string;
   archived?: boolean;
@@ -129,6 +157,13 @@ export type RelayEvent =
       status: SessionStatus;
       phase: string;
       pendingDecision?: RelaySession["pendingDecision"];
+    }
+  | {
+      id: string;
+      type: "collaboration.round.started";
+      sessionId: string;
+      timestamp: string;
+      manifest: CollaborationRoundManifest;
     }
   | {
       id: string;
@@ -296,6 +331,7 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
     agentRuns: [],
     artifacts: [],
     decisions: [],
+    collaborationRounds: [],
     events: [],
     archived: false,
   };
@@ -309,6 +345,12 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
       session.pendingDecision = event.pendingDecision;
       if (!event.pendingDecision) delete session.pendingDecision;
       if (event.status !== "completed" && event.status !== "failed") delete session.finalOutcome;
+    } else if (event.type === "collaboration.round.started") {
+      if (!session.collaborationRounds.some((round) => round.roundId === event.manifest.roundId)) {
+        session.collaborationRounds.push(event.manifest);
+      }
+      session.activeCollaborationId = event.manifest.collaborationId;
+      session.activeRoundId = event.manifest.roundId;
     } else if (event.type === "agent.started") {
       // Threads created before node pinning adopt the computer their first
       // stamped run executed on.

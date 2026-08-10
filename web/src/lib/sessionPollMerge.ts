@@ -10,6 +10,7 @@ function inflateSessionSummary(summary: SessionSummary): RelaySession {
     agentRuns: [],
     artifacts: [],
     decisions: [],
+    collaborationRounds: [],
     events: [],
   } as RelaySession;
 }

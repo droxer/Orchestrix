@@ -478,6 +478,7 @@ function makeSession(status: RelaySession["status"]): RelaySession {
     agentRuns: [],
     artifacts: [],
     decisions: [],
+    collaborationRounds: [],
     events: [],
   };
 }

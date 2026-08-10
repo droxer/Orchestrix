@@ -282,7 +282,7 @@ function fakeGateway(requests: ChatAgentRequest[]) {
 function makeSession(status: RelaySession["status"]): RelaySession {
   return {
     id: "sess_1", workspacePath: "/workspace", taskGoal: "ship it", participants: ["human", "codex"],
-    status, phase: "running", createdAt: "now", updatedAt: "now", agentRuns: [], artifacts: [], decisions: [], events: [],
+    status, phase: "running", createdAt: "now", updatedAt: "now", agentRuns: [], artifacts: [], decisions: [], collaborationRounds: [], events: [],
   };
 }
 

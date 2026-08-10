@@ -42,6 +42,20 @@ function applySessionEventProjection(session: RelaySession, event: RelayEvent): 
   };
 
   switch (event.type) {
+    case "collaboration.round.started": {
+      const existingRounds = next.collaborationRounds ?? [];
+      const collaborationRounds = existingRounds.some(
+        (round) => round.roundId === event.manifest.roundId,
+      )
+        ? existingRounds
+        : [...existingRounds, event.manifest];
+      return {
+        ...next,
+        collaborationRounds,
+        activeCollaborationId: event.manifest.collaborationId,
+        activeRoundId: event.manifest.roundId,
+      };
+    }
     case "session.status":
       {
         const updated: RelaySession = {
