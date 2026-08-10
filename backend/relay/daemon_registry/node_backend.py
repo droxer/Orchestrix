@@ -686,7 +686,7 @@ class ServerDaemonNodeBackend:
                     actor_employee_id=actor_employee_id,
                     message_id=message_id,
                 )
-                controller.continue_session(session_id)
+            controller.continue_session(session_id)
         if decision:
             self._record_run_decision(
                 controller,
@@ -792,15 +792,8 @@ class ServerDaemonNodeBackend:
         request = self.registry.daemon_store.active_run_request_for_session_any_node(
             session_id
         )
-        if request and request.get("status") == "prepared":
-            with self.registry.dispatch_scope([request["nodeId"]]):
-                cancelled = self.registry.daemon_store.update_run_request_if_status(
-                    request["id"],
-                    "prepared",
-                    {"status": "cancelled", "error": reason},
-                )
-                if cancelled:
-                    return None
+        if request:
+            self.registry.cancel_run_request_before_delivery(request["id"], reason)
         active = self.registry.cancel_active_run(sandbox_id, session_id, reason)
         if not active:
             session = self.registry.store.get_session(session_id)

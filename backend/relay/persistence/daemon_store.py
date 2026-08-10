@@ -5,7 +5,7 @@ import json
 import os
 from collections import defaultdict
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timedelta
 from pathlib import Path
 from threading import RLock
@@ -549,11 +549,15 @@ class LocalDaemonStore:
         request_id: str | None = None,
         claim_id: str | None = None,
     ) -> dict[str, Any] | None:
-        with self._lock:
+        claim_scope = (
+            self._run_request_claim_lock() if request_id is not None else nullcontext()
+        )
+        with self._lock, claim_scope:
             if request_id is not None:
                 request = self.get_run_request(request_id)
                 if (
                     not request
+                    or request.get("status") != "dispatching"
                     or (request.get("state") or {}).get(DISPATCH_CLAIM_ID_STATE_KEY)
                     != claim_id
                 ):
@@ -605,8 +609,21 @@ class LocalDaemonStore:
             )
             return record
 
-    def publish_command(self, command_id: str) -> dict[str, Any]:
-        with self._lock:
+    def publish_command(
+        self, command_id: str, *, request_id: str | None = None
+    ) -> dict[str, Any] | None:
+        claim_scope = (
+            self._run_request_claim_lock() if request_id is not None else nullcontext()
+        )
+        with self._lock, claim_scope:
+            if request_id is not None:
+                request = self.get_run_request(request_id)
+                if not (
+                    request
+                    and request.get("status") == "running"
+                    and request.get("currentCommandId") == command_id
+                ):
+                    return None
             record = self._get_command(command_id)
             if not record:
                 raise KeyError(command_id)
@@ -963,7 +980,7 @@ class LocalDaemonStore:
     def claim_run_request_dispatch(
         self, request_id: str, claim_id: str, lease_seconds: float
     ) -> dict[str, Any] | None:
-        with self._lock:
+        with self._lock, self._run_request_claim_lock():
             request = self.get_run_request(request_id)
             if (
                 not request
@@ -1019,7 +1036,7 @@ class LocalDaemonStore:
         self, request_id: str, expected_status: str, patch: dict[str, Any]
     ) -> dict[str, Any] | None:
         """Apply a run-request transition only from the expected state."""
-        with self._lock:
+        with self._lock, self._run_request_claim_lock():
             current = self.get_run_request(request_id)
             if not current or current.get("status") != expected_status:
                 return None
@@ -1032,9 +1049,16 @@ class LocalDaemonStore:
         claim_id: str,
         patch: dict[str, Any],
     ) -> dict[str, Any] | None:
-        with self._lock:
+        with self._lock, self._run_request_claim_lock():
             current = self.get_run_request(request_id)
-            if not current or (current.get("state") or {}).get(claim_key) != claim_id:
+            if (
+                not current
+                or (current.get("state") or {}).get(claim_key) != claim_id
+                or (
+                    claim_key == DISPATCH_CLAIM_ID_STATE_KEY
+                    and current.get("status") != "dispatching"
+                )
+            ):
                 return None
             return self.update_run_request(request_id, patch)
 
@@ -1911,6 +1935,7 @@ class DatabaseDaemonStore:
                 )
                 if (
                     not request_row
+                    or request_row.get("status") != "dispatching"
                     or (request_row.get("state") or {}).get(DISPATCH_CLAIM_ID_STATE_KEY)
                     != claim_id
                 ):
@@ -1957,9 +1982,27 @@ class DatabaseDaemonStore:
             )
         return record
 
-    def publish_command(self, command_id: str) -> dict[str, Any]:
+    def publish_command(
+        self, command_id: str, *, request_id: str | None = None
+    ) -> dict[str, Any] | None:
         now = now_iso()
         with store_transaction(self.engine) as conn:
+            if request_id is not None:
+                request_row = (
+                    conn.execute(
+                        select(self.run_requests)
+                        .where(self.run_requests.c.id == request_id)
+                        .with_for_update()
+                    )
+                    .mappings()
+                    .first()
+                )
+                if not (
+                    request_row
+                    and request_row.get("status") == "running"
+                    and str(request_row.get("current_command_id")) == command_id
+                ):
+                    return None
             row = (
                 conn.execute(
                     select(self.commands)
@@ -2631,13 +2674,14 @@ class DatabaseDaemonStore:
             updated = {**current, **patch, "updatedAt": now}
             if patch.get("status") in TERMINAL_DAEMON_STATUSES:
                 updated["completedAt"] = now
+            node_pk = self._node_pk(conn, updated["nodeId"])
             applied = conn.execute(
                 update(self.run_requests)
                 .where(self.run_requests.c.id == row["id"])
                 .where(self.run_requests.c.status == expected_status)
                 .values(
                     **run_request_to_row(
-                        updated, database_id=row["id"], node_pk=row["node_id"]
+                        updated, database_id=row["id"], node_pk=node_pk
                     )
                 )
             )
@@ -2677,7 +2721,10 @@ class DatabaseDaemonStore:
             if not row:
                 return None
             current = row_to_run_request(row)
-            if (current.get("state") or {}).get(claim_key) != claim_id:
+            if (current.get("state") or {}).get(claim_key) != claim_id or (
+                claim_key == DISPATCH_CLAIM_ID_STATE_KEY
+                and current.get("status") != "dispatching"
+            ):
                 return None
             updated = {**current, **patch, "updatedAt": now}
             if patch.get("status") in TERMINAL_DAEMON_STATUSES:

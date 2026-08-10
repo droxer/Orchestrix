@@ -12,6 +12,7 @@ COLLABORATION_NEW_SESSION_STATE_KEY = "_relay_collaboration_new_session"
 COLLABORATION_ADMISSION_EXPIRED_OUTCOME = (
     "Collaboration admission expired before the round started."
 )
+COLLABORATION_ADMISSION_EXPIRED_ERROR = "Collaboration admission expired before its authoritative round event was committed."
 
 
 class CollaborationIdempotencyError(ValueError):

@@ -14,6 +14,7 @@ from typing import Any
 from loguru import logger
 
 from ..collaboration.models import (
+    COLLABORATION_ADMISSION_EXPIRED_ERROR,
     COLLABORATION_ADMISSION_EXPIRED_OUTCOME,
     COLLABORATION_ADMISSION_EXPIRED_STATE_KEY,
     COLLABORATION_FINGERPRINT_STATE_KEY,
@@ -1568,6 +1569,13 @@ class DaemonNodeRegistry:
         if existing and (existing.get("state") or {}).get(
             COLLABORATION_ADMISSION_EXPIRED_STATE_KEY
         ):
+            if not (
+                existing.get("status") == "failed"
+                and existing.get("error") == COLLABORATION_ADMISSION_EXPIRED_ERROR
+            ):
+                raise ValueError(
+                    "Cannot revive a collaboration request that is not the expired failure."
+                )
             session = self.store.get_session(existing["sessionId"])
             is_expired_new_session = bool(
                 (existing.get("state") or {}).get(COLLABORATION_NEW_SESSION_STATE_KEY)
@@ -1695,6 +1703,41 @@ class DaemonNodeRegistry:
     ) -> dict[str, Any] | None:
         with self.dispatch_lock:
             return self._cancel_active_run_unlocked(sandbox_id, session_id, reason)
+
+    def cancel_run_request_before_delivery(
+        self, request_id: str, reason: str
+    ) -> dict[str, Any] | None:
+        """Persist a cancellation fence before any staged command is published."""
+        request = self.daemon_store.get_run_request(request_id)
+        if not request:
+            return None
+        with self.dispatch_scope([request["nodeId"]]):
+            request = self.daemon_store.get_run_request(request_id)
+            if not request or request.get("status") not in (
+                "prepared",
+                "running",
+                "dispatching",
+            ):
+                return None
+            state = dict(request.get("state") or {})
+            state.pop("_relay_dispatch_claim_id", None)
+            state.pop("_relay_dispatch_claim_expires_at", None)
+            cancelled = self.daemon_store.update_run_request_if_status(
+                request_id,
+                request["status"],
+                {"status": "cancelled", "error": reason, "state": state},
+            )
+            if not cancelled:
+                return None
+            command_id = cancelled.get("currentCommandId")
+            staged = (
+                self.daemon_store.get_command(command_id)
+                if command_id
+                else self.daemon_store.pending_command_for_run_request(request_id)
+            )
+            if staged and staged.get("status") == "pending":
+                self.daemon_store.discard_staged_command(staged["id"])
+            return cancelled
 
     def _cancel_active_run_unlocked(
         self, sandbox_id: str, session_id: str, reason: str
@@ -2123,10 +2166,7 @@ class DaemonNodeRegistry:
                         request["id"],
                         {
                             "status": "failed",
-                            "error": (
-                                "Collaboration admission expired before its "
-                                "authoritative round event was committed."
-                            ),
+                            "error": COLLABORATION_ADMISSION_EXPIRED_ERROR,
                             "state": state,
                         },
                     )
@@ -2159,6 +2199,45 @@ class DaemonNodeRegistry:
                             error=str(error),
                         )
                 continue
+            session = self.store.get_session(request["sessionId"])
+            if session.get("status") in ("completed", "failed", "cancelled"):
+                terminalized = self.daemon_store.update_run_request_if_status(
+                    request["id"],
+                    request["status"],
+                    {
+                        "status": session["status"],
+                        "error": (
+                            "Collaboration delivery was suppressed because "
+                            f"the session is {session['status']}."
+                        ),
+                    },
+                )
+                if terminalized:
+                    command_id = request.get("currentCommandId")
+                    staged = (
+                        self.daemon_store.get_command(command_id)
+                        if command_id
+                        else self.daemon_store.pending_command_for_run_request(
+                            request["id"]
+                        )
+                    )
+                    if staged and staged.get("status") == "pending":
+                        self.daemon_store.discard_staged_command(staged["id"])
+                continue
+            if request.get("status") == "dispatching":
+                claim_expires_at = (request.get("state") or {}).get(
+                    "_relay_dispatch_claim_expires_at"
+                )
+                staged_for_request = self.daemon_store.pending_command_for_run_request(
+                    request["id"]
+                )
+                if (
+                    not staged_for_request
+                    and isinstance(claim_expires_at, str)
+                    and datetime.fromisoformat(claim_expires_at)
+                    > datetime.now(timezone.utc)
+                ):
+                    continue
             command_id = request.get("currentCommandId")
             if not command_id:
                 staged = self.daemon_store.pending_command_for_run_request(
@@ -2211,17 +2290,23 @@ class DaemonNodeRegistry:
                         )
                         if not request:
                             continue
-                    self.daemon_store.publish_command(command["id"])
-                    self._track_active_command(staged["nodeId"], command)
+                    published = self.daemon_store.publish_command(
+                        command["id"], request_id=request["id"]
+                    )
+                    if published:
+                        self._track_active_command(staged["nodeId"], command)
                 else:
                     self._enqueue_current_assignment(request)
                 continue
             command_record = self.daemon_store.get_command(command_id)
             if command_record and command_record.get("status") == "pending":
-                self.daemon_store.publish_command(command_id)
-                self._track_active_command(
-                    command_record["nodeId"], command_record["command"]
+                published = self.daemon_store.publish_command(
+                    command_id, request_id=request["id"]
                 )
+                if published:
+                    self._track_active_command(
+                        command_record["nodeId"], command_record["command"]
+                    )
             if command_record and command_record.get("status") in (
                 "completed",
                 "failed",
@@ -2533,7 +2618,11 @@ class DaemonNodeRegistry:
             return self.daemon_store.get_run_request(run_request["id"]) or run_request
         # A staged command is not claimable. Publish it only after its durable
         # run-request link exists; reaping can safely publish after a crash.
-        self.daemon_store.publish_command(command["id"])
+        published = self.daemon_store.publish_command(
+            command["id"], request_id=updated["id"]
+        )
+        if not published:
+            return self.daemon_store.get_run_request(updated["id"]) or updated
         self._track_active_command(node_id, command)
         return updated
 

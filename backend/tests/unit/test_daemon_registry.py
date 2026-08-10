@@ -116,6 +116,48 @@ def test_database_run_request_status_transition_moves_the_node_reference() -> No
         assert store.get_run_request(request["id"])["nodeId"] == "sbx_bob"
 
 
+def test_local_run_request_status_cas_is_shared_across_store_instances() -> None:
+    with TemporaryDirectory() as root:
+        first = LocalDaemonStore(root)
+        second = LocalDaemonStore(root)
+        first.register_node(store_node_payload())
+        request = first.create_run_request(
+            {
+                "nodeId": "sbx_alice",
+                "sessionId": "ses_cross_instance_cas",
+                "taskGoal": "choose one transition",
+                "assignments": [{"executorKind": "codex", "mode": "action"}],
+                "state": {},
+                "status": "prepared",
+            }
+        )
+        for store in (first, second):
+            original_get = store.get_run_request
+
+            def slow_get(request_id, original_get=original_get):
+                value = original_get(request_id)
+                time.sleep(0.03)
+                return value
+
+            store.get_run_request = slow_get
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            transitions = list(
+                executor.map(
+                    lambda item: item[0].update_run_request_if_status(
+                        request["id"], "prepared", {"status": item[1]}
+                    ),
+                    ((first, "running"), (second, "cancelled")),
+                )
+            )
+
+        assert sum(item is not None for item in transitions) == 1
+        assert first.get_run_request(request["id"])["status"] in (
+            "running",
+            "cancelled",
+        )
+
+
 @pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
 def test_daemon_store_notifies_when_command_becomes_visible(
     daemon_store_factory,
@@ -506,10 +548,12 @@ def test_command_poll_cannot_observe_run_before_request_links_command() -> None:
             self.enqueued = Event()
             self.release_enqueue = Event()
 
-        def publish_command(self, command_id: str) -> dict[str, object]:
+        def publish_command(
+            self, command_id: str, *, request_id: str | None = None
+        ) -> dict[str, object] | None:
             self.enqueued.set()
             assert self.release_enqueue.wait(timeout=1)
-            return super().publish_command(command_id)
+            return super().publish_command(command_id, request_id=request_id)
 
     with TemporaryDirectory() as root:
         database_url = f"sqlite:///{root}/daemon.db"
@@ -616,6 +660,8 @@ def test_dispatch_claim_prevents_reaper_from_creating_second_command() -> None:
                 )
             )
             assert daemon_store.claimed.wait(timeout=1)
+            active_request = daemon_store.list_active_run_requests()[0]
+            assert active_request["status"] == "dispatching"
             second.reap_stale_runs()
             assert second.take_commands("sbx_alice", "node_token") == []
             daemon_store.release_claim.set()
@@ -632,11 +678,13 @@ def test_staged_command_is_published_after_dispatcher_crash() -> None:
             super().__init__(database_url, create_schema=True)
             self.fail_once = True
 
-        def publish_command(self, command_id: str) -> dict[str, object]:
+        def publish_command(
+            self, command_id: str, *, request_id: str | None = None
+        ) -> dict[str, object] | None:
             if self.fail_once:
                 self.fail_once = False
                 raise RuntimeError("dispatcher crashed before publish")
-            return super().publish_command(command_id)
+            return super().publish_command(command_id, request_id=request_id)
 
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
@@ -3049,6 +3097,10 @@ def test_expired_admission_cannot_revive_after_a_newer_terminal_decision() -> No
                 "assignments": [],
                 "state": {"_relay_collaboration_admission_expired": True},
                 "status": "failed",
+                "error": (
+                    "Collaboration admission expired before its authoritative "
+                    "round event was committed."
+                ),
             }
         )
         SessionController(session_store).cancel_session(session["id"], "stop")
@@ -3066,7 +3118,9 @@ def test_expired_admission_cannot_revive_after_a_newer_terminal_decision() -> No
         assert daemon_store.get_run_request(prepared["id"])["status"] == "failed"
 
 
-def test_cancelled_expired_request_cannot_revive_even_before_session_cancel_event() -> None:
+def test_cancelled_expired_request_cannot_revive_even_before_session_cancel_event() -> (
+    None
+):
     with TemporaryDirectory() as root:
         session_store = LocalSessionStore(root)
         daemon_store = LocalDaemonStore(root)
@@ -3146,6 +3200,54 @@ def test_reaper_never_dispatches_a_running_request_for_a_terminal_session() -> N
         registry.reap_stale_runs()
 
         assert daemon_store.get_run_request(request["id"])["status"] == "cancelled"
+        assert registry.take_commands("sbx_alice", "node_token") == []
+
+
+def test_stale_activation_cannot_publish_after_persistent_cancellation_fence() -> None:
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        backend = ServerDaemonNodeBackend(registry)
+        registry.register(
+            {
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            },
+            "ui_token",
+        )
+        session = session_store.create_session(
+            {"workspacePath": "/workspace/alice", "taskGoal": "cancel before queue"}
+        )
+        stale_running = daemon_store.create_run_request(
+            {
+                "nodeId": "sbx_alice",
+                "sessionId": session["id"],
+                "taskGoal": session["taskGoal"],
+                "assignments": [
+                    {
+                        "assignmentId": "assignment_cancel_fence",
+                        "executorKind": "codex",
+                        "mode": "action",
+                    }
+                ],
+                "state": {},
+                "status": "running",
+            }
+        )
+
+        assert backend.cancel_run("sbx_alice", session["id"], "stop") is None
+        registry._enqueue_current_assignment(stale_running)
+
+        assert daemon_store.get_run_request(stale_running["id"])["status"] == (
+            "cancelled"
+        )
         assert registry.take_commands("sbx_alice", "node_token") == []
 
 

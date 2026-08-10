@@ -1007,10 +1007,10 @@ def test_completed_thread_retry_reopens_after_message_commit_interruption(
         assert retried.json()["status"] == "running"
         assert "finalOutcome" not in retried.json()
         assert len(app.state.daemon_store.take_queued_commands(node["id"])) == 1
-        assert sum(
-            event["type"] == "user.message"
-            for event in retried.json()["events"]
-        ) == 1
+        assert (
+            sum(event["type"] == "user.message" for event in retried.json()["events"])
+            == 1
+        )
 
 
 def test_admin_can_replay_a_scoped_message_for_an_employee_owned_thread(
