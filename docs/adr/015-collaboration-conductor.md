@@ -67,6 +67,18 @@ seconds by default) and releases session/runtime capacity. Keyed new-thread
 admission derives the session identity from the scoped operation key, so
 concurrent retries converge on one session and one run request.
 
+Activation is a prepared-to-running compare-and-set and rechecks the session
+before command staging. Cancellation and terminal session decisions therefore
+cannot race a prepared request into daemon delivery. A persistent cancellation
+fence is checked while claiming, staging, linking, and atomically publishing a
+command, including across backend replicas and reaper recovery. Terminal user
+and linked-task decisions establish the same fence, and daemon polling rejects
+queued commands whose request or session is no longer live. An expired new-thread
+admission records an authoritative failure; replay of the same operation may
+reopen only that exact admission-expiry outcome, using an authoritative running
+status event that clears the stale outcome. A later cancellation, completion,
+or unrelated failure is never resurrected by replay.
+
 The compatibility run request may retain a private sequential cursor while the
 execution plane migrates. That cursor is not workflow truth and is absent from
 the client interface. Future dependency-graph scheduling or custom completion
