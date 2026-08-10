@@ -182,9 +182,27 @@ export function readInitialRoute(): AppRoute {
   return parseAppPath(window.location.pathname, window.location.search).route;
 }
 
+/**
+ * The browser URL a state change should land on.
+ *
+ * Staying on the same path keeps that path's own canonical params: the thread
+ * space panel is URL-driven (`?space=1&artifact=…`), so a send inside an open
+ * thread — the team-room case, where artifacts pile up — must not silently
+ * close the panel. Moving to a different path starts clean, because an
+ * artifact selection only describes the thread it came from.
+ */
+export function browserUrlForAppState(
+  state: AppLocationState,
+  currentPathname: string,
+  currentSearch = "",
+): string {
+  const nextPath = pathForAppState(state);
+  return nextPath === currentPathname ? canonicalBrowserUrl(nextPath, currentSearch) : nextPath;
+}
+
 export function syncAppStateToUrl(state: AppLocationState, replace = false): void {
   if (typeof window === "undefined") return;
-  const nextUrl = pathForAppState(state);
+  const nextUrl = browserUrlForAppState(state, window.location.pathname, window.location.search);
   if (`${window.location.pathname}${window.location.search}${window.location.hash}` === nextUrl) return;
   window.history[replace ? "replaceState" : "pushState"]({ relayRoute: state }, "", nextUrl);
   window.dispatchEvent(new Event(APP_NAVIGATION_EVENT));
