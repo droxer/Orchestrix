@@ -19,7 +19,7 @@ import {
   threadRuntimeNodeId,
 } from "../src/lib/threadRuntime.js";
 import { isAwaitingFeedbackDecision, rerunAssignmentForSession } from "../src/lib/workflow.js";
-import { teamMembersForMention, teamRunInput } from "../src/lib/messageRouting.js";
+import { teamMembersForMention, teamMessageInput } from "../src/lib/messageRouting.js";
 import type { RelaySession } from "../src/types.js";
 
 type AgentRuns = RelaySession["agentRuns"];
@@ -356,38 +356,41 @@ describe("new-thread computer selection", () => {
   });
 });
 
-describe("team thread run input", () => {
+describe("team thread message input", () => {
   const teamMembers = [
     { id: "agent_lead", displayName: "Lead" },
     { id: "agent_support", displayName: "Support" },
   ];
 
   it("addresses the room when no member is mentioned", () => {
-    const input = teamRunInput({
-      taskGoal: "one more pass",
-      sessionId: "ses_1",
+    const input = teamMessageInput({
+      text: "one more pass",
       teamMembers,
       mode: "action",
       userMessageId: "evt_1",
     });
 
-    assert.equal(input.assignments, undefined);
-    assert.equal(input.mode, "action");
-    assert.equal(input.sessionId, "ses_1");
-    assert.equal(input.userMessageId, "evt_1");
+    assert.deepEqual(input, {
+      text: "one more pass",
+      intent: "accomplish",
+      userMessageId: "evt_1",
+    });
   });
 
   it("narrows to the mentioned member", () => {
-    const input = teamRunInput({
-      taskGoal: "@Support take this",
-      sessionId: "ses_1",
+    const input = teamMessageInput({
+      text: "@Support take this",
       teamMembers,
       mode: "action",
       userMessageId: "evt_1",
     });
 
-    assert.deepEqual(input.assignments, [{ agentId: "agent_support", mode: "action" }]);
-    assert.equal(input.mode, undefined);
+    assert.deepEqual(input, {
+      text: "@Support take this",
+      intent: "accomplish",
+      addressAgentId: "agent_support",
+      userMessageId: "evt_1",
+    });
   });
 });
 
@@ -417,9 +420,8 @@ describe("team mention candidates", () => {
     // but is not a member of this team.
     const members = teamMembersForMention(["agent_lead", "agent_support"], employeeAgents);
 
-    const input = teamRunInput({
-      taskGoal: "@Scout can you look at this?",
-      sessionId: "ses_1",
+    const input = teamMessageInput({
+      text: "@Scout can you look at this?",
       teamMembers: members,
       mode: "action",
       userMessageId: "evt_1",
@@ -427,7 +429,7 @@ describe("team mention candidates", () => {
 
     // Unknown to the room, so the message runs the whole room instead of
     // narrowing to (and being rejected for) an outsider.
-    assert.equal(input.assignments, undefined);
-    assert.equal(input.mode, "action");
+    assert.equal(input.addressAgentId, undefined);
+    assert.equal(input.intent, "accomplish");
   });
 });

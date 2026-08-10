@@ -19,6 +19,7 @@ import {
   renameSession,
   runLogicalAgents,
   startTask,
+  submitThreadMessage,
   updateAgentProfileImage,
   updateComputerDisplayName,
   updateOwnEmployeeAgent,
@@ -513,5 +514,39 @@ describe("agent run payloads", () => {
       sessionId: "ses_1",
       mode: "action",
     });
+  });
+});
+
+describe("thread collaboration messages", () => {
+  it("sends semantic intent without assignment transport details", async () => {
+    const calls: Array<{ url: string; body: unknown }> = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), body: JSON.parse(String(init?.body ?? "{}")) });
+      return new Response(JSON.stringify({ id: "ses_1" }), {
+        status: 202,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      await submitThreadMessage("ses_1", {
+        text: "@Support check this",
+        intent: "review",
+        addressAgentId: "agent_support",
+        userMessageId: "evt_1",
+      });
+    } finally {
+      globalThis.fetch = original;
+    }
+
+    assert.deepEqual(calls, [{
+      url: "/api/v1/threads/ses_1/messages",
+      body: {
+        text: "@Support check this",
+        intent: "review",
+        addressAgentId: "agent_support",
+        userMessageId: "evt_1",
+      },
+    }]);
   });
 });
