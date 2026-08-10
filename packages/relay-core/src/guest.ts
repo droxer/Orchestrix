@@ -224,7 +224,11 @@ export function codexCliConfigOverrides(): string[] {
   if (baseUrl) {
     argv.push(
       "-c",
+      'model_providers.dashscope.name="DashScope"',
+      "-c",
       `model_providers.dashscope.base_url=${JSON.stringify(baseUrl)}`,
+      "-c",
+      'model_providers.dashscope.env_key="OPENAI_API_KEY"',
       "-c",
       "model_providers.dashscope.requires_openai_auth=false",
     );

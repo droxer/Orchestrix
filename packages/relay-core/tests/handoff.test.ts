@@ -1403,6 +1403,26 @@ describe("Pi provider config", () => {
     );
   });
 
+  it("fully defines the dashscope provider so codex config loading does not fail", () => {
+    withEnv(
+      {
+        OPENAI_API_KEY: "llm-key",
+        OPENAI_BASE_URL: "https://llm.example.com/v1",
+        OPENAI_MODEL: "llm-model",
+      },
+      () => {
+        const codexConfig = guestCodexConfigToml();
+        const codexCommand = buildCodexCommand(state());
+
+        assert.match(codexConfig, /\[model_providers\.dashscope\]/);
+        assert.match(codexConfig, /name = "DashScope"/);
+        assert.match(codexCommand, /model_providers\.dashscope\.name="DashScope"/);
+        assert.match(codexCommand, /model_providers\.dashscope\.env_key="OPENAI_API_KEY"/);
+        assert.match(codexCommand, /model_providers\.dashscope\.requires_openai_auth=false/);
+      },
+    );
+  });
+
   it("uses RELAY_WORKSPACE for the host workspace path", () => {
     const temp = mkdtempSync(join(tmpdir(), "relay-workspace-"));
     const explicit = mkdtempSync(join(tmpdir(), "relay-explicit-workspace-"));
