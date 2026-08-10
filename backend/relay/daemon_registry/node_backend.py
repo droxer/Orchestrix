@@ -493,6 +493,13 @@ class ServerDaemonNodeBackend:
             self._record_run_decision(
                 controller, session_id, decision, request["assignments"]
             )
+        collaboration = request.get("collaboration")
+        if isinstance(collaboration, dict) and isinstance(
+            collaboration.get("manifest"), dict
+        ):
+            controller.record_collaboration_round_started(
+                session_id, collaboration["manifest"]
+            )
         return dispatch_task_goal
 
     @staticmethod

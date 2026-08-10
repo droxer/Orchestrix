@@ -132,6 +132,19 @@ class SessionController:
         )
         return session
 
+    def record_collaboration_round_started(
+        self, session_id: str, manifest: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Persist the immutable collaboration plan before daemon delivery."""
+        return self._append(
+            session_id,
+            relay_event(
+                "collaboration.round.started",
+                session_id,
+                {"manifest": manifest},
+            ),
+        )
+
     def complete_session(
         self, session_id: str, outcome: str, task_status: str = "done"
     ) -> dict[str, Any]:
