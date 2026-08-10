@@ -934,6 +934,9 @@ def test_new_thread_retry_resumes_the_session_owned_by_its_prepared_admission(
         assert interrupted.status_code == 409
         assert retried.status_code == 202, retried.text
         assert retried.json()["id"] == prepared["sessionId"]
+        assert retried.json()["status"] == "running"
+        assert "finalOutcome" not in retried.json()
+        assert len(app.state.daemon_store.take_queued_commands(node["id"])) == 1
         assert len(app.state.session_store.list_sessions()) == 1
 
 

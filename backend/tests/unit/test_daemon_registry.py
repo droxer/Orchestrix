@@ -2931,6 +2931,75 @@ def test_cancelling_a_prepared_request_prevents_later_reaper_activation() -> Non
         assert registry.take_commands("sbx_alice", "node_token") == []
 
 
+def test_direct_activation_refuses_a_cancelled_prepared_request() -> None:
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        registry.register(
+            {
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            },
+            "ui_token",
+        )
+        session = session_store.create_session(
+            {"workspacePath": "/workspace/alice", "taskGoal": "cancel admission"}
+        )
+        prepared = registry.prepare_run_request(
+            "sbx_alice",
+            session["id"],
+            session["taskGoal"],
+            [{"executorKind": "codex", "mode": "action"}],
+            {},
+        )
+        daemon_store.update_run_request(prepared["id"], {"status": "cancelled"})
+
+        with pytest.raises(ValueError, match="cannot activate.*cancelled"):
+            registry.activate_run_request(prepared["id"])
+
+        assert registry.take_commands("sbx_alice", "node_token") == []
+
+
+def test_expired_admission_cannot_revive_after_a_newer_terminal_decision() -> None:
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        session = session_store.create_session(
+            {"workspacePath": "/workspace", "taskGoal": "do not revive"}
+        )
+        prepared = daemon_store.create_run_request(
+            {
+                "nodeId": "sbx_alice",
+                "sessionId": session["id"],
+                "taskGoal": session["taskGoal"],
+                "assignments": [],
+                "state": {"_relay_collaboration_admission_expired": True},
+                "status": "failed",
+            }
+        )
+        SessionController(session_store).cancel_session(session["id"], "stop")
+
+        with pytest.raises(ValueError, match="terminal session"):
+            registry.prepare_run_request(
+                "sbx_alice",
+                session["id"],
+                session["taskGoal"],
+                [],
+                {},
+                request_id=prepared["id"],
+            )
+
+        assert daemon_store.get_run_request(prepared["id"])["status"] == "failed"
+
+
 @pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
 def test_run_request_creation_reserves_node_capacity_atomically(store_factory) -> None:
     with TemporaryDirectory() as root:
