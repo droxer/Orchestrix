@@ -14,8 +14,10 @@ from typing import Any
 from loguru import logger
 
 from ..collaboration.models import (
+    COLLABORATION_ADMISSION_EXPIRED_STATE_KEY,
     COLLABORATION_FINGERPRINT_STATE_KEY,
     COLLABORATION_MANIFEST_STATE_KEY,
+    COLLABORATION_NEW_SESSION_STATE_KEY,
 )
 from ..collaboration.policy import (
     PARTICIPANT_FAILURES_STATE_KEY,
@@ -1561,6 +1563,30 @@ class DaemonNodeRegistry:
         active_runs: list[dict[str, Any]] | None,
         request_id: str | None,
     ) -> dict[str, Any]:
+        existing = self.daemon_store.get_run_request(request_id) if request_id else None
+        if existing and (existing.get("state") or {}).get(
+            COLLABORATION_ADMISSION_EXPIRED_STATE_KEY
+        ):
+            return self.daemon_store.update_run_request(
+                existing["id"],
+                {
+                    "nodeId": sandbox_id,
+                    "sessionId": session_id,
+                    "taskGoal": task_goal,
+                    "assignments": assignments,
+                    "state": state,
+                    "status": "prepared",
+                    "currentIndex": 0,
+                    "currentCommandId": None,
+                    "currentRunId": None,
+                    "currentAgent": None,
+                    "currentMode": None,
+                    "currentStartedAt": None,
+                    "currentProgressAt": None,
+                    "error": None,
+                    "completedAt": None,
+                },
+            )
         active = self.daemon_store.active_run_request_for_session_any_node(session_id)
         if active and request_id and active.get("id") == request_id:
             return active
@@ -2002,6 +2028,18 @@ class DaemonNodeRegistry:
                         },
                     )
                     continue
+                if session.get("status") in ("completed", "failed", "cancelled"):
+                    self.daemon_store.update_run_request(
+                        request["id"],
+                        {
+                            "status": session["status"],
+                            "error": (
+                                "Prepared collaboration was not activated because "
+                                f"the session is {session['status']}."
+                            ),
+                        },
+                    )
+                    continue
                 round_id = (
                     manifest.get("roundId") if isinstance(manifest, dict) else None
                 )
@@ -2019,6 +2057,10 @@ class DaemonNodeRegistry:
                 updated_at = datetime.fromisoformat(request["updatedAt"])
                 age_seconds = (datetime.now(timezone.utc) - updated_at).total_seconds()
                 if age_seconds >= PREPARED_ADMISSION_LEASE_SECONDS:
+                    state = {
+                        **(request.get("state") or {}),
+                        COLLABORATION_ADMISSION_EXPIRED_STATE_KEY: True,
+                    }
                     self.daemon_store.update_run_request(
                         request["id"],
                         {
@@ -2027,8 +2069,18 @@ class DaemonNodeRegistry:
                                 "Collaboration admission expired before its "
                                 "authoritative round event was committed."
                             ),
+                            "state": state,
                         },
                     )
+                    if state.get(COLLABORATION_NEW_SESSION_STATE_KEY):
+                        SessionController(
+                            self.store,
+                            task_store=self.task_store,
+                            task_id=request.get("taskId"),
+                        ).fail_session(
+                            request["sessionId"],
+                            "Collaboration admission expired before the round started.",
+                        )
                 continue
             if request.get("status") == "finalizing":
                 terminal_event = (request.get("state") or {}).get(

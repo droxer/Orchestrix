@@ -7,6 +7,8 @@ CollaborationPurpose = Literal["accomplish", "discuss", "review"]
 RecoveryKind = Literal["rerun", "handoff"]
 COLLABORATION_MANIFEST_STATE_KEY = "_relay_collaboration_manifest"
 COLLABORATION_FINGERPRINT_STATE_KEY = "_relay_collaboration_fingerprint"
+COLLABORATION_ADMISSION_EXPIRED_STATE_KEY = "_relay_collaboration_admission_expired"
+COLLABORATION_NEW_SESSION_STATE_KEY = "_relay_collaboration_new_session"
 
 
 class CollaborationIdempotencyError(ValueError):
