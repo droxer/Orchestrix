@@ -60,8 +60,8 @@ truncate either projection.
 ```text
 PATCH  /api/v1/threads/{id}                         { title } or { archived: true }
 POST   /api/v1/threads/{id}/cancellations
-POST   /api/v1/threads/{id}/messages               { text, intent, addressAgentId? }
-POST   /api/v1/threads/{id}/recoveries             { kind, targetAgentId, mode, note? }
+POST   /api/v1/threads/{id}/messages               { text, intent, addressAgentId?, userMessageId?, idempotencyKey? }
+POST   /api/v1/threads/{id}/recoveries             { kind, targetAgentId, mode, note?, idempotencyKey? }
 PUT    /api/v1/tasks/{id}/assignment
 POST   /api/v1/tasks/{id}/runs
 POST   /api/v1/tasks/{id}/pickups

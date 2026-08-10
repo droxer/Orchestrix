@@ -23,6 +23,7 @@ export interface AgentRun {
   role?: AgentRole;
   brief?: string;
   coordinator?: boolean;
+  synthesizer?: boolean;
   teamSnapshot?: {
     teamId: string;
     teamRevision?: string;
@@ -92,6 +93,7 @@ export interface CollaborationRoundManifest {
     role?: AgentRole;
     brief?: string;
     coordinator?: boolean;
+    synthesizer?: boolean;
   }>;
   completionPolicy: string;
 }
@@ -191,6 +193,7 @@ export type RelayEvent =
       role?: AgentRole;
       brief?: string;
       coordinator?: boolean;
+      synthesizer?: boolean;
       teamSnapshot?: AgentRun["teamSnapshot"];
       teamPhase?: AgentRun["teamPhase"];
       mode: AgentTaskMode;

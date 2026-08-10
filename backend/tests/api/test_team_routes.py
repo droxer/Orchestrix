@@ -784,24 +784,26 @@ def test_team_task_start_propagates_review_mode_to_every_member(monkeypatch) -> 
         )
 
         assert started.status_code == 202
-        [lead_command] = app.state.registry.take_commands("node_alice", "node_token")
-        assert lead_command["mode"] == "review"
+        [support_command] = app.state.registry.take_commands("node_alice", "node_token")
+        assert support_command["mode"] == "review"
+        assert support_command["logicalAgentId"] == support["id"]
         app.state.registry.handle_event(
             "node_alice",
             {
                 "type": "run.completed",
-                "commandId": lead_command["id"],
-                "sessionId": lead_command["sessionId"],
-                "runId": lead_command["runId"],
-                "agent": "codex",
+                "commandId": support_command["id"],
+                "sessionId": support_command["sessionId"],
+                "runId": support_command["runId"],
+                "agent": "claude",
                 "mode": "review",
                 "exitCode": 0,
-                "agentLog": "lead review",
+                "agentLog": "support review",
             },
             "node_token",
         )
-        [support_command] = app.state.registry.take_commands("node_alice", "node_token")
-        assert support_command["mode"] == "review"
+        [lead_command] = app.state.registry.take_commands("node_alice", "node_token")
+        assert lead_command["mode"] == "review"
+        assert lead_command["logicalAgentId"] == lead["id"]
 
 
 def test_unroutable_team_start_requests_capacity_and_queues_scheduler_retry(
@@ -1741,8 +1743,10 @@ def test_explicit_assignment_to_a_disabled_team_requires_a_recovery_decision(
         )
 
         assert recovered.status_code == 202
-        request = app.state.registry.daemon_store.active_run_request_for_session_any_node(
-            session_id
+        request = (
+            app.state.registry.daemon_store.active_run_request_for_session_any_node(
+                session_id
+            )
         )
         assert [item["agentId"] for item in request["assignments"]] == [lead["id"]]
         recovery_round = [

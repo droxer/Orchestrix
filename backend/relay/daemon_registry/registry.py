@@ -13,7 +13,10 @@ from typing import Any
 
 from loguru import logger
 
-from ..collaboration.models import COLLABORATION_MANIFEST_STATE_KEY
+from ..collaboration.models import (
+    COLLABORATION_FINGERPRINT_STATE_KEY,
+    COLLABORATION_MANIFEST_STATE_KEY,
+)
 from ..collaboration.policy import (
     PARTICIPANT_FAILURES_STATE_KEY,
     REPAIR_COUNT_STATE_KEY,
@@ -155,6 +158,7 @@ CARRIED_RUN_REQUEST_STATE_KEYS = frozenset(
         ROUND_RESULT_STATE_KEY,
         PARTICIPANT_FAILURES_STATE_KEY,
         COLLABORATION_MANIFEST_STATE_KEY,
+        COLLABORATION_FINGERPRINT_STATE_KEY,
     }
 )
 # Mirrors ROUND_RESULT_RELATIVE_PATH in relay-daemon: `.relay/` is excluded
@@ -1490,6 +1494,32 @@ class DaemonNodeRegistry:
         active_runs: list[dict[str, Any]] | None = None,
         request_id: str | None = None,
     ) -> dict[str, Any]:
+        request = self.prepare_run_request(
+            sandbox_id,
+            session_id,
+            task_goal,
+            assignments,
+            state,
+            task_id,
+            active_runs=active_runs,
+            request_id=request_id,
+        )
+        return self.activate_run_request(
+            request["id"], task_goal=task_goal, active_runs=active_runs
+        )
+
+    def prepare_run_request(
+        self,
+        sandbox_id: str,
+        session_id: str,
+        task_goal: str,
+        assignments: list[dict[str, Any]],
+        state: dict[str, Any],
+        task_id: str | None = None,
+        *,
+        active_runs: list[dict[str, Any]] | None = None,
+        request_id: str | None = None,
+    ) -> dict[str, Any]:
         assignments = [
             {
                 **assignment,
@@ -1506,7 +1536,7 @@ class DaemonNodeRegistry:
             ),
         ]
         with self.dispatch_scope(node_ids):
-            return self._start_run_request_unlocked(
+            return self._prepare_run_request_unlocked(
                 sandbox_id,
                 session_id,
                 task_goal,
@@ -1517,7 +1547,7 @@ class DaemonNodeRegistry:
                 request_id,
             )
 
-    def _start_run_request_unlocked(
+    def _prepare_run_request_unlocked(
         self,
         sandbox_id: str,
         session_id: str,
@@ -1530,7 +1560,7 @@ class DaemonNodeRegistry:
     ) -> dict[str, Any]:
         if self.daemon_store.active_run_request_for_session_any_node(session_id):
             raise ValueError(f"Session {session_id} already has an active daemon run.")
-        request = self.daemon_store.create_run_request(
+        return self.daemon_store.create_run_request(
             {
                 **({"id": request_id} if request_id else {}),
                 "nodeId": sandbox_id,
@@ -1538,10 +1568,37 @@ class DaemonNodeRegistry:
                 "taskGoal": task_goal,
                 "assignments": assignments,
                 "state": state,
+                "status": "prepared",
                 **({"taskId": task_id} if task_id else {}),
             }
         )
-        return self._enqueue_current_assignment(request, active_runs=active_runs)
+
+    def activate_run_request(
+        self,
+        request_id: str,
+        *,
+        task_goal: str | None = None,
+        active_runs: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        request = self.daemon_store.get_run_request(request_id)
+        if not request:
+            raise KeyError(request_id)
+        with self.dispatch_scope([request["nodeId"]]):
+            request = self.daemon_store.get_run_request(request_id)
+            if not request:
+                raise KeyError(request_id)
+            if request.get("status") == "prepared":
+                patch: dict[str, Any] = {"status": "running"}
+                if task_goal is not None:
+                    patch["taskGoal"] = task_goal
+                    patch["state"] = {
+                        **(request.get("state") or {}),
+                        "task_goal": task_goal,
+                    }
+                request = self.daemon_store.update_run_request(request_id, patch)
+            if request.get("currentCommandId"):
+                return request
+            return self._enqueue_current_assignment(request, active_runs=active_runs)
 
     def cancel_active_run(
         self, sandbox_id: str, session_id: str, reason: str
@@ -1924,6 +1981,10 @@ class DaemonNodeRegistry:
         self._maybe_prune_terminal_records(monotonic_now)
         self._reap_orphaned_runs_unlocked()
         for request in self.daemon_store.list_active_run_requests():
+            # Admission has reserved capacity but session events are not yet
+            # committed. Only the submitting conductor may activate it.
+            if request.get("status") == "prepared":
+                continue
             if request.get("status") == "finalizing":
                 terminal_event = (request.get("state") or {}).get(
                     TERMINAL_EVENT_STATE_KEY
@@ -2266,9 +2327,7 @@ class DaemonNodeRegistry:
             "_runRequestId": run_request["id"],
             "_nodeId": node_id,
         }
-        collaboration_manifest = request_state.get(
-            COLLABORATION_MANIFEST_STATE_KEY
-        )
+        collaboration_manifest = request_state.get(COLLABORATION_MANIFEST_STATE_KEY)
         if isinstance(collaboration_manifest, dict):
             command["delivery"] = {
                 "type": "assignment-attempt",
@@ -2379,6 +2438,11 @@ class DaemonNodeRegistry:
                 **(
                     {"coordinator": True}
                     if assignment.get("coordinator") is True
+                    else {}
+                ),
+                **(
+                    {"synthesizer": True}
+                    if assignment.get("synthesizer") is True
                     else {}
                 ),
                 **(
@@ -3157,10 +3221,15 @@ class DaemonNodeRegistry:
             return {}
         seen: dict[str, int] = {}
         for event in session.get("events", []):
-            if event.get("type") == "agent.output.batch" and event.get("runId") == run_id:
+            if (
+                event.get("type") == "agent.output.batch"
+                and event.get("runId") == run_id
+            ):
                 for entry in event.get("entries", []):
                     stream = entry.get("stream") if isinstance(entry, dict) else None
-                    sequence = entry.get("sequence") if isinstance(entry, dict) else None
+                    sequence = (
+                        entry.get("sequence") if isinstance(entry, dict) else None
+                    )
                     if isinstance(stream, str) and isinstance(sequence, int):
                         seen[stream] = max(seen.get(stream, -1), sequence)
                 continue

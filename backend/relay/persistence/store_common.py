@@ -386,6 +386,7 @@ def _apply_agent_started(session: dict[str, Any], event: dict[str, Any]) -> None
         "workspaceIdentity",
         "brief",
         "coordinator",
+        "synthesizer",
         "teamSnapshot",
         "assignmentId",
         "teamPhase",

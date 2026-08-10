@@ -43,10 +43,22 @@ manifest and re-read when the next round opens.
 
 The advancement and failure rules are pure collaboration policy. The daemon
 registry applies their decisions and owns only delivery concerns: capacity,
-leases, command staging, output, and retries. Each `run.start` command carries a
-single `assignment-attempt` delivery envelope referencing its immutable round
-and assignment. The durable staged-command path is the outbox boundary: the
-assignment is authorized and recorded before a daemon can claim it.
+leases, command staging, output, and retries. Admission first creates a durable
+`prepared` run request. That state reserves the session and runtime capacity but
+cannot be claimed by a daemon. The conductor then appends the user/decision and
+`collaboration.round.started` events, activates the request, stages its command,
+and publishes it. Each `run.start` command carries a single
+`assignment-attempt` delivery envelope referencing its immutable round and
+assignment. This prepared-request plus staged-command path is the outbox
+boundary: the assignment is authorized and recorded before a daemon can claim
+it.
+
+Idempotency keys are scoped by actor and thread before they identify a run
+request. A persisted semantic-request fingerprint rejects reuse of a key for
+different work. `userMessageId` is the message endpoint's default idempotency
+key. If event persistence is interrupted after admission, a retry resumes the
+same prepared request and reuses its immutable manifest; event IDs, decision
+IDs, and round IDs prevent duplicate authoritative entries.
 
 The compatibility run request may retain a private sequential cursor while the
 execution plane migrates. That cursor is not workflow truth and is absent from
@@ -66,8 +78,9 @@ POST /api/v1/threads/{threadId}/recoveries
 ```
 
 Message requests contain `text`, semantic `intent`, and optional
-`addressAgentId`. Recovery requests contain `kind`, `targetAgentId`, `mode`,
-and an optional note. Neither interface accepts daemon IDs, executor kinds, or
+`addressAgentId`, `userMessageId`, and `idempotencyKey`. Recovery requests
+contain `kind`, `targetAgentId`, `mode`, an optional note, and an optional
+`idempotencyKey`. Neither interface accepts daemon IDs, executor kinds, or
 assignment arrays.
 
 ## Consequences
@@ -79,6 +92,8 @@ assignment arrays.
   outside agents into that room.
 - Daemon delivery can be retried at least once without changing logical
   assignment identity.
+- A collaboration round cannot become daemon-claimable before its
+  authoritative session events are durable.
 - The legacy `/agent-runs` route remains a compatibility adapter for new-thread
   creation and older callers; continued-thread web traffic uses the conductor.
 

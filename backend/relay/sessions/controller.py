@@ -136,6 +136,14 @@ class SessionController:
         self, session_id: str, manifest: dict[str, Any]
     ) -> dict[str, Any]:
         """Persist the immutable collaboration plan before daemon delivery."""
+        round_id = manifest.get("roundId")
+        current = self.store.get_session(session_id)
+        if round_id and any(
+            event.get("type") == "collaboration.round.started"
+            and (event.get("manifest") or {}).get("roundId") == round_id
+            for event in current.get("events", [])
+        ):
+            return current
         return self._append(
             session_id,
             relay_event(
@@ -195,11 +203,20 @@ class SessionController:
         kind: str,
         note: str | None = None,
         target_agent: str | None = None,
+        *,
+        decision_id: str | None = None,
     ) -> dict[str, Any]:
         if kind == "cancel":
             return self.cancel_session(session_id, note or "Cancelled by human.")
+        if decision_id:
+            current = self.store.get_session(session_id)
+            if any(
+                decision.get("id") == decision_id
+                for decision in current.get("decisions", [])
+            ):
+                return current
         decision = {
-            "id": new_relay_id("dec"),
+            "id": decision_id or new_relay_id("dec"),
             "kind": kind,
             "createdAt": now_iso(),
             **({"note": note} if note else {}),
@@ -274,7 +291,16 @@ class SessionController:
         assignments: list[dict[str, Any]],
         note: str | None = None,
         target_agent_id: str | None = None,
+        *,
+        decision_id: str | None = None,
     ) -> dict[str, Any]:
+        if decision_id:
+            current = self.store.get_session(session_id)
+            if any(
+                decision.get("id") == decision_id
+                for decision in current.get("decisions", [])
+            ):
+                return current
         self._validate_assignment(session_id)
         self._append(
             session_id,
@@ -283,7 +309,7 @@ class SessionController:
                 session_id,
                 {
                     "decision": {
-                        "id": new_relay_id("dec"),
+                        "id": decision_id or new_relay_id("dec"),
                         "kind": "handoff",
                         "createdAt": now_iso(),
                         **({"note": note} if note else {}),
@@ -505,6 +531,9 @@ class SessionController:
                     **({"brief": step["brief"]} if step.get("brief") else {}),
                     **(
                         {"coordinator": True} if step.get("coordinator") is True else {}
+                    ),
+                    **(
+                        {"synthesizer": True} if step.get("synthesizer") is True else {}
                     ),
                     **(
                         {"teamSnapshot": step["teamSnapshot"]}

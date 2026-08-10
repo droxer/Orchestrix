@@ -79,7 +79,9 @@ def daemon_event_is_prunable(event_type: str) -> bool:
     )
 
 
-ACTIVE_RUN_REQUEST_STATUSES = frozenset({"running", "dispatching", "finalizing"})
+ACTIVE_RUN_REQUEST_STATUSES = frozenset(
+    {"prepared", "running", "dispatching", "finalizing"}
+)
 DISPATCH_CLAIM_ID_STATE_KEY = "_relay_dispatch_claim_id"
 DISPATCH_CLAIM_EXPIRES_STATE_KEY = "_relay_dispatch_claim_expires_at"
 TERMINAL_EVENT_STATE_KEY = "_relay_terminal_event"
@@ -352,7 +354,9 @@ class LocalDaemonStore:
         try:
             self._workspace_listener(command_id)
         except Exception:  # noqa: BLE001 - notification hints must not fail writes
-            logger.exception("Workspace response listener failed", command_id=command_id)
+            logger.exception(
+                "Workspace response listener failed", command_id=command_id
+            )
 
     def register_node(self, sandbox: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
@@ -624,9 +628,7 @@ class LocalDaemonStore:
         self._notify_command(record["nodeId"])
         return updated
 
-    def record_workspace_response(
-        self, node_id: str, response: dict[str, Any]
-    ) -> None:
+    def record_workspace_response(self, node_id: str, response: dict[str, Any]) -> None:
         command_id = str(response["commandId"])
         with self._lock:
             record = self._get_command(command_id)
@@ -652,9 +654,7 @@ class LocalDaemonStore:
                 "updatedAt": now_iso(),
                 "completedAt": now_iso(),
             }
-            _write_json(
-                self.commands_dir / f"{safe_name(command_id)}.json", completed
-            )
+            _write_json(self.commands_dir / f"{safe_name(command_id)}.json", completed)
             self._remove_command_from_index(node_id, command_id)
             self.append_daemon_event(
                 daemon_event(
@@ -1524,7 +1524,9 @@ class DatabaseDaemonStore:
         try:
             self._workspace_listener(command_id)
         except Exception:  # noqa: BLE001 - notification hints must not fail writes
-            logger.exception("Workspace response listener failed", command_id=command_id)
+            logger.exception(
+                "Workspace response listener failed", command_id=command_id
+            )
 
     def _write_node_agents(self, conn: Any, node_pk: str, node: dict[str, Any]) -> None:
         """Replace a node's daemon_node_agents rows, but only if they changed.
@@ -1993,9 +1995,7 @@ class DatabaseDaemonStore:
         self._notify_command(record["nodeId"])
         return updated
 
-    def record_workspace_response(
-        self, node_id: str, response: dict[str, Any]
-    ) -> None:
+    def record_workspace_response(self, node_id: str, response: dict[str, Any]) -> None:
         command_id = str(response["commandId"])
         with store_transaction(self.engine) as conn:
             row = (
@@ -2301,9 +2301,7 @@ class DatabaseDaemonStore:
                         select(self.run_requests)
                         .where(self.run_requests.c.node_id == node_pk)
                         .where(
-                            self.run_requests.c.status.in_(
-                                ACTIVE_RUN_REQUEST_STATUSES
-                            )
+                            self.run_requests.c.status.in_(ACTIVE_RUN_REQUEST_STATUSES)
                         )
                     )
                     .mappings()
@@ -2311,8 +2309,7 @@ class DatabaseDaemonStore:
                 )
                 active_requests = [row_to_run_request(row) for row in active_rows]
                 if any(
-                    item["sessionId"] == record["sessionId"]
-                    for item in active_requests
+                    item["sessionId"] == record["sessionId"] for item in active_requests
                 ):
                     raise ValueError(
                         f"Session {record['sessionId']} already has an active daemon run."

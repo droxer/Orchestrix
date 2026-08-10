@@ -732,9 +732,7 @@ def test_normal_solo_message_cannot_address_an_agent_outside_the_room(
         sync_node_agents(app.state, node)
         agents = app.state.agent_store.list_agents(supervisor_employee_id="admin")
         owner = next(agent for agent in agents if agent["executorKind"] == "codex")
-        outsider = next(
-            agent for agent in agents if agent["executorKind"] == "claude"
-        )
+        outsider = next(agent for agent in agents if agent["executorKind"] == "claude")
         session = app.state.session_store.create_session(
             {
                 "daemonNodeId": node["id"],
@@ -779,9 +777,13 @@ def test_semantic_message_retry_reconciles_a_prepared_attempt_without_duplicate_
             }
         )
         sync_node_agents(app.state, node)
-        owner = app.state.agent_store.list_agents(
-            supervisor_employee_id="admin"
-        )[0]
+        owner = next(
+            agent
+            for agent in app.state.agent_store.list_agents(
+                supervisor_employee_id="admin"
+            )
+            if agent["executorKind"] == "codex"
+        )
         session = app.state.session_store.create_session(
             {
                 "daemonNodeId": node["id"],
@@ -798,10 +800,8 @@ def test_semantic_message_retry_reconciles_a_prepared_attempt_without_duplicate_
             nonlocal attempts
             attempts += 1
             if attempts == 1:
-                prepared = (
-                    app.state.registry.daemon_store.active_run_request_for_session_any_node(
-                        session_id
-                    )
+                prepared = app.state.registry.daemon_store.active_run_request_for_session_any_node(
+                    session_id
                 )
                 assert prepared and prepared["status"] == "prepared"
                 assert app.state.daemon_store.take_queued_commands(node["id"]) == []
@@ -820,9 +820,7 @@ def test_semantic_message_retry_reconciles_a_prepared_attempt_without_duplicate_
         interrupted = client.post(
             f"/api/v1/threads/{session['id']}/messages", json=body
         )
-        retried = client.post(
-            f"/api/v1/threads/{session['id']}/messages", json=body
-        )
+        retried = client.post(f"/api/v1/threads/{session['id']}/messages", json=body)
 
         assert interrupted.status_code == 409
         assert retried.status_code == 202, retried.text
@@ -830,16 +828,18 @@ def test_semantic_message_retry_reconciles_a_prepared_attempt_without_duplicate_
         assert [
             event["id"]
             for event in persisted["events"]
-            if event["type"] == "user.message"
-            and event["id"] == "message_retry_1"
+            if event["type"] == "user.message" and event["id"] == "message_retry_1"
         ] == ["message_retry_1"]
-        assert len(
-            [
-                event
-                for event in persisted["events"]
-                if event["type"] == "collaboration.round.started"
-            ]
-        ) == 1
+        assert (
+            len(
+                [
+                    event
+                    for event in persisted["events"]
+                    if event["type"] == "collaboration.round.started"
+                ]
+            )
+            == 1
+        )
         assert len(app.state.daemon_store.take_queued_commands(node["id"])) == 1
 
         conflict = client.post(
@@ -1932,9 +1932,10 @@ def test_agent_role_is_visible_and_can_be_cleared(monkeypatch) -> None:
         # The role decides what a team member is told to do, so the view that
         # renders the agent has to carry it.
         listed = client.get("/api/v1/admin/agents").json()["agents"]
-        assert next(item for item in listed if item["id"] == agent["id"])[
-            "defaultRole"
-        ] == "reviewer"
+        assert (
+            next(item for item in listed if item["id"] == agent["id"])["defaultRole"]
+            == "reviewer"
+        )
 
         cleared = client.patch(
             f"/api/v1/admin/agents/{agent['id']}", json={"defaultRole": None}
@@ -1964,6 +1965,10 @@ def test_agent_role_is_visible_and_can_be_cleared(monkeypatch) -> None:
         )
         assert owned.status_code == 200, owned.text
         assert owned.json()["agent"]["defaultRole"] == "planner"
-        assert not client.patch(
-            f"/api/v1/agents/{agent['id']}", json={"defaultRole": None}
-        ).json()["agent"].get("defaultRole")
+        assert (
+            not client.patch(
+                f"/api/v1/agents/{agent['id']}", json={"defaultRole": None}
+            )
+            .json()["agent"]
+            .get("defaultRole")
+        )

@@ -6,6 +6,11 @@ from typing import Any, Literal
 CollaborationPurpose = Literal["accomplish", "discuss", "review"]
 RecoveryKind = Literal["rerun", "handoff"]
 COLLABORATION_MANIFEST_STATE_KEY = "_relay_collaboration_manifest"
+COLLABORATION_FINGERPRINT_STATE_KEY = "_relay_collaboration_fingerprint"
+
+
+class CollaborationIdempotencyError(ValueError):
+    """The caller reused an admission key for a different semantic request."""
 
 
 @dataclass(frozen=True)

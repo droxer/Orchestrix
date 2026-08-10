@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import hashlib
+import json
+from dataclasses import asdict, dataclass, replace
 from typing import Any
 
 from ..core.ids import new_database_id, new_relay_id
@@ -15,7 +17,12 @@ from ..services.team_dispatch import (
     team_member_assignments,
 )
 from ..sessions.controller import SessionController
-from .models import MessageIntent, RecoveryIntent, RunIntent
+from .models import (
+    CollaborationIdempotencyError,
+    MessageIntent,
+    RecoveryIntent,
+    RunIntent,
+)
 
 ASSIGNMENT_BRIEF_MAX_CHARS = 4000
 VALID_MODES = frozenset({"action", "ask", "review"})
@@ -58,20 +65,34 @@ class CollaborationConductor:
         self, intent: MessageIntent | RecoveryIntent | RunIntent, actor: dict[str, Any]
     ) -> dict[str, Any]:
         prepared = self._prepare(intent)
+        fingerprint = _request_fingerprint(prepared)
         if prepared.idempotency_key:
-            existing = self.ctx.backend.idempotent_run(
-                prepared.idempotency_key, actor["employeeId"]
+            prepared = replace(
+                prepared,
+                idempotency_key=_scoped_idempotency_key(
+                    actor["employeeId"],
+                    prepared.session_id,
+                    prepared.idempotency_key,
+                ),
             )
-            if existing:
-                return existing
         try:
-            return await self._submit_prepared(prepared, actor)
+            if prepared.idempotency_key:
+                existing = self.ctx.backend.idempotent_run(
+                    prepared.idempotency_key,
+                    actor["employeeId"],
+                    expected_fingerprint=fingerprint,
+                )
+                if existing:
+                    return existing
+            return await self._submit_prepared(prepared, actor, fingerprint)
         except TeamDispatchError as error:
             raise CollaborationError(error.code) from error
         except AgentRoutingError as error:
             raise CollaborationError(error.code, str(error)) from error
         except PermissionError as error:
             raise CollaborationError("forbidden", str(error), status=403) from error
+        except CollaborationIdempotencyError as error:
+            raise CollaborationError("idempotency_conflict", str(error)) from error
         except CollaborationError:
             raise
         except ValueError as error:
@@ -108,7 +129,7 @@ class CollaborationConductor:
                 raw_assignments=raw_assignments,
                 mode=purpose_modes[intent.purpose],
                 requested_node_id=None,
-                idempotency_key=intent.idempotency_key,
+                idempotency_key=intent.idempotency_key or intent.user_message_id,
                 user_message_id=intent.user_message_id,
                 decision=None,
                 source="message",
@@ -120,9 +141,7 @@ class CollaborationConductor:
             return _PreparedRound(
                 task_goal="",
                 session_id=intent.thread_id,
-                raw_assignments=[
-                    {"agentId": intent.target_agent_id, "mode": mode}
-                ],
+                raw_assignments=[{"agentId": intent.target_agent_id, "mode": mode}],
                 mode=mode,
                 requested_node_id=None,
                 idempotency_key=intent.idempotency_key,
@@ -164,7 +183,10 @@ class CollaborationConductor:
         )
 
     async def _submit_prepared(
-        self, intent: _PreparedRound, actor: dict[str, Any]
+        self,
+        intent: _PreparedRound,
+        actor: dict[str, Any],
+        fingerprint: str,
     ) -> dict[str, Any]:
         session = self._session_for_actor(intent.session_id, actor)
         session = self._backfill_runtime_affinity(session)
@@ -301,6 +323,7 @@ class CollaborationConductor:
             parsed["userMessageId"] = intent.user_message_id
         if intent.idempotency_key:
             parsed["idempotencyKey"] = intent.idempotency_key
+            parsed["idempotencyFingerprint"] = fingerprint
         if team_id:
             parsed["teamId"] = team_id
         if intent.decision:
@@ -318,9 +341,10 @@ class CollaborationConductor:
             raise CollaborationError("thread_not_found", status=404) from error
         if not session.get("id"):
             raise CollaborationError("thread_not_found", status=404)
-        if not actor["isAdmin"] and session.get("ownerEmployeeId") != actor[
-            "employeeId"
-        ]:
+        if (
+            not actor["isAdmin"]
+            and session.get("ownerEmployeeId") != actor["employeeId"]
+        ):
             raise CollaborationError("thread_forbidden", status=403)
         return session
 
@@ -342,9 +366,7 @@ class CollaborationConductor:
             session["id"], managed_node_id
         )
 
-    def _team_employee_id(
-        self, session: dict[str, Any], actor: dict[str, Any]
-    ) -> str:
+    def _team_employee_id(self, session: dict[str, Any], actor: dict[str, Any]) -> str:
         if actor["isAdmin"]:
             return session.get("ownerEmployeeId") or actor["employeeId"]
         return actor["employeeId"]
@@ -417,14 +439,34 @@ class CollaborationConductor:
                         else {}
                     ),
                     **(
-                        {"synthesizer": True}
-                        if item.get("synthesizer") is True
-                        else {}
+                        {"synthesizer": True} if item.get("synthesizer") is True else {}
                     ),
                     **({"teamSnapshot": team_snapshot} if team_snapshot else {}),
                 }
             )
         return assignments
+
+
+def _scoped_idempotency_key(
+    actor_employee_id: str, session_id: str | None, caller_key: str
+) -> str:
+    resource = session_id or "new-thread"
+    digest = hashlib.sha256(
+        f"{actor_employee_id}\0{resource}\0{caller_key}".encode()
+    ).hexdigest()
+    return f"collaboration:{digest}"
+
+
+def _request_fingerprint(intent: _PreparedRound) -> str:
+    payload = asdict(intent)
+    payload.pop("idempotency_key", None)
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _mode(value: Any) -> str:
