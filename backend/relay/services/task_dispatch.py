@@ -5,7 +5,7 @@ from typing import Any, Protocol, TypedDict
 
 from loguru import logger
 
-from ..collaboration import create_round_manifest
+from ..collaboration.service import create_round_manifest
 from ..core.ids import new_database_id
 from ..daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
 from ..persistence.protocols import (

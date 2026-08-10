@@ -4,12 +4,8 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from ..collaboration import (
-    CollaborationConductor,
-    CollaborationError,
-    MessageIntent,
-    RecoveryIntent,
-)
+from ..collaboration.models import MessageIntent, RecoveryIntent
+from ..collaboration.service import CollaborationConductor, CollaborationError
 from .deps import AppContextDep
 from .helpers import json_body, request_actor, string_field
 

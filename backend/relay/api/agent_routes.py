@@ -5,7 +5,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
-from ..collaboration import CollaborationConductor, CollaborationError, RunIntent
+from ..collaboration.models import RunIntent
+from ..collaboration.service import CollaborationConductor, CollaborationError
 from ..persistence.agent_placement_store import create_node_placement, placement_status
 from ..security.auth import require_admin_session
 from ..services.computer_names import computer_display_name
