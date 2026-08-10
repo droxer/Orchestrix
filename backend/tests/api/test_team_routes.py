@@ -1724,20 +1724,30 @@ def test_explicit_assignment_to_a_disabled_team_requires_a_recovery_decision(
         assert answered.json()["detail"]["code"] == "team_disabled"
 
         recovered = client.post(
-            "/api/v1/agent-runs",
+            f"/api/v1/threads/{session_id}/recoveries",
             json={
-                "taskGoal": "another pass",
-                "sessionId": session_id,
-                "assignments": [{"agentId": lead["id"]}],
-                "decision": {
-                    "kind": "rerun",
-                    "targetAgent": "codex",
-                    "targetAgentId": lead["id"],
-                },
+                "kind": "rerun",
+                "targetAgentId": lead["id"],
+                "mode": "action",
+                "note": "try the same participant again",
             },
         )
 
         assert recovered.status_code == 202
+        request = app.state.registry.daemon_store.active_run_request_for_session_any_node(
+            session_id
+        )
+        assert [item["agentId"] for item in request["assignments"]] == [lead["id"]]
+        recovery_round = [
+            event
+            for event in recovered.json()["events"]
+            if event["type"] == "collaboration.round.started"
+        ][-1]
+        assert recovery_round["manifest"]["source"] == "recovery"
+        assert recovery_round["manifest"]["address"] == {
+            "kind": "members",
+            "agentIds": [lead["id"]],
+        }
 
 
 def test_agent_runs_still_requires_an_assignment_for_a_solo_thread(monkeypatch) -> None:

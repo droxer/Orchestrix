@@ -17,6 +17,7 @@ import {
   readAgentWorkspaceFile,
   RelayApiError,
   renameSession,
+  requestThreadRecovery,
   runLogicalAgents,
   startTask,
   submitThreadMessage,
@@ -546,6 +547,38 @@ describe("thread collaboration messages", () => {
         intent: "review",
         addressAgentId: "agent_support",
         userMessageId: "evt_1",
+      },
+    }]);
+  });
+
+  it("requests recovery without sending assignments or executor details", async () => {
+    const calls: Array<{ url: string; body: unknown }> = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), body: JSON.parse(String(init?.body ?? "{}")) });
+      return new Response(JSON.stringify({ id: "ses_1" }), {
+        status: 202,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      await requestThreadRecovery("ses_1", {
+        kind: "handoff",
+        targetAgentId: "agent_support",
+        mode: "review",
+        note: "fresh eyes",
+      });
+    } finally {
+      globalThis.fetch = original;
+    }
+
+    assert.deepEqual(calls, [{
+      url: "/api/v1/threads/ses_1/recoveries",
+      body: {
+        kind: "handoff",
+        targetAgentId: "agent_support",
+        mode: "review",
+        note: "fresh eyes",
       },
     }]);
   });
