@@ -1478,6 +1478,17 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
         ).json()
         started = client.post(f"/api/v1/tasks/{task['id']}/runs", json={})
         session_id = started.json()["session"]["id"]
+        task_round = next(
+            event
+            for event in app.state.session_store.get_session(session_id)["events"]
+            if event["type"] == "collaboration.round.started"
+        )
+        assert task_round["manifest"]["source"] == "task"
+        assert task_round["manifest"]["strategy"] == "coordinate"
+        assert all(
+            assignment["assignmentId"]
+            for assignment in task_round["manifest"]["assignments"]
+        )
         first = app.state.registry.take_commands("node_alice", "node_token")[0]
         app.state.registry.handle_event(
             "node_alice",
@@ -1543,6 +1554,7 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
             event
             for event in app.state.session_store.get_session(session_id)["events"]
             if event["type"] == "collaboration.round.started"
+            and event["manifest"]["source"] == "message"
         ]
         assert len(round_events) == 1
         manifest = round_events[0]["manifest"]
