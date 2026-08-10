@@ -25,7 +25,7 @@ import { useAuthSession } from "./hooks/useAuthSession";
 import { useClientMounted } from "./hooks/useClientMounted";
 import { useActiveSession } from "./hooks/useActiveSession";
 import type { WorkspacePageTab } from "./components/AgentWorkspacePage";
-import { chooseSendAction, suppressActiveSessionDuringPendingSend } from "./lib/sendAction";
+import { chooseSendAction, sendThreadSessionId, suppressActiveSessionDuringPendingSend } from "./lib/sendAction";
 import { matchesThreadQuery, myThreadSessions, pickActiveThreadSession } from "./lib/threads";
 import { shouldTailSessionEvents } from "./lib/sessionEventStream";
 import { useEmployeeProvisioning } from "./hooks/useEmployeeProvisioning";
@@ -784,7 +784,12 @@ export function App() {
     // Route synchronization clears any pending message when it reapplies an
     // existing session from the URL. Navigate before adding this optimistic
     // turn so that cleanup cannot erase the message in the same render batch.
-    navigateToRoute("main");
+    // The URL must name the thread this turn belongs to: a create stays on
+    // /threads/new (so composingNew survives) and a continued send stays on
+    // its own path. The bare /threads route parses as neither, which reset
+    // composingNew and rendered the new turn inside the previously active
+    // thread until the create resolved and snapped the view back.
+    syncThreadUrl(sendThreadSessionId(action), true);
     setPendingUserMessage({ id: userMessageId, text: goal });
     setIsRunning(true);
     composerRef.current?.clear();
