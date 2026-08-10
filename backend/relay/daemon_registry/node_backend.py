@@ -7,6 +7,7 @@ from uuid import UUID, uuid5
 from starlette.concurrency import run_in_threadpool
 
 from ..collaboration.models import (
+    COLLABORATION_ADMISSION_EXPIRED_OUTCOME,
     COLLABORATION_ADMISSION_EXPIRED_STATE_KEY,
     COLLABORATION_FINGERPRINT_STATE_KEY,
     COLLABORATION_MANIFEST_STATE_KEY,
@@ -310,6 +311,16 @@ class ServerDaemonNodeBackend:
                 return self.registry.store.get_session(run_request["sessionId"])
             request = self._resume_prepared_request(request, run_request)
             session_id = run_request["sessionId"]
+            current_session = self.registry.store.get_session(session_id)
+            if (
+                (run_request.get("state") or {}).get(
+                    COLLABORATION_NEW_SESSION_STATE_KEY
+                )
+                and current_session.get("status") == "failed"
+                and current_session.get("finalOutcome")
+                == COLLABORATION_ADMISSION_EXPIRED_OUTCOME
+            ):
+                controller.reopen_expired_admission(session_id)
             dispatch_task_goal = self._record_run_intent(
                 controller,
                 session_id,
@@ -675,6 +686,7 @@ class ServerDaemonNodeBackend:
                     actor_employee_id=actor_employee_id,
                     message_id=message_id,
                 )
+                controller.continue_session(session_id)
         if decision:
             self._record_run_decision(
                 controller,
@@ -781,11 +793,14 @@ class ServerDaemonNodeBackend:
             session_id
         )
         if request and request.get("status") == "prepared":
-            self.registry.daemon_store.update_run_request(
-                request["id"],
-                {"status": "cancelled", "error": reason},
-            )
-            return None
+            with self.registry.dispatch_scope([request["nodeId"]]):
+                cancelled = self.registry.daemon_store.update_run_request_if_status(
+                    request["id"],
+                    "prepared",
+                    {"status": "cancelled", "error": reason},
+                )
+                if cancelled:
+                    return None
         active = self.registry.cancel_active_run(sandbox_id, session_id, reason)
         if not active:
             session = self.registry.store.get_session(session_id)

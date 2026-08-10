@@ -5,6 +5,7 @@ from typing import Any
 
 from loguru import logger
 
+from ..collaboration.models import COLLABORATION_ADMISSION_EXPIRED_OUTCOME
 from ..core.ids import new_relay_id, now_iso
 from ..persistence.protocols import SessionStore, TaskStore
 from ..persistence.stores import relay_event, relay_task_event
@@ -173,6 +174,47 @@ class SessionController:
         self._update_task_status("blocked", outcome, {"sessionId": session_id})
         logger.info("Session failed", session_id=session_id, outcome=outcome)
         return session
+
+    def reopen_expired_admission(self, session_id: str) -> dict[str, Any]:
+        """Authoritatively reopen only a session failed by admission expiry."""
+        current = self.store.get_session(session_id)
+        if current.get("status") == "running" and not current.get("finalOutcome"):
+            return current
+        if not (
+            current.get("status") == "failed"
+            and current.get("finalOutcome") == COLLABORATION_ADMISSION_EXPIRED_OUTCOME
+        ):
+            raise ValueError(
+                f"Cannot reopen terminal session {session_id} after collaboration admission expiry."
+            )
+        session = self._append(
+            session_id,
+            relay_event(
+                "session.status",
+                session_id,
+                {"status": "running", "phase": "admission:retry"},
+            ),
+        )
+        self._update_task_status(
+            "running",
+            "Collaboration admission retry started.",
+            {"sessionId": session_id},
+        )
+        return session
+
+    def continue_session(self, session_id: str) -> dict[str, Any]:
+        """Reopen a terminal thread because a new user contribution was accepted."""
+        current = self.store.get_session(session_id)
+        if current.get("status") not in ("completed", "failed", "cancelled"):
+            return current
+        return self._append(
+            session_id,
+            relay_event(
+                "session.status",
+                session_id,
+                {"status": "running", "phase": "continued"},
+            ),
+        )
 
     def cancel_session(
         self, session_id: str, note: str = "Cancelled by human."

@@ -14,6 +14,7 @@ from typing import Any
 from loguru import logger
 
 from ..collaboration.models import (
+    COLLABORATION_ADMISSION_EXPIRED_OUTCOME,
     COLLABORATION_ADMISSION_EXPIRED_STATE_KEY,
     COLLABORATION_FINGERPRINT_STATE_KEY,
     COLLABORATION_MANIFEST_STATE_KEY,
@@ -1567,14 +1568,31 @@ class DaemonNodeRegistry:
         if existing and (existing.get("state") or {}).get(
             COLLABORATION_ADMISSION_EXPIRED_STATE_KEY
         ):
-            return self.daemon_store.update_run_request(
+            session = self.store.get_session(existing["sessionId"])
+            is_expired_new_session = bool(
+                (existing.get("state") or {}).get(COLLABORATION_NEW_SESSION_STATE_KEY)
+                and session.get("status") == "failed"
+                and session.get("finalOutcome")
+                == COLLABORATION_ADMISSION_EXPIRED_OUTCOME
+            )
+            if session.get("status") in ("completed", "failed", "cancelled") and not (
+                is_expired_new_session
+            ):
+                raise ValueError(
+                    "Cannot revive an expired collaboration admission for a terminal session."
+                )
+            revived = self.daemon_store.update_run_request_if_status(
                 existing["id"],
+                existing["status"],
                 {
                     "nodeId": sandbox_id,
                     "sessionId": session_id,
                     "taskGoal": task_goal,
                     "assignments": assignments,
-                    "state": state,
+                    "state": {
+                        **state,
+                        COLLABORATION_ADMISSION_EXPIRED_STATE_KEY: True,
+                    },
                     "status": "prepared",
                     "currentIndex": 0,
                     "currentCommandId": None,
@@ -1587,6 +1605,9 @@ class DaemonNodeRegistry:
                     "completedAt": None,
                 },
             )
+            if revived:
+                return revived
+            return self.daemon_store.get_run_request(existing["id"]) or existing
         active = self.daemon_store.active_run_request_for_session_any_node(session_id)
         if active and request_id and active.get("id") == request_id:
             return active
@@ -1619,17 +1640,54 @@ class DaemonNodeRegistry:
             request = self.daemon_store.get_run_request(request_id)
             if not request:
                 raise KeyError(request_id)
+            session = self.store.get_session(request["sessionId"])
+            if session.get("status") in ("completed", "failed", "cancelled"):
+                if request.get("status") == "prepared":
+                    self.daemon_store.update_run_request_if_status(
+                        request_id,
+                        "prepared",
+                        {
+                            "status": session["status"],
+                            "error": (
+                                "Prepared collaboration was not activated because "
+                                f"the session is {session['status']}."
+                            ),
+                        },
+                    )
+                raise ValueError(
+                    f"cannot activate collaboration request for {session['status']} session"
+                )
             if request.get("status") == "prepared":
-                patch: dict[str, Any] = {"status": "running"}
+                activation_state = dict(request.get("state") or {})
+                activation_state.pop(COLLABORATION_ADMISSION_EXPIRED_STATE_KEY, None)
+                patch: dict[str, Any] = {
+                    "status": "running",
+                    "state": activation_state,
+                }
                 if task_goal is not None:
                     patch["taskGoal"] = task_goal
                     patch["state"] = {
-                        **(request.get("state") or {}),
+                        **activation_state,
                         "task_goal": task_goal,
                     }
-                request = self.daemon_store.update_run_request(request_id, patch)
+                activated = self.daemon_store.update_run_request_if_status(
+                    request_id, "prepared", patch
+                )
+                request = activated or self.daemon_store.get_run_request(request_id)
+                if not request:
+                    raise KeyError(request_id)
+            if request.get("status") not in ("running", "dispatching"):
+                raise ValueError(
+                    "cannot activate collaboration request in "
+                    f"{request.get('status')} state"
+                )
             if request.get("currentCommandId"):
                 return request
+            session = self.store.get_session(request["sessionId"])
+            if session.get("status") in ("completed", "failed", "cancelled"):
+                raise ValueError(
+                    f"cannot activate collaboration request for {session['status']} session"
+                )
             return self._enqueue_current_assignment(request, active_runs=active_runs)
 
     def cancel_active_run(
@@ -2079,7 +2137,7 @@ class DaemonNodeRegistry:
                             task_id=request.get("taskId"),
                         ).fail_session(
                             request["sessionId"],
-                            "Collaboration admission expired before the round started.",
+                            COLLABORATION_ADMISSION_EXPIRED_OUTCOME,
                         )
                 continue
             if request.get("status") == "finalizing":

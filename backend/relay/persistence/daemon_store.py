@@ -1015,6 +1015,16 @@ class LocalDaemonStore:
             )
             return updated
 
+    def update_run_request_if_status(
+        self, request_id: str, expected_status: str, patch: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """Apply a run-request transition only from the expected state."""
+        with self._lock:
+            current = self.get_run_request(request_id)
+            if not current or current.get("status") != expected_status:
+                return None
+            return self.update_run_request(request_id, patch)
+
     def update_run_request_if_claimed(
         self,
         request_id: str,
@@ -2312,11 +2322,7 @@ class DatabaseDaemonStore:
                 )
                 active_requests = [row_to_run_request(row) for row in active_rows]
                 idempotent = next(
-                    (
-                        item
-                        for item in active_requests
-                        if item["id"] == record["id"]
-                    ),
+                    (item for item in active_requests if item["id"] == record["id"]),
                     None,
                 )
                 if idempotent:
@@ -2589,6 +2595,54 @@ class DatabaseDaemonStore:
                     )
                 )
             )
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    "daemon.run_request.updated",
+                    {
+                        "nodeId": updated["nodeId"],
+                        "runRequestId": updated["id"],
+                        "status": updated["status"],
+                    },
+                ),
+            )
+        return updated
+
+    def update_run_request_if_status(
+        self, request_id: str, expected_status: str, patch: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """Atomically apply a run-request transition from one status."""
+        now = now_iso()
+        with store_transaction(self.engine) as conn:
+            row = (
+                conn.execute(
+                    select(self.run_requests)
+                    .where(self.run_requests.c.id == request_id)
+                    .with_for_update()
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                return None
+            current = row_to_run_request(row)
+            if current.get("status") != expected_status:
+                return None
+            updated = {**current, **patch, "updatedAt": now}
+            if patch.get("status") in TERMINAL_DAEMON_STATUSES:
+                updated["completedAt"] = now
+            applied = conn.execute(
+                update(self.run_requests)
+                .where(self.run_requests.c.id == row["id"])
+                .where(self.run_requests.c.status == expected_status)
+                .values(
+                    **run_request_to_row(
+                        updated, database_id=row["id"], node_pk=row["node_id"]
+                    )
+                )
+            )
+            if applied.rowcount != 1:
+                return None
             self._append_daemon_event(
                 conn,
                 daemon_event(

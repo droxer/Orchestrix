@@ -25,11 +25,11 @@ from relay.daemon_registry import (
 from relay.daemon_registry.artifacts import _is_generated_artifact_path
 from relay.daemon_registry.registry import task_progress_file
 from relay.persistence.agent_placement_store import LocalAgentPlacementStore
-from relay.persistence.task_store import LocalTaskStore
 from relay.persistence.agent_store import LocalAgentStore
 from relay.persistence.daemon_store import DatabaseDaemonStore, LocalDaemonStore
 from relay.persistence.session_store import LocalSessionStore
 from relay.persistence.store_common import _read_jsonl, new_database_id
+from relay.persistence.task_store import LocalTaskStore
 from relay.sessions import SessionController
 from sqlalchemy import event, select
 
@@ -50,6 +50,36 @@ def stored_daemon_event_types(store: object) -> list[str]:
         return [event["type"] for event in _read_jsonl(events_path)]
     with store.engine.begin() as conn:
         return list(conn.scalars(select(store.events.c.type)))
+
+
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_daemon_store_run_request_status_transition_is_compare_and_set(
+    daemon_store_factory,
+) -> None:
+    with TemporaryDirectory() as root:
+        store = daemon_store_factory(root)
+        store.register_node(store_node_payload())
+        request = store.create_run_request(
+            {
+                "nodeId": "sbx_alice",
+                "sessionId": "ses_compare_and_set",
+                "taskGoal": "transition once",
+                "assignments": [{"executorKind": "codex", "mode": "action"}],
+                "state": {},
+                "status": "prepared",
+            }
+        )
+
+        transitioned = store.update_run_request_if_status(
+            request["id"], "prepared", {"status": "running"}
+        )
+        rejected = store.update_run_request_if_status(
+            request["id"], "prepared", {"status": "cancelled"}
+        )
+
+        assert transitioned and transitioned["status"] == "running"
+        assert rejected is None
+        assert store.get_run_request(request["id"])["status"] == "running"
 
 
 @pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
@@ -1186,7 +1216,9 @@ def test_daemon_completion_indexes_text_files_under_output_folder() -> None:
             [command] = registry.take_commands("sbx_alice", "node_token")
             generated = output / "summary.md"
             generated.write_text("# Summary\n", encoding="utf-8")
-            (workspace / "notes.md").write_text("a root deliverable\n", encoding="utf-8")
+            (workspace / "notes.md").write_text(
+                "a root deliverable\n", encoding="utf-8"
+            )
             (workspace / "checkout").mkdir()
             (workspace / "checkout" / "README.md").write_text(
                 "a repo file the run merely touched\n", encoding="utf-8"
