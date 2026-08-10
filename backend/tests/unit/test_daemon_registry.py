@@ -3251,6 +3251,44 @@ def test_stale_activation_cannot_publish_after_persistent_cancellation_fence() -
         assert registry.take_commands("sbx_alice", "node_token") == []
 
 
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_command_claim_rejects_queued_work_after_session_terminalization(
+    daemon_store_factory,
+) -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = daemon_store_factory(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            registry.register(
+                {
+                    "sandboxId": "sbx_alice",
+                    "employeeId": "alice",
+                    "token": "node_token",
+                    "workspacePath": "/workspace/alice",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "capabilities": ["thread-workspaces"],
+                    "status": "ready",
+                },
+                "ui_token",
+            )
+            session = await ServerDaemonNodeBackend(registry).run(
+                "sbx_alice",
+                {
+                    "taskGoal": "finish before daemon claim",
+                    "assignments": [{"agent": "codex", "mode": "action"}],
+                },
+            )
+            SessionController(session_store).complete_session(
+                session["id"], "finished elsewhere"
+            )
+
+            assert registry.take_commands("sbx_alice", "node_token") == []
+
+    asyncio.run(run_flow())
+
+
 @pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
 def test_run_request_creation_reserves_node_capacity_atomically(store_factory) -> None:
     with TemporaryDirectory() as root:
