@@ -2885,6 +2885,52 @@ def test_reaper_expires_a_prepared_request_without_a_durable_round(
         assert "expired" in expired["error"]
 
 
+def test_cancelling_a_prepared_request_prevents_later_reaper_activation() -> None:
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        backend = ServerDaemonNodeBackend(registry)
+        registry.register(
+            {
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            },
+            "ui_token",
+        )
+        session = session_store.create_session(
+            {
+                "workspacePath": "/workspace/alice",
+                "ownerEmployeeId": "alice",
+                "taskGoal": "cancel admission",
+            }
+        )
+        manifest = {"collaborationId": "col_1", "roundId": "round_1"}
+        prepared = registry.prepare_run_request(
+            "sbx_alice",
+            session["id"],
+            session["taskGoal"],
+            [{"executorKind": "codex", "mode": "action"}],
+            {"_relay_collaboration_manifest": manifest},
+        )
+        SessionController(session_store).record_collaboration_round_started(
+            session["id"], manifest
+        )
+
+        assert backend.cancel_run("sbx_alice", session["id"], "stop") is None
+        SessionController(session_store).cancel_session(session["id"], "stop")
+        registry.reap_stale_runs()
+
+        assert daemon_store.get_run_request(prepared["id"])["status"] == "cancelled"
+        assert registry.take_commands("sbx_alice", "node_token") == []
+
+
 @pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
 def test_run_request_creation_reserves_node_capacity_atomically(store_factory) -> None:
     with TemporaryDirectory() as root:

@@ -825,6 +825,15 @@ def test_semantic_message_retry_reconciles_a_prepared_attempt_without_duplicate_
         interrupted = client.post(
             f"/api/v1/threads/{session['id']}/messages", json=body
         )
+        if operation_fields:
+            prepared_id = app.state.daemon_store.list_active_run_requests()[0]["id"]
+            monkeypatch.setattr(
+                "relay.daemon_registry.registry.PREPARED_ADMISSION_LEASE_SECONDS", 0
+            )
+            app.state.registry.reap_stale_runs()
+            assert app.state.daemon_store.get_run_request(prepared_id)["status"] == (
+                "failed"
+            )
         retried = client.post(f"/api/v1/threads/{session['id']}/messages", json=body)
 
         assert interrupted.status_code == 409
@@ -913,6 +922,13 @@ def test_new_thread_retry_resumes_the_session_owned_by_its_prepared_admission(
 
         interrupted = client.post("/api/v1/agent-runs", json=body)
         prepared = app.state.daemon_store.list_active_run_requests()[0]
+        monkeypatch.setattr(
+            "relay.daemon_registry.registry.PREPARED_ADMISSION_LEASE_SECONDS", 0
+        )
+        app.state.registry.reap_stale_runs()
+        assert app.state.session_store.get_session(prepared["sessionId"])["status"] == (
+            "failed"
+        )
         retried = client.post("/api/v1/agent-runs", json=body)
 
         assert interrupted.status_code == 409
