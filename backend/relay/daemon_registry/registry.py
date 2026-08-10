@@ -13,6 +13,17 @@ from typing import Any
 
 from loguru import logger
 
+from ..collaboration.policy import (
+    PARTICIPANT_FAILURES_STATE_KEY,
+    REPAIR_COUNT_STATE_KEY,
+    REPAIR_NOTE_STATE_KEY,
+    REPAIR_RESUME_INDEX_STATE_KEY,
+    ROUND_RESULT_STATE_KEY,
+    advance_after_success,
+    assignment_reports_round_result,
+    decide_failure,
+    validate_round_result,
+)
 from ..core.environment import load_backend_env
 from ..core.ids import new_database_id, new_relay_id, new_sandbox_id, now_iso
 from ..core.models import (
@@ -132,11 +143,6 @@ def task_progress_file(session_id: str, workspace_layout: str) -> str:
 
 
 ARTIFACT_SNAPSHOT_STATE_KEY = "_relay_artifact_snapshot"
-REPAIR_COUNT_STATE_KEY = "_relay_repair_count"
-REPAIR_RESUME_INDEX_STATE_KEY = "_relay_repair_resume_index"
-REPAIR_NOTE_STATE_KEY = "_relay_repair_note"
-ROUND_RESULT_STATE_KEY = "_relay_round_result"
-PARTICIPANT_FAILURES_STATE_KEY = "_relay_participant_failures"
 # Run-request bookkeeping that has to survive being re-staged. Command state is
 # filtered down to the agent-visible keys, so anything not listed here is lost
 # the moment the next command is staged.
@@ -152,8 +158,6 @@ CARRIED_RUN_REQUEST_STATE_KEYS = frozenset(
 # Mirrors ROUND_RESULT_RELATIVE_PATH in relay-daemon: `.relay/` is excluded
 # from the artifact scan, so the control file never becomes a deliverable.
 ROUND_RESULT_RELATIVE_PATH = ".relay/round-result.json"
-ROUND_RESULT_STATUSES = frozenset({"done", "continue", "blocked"})
-ROUND_RESULT_NOTE_MAX_CHARS = 2000
 # How many times the lead may be sent back to repair a failed teammate before
 # the run is allowed to fail. Each repair costs a full agent turn.
 DAEMON_RUN_MAX_REPAIRS = int(os.environ.get("RELAY_DAEMON_RUN_MAX_REPAIRS", "1"))
@@ -2641,27 +2645,7 @@ class DaemonNodeRegistry:
 
     @staticmethod
     def _round_result(event: dict[str, Any]) -> dict[str, Any] | None:
-        """Validate the verdict a daemon reported for the round that just ended.
-
-        The daemon relays a file an agent wrote, so nothing about it is
-        trusted: an unknown status or an oversized note is dropped rather than
-        allowed to steer the task.
-        """
-        reported = event.get("roundResult")
-        if not isinstance(reported, dict):
-            return None
-        status = reported.get("status")
-        if status not in ROUND_RESULT_STATUSES:
-            return None
-        note = reported.get("note")
-        return {
-            "status": status,
-            **(
-                {"note": note.strip()[:ROUND_RESULT_NOTE_MAX_CHARS]}
-                if isinstance(note, str) and note.strip()
-                else {}
-            ),
-        }
+        return validate_round_result(event)
 
     def _send_back_for_repair(
         self,
@@ -2678,38 +2662,29 @@ class DaemonNodeRegistry:
         the task, so it gets a bounded chance to repair and let the pipeline
         resume at the member that failed.
         """
-        assignments = run_request["assignments"]
-        index = run_request.get("currentIndex", 0)
-        state = dict(next_state)
-        repairs = int(state.get(REPAIR_COUNT_STATE_KEY) or 0)
-        # A repair turn instructs the lead to fix the task the failing member
-        # was working on; without a task that instruction is false, so a
-        # task-less room fails the round instead of inventing a lead's duty.
-        # There is also nothing above index 0 to appeal to, and a lead that
-        # fails its own repair has already had its turn.
-        if (
-            not run_request.get("taskId")
-            or index == 0
-            or len(assignments) < 2
-            or repairs >= DAEMON_RUN_MAX_REPAIRS
-            or assignments[0].get("coordinator") is not True
-            or (assignments[0].get("mode") or "action") != "action"
-        ):
-            return False
-        state[REPAIR_COUNT_STATE_KEY] = repairs + 1
-        state[REPAIR_RESUME_INDEX_STATE_KEY] = index
-        state[REPAIR_NOTE_STATE_KEY] = (
-            f"{outcome} You are the lead on this task: fix the cause so "
-            f"{agent_label} can run again. Do not repeat its work yourself."
+        decision = decide_failure(
+            run_request,
+            next_state,
+            outcome=outcome,
+            agent_label=agent_label,
+            mode=(
+                run_request["assignments"][run_request.get("currentIndex", 0)].get(
+                    "mode"
+                )
+                or "action"
+            ),
+            max_repairs=DAEMON_RUN_MAX_REPAIRS,
         )
+        if decision.kind != "repair" or decision.next_index is None:
+            return False
         updated = self.daemon_store.update_run_request_if_claimed(
             run_request["id"],
             TERMINAL_CLAIM_ID_STATE_KEY,
             terminal_claim_id,
             {
                 "status": "running",
-                "currentIndex": 0,
-                "state": state,
+                "currentIndex": decision.next_index,
+                "state": decision.state,
                 "currentCommandId": None,
                 "currentRunId": None,
                 "currentAgent": None,
@@ -2724,8 +2699,8 @@ class DaemonNodeRegistry:
             "Sending the lead back to repair a failed teammate",
             request_id=run_request["id"],
             session_id=run_request["sessionId"],
-            failed_index=index,
-            repair=repairs + 1,
+            failed_index=run_request.get("currentIndex", 0),
+            repair=decision.state[REPAIR_COUNT_STATE_KEY],
         )
         self._enqueue_current_assignment(updated)
         return True
@@ -2734,14 +2709,7 @@ class DaemonNodeRegistry:
         self, run_request: dict[str, Any], next_state: dict[str, Any]
     ) -> tuple[int, dict[str, Any]]:
         """Advance one step, or resume at the member whose failure was repaired."""
-        index = run_request.get("currentIndex", 0)
-        state = dict(next_state)
-        resume_index = state.get(REPAIR_RESUME_INDEX_STATE_KEY)
-        if index != 0 or not isinstance(resume_index, int):
-            return index + 1, state
-        state.pop(REPAIR_RESUME_INDEX_STATE_KEY, None)
-        state.pop(REPAIR_NOTE_STATE_KEY, None)
-        return resume_index, state
+        return advance_after_success(run_request, next_state)
 
     def _continue_after_non_action_failure(
         self,
@@ -2753,30 +2721,25 @@ class DaemonNodeRegistry:
         mode: str,
     ) -> bool:
         """Keep collecting discussion/review results after one member fails."""
-        if mode not in ("ask", "review"):
-            return False
         assignments = run_request["assignments"]
-        index = run_request.get("currentIndex", 0)
-        state = dict(next_state)
-        failures = list(state.get(PARTICIPANT_FAILURES_STATE_KEY) or [])
-        failures.append(
-            {
-                "assignmentId": assignments[index].get("assignmentId"),
-                "agent": agent_label,
-                "mode": mode,
-                "outcome": outcome,
-            }
+        decision = decide_failure(
+            run_request,
+            next_state,
+            outcome=outcome,
+            agent_label=agent_label,
+            mode=mode,
+            max_repairs=DAEMON_RUN_MAX_REPAIRS,
         )
-        state[PARTICIPANT_FAILURES_STATE_KEY] = failures
-        next_index = index + 1
+        if decision.kind != "continue" or decision.next_index is None:
+            return False
         updated = self.daemon_store.update_run_request_if_claimed(
             run_request["id"],
             TERMINAL_CLAIM_ID_STATE_KEY,
             terminal_claim_id,
             {
                 "status": "running",
-                "currentIndex": next_index,
-                "state": state,
+                "currentIndex": decision.next_index,
+                "state": decision.state,
                 "currentCommandId": None,
                 "currentRunId": None,
                 "currentAgent": None,
@@ -2787,7 +2750,7 @@ class DaemonNodeRegistry:
         )
         if not updated:
             return False
-        if next_index < len(assignments):
+        if decision.next_index < len(assignments):
             self._enqueue_current_assignment(updated)
         else:
             self._complete_run_request(
@@ -2801,14 +2764,7 @@ class DaemonNodeRegistry:
         assignments: list[dict[str, Any]], index: int
     ) -> bool:
         """Only the last writable member may publish the aggregate verdict."""
-        if index < 0 or index >= len(assignments):
-            return False
-        if (assignments[index].get("mode") or "action") == "ask":
-            return False
-        return not any(
-            (assignment.get("mode") or "action") != "ask"
-            for assignment in assignments[index + 1 :]
-        )
+        return assignment_reports_round_result(assignments, index)
 
     @staticmethod
     def _assignment_phase(mode: str) -> str:
