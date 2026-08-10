@@ -338,13 +338,22 @@ describe("workspace status colors", () => {
 
   it("uses the neutral info token instead of the action token", () => {
     assert.match(workspace, /\.workspace-status-pip\.tone-info\s*\{\s*color:\s*var\(--info\);\s*\}/);
-    assert.match(workspace, /\.workspace-status-pill\.tone-info\s*\{\s*color:\s*var\(--info\);\s*\}/);
   });
 
-  it("renders status pills as outlined labels without tinted fills", () => {
-    assert.match(workspace, /\.workspace-status-pill\s*\{[^}]*border:\s*1px solid currentColor;[^}]*background:\s*transparent;/s);
-    for (const tone of ["good", "info", "warn", "bad", "neutral"]) {
-      const rule = workspace.match(new RegExp(`\\.workspace-status-pill\\.tone-${tone}\\s*\\{([^}]*)\\}`));
+  it("keeps every workspace status tone free of a tinted fill", () => {
+    // `.workspace-status-pill` was the team activities readiness chip. It
+    // restated the RecordBand's availability and disagreed with it (a busy
+    // team rendered "Unavailable"), so it was deleted along with the last of
+    // the metric strip. The pip is what remains; the contract — a status tone
+    // colours ink, never a fill — is asserted for whatever tones exist.
+    assert.doesNotMatch(
+      workspace,
+      /\.workspace-status-pill\b/,
+      "the status pill is gone; status lives in the RecordBand",
+    );
+    const tones = ["good", "info", "warn", "bad", "neutral"];
+    for (const tone of tones) {
+      const rule = workspace.match(new RegExp(`\\.workspace-status-pip\\.tone-${tone}\\s*\\{([^}]*)\\}`));
       assert.ok(rule, `missing ${tone} workspace status rule`);
       assert.ok(!rule[1].includes("background"), `${tone} workspace status must not use a tinted fill`);
     }

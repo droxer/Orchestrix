@@ -31,6 +31,15 @@
   flex: 1;
 }
 
+/* The record surface fills the pane. Without this it sized to its own content
+   — a short roster left the panel ending a third of the way down with the
+   rest of the detail pane blank, which read as an unfinished page rather than
+   as a page with room to spare. */
+.teams-detail > .workspace-page {
+  flex: 1;
+  min-height: 0;
+}
+
 .teams-page-body {
   min-height: 0;
   flex: 1;
@@ -173,6 +182,17 @@
   font-size: var(--fs-2);
 }
 
+.team-profile-section-head h2 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.team-profile-section-head h2 .tnum {
+  color: var(--ink-3);
+  letter-spacing: var(--track-0);
+}
+
 .team-profile-members {
   display: flex;
   margin: 0;
@@ -183,11 +203,18 @@
 
 .team-profile-member {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--sp-3);
   padding: var(--sp-3) 0;
   border-bottom: 1px solid var(--line-2);
+}
+
+.team-profile-member-state {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-self: end;
 }
 
 .team-profile-member:last-child {
@@ -279,6 +306,26 @@
   max-height: 280px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* The list clips mid-row, so it needs a permanent scroll affordance: macOS
+     overlay scrollbars stay hidden until you scroll, and a half-drawn agent
+     with no track reads as a broken render rather than as more list. */
+  scrollbar-gutter: stable;
+}
+
+.team-member-options.team-profile-member-options::-webkit-scrollbar {
+  width: 8px;
+}
+
+.team-member-options.team-profile-member-options::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: var(--r-2);
+  background: var(--line-1);
+  background-clip: content-box;
+}
+
+.team-member-options.team-profile-member-options::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-4);
+  background-clip: content-box;
 }
 
 .team-profile-lead-field {

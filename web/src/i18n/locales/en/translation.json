@@ -322,7 +322,9 @@
     "band_id": "Agent ID",
     "band_team_label": "Team record",
     "band_team_id": "Team ID",
-    "identity_label": "Identity"
+    "identity_label": "Identity",
+    "band_created": "Created",
+    "band_updated": "Updated"
   },
   "profile_image": {
     "alt": "{{name}} profile image",
@@ -373,7 +375,9 @@
     "select_title": "Select a team",
     "select_body": "Choose a team to inspect its profile, workspace, and activity.",
     "empty_title": "No teams yet",
-    "empty_body": "Group agents under a named lead for repeatable task dispatch."
+    "empty_body": "Group agents under a named lead for repeatable task dispatch.",
+    "edit_members": "Edit members",
+    "rename": "Rename team"
   },
   "computer": {
     "title": "My Computer",

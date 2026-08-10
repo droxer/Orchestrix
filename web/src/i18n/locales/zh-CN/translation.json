@@ -322,7 +322,9 @@
     "band_id": "智能体 ID",
     "band_team_label": "团队档案",
     "band_team_id": "团队 ID",
-    "identity_label": "身份"
+    "identity_label": "身份",
+    "band_created": "创建时间",
+    "band_updated": "更新时间"
   },
   "profile_image": {
     "alt": "{{name}}的头像",
@@ -373,7 +375,9 @@
     "select_title": "选择一个团队",
     "select_body": "选择团队以查看其档案、工作区和活动。",
     "empty_title": "暂无团队",
-    "empty_body": "将智能体组成有负责人的命名团队，以便重复派发任务。"
+    "empty_body": "将智能体组成有负责人的命名团队，以便重复派发任务。",
+    "edit_members": "编辑成员",
+    "rename": "重命名团队"
   },
   "computer": {
     "title": "我的电脑",
