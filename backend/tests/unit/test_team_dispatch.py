@@ -136,3 +136,17 @@ def test_team_member_assignments_freezes_the_roster_for_the_round() -> None:
         "leadAgentId": "lead",
     }
     assert [item["teamSnapshot"] for item in assignments] == [expected, expected]
+
+
+def test_discussion_runs_the_facilitator_last_without_changing_the_snapshot() -> None:
+    team = _team(updatedAt="2026-08-08T00:00:00Z")
+    agents = [_agent("lead", "codex"), _agent("support", "claude")]
+
+    assignments = team_member_assignments(agents, mode="ask", team=team)
+
+    assert [item["agentId"] for item in assignments] == ["support", "lead"]
+    assert [item.get("coordinator", False) for item in assignments] == [False, True]
+    assert [item["teamSnapshot"]["memberAgentIds"] for item in assignments] == [
+        ["lead", "support"],
+        ["lead", "support"],
+    ]
