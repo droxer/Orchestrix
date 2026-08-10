@@ -23,6 +23,34 @@ function session(partial: Partial<RelaySession> = {}): RelaySession {
 }
 
 describe("applySessionEvent", () => {
+  it("materializes collaboration round identity and strategy from SSE", () => {
+    const updated = applySessionEvent(session(), {
+      id: "evt_round",
+      type: "collaboration.round.started",
+      sessionId: "ses_1",
+      timestamp: "2026-06-20T00:00:00.500Z",
+      manifest: {
+        collaborationId: "col_1",
+        roundId: "round_1",
+        source: "message",
+        purpose: "review",
+        strategy: "review",
+        address: { kind: "room" },
+        assignments: [{
+          assignmentId: "assignment_1",
+          agentId: "agent_1",
+          mode: "review",
+          phase: "review",
+        }],
+        completionPolicy: "synthesize",
+      },
+    });
+
+    assert.equal(updated.activeCollaborationId, "col_1");
+    assert.equal(updated.activeRoundId, "round_1");
+    assert.equal(updated.collaborationRounds[0]?.strategy, "review");
+  });
+
   it("preserves runtime affinity from streamed run starts", () => {
     const workspaceIdentity = { kind: "host", workspacePath: "/workspace" };
     const updated = applySessionEvent(session(), {

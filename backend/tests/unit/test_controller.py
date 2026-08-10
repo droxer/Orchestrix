@@ -62,6 +62,29 @@ def test_record_user_message_appends_event_with_given_id() -> None:
         assert user_events[0]["text"] == "second turn"
 
 
+def test_collaboration_round_is_materialized_as_authoritative_session_state() -> None:
+    with TemporaryDirectory() as root:
+        store = LocalSessionStore(root)
+        controller = SessionController(store, workspace_path="/workspace")
+        session = controller.create_session("ship it")
+        manifest = {
+            "collaborationId": "col_1",
+            "roundId": "round_1",
+            "source": "message",
+            "purpose": "accomplish",
+            "strategy": "coordinate",
+            "address": {"kind": "room"},
+            "assignments": [{"assignmentId": "assignment_1", "agentId": "agent_1"}],
+            "completionPolicy": "assigned_work",
+        }
+
+        updated = controller.record_collaboration_round_started(session["id"], manifest)
+
+        assert updated["collaborationRounds"] == [manifest]
+        assert updated["activeCollaborationId"] == "col_1"
+        assert updated["activeRoundId"] == "round_1"
+
+
 def test_compute_conversation_history_excludes_current_turn() -> None:
     from relay.sessions import compute_conversation_history
     with TemporaryDirectory() as root:

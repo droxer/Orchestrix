@@ -1629,6 +1629,18 @@ describe("token usage accounting", () => {
         taskGoal: "count tokens",
         participants: ["human", "codex"],
       }),
+      relayEvent("collaboration.round.started", sessionId, {
+        manifest: {
+          collaborationId: "col_1",
+          roundId: "round_1",
+          source: "task",
+          purpose: "accomplish",
+          strategy: "coordinate",
+          address: { kind: "room" },
+          assignments: [{ assignmentId: "assignment_1", agentId: "agent_builder", mode: "action", phase: "execution" }],
+          completionPolicy: "assigned_work",
+        },
+      }),
       relayEvent("agent.started", sessionId, {
         runId: "run_1",
         assignmentId: "assignment_1",
@@ -1671,6 +1683,9 @@ describe("token usage accounting", () => {
     assert.equal(session.agentRuns[0].coordinator, true);
     assert.equal(session.agentRuns[0].teamPhase, "execution");
     assert.deepEqual(session.agentRuns[0].teamSnapshot?.memberAgentIds, ["agent_builder", "agent_reviewer"]);
+    assert.equal(session.activeCollaborationId, "col_1");
+    assert.equal(session.activeRoundId, "round_1");
+    assert.equal(session.collaborationRounds[0]?.strategy, "coordinate");
     assert.deepEqual(session.tokenUsage, { input: 5, output: 7, cache: 3, total: 15 });
   });
 
