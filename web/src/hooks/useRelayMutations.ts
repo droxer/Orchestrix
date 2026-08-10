@@ -16,10 +16,11 @@ import {
   runSandbox,
   runLogicalAgents,
   startTask,
+  submitThreadMessage,
   updateTask,
   updateTeam,
 } from "../api";
-import type { AgentRunInput, AgentTaskMode, CreateTaskInput, RelaySession, RelayTask, RelayTaskSummary, RunInput, TaskMutationInput, TeamMutationInput } from "../types";
+import type { AgentRunInput, AgentTaskMode, CreateTaskInput, RelaySession, RelayTask, RelayTaskSummary, RunInput, TaskMutationInput, TeamMutationInput, ThreadMessageInput } from "../types";
 import { NODES_QUERY_KEY, RELAY_QUERY_KEY, SESSIONS_QUERY_KEY, TASKS_QUERY_KEY } from "./useRelayData";
 import { useMutationError } from "./useMutationError";
 import { useDialogs } from "../components/ui/DialogProvider";
@@ -128,6 +129,15 @@ export function useRelayMutations() {
 
   const runLogicalAgentsMutation = useMutation({
     mutationFn: (input: AgentRunInput) => runLogicalAgents(input),
+    onSuccess: (session) => {
+      cacheSession(session);
+      void invalidateNodes();
+    },
+  });
+
+  const submitThreadMessageMutation = useMutation({
+    mutationFn: ({ sessionId, input }: { sessionId: string; input: ThreadMessageInput }) =>
+      submitThreadMessage(sessionId, input),
     onSuccess: (session) => {
       cacheSession(session);
       void invalidateNodes();
@@ -246,6 +256,7 @@ export function useRelayMutations() {
     recordDecisionMutation,
     runSandboxMutation,
     runLogicalAgentsMutation,
+    submitThreadMessageMutation,
     createTaskMutation,
     updateTaskMutation,
     deleteTaskMutation,

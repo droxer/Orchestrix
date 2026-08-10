@@ -535,6 +535,14 @@ export interface AgentRunInput {
   };
 }
 
+export interface ThreadMessageInput {
+  text: string;
+  intent: "accomplish" | "discuss" | "review";
+  addressAgentId?: string;
+  userMessageId?: string;
+  idempotencyKey?: string;
+}
+
 export interface RunInput {
   sandboxId: string;
   taskGoal: string;

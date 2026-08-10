@@ -166,6 +166,15 @@ class CollaborationConductor:
                 team, members = self._team_for_round(team_id, session, actor)
                 team_member_ids = {agent["id"] for agent in members}
             team_snapshot = _team_snapshot(team, members)
+        elif session and not raw_assignments:
+            owner_agent_id = session.get("ownerAgentId")
+            if not isinstance(owner_agent_id, str) or not owner_agent_id:
+                raise CollaborationError(
+                    "participants_required",
+                    "The thread has no addressable room participant.",
+                    status=400,
+                )
+            raw_assignments = [{"agentId": owner_agent_id, "mode": intent.mode}]
         if not raw_assignments:
             raise CollaborationError(
                 "participants_required", "At least one participant is required.", status=400

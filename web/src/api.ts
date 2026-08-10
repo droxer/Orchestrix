@@ -48,6 +48,7 @@ import type {
   TaskArtifactsResponse,
   TaskDeletionResponse,
   TaskMutationInput,
+  ThreadMessageInput,
   TasksResponse,
   WorkspaceBriefResponse,
   AgentWorkspaceFilesResponse,
@@ -841,6 +842,22 @@ export function runLogicalAgents(input: AgentRunInput): Promise<RelaySession> {
       sessionId: input.sessionId,
       ...(input.userMessageId ? { userMessageId: input.userMessageId } : {}),
       ...(input.decision ? { decision: input.decision } : {}),
+    },
+  });
+}
+
+export function submitThreadMessage(
+  sessionId: string,
+  input: ThreadMessageInput,
+): Promise<RelaySession> {
+  return apiJson<RelaySession>(`/threads/${encodeURIComponent(sessionId)}/messages`, {
+    method: "POST",
+    body: {
+      text: input.text,
+      intent: input.intent,
+      ...(input.addressAgentId ? { addressAgentId: input.addressAgentId } : {}),
+      ...(input.userMessageId ? { userMessageId: input.userMessageId } : {}),
+      ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
     },
   });
 }

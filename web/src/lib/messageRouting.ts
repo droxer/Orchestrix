@@ -1,4 +1,4 @@
-import type { AgentName, AgentRunInput, AgentTaskMode } from "../types.js";
+import type { AgentName, AgentTaskMode, ThreadMessageInput } from "../types.js";
 
 export type RoutedComposerMessage = {
   agentId: string;
@@ -72,21 +72,31 @@ export function teamMembersForMention(
     .filter((agent): agent is { id: string; displayName: string } => Boolean(agent));
 }
 
-/** Build the run for a message typed into a team thread: the room, or one member. */
-export function teamRunInput({ taskGoal, sessionId, teamMembers, mode, userMessageId }: {
-  taskGoal: string;
-  sessionId: string;
+function collaborationIntent(mode: AgentTaskMode): ThreadMessageInput["intent"] {
+  return mode === "ask" ? "discuss" : mode === "review" ? "review" : "accomplish";
+}
+
+/** Build semantic intent for a message typed into a team thread. */
+export function teamMessageInput({ text, teamMembers, mode, userMessageId }: {
+  text: string;
   teamMembers: Array<{ id: string; displayName: string }>;
   mode: AgentTaskMode;
   userMessageId: string;
-}): AgentRunInput {
-  const mentioned = resolveLeadingMention(taskGoal, teamMembers);
+}): ThreadMessageInput {
+  const mentioned = resolveLeadingMention(text, teamMembers);
   return {
-    taskGoal,
-    sessionId,
+    text,
+    intent: collaborationIntent(mode),
     userMessageId,
-    ...(mentioned
-      ? { assignments: [{ agentId: mentioned.agentId, mode }] }
-      : { mode }),
+    ...(mentioned ? { addressAgentId: mentioned.agentId } : {}),
   };
+}
+
+/** Build semantic intent for a solo thread, whose room identity is server-owned. */
+export function threadMessageInput({ text, mode, userMessageId }: {
+  text: string;
+  mode: AgentTaskMode;
+  userMessageId: string;
+}): ThreadMessageInput {
+  return { text, intent: collaborationIntent(mode), userMessageId };
 }

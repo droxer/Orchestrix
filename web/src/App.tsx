@@ -17,7 +17,7 @@ import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeThreadRuntimeNodes, mergeVisibleDaemonNodes } from "./lib/daemonNodes";
 import { formatDispatchError } from "./lib/agentReadiness";
 import { isEmployeeAgentRoutable, preferredRoutableAgent } from "./lib/agentDisplayNames";
-import { routeComposerMessage, teamMembersForMention, teamRunInput } from "./lib/messageRouting";
+import { routeComposerMessage, teamMembersForMention, teamMessageInput, threadMessageInput } from "./lib/messageRouting";
 import { applyTheme, readLanguage, readSidenavExpanded, readTheme, readThreadSpaceWidth, readTokens, selectedEmployeeKey, writeLanguage, writeSidenavExpanded, writeTheme, writeThreadSpaceWidth } from "./lib/appStorage";
 import { canUseLocalControlPanel } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
@@ -108,6 +108,7 @@ export function App() {
     cancelRunMutation,
     recordDecisionMutation,
     runLogicalAgentsMutation,
+    submitThreadMessageMutation,
     invalidateRelay,
   } = useRelayMutations();
   const selectedEmployee = useRelayStore((s) => s.selectedEmployee);
@@ -796,23 +797,23 @@ export function App() {
             logicalAgents.map((agent) => ({ id: agent.id, displayName: agent.displayName })),
           )
         : [];
-      const done = await runLogicalAgentsMutation.mutateAsync(
-        sessionId && activeSession?.teamId
-          ? teamRunInput({
-              taskGoal: goal,
-              sessionId,
-              teamMembers,
-              mode: composerMode,
-              userMessageId,
-            })
-          : {
-              taskGoal: goal,
-              ...(selectedThreadNodeId ? { daemonNodeId: selectedThreadNodeId } : {}),
-              assignments: [{ agentId: routedLogicalAgent.id, mode: composerMode }],
-              sessionId,
-              ...(sessionId ? { userMessageId } : {}),
-            },
-      );
+      const done = sessionId
+        ? await submitThreadMessageMutation.mutateAsync({
+            sessionId,
+            input: activeSession?.teamId
+              ? teamMessageInput({
+                  text: goal,
+                  teamMembers,
+                  mode: composerMode,
+                  userMessageId,
+                })
+              : threadMessageInput({ text: goal, mode: composerMode, userMessageId }),
+          })
+        : await runLogicalAgentsMutation.mutateAsync({
+            taskGoal: goal,
+            ...(selectedThreadNodeId ? { daemonNodeId: selectedThreadNodeId } : {}),
+            assignments: [{ agentId: routedLogicalAgent.id, mode: composerMode }],
+          });
       setActiveSessionId(done.id);
       setSelectedSessionId(done.id);
       setComposingNew(false);
