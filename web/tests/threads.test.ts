@@ -374,6 +374,7 @@ describe("team thread message input", () => {
       text: "one more pass",
       intent: "accomplish",
       userMessageId: "evt_1",
+      idempotencyKey: "evt_1",
     });
   });
 
@@ -390,6 +391,7 @@ describe("team thread message input", () => {
       intent: "accomplish",
       addressAgentId: "agent_support",
       userMessageId: "evt_1",
+      idempotencyKey: "evt_1",
     });
   });
 });

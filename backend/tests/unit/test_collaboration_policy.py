@@ -100,6 +100,16 @@ def test_only_the_last_writable_assignment_reports_the_round_result() -> None:
     assert assignment_reports_round_result(assignments, 2) is True
 
 
+def test_explicit_review_synthesizer_owns_the_round_result() -> None:
+    assignments = [
+        {"assignmentId": "reviewer", "mode": "review"},
+        {"assignmentId": "lead", "mode": "review", "synthesizer": True},
+    ]
+
+    assert assignment_reports_round_result(assignments, 0) is False
+    assert assignment_reports_round_result(assignments, 1) is True
+
+
 def test_round_result_adapter_rejects_unknown_status_and_caps_notes() -> None:
     assert validate_round_result({"roundResult": {"status": "maybe"}}) is None
     assert validate_round_result(

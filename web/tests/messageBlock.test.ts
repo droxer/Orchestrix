@@ -105,6 +105,16 @@ describe("memoized transcript messages", () => {
     assert.match(source, /const handleOpenThreadSpace = useStableEvent\(/);
     assert.match(source, /onOpenArtifacts=\{handleOpenThreadSpace\}/);
   });
+
+  it("resolves append-vs-create before requiring a locally routable agent", () => {
+    const source = readFileSync("web/src/App.tsx", "utf8");
+    const actionIndex = source.indexOf("const action = composingNew");
+    const routingGateIndex = source.indexOf("const defaultLogicalAgent");
+
+    assert.ok(actionIndex >= 0);
+    assert.ok(routingGateIndex >= 0);
+    assert.ok(actionIndex < routingGateIndex);
+  });
 });
 
 describe("projectMessages artifact projection", () => {

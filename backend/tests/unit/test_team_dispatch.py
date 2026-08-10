@@ -149,3 +149,19 @@ def test_discussion_runs_the_facilitator_last_without_changing_the_snapshot() ->
         ["lead", "support"],
         ["lead", "support"],
     ]
+    assert assignments[-1]["synthesizer"] is True
+    assert assignments[-1]["brief"].startswith("Synthesize")
+
+
+def test_review_runs_the_facilitator_last_as_the_result_synthesizer() -> None:
+    team = _team(updatedAt="2026-08-08T00:00:00Z")
+    agents = [
+        _agent("lead", "codex", defaultRole="planner"),
+        _agent("support", "claude", defaultRole="reviewer"),
+    ]
+
+    assignments = team_member_assignments(agents, mode="review", team=team)
+
+    assert [item["agentId"] for item in assignments] == ["support", "lead"]
+    assert assignments[-1]["synthesizer"] is True
+    assert assignments[-1]["brief"].startswith("Synthesize")

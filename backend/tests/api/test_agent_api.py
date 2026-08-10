@@ -708,6 +708,55 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
         assert not app.state.agent_store.get_agent(agent["id"]).get("deletedAt")
 
 
+def test_normal_solo_message_cannot_address_an_agent_outside_the_room(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        node = app.state.registry.register(
+            {
+                "sandboxId": "node_admin",
+                "employeeId": "admin",
+                "token": "node_token",
+                "workspacePath": "/workspace/admin",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex", "claude"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        sync_node_agents(app.state, node)
+        agents = app.state.agent_store.list_agents(supervisor_employee_id="admin")
+        owner = next(agent for agent in agents if agent["executorKind"] == "codex")
+        outsider = next(
+            agent for agent in agents if agent["executorKind"] == "claude"
+        )
+        session = app.state.session_store.create_session(
+            {
+                "daemonNodeId": node["id"],
+                "workspacePath": "/workspace/admin",
+                "ownerEmployeeId": "admin",
+                "ownerAgentId": owner["id"],
+                "taskGoal": "Keep one room",
+            }
+        )
+
+        response = client.post(
+            f"/api/v1/threads/{session['id']}/messages",
+            json={
+                "text": "bring in somebody else",
+                "intent": "accomplish",
+                "addressAgentId": outsider["id"],
+            },
+        )
+
+        assert response.status_code == 409
+        assert response.json()["detail"]["code"] == "agent_forbidden"
+
+
 def test_existing_thread_resumes_after_managed_runtime_replacement_without_read(
     monkeypatch,
 ) -> None:
