@@ -60,6 +60,13 @@ key. If event persistence is interrupted after admission, a retry resumes the
 same prepared request and reuses its immutable manifest; event IDs, decision
 IDs, and round IDs prevent duplicate authoritative entries.
 
+Prepared admission is itself reconciled. If the round event is durable, the
+reaper activates the original request after a process interruption. If the
+event never committed, the reservation expires after a bounded lease (60
+seconds by default) and releases session/runtime capacity. Keyed new-thread
+admission derives the session identity from the scoped operation key, so
+concurrent retries converge on one session and one run request.
+
 The compatibility run request may retain a private sequential cursor while the
 execution plane migrates. That cursor is not workflow truth and is absent from
 the client interface. Future dependency-graph scheduling or custom completion

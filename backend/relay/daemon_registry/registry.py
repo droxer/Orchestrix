@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from threading import RLock
 from typing import Any
@@ -175,6 +175,9 @@ TERMINAL_CLAIM_LEASE_SECONDS = float(
 )
 DISPATCH_CLAIM_LEASE_SECONDS = float(
     os.environ.get("RELAY_DISPATCH_CLAIM_LEASE_SECONDS", "60")
+)
+PREPARED_ADMISSION_LEASE_SECONDS = float(
+    os.environ.get("RELAY_PREPARED_ADMISSION_LEASE_SECONDS", "60")
 )
 RUN_OUTPUT_BUFFER_MAX_CHARS = int(
     os.environ.get("RELAY_RUN_OUTPUT_BUFFER_MAX_CHARS", str(2 * 1024 * 1024))
@@ -1558,7 +1561,10 @@ class DaemonNodeRegistry:
         active_runs: list[dict[str, Any]] | None,
         request_id: str | None,
     ) -> dict[str, Any]:
-        if self.daemon_store.active_run_request_for_session_any_node(session_id):
+        active = self.daemon_store.active_run_request_for_session_any_node(session_id)
+        if active and request_id and active.get("id") == request_id:
+            return active
+        if active:
             raise ValueError(f"Session {session_id} already has an active daemon run.")
         return self.daemon_store.create_run_request(
             {
@@ -1981,9 +1987,48 @@ class DaemonNodeRegistry:
         self._maybe_prune_terminal_records(monotonic_now)
         self._reap_orphaned_runs_unlocked()
         for request in self.daemon_store.list_active_run_requests():
-            # Admission has reserved capacity but session events are not yet
-            # committed. Only the submitting conductor may activate it.
             if request.get("status") == "prepared":
+                manifest = (request.get("state") or {}).get(
+                    COLLABORATION_MANIFEST_STATE_KEY
+                )
+                try:
+                    session = self.store.get_session(request["sessionId"])
+                except KeyError:
+                    self.daemon_store.update_run_request(
+                        request["id"],
+                        {
+                            "status": "failed",
+                            "error": "Prepared collaboration session no longer exists.",
+                        },
+                    )
+                    continue
+                round_id = (
+                    manifest.get("roundId") if isinstance(manifest, dict) else None
+                )
+                round_is_durable = bool(
+                    round_id
+                    and any(
+                        event.get("type") == "collaboration.round.started"
+                        and (event.get("manifest") or {}).get("roundId") == round_id
+                        for event in session.get("events", [])
+                    )
+                )
+                if round_is_durable:
+                    self.activate_run_request(request["id"])
+                    continue
+                updated_at = datetime.fromisoformat(request["updatedAt"])
+                age_seconds = (datetime.now(timezone.utc) - updated_at).total_seconds()
+                if age_seconds >= PREPARED_ADMISSION_LEASE_SECONDS:
+                    self.daemon_store.update_run_request(
+                        request["id"],
+                        {
+                            "status": "failed",
+                            "error": (
+                                "Collaboration admission expired before its "
+                                "authoritative round event was committed."
+                            ),
+                        },
+                    )
                 continue
             if request.get("status") == "finalizing":
                 terminal_event = (request.get("state") or {}).get(

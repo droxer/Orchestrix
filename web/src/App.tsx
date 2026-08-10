@@ -172,6 +172,8 @@ export function App() {
   const transcriptRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
   const messageProjectorRef = useRef(new ProjectMessagesAccumulator());
+  const messageOperationIdsRef = useRef(new Map<string, string>());
+  const recoveryOperationIdsRef = useRef(new Map<string, string>());
 
   const selectedEmployeeToken = tokens[selectedEmployee];
   const { sandboxes, nodes, sessions, tasks, isRefreshing, refresh, setSandboxes } = useRelayData(selectedEmployeeToken, Boolean(user));
@@ -780,7 +782,16 @@ export function App() {
     }
     // Echo the turn immediately. For a continued session we mint the message id
     // here and hand it to the backend so the persisted event reconciles by id.
-    const userMessageId = `evt_${crypto.randomUUID()}`;
+    const messageOperationKey = sessionId
+      ? `${sessionId}:${composerMode}:${goal}`
+      : null;
+    const retainedMessageId = messageOperationKey
+      ? messageOperationIdsRef.current.get(messageOperationKey)
+      : null;
+    const userMessageId = retainedMessageId ?? `evt_${crypto.randomUUID()}`;
+    if (messageOperationKey && !retainedMessageId) {
+      messageOperationIdsRef.current.set(messageOperationKey, userMessageId);
+    }
     // While creating a fresh thread, keep suppressing the previous active
     // thread so the optimistic user turn does not appear in the wrong transcript.
     if (!creatingSession) setComposingNew(false);
@@ -820,6 +831,9 @@ export function App() {
       setSelectedSessionId(done.id);
       setComposingNew(false);
       syncThreadUrl(done.id, true);
+      if (messageOperationKey) {
+        messageOperationIdsRef.current.delete(messageOperationKey);
+      }
     } catch (error) {
       setPendingUserMessage(null);
       // The composer was cleared optimistically; a rejected dispatch (busy
@@ -859,6 +873,14 @@ export function App() {
   const handleRetryAgent = useStableEvent((agent: AgentName, mode: AgentTaskMode, agentId?: string) => { void retryAgentMessage(agent, mode, agentId); });
   const handleOpenThreadSpace = useStableEvent((artifact?: RelayArtifact) => openThreadSpace(artifact));
 
+  function recoveryOperationId(key: string): string {
+    const existing = recoveryOperationIdsRef.current.get(key);
+    if (existing) return existing;
+    const created = crypto.randomUUID();
+    recoveryOperationIdsRef.current.set(key, created);
+    return created;
+  }
+
   async function sendDecision(kind: "approve" | "reject" | "rerun" | "mark_done") {
     if (!activeSession) return;
     if (kind === "rerun") {
@@ -887,14 +909,17 @@ export function App() {
         setSelectedSessionId(activeSession.id);
         navigateToRoute("main");
         atBottomRef.current = true;
+        const recoveryKey = `${activeSession.id}:rerun:${logicalAgent.id}:${assignment.mode}`;
         const done = await requestThreadRecoveryMutation.mutateAsync({
           sessionId: activeSession.id,
           input: {
             kind: "rerun",
+            idempotencyKey: recoveryOperationId(recoveryKey),
             targetAgentId: logicalAgent.id,
             mode: assignment.mode,
           },
         });
+        recoveryOperationIdsRef.current.delete(recoveryKey);
         setSelectedSessionId(done.id);
         syncThreadUrl(done.id, true);
       } catch (error) {
@@ -944,10 +969,17 @@ export function App() {
       setSelectedSessionId(activeSession.id);
       navigateToRoute("main");
       atBottomRef.current = true;
+      const recoveryKey = `${activeSession.id}:rerun:${logicalAgent.id}:${mode}`;
       const done = await requestThreadRecoveryMutation.mutateAsync({
         sessionId: activeSession.id,
-        input: { kind: "rerun", targetAgentId: logicalAgent.id, mode },
+        input: {
+          kind: "rerun",
+          idempotencyKey: recoveryOperationId(recoveryKey),
+          targetAgentId: logicalAgent.id,
+          mode,
+        },
       });
+      recoveryOperationIdsRef.current.delete(recoveryKey);
       setSelectedSessionId(done.id);
       syncThreadUrl(done.id, true);
     } catch (error) {
@@ -975,15 +1007,18 @@ export function App() {
     setIsRunning(true);
     try {
       const note = handoffNote.trim();
+      const recoveryKey = `${activeSession.id}:handoff:${logicalAgent.id}:${handoffMode}:${note}`;
       const done = await requestThreadRecoveryMutation.mutateAsync({
         sessionId: activeSession.id,
         input: {
           kind: "handoff",
+          idempotencyKey: recoveryOperationId(recoveryKey),
           targetAgentId: logicalAgent.id,
           mode: handoffMode,
           ...(note ? { note } : {}),
         },
       });
+      recoveryOperationIdsRef.current.delete(recoveryKey);
       setSelectedSessionId(done.id); setHandoffNote(""); setHandoffMode("action"); setHandoffOpen(false); setActiveAgent(logicalAgent.executorKind); setActiveLogicalAgentId(logicalAgent.id);
       syncThreadUrl(done.id, true);
     } catch (error) {

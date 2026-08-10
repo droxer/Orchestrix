@@ -2781,6 +2781,111 @@ def test_active_session_run_request_claim_is_atomic_across_store_instances(
 
 
 @pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
+def test_same_idempotent_run_request_is_get_or_create_across_store_instances(
+    store_factory,
+) -> None:
+    with TemporaryDirectory() as root:
+        stores = (store_factory(root), store_factory(root))
+        stores[0].register_node(store_node_payload())
+        barrier = Barrier(2)
+        request_id = new_database_id()
+        session_id = new_database_id()
+
+        def create(store) -> str:
+            barrier.wait()
+            return store.create_run_request(
+                {
+                    "id": request_id,
+                    "nodeId": "sbx_alice",
+                    "sessionId": session_id,
+                    "taskGoal": "do one thing",
+                    "assignments": [{"executorKind": "codex", "mode": "action"}],
+                    "state": {"fingerprint": "same"},
+                    "status": "prepared",
+                }
+            )["id"]
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(create, stores))
+
+        assert results == [request_id, request_id]
+
+
+def test_reaper_activates_a_prepared_request_only_after_its_round_is_durable() -> None:
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        registry.register(
+            {
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            },
+            "ui_token",
+        )
+        session = session_store.create_session(
+            {
+                "workspacePath": "/workspace/alice",
+                "ownerEmployeeId": "alice",
+                "taskGoal": "reconcile admission",
+            }
+        )
+        manifest = {"collaborationId": "col_1", "roundId": "round_1"}
+        prepared = registry.prepare_run_request(
+            "sbx_alice",
+            session["id"],
+            session["taskGoal"],
+            [{"executorKind": "codex", "mode": "action"}],
+            {"_relay_collaboration_manifest": manifest},
+        )
+        SessionController(session_store).record_collaboration_round_started(
+            session["id"], manifest
+        )
+
+        registry.reap_stale_runs()
+
+        assert daemon_store.get_run_request(prepared["id"])["status"] == "running"
+        assert len(registry.take_commands("sbx_alice", "node_token")) == 1
+
+
+def test_reaper_expires_a_prepared_request_without_a_durable_round(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "relay.daemon_registry.registry.PREPARED_ADMISSION_LEASE_SECONDS", 0
+    )
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        session = session_store.create_session(
+            {"workspacePath": "/workspace", "taskGoal": "expire admission"}
+        )
+        prepared = daemon_store.create_run_request(
+            {
+                "nodeId": "sbx_alice",
+                "sessionId": session["id"],
+                "taskGoal": session["taskGoal"],
+                "assignments": [],
+                "state": {},
+                "status": "prepared",
+            }
+        )
+
+        registry.reap_stale_runs()
+
+        expired = daemon_store.get_run_request(prepared["id"])
+        assert expired["status"] == "failed"
+        assert "expired" in expired["error"]
+
+
+@pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
 def test_run_request_creation_reserves_node_capacity_atomically(store_factory) -> None:
     with TemporaryDirectory() as root:
         store = store_factory(root)

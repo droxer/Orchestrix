@@ -567,6 +567,7 @@ describe("thread collaboration messages", () => {
         targetAgentId: "agent_support",
         mode: "review",
         note: "fresh eyes",
+        idempotencyKey: "recovery_1",
       });
     } finally {
       globalThis.fetch = original;
@@ -579,6 +580,7 @@ describe("thread collaboration messages", () => {
         targetAgentId: "agent_support",
         mode: "review",
         note: "fresh eyes",
+        idempotencyKey: "recovery_1",
       },
     }]);
   });

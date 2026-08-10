@@ -77,9 +77,11 @@ class SessionController:
         task_goal: str,
         participants: list[str] | None = None,
         pending_start: bool = False,
+        session_id: str | None = None,
     ) -> dict[str, Any]:
         session = self.store.create_session(
             {
+                **({"id": session_id} if session_id else {}),
                 "workspacePath": self.workspace_path,
                 **(
                     {"ownerEmployeeId": self.owner_employee_id}

@@ -831,6 +831,9 @@ class LocalDaemonStore:
             **request,
         }
         with self._lock, self._run_request_claim_lock():
+            existing = self.get_run_request(record["id"])
+            if existing:
+                return existing
             if self.active_run_request_for_session_any_node(record["sessionId"]):
                 raise ValueError(
                     f"Session {record['sessionId']} already has an active daemon run."
@@ -2308,6 +2311,16 @@ class DatabaseDaemonStore:
                     .all()
                 )
                 active_requests = [row_to_run_request(row) for row in active_rows]
+                idempotent = next(
+                    (
+                        item
+                        for item in active_requests
+                        if item["id"] == record["id"]
+                    ),
+                    None,
+                )
+                if idempotent:
+                    return idempotent
                 if any(
                     item["sessionId"] == record["sessionId"] for item in active_requests
                 ):
@@ -2334,6 +2347,9 @@ class DatabaseDaemonStore:
                     ),
                 )
         except IntegrityError as error:
+            existing = self.get_run_request(record["id"])
+            if existing:
+                return existing
             if self.active_run_request_for_session_any_node(record["sessionId"]):
                 raise ValueError(
                     f"Session {record['sessionId']} already has an active daemon run."

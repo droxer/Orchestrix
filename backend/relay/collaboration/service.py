@@ -80,6 +80,16 @@ class CollaborationConductor:
                 existing = self.ctx.backend.idempotent_run(
                     prepared.idempotency_key,
                     actor["employeeId"],
+                    actor_is_admin=actor["isAdmin"],
+                    expected_fingerprint=fingerprint,
+                )
+                if existing:
+                    return existing
+            elif prepared.session_id:
+                existing = self.ctx.backend.idempotent_session_run(
+                    prepared.session_id,
+                    actor["employeeId"],
+                    actor_is_admin=actor["isAdmin"],
                     expected_fingerprint=fingerprint,
                 )
                 if existing:
@@ -321,9 +331,9 @@ class CollaborationConductor:
             parsed["sessionId"] = intent.session_id
         if intent.user_message_id:
             parsed["userMessageId"] = intent.user_message_id
+        parsed["idempotencyFingerprint"] = fingerprint
         if intent.idempotency_key:
             parsed["idempotencyKey"] = intent.idempotency_key
-            parsed["idempotencyFingerprint"] = fingerprint
         if team_id:
             parsed["teamId"] = team_id
         if intent.decision:

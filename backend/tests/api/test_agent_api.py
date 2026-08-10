@@ -830,9 +830,16 @@ def test_semantic_message_retry_reconciles_a_prepared_attempt_without_duplicate_
         assert interrupted.status_code == 409
         assert retried.status_code == 202, retried.text
         persisted = app.state.session_store.get_session(session["id"])
-        assert len(
-            [event for event in persisted["events"] if event["type"] == "user.message"]
-        ) == 1
+        assert (
+            len(
+                [
+                    event
+                    for event in persisted["events"]
+                    if event["type"] == "user.message"
+                ]
+            )
+            == 1
+        )
         assert (
             len(
                 [
@@ -852,6 +859,9 @@ def test_semantic_message_retry_reconciles_a_prepared_attempt_without_duplicate_
             )
             assert conflict.status_code == 409
             assert conflict.json()["detail"]["code"] == "idempotency_conflict"
+        else:
+            replay = client.post(f"/api/v1/threads/{session['id']}/messages", json=body)
+            assert replay.status_code == 202, replay.text
 
 
 def test_new_thread_retry_resumes_the_session_owned_by_its_prepared_admission(
@@ -966,9 +976,7 @@ def test_admin_can_replay_a_scoped_message_for_an_employee_owned_thread(
         }
 
         first = client.post(f"/api/v1/threads/{session['id']}/messages", json=body)
-        replay = client.post(
-            f"/api/v1/threads/{session['id']}/messages", json=body
-        )
+        replay = client.post(f"/api/v1/threads/{session['id']}/messages", json=body)
 
         assert first.status_code == 202
         assert replay.status_code == 202, replay.text
