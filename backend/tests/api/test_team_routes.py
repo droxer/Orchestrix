@@ -1510,8 +1510,12 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
         )
 
         answered = client.post(
-            "/api/v1/agent-runs",
-            json={"taskGoal": "one more pass please", "sessionId": session_id},
+            f"/api/v1/threads/{session_id}/messages",
+            json={
+                "text": "one more pass please",
+                "intent": "accomplish",
+                "idempotencyKey": "message_room_1",
+            },
         )
 
         assert answered.status_code == 202
@@ -1535,6 +1539,20 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
             "memberAgentIds": [lead["id"], support["id"]],
             "leadAgentId": lead["id"],
         }
+        round_events = [
+            event
+            for event in app.state.session_store.get_session(session_id)["events"]
+            if event["type"] == "collaboration.round.started"
+        ]
+        assert len(round_events) == 1
+        manifest = round_events[0]["manifest"]
+        assert manifest["strategy"] == "coordinate"
+        assert manifest["source"] == "message"
+        assert manifest["teamSnapshot"] == request["assignments"][0]["teamSnapshot"]
+        assert [item["assignmentId"] for item in manifest["assignments"]] == [
+            item["assignmentId"] for item in request["assignments"]
+        ]
+        assert all(item["assignmentId"] for item in request["assignments"])
         assert (
             room_command["state"]["assignment_brief"]
             == (request["assignments"][0]["brief"])
@@ -1868,11 +1886,12 @@ def test_a_team_thread_accepts_an_assignment_naming_one_member(monkeypatch) -> N
             )
 
         answered = client.post(
-            "/api/v1/agent-runs",
+            f"/api/v1/threads/{session_id}/messages",
             json={
-                "taskGoal": "just you, Support",
-                "sessionId": session_id,
-                "assignments": [{"agentId": support["id"], "mode": "action"}],
+                "text": "just you, Support",
+                "intent": "accomplish",
+                "addressAgentId": support["id"],
+                "idempotencyKey": "message_support_1",
             },
         )
 
@@ -1883,6 +1902,18 @@ def test_a_team_thread_accepts_an_assignment_naming_one_member(monkeypatch) -> N
             )
         )
         assert [item["agentId"] for item in request["assignments"]] == [support["id"]]
+        round_event = next(
+            event
+            for event in reversed(
+                app.state.session_store.get_session(session_id)["events"]
+            )
+            if event["type"] == "collaboration.round.started"
+        )
+        assert round_event["manifest"]["strategy"] == "direct"
+        assert round_event["manifest"]["address"] == {
+            "kind": "members",
+            "agentIds": [support["id"]],
+        }
 
 
 def test_message_to_a_team_thread_runs_every_member_as_the_owning_employee(
