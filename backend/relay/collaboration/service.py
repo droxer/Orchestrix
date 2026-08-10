@@ -219,12 +219,14 @@ class CollaborationConductor:
         )
         collaboration_id = new_relay_id("col")
         round_id = new_relay_id("round")
-        manifest = _round_manifest(
-            collaboration_id,
-            round_id,
-            intent,
-            resolved,
-            team_snapshot,
+        manifest = create_round_manifest(
+            source=intent.source,
+            purpose=intent.purpose,
+            address=intent.address,
+            assignments=resolved,
+            team_snapshot=team_snapshot,
+            collaboration_id=collaboration_id,
+            round_id=round_id,
         )
         parsed: dict[str, Any] = {
             "taskGoal": intent.task_goal,
@@ -379,29 +381,32 @@ def _team_snapshot(
     }
 
 
-def _round_manifest(
-    collaboration_id: str,
-    round_id: str,
-    intent: _PreparedRound,
+def create_round_manifest(
+    *,
+    source: str,
+    purpose: str,
+    address: dict[str, Any],
     assignments: list[dict[str, Any]],
     team_snapshot: dict[str, Any] | None,
+    collaboration_id: str | None = None,
+    round_id: str | None = None,
 ) -> dict[str, Any]:
     strategy = (
         "direct"
-        if intent.address.get("kind") == "members" and len(assignments) == 1
+        if address.get("kind") == "members" and len(assignments) == 1
         else "room"
-        if intent.purpose == "discuss"
+        if purpose == "discuss"
         else "review"
-        if intent.purpose == "review"
+        if purpose == "review"
         else "coordinate"
     )
     return {
-        "collaborationId": collaboration_id,
-        "roundId": round_id,
-        "source": intent.source,
-        "purpose": intent.purpose,
+        "collaborationId": collaboration_id or new_relay_id("col"),
+        "roundId": round_id or new_relay_id("round"),
+        "source": source,
+        "purpose": purpose,
         "strategy": strategy,
-        "address": intent.address,
+        "address": address,
         **({"teamSnapshot": team_snapshot} if team_snapshot else {}),
         "assignments": [
             {

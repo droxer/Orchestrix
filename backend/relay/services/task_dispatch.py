@@ -5,6 +5,8 @@ from typing import Any, Protocol, TypedDict
 
 from loguru import logger
 
+from ..collaboration import create_round_manifest
+from ..core.ids import new_database_id
 from ..daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
 from ..persistence.protocols import (
     AgentPlacementStore,
@@ -293,6 +295,13 @@ class TaskDispatcher:
                     ),
                 }
             ]
+        self.run_assignments = [
+            {
+                **assignment,
+                "assignmentId": assignment.get("assignmentId") or new_database_id(),
+            }
+            for assignment in self.run_assignments
+        ]
         if (
             self.task.get("assignedAgentId") or self.task.get("assignedTeamId")
         ) and self.task.get("status") == "backlog":
@@ -448,11 +457,41 @@ class TaskDispatcher:
         return _result(updated, "started", session=session)
 
     def _run_request(self) -> dict[str, Any]:
+        mode = _task_mode(self.mode)
+        purpose = "discuss" if mode == "ask" else "review" if mode == "review" else "accomplish"
+        team_snapshot = next(
+            (
+                assignment.get("teamSnapshot")
+                for assignment in self.run_assignments
+                if isinstance(assignment.get("teamSnapshot"), dict)
+            ),
+            None,
+        )
         request: dict[str, Any] = {
             "taskGoal": task_goal_text(self.task),
             "assignments": self.run_assignments,
             "taskId": self.task["id"],
             "actorIsAdmin": self.actor["isAdmin"],
+            "collaboration": {
+                "manifest": create_round_manifest(
+                    source="task",
+                    purpose=purpose,
+                    address=(
+                        {"kind": "room"}
+                        if self.task.get("assignedTeamId")
+                        else {
+                            "kind": "members",
+                            "agentIds": [
+                                assignment["agentId"]
+                                for assignment in self.run_assignments
+                                if assignment.get("agentId")
+                            ],
+                        }
+                    ),
+                    assignments=self.run_assignments,
+                    team_snapshot=team_snapshot,
+                )
+            },
         }
         if self.agent_first:
             request["agentFirst"] = True
