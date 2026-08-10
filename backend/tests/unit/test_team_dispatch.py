@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-
 from relay.services.team_dispatch import (
     TeamDispatchError,
     team_agents,

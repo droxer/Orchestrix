@@ -13,6 +13,7 @@ from typing import Any
 
 from loguru import logger
 
+from ..collaboration.models import COLLABORATION_MANIFEST_STATE_KEY
 from ..collaboration.policy import (
     PARTICIPANT_FAILURES_STATE_KEY,
     REPAIR_COUNT_STATE_KEY,
@@ -24,7 +25,6 @@ from ..collaboration.policy import (
     decide_failure,
     validate_round_result,
 )
-from ..collaboration.models import COLLABORATION_MANIFEST_STATE_KEY
 from ..core.environment import load_backend_env
 from ..core.ids import new_database_id, new_relay_id, new_sandbox_id, now_iso
 from ..core.models import (

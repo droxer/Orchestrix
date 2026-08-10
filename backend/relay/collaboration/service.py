@@ -9,7 +9,11 @@ from ..services.agent_routing import (
     resolve_agent_assignments,
     resolve_session_daemon_node_id,
 )
-from ..services.team_dispatch import TeamDispatchError, team_agents, team_member_assignments
+from ..services.team_dispatch import (
+    TeamDispatchError,
+    team_agents,
+    team_member_assignments,
+)
 from ..sessions.controller import SessionController
 from .models import MessageIntent, RecoveryIntent, RunIntent
 
@@ -84,7 +88,12 @@ class CollaborationConductor:
                 "review": "review",
             }
             raw_assignments = (
-                [{"agentId": intent.address_agent_id, "mode": purpose_modes[intent.purpose]}]
+                [
+                    {
+                        "agentId": intent.address_agent_id,
+                        "mode": purpose_modes[intent.purpose],
+                    }
+                ]
                 if intent.address_agent_id
                 else None
             )
@@ -210,7 +219,9 @@ class CollaborationConductor:
             raw_assignments = [{"agentId": owner_agent_id, "mode": intent.mode}]
         if not raw_assignments:
             raise CollaborationError(
-                "participants_required", "At least one participant is required.", status=400
+                "participants_required",
+                "At least one participant is required.",
+                status=400,
             )
 
         daemon_nodes = self.ctx.registry.monitor_nodes()
@@ -302,7 +313,11 @@ class CollaborationConductor:
     def _backfill_runtime_affinity(
         self, session: dict[str, Any] | None
     ) -> dict[str, Any] | None:
-        if not session or session.get("managedNodeId") or not session.get("daemonNodeId"):
+        if (
+            not session
+            or session.get("managedNodeId")
+            or not session.get("daemonNodeId")
+        ):
             return session
         managed_node_id = self.ctx.registry.daemon_store.historical_managed_node_id(
             session["daemonNodeId"]
@@ -345,7 +360,9 @@ class CollaborationConductor:
                 or not item["agentId"]
             ):
                 raise CollaborationError(
-                    "assignment_invalid", "Each participant requires agentId.", status=400
+                    "assignment_invalid",
+                    "Each participant requires agentId.",
+                    status=400,
                 )
             if team_id and item["agentId"] not in team_member_ids:
                 raise CollaborationError(
@@ -400,7 +417,11 @@ def _role(value: Any) -> str | None:
 
 
 def _purpose_for_mode(mode: Any) -> str:
-    return "discuss" if mode == "ask" else "review" if mode == "review" else "accomplish"
+    if mode == "ask":
+        return "discuss"
+    if mode == "review":
+        return "review"
+    return "accomplish"
 
 
 def _team_snapshot(
@@ -480,7 +501,9 @@ def _validated_decision(
         )
     if target_agent is not None and target_agent != target_assignment["executorKind"]:
         raise CollaborationError(
-            "decision_invalid", "decision targetAgent does not match participant.", status=400
+            "decision_invalid",
+            "decision targetAgent does not match participant.",
+            status=400,
         )
     requested_target_id = decision.get("targetAgentId")
     if requested_target_id and requested_target_id != target_assignment["agentId"]:
