@@ -70,6 +70,11 @@ export type CollaborationPurpose = "accomplish" | "discuss" | "review";
 export type CollaborationStrategy = "direct" | "room" | "review" | "coordinate";
 
 export interface CollaborationRoundManifest {
+  /** Absent only on rounds persisted before the conductor contract shipped. */
+  contract?: {
+    name: "relay.collaboration.round";
+    version: number;
+  };
   collaborationId: string;
   roundId: string;
   source: string;

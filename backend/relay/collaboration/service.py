@@ -434,6 +434,10 @@ def create_round_manifest(
         else "coordinate"
     )
     return {
+        "contract": {
+            "name": "relay.collaboration.round",
+            "version": 1,
+        },
         "collaborationId": collaboration_id or new_relay_id("col"),
         "roundId": round_id or new_relay_id("round"),
         "source": source,

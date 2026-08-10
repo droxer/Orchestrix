@@ -132,6 +132,7 @@ def team_member_assignments(
     mode: str = "action",
     team: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
+    lead_agent_id = team.get("leadAgentId") if team else None
     snapshot = (
         {
             "teamId": team["id"],
@@ -142,14 +143,24 @@ def team_member_assignments(
         if team
         else None
     )
+    ordered_agents = (
+        [
+            *(agent for agent in agents if agent["id"] != lead_agent_id),
+            *(agent for agent in agents if agent["id"] == lead_agent_id),
+        ]
+        if mode == "ask" and lead_agent_id
+        else agents
+    )
     return [
         _team_member_assignment(
             agent,
             mode=mode,
-            coordinator=index == 0,
+            coordinator=(
+                agent["id"] == lead_agent_id if lead_agent_id else index == 0
+            ),
             team_snapshot=snapshot,
         )
-        for index, agent in enumerate(agents)
+        for index, agent in enumerate(ordered_agents)
     ]
 
 
