@@ -1685,6 +1685,7 @@ describe("token usage accounting", () => {
     assert.deepEqual(session.agentRuns[0].teamSnapshot?.memberAgentIds, ["agent_builder", "agent_reviewer"]);
     assert.equal(session.activeCollaborationId, "col_1");
     assert.equal(session.activeRoundId, "round_1");
+    assert.equal(session.collaborationRevision, 1);
     assert.equal(session.collaborationRounds[0]?.strategy, "coordinate");
     assert.deepEqual(session.tokenUsage, { input: 5, output: 7, cache: 3, total: 15 });
   });

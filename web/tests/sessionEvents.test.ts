@@ -48,6 +48,7 @@ describe("applySessionEvent", () => {
 
     assert.equal(updated.activeCollaborationId, "col_1");
     assert.equal(updated.activeRoundId, "round_1");
+    assert.equal(updated.collaborationRevision, 1);
     assert.equal(updated.collaborationRounds[0]?.strategy, "review");
   });
 

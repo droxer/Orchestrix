@@ -1558,6 +1558,13 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
         ]
         assert len(round_events) == 1
         manifest = round_events[0]["manifest"]
+        assert room_command["delivery"] == {
+            "type": "assignment-attempt",
+            "attemptId": room_command["runId"],
+            "collaborationId": manifest["collaborationId"],
+            "roundId": manifest["roundId"],
+            "assignmentId": manifest["assignments"][0]["assignmentId"],
+        }
         assert manifest["strategy"] == "coordinate"
         assert manifest["source"] == "message"
         assert manifest["teamSnapshot"] == request["assignments"][0]["teamSnapshot"]

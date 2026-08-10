@@ -83,6 +83,7 @@ def test_collaboration_round_is_materialized_as_authoritative_session_state() ->
         assert updated["collaborationRounds"] == [manifest]
         assert updated["activeCollaborationId"] == "col_1"
         assert updated["activeRoundId"] == "round_1"
+        assert updated["collaborationRevision"] == 1
 
 
 def test_compute_conversation_history_excludes_current_turn() -> None:
