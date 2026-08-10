@@ -106,6 +106,55 @@ def test_session_events_streams_backlog_then_closes_on_terminal(monkeypatch) -> 
         assert frames[-1][0] == "done"
 
 
+def test_mark_done_persists_a_delivery_fence_for_an_active_request(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        app.state.registry.register(
+            {
+                "sandboxId": "node_admin",
+                "employeeId": "admin",
+                "token": "node_token",
+                "workspacePath": "/workspace/admin",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        created = client.post("/api/v1/threads", json={"taskGoal": "finish safely"})
+        session_id = created.json()["id"]
+        run_request = app.state.daemon_store.create_run_request(
+            {
+                "nodeId": "node_admin",
+                "sessionId": session_id,
+                "taskGoal": "finish safely",
+                "assignments": [
+                    {
+                        "assignmentId": "assignment_mark_done",
+                        "executorKind": "codex",
+                        "mode": "action",
+                    }
+                ],
+                "state": {},
+                "status": "running",
+            }
+        )
+
+        done = client.post(
+            f"/api/v1/threads/{session_id}/decisions", json={"kind": "mark_done"}
+        )
+
+        assert done.status_code == 200, done.text
+        assert done.json()["status"] == "completed"
+        assert (
+            app.state.daemon_store.get_run_request(run_request["id"])["status"]
+            == "cancelled"
+        )
+
+
 def test_terminal_session_stream_drains_every_bounded_page(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

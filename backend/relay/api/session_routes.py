@@ -678,6 +678,23 @@ async def decision(
         task_store=ctx.task_store,
         owner_employee_id=actor["employeeId"],
     )
+    if kind in ("cancel", "mark_done"):
+        run_request = ctx.registry.daemon_store.active_run_request_for_session_any_node(
+            session_id
+        )
+        if run_request:
+            terminal_reason = string_field(body, "note") or (
+                "Session marked done by employee."
+                if kind == "mark_done"
+                else "Cancelled by employee."
+            )
+            ctx.registry.cancel_run_request_before_delivery(
+                run_request["id"], terminal_reason
+            )
+            if ctx.registry.get(run_request["nodeId"]):
+                ctx.registry.cancel_active_run(
+                    run_request["nodeId"], session_id, terminal_reason
+                )
     result = controller.record_decision(
         session_id,
         kind,

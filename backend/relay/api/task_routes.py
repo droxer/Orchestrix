@@ -253,6 +253,18 @@ def complete_linked_task_sessions(
             continue
         if session.get("status") in ("completed", "failed", "cancelled"):
             continue
+        run_request = ctx.registry.daemon_store.active_run_request_for_session_any_node(
+            session_id
+        )
+        if run_request:
+            terminal_reason = "Linked task completed before agent delivery finished."
+            ctx.registry.cancel_run_request_before_delivery(
+                run_request["id"], terminal_reason
+            )
+            if ctx.registry.get(run_request["nodeId"]):
+                ctx.registry.cancel_active_run(
+                    run_request["nodeId"], session_id, terminal_reason
+                )
         controller.complete_session(session_id, outcome)
 
 

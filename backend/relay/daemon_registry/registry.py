@@ -1403,6 +1403,68 @@ class DaemonNodeRegistry:
         records = self.daemon_store.take_queued_commands(
             sandbox_id, limit=limit, lease_seconds=lease_seconds
         )
+        deliverable_records: list[dict[str, Any]] = []
+        for record in records:
+            command = record["command"]
+            if command.get("type") != "run.start":
+                deliverable_records.append(record)
+                continue
+            request_id = command.get("_runRequestId")
+            run_request = (
+                self.daemon_store.get_run_request(request_id) if request_id else None
+            )
+            try:
+                session = self.store.get_session(command["sessionId"])
+            except KeyError:
+                session = None
+            request_is_live = bool(
+                run_request
+                and run_request.get("status") == "running"
+                and run_request.get("currentCommandId") == command.get("id")
+            )
+            session_is_live = bool(
+                session
+                and session.get("status") not in ("completed", "failed", "cancelled")
+            )
+            if request_is_live and session_is_live:
+                deliverable_records.append(record)
+                continue
+            reason = (
+                "Run delivery suppressed because its request or session is terminal."
+            )
+            self.daemon_store.mark_command_cancelled(
+                sandbox_id,
+                {
+                    "type": "run.cancelled",
+                    "commandId": command["id"],
+                    "sessionId": command["sessionId"],
+                    "runId": command["runId"],
+                    "agent": command["agent"],
+                    "mode": command["mode"],
+                    "reason": reason,
+                    **({"leaseId": record["leaseId"]} if record.get("leaseId") else {}),
+                },
+            )
+            if run_request and run_request.get("status") in (
+                "prepared",
+                "running",
+                "dispatching",
+            ):
+                self.daemon_store.update_run_request_if_status(
+                    run_request["id"],
+                    run_request["status"],
+                    {
+                        "status": (
+                            session["status"]
+                            if session
+                            and session.get("status")
+                            in ("completed", "failed", "cancelled")
+                            else "cancelled"
+                        ),
+                        "error": reason,
+                    },
+                )
+        records = deliverable_records
         logger.debug(
             "Commands taken by daemon node",
             sandbox_id=sandbox_id,

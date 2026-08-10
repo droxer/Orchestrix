@@ -725,7 +725,7 @@ class LocalDaemonStore:
     def take_queued_commands(
         self, node_id: str, limit: int = 2**53, lease_seconds: float = 60.0
     ) -> list[dict[str, Any]]:
-        with self._lock:
+        with self._lock, self._run_request_claim_lock():
             now = now_iso()
             # Safe only inside the single backend process that owns this store.
             records = [
@@ -736,6 +736,28 @@ class LocalDaemonStore:
             records = sorted(records, key=lambda item: item["createdAt"])[:limit]
             result = []
             for record in records:
+                command = record.get("command") or {}
+                request_id = command.get("_runRequestId")
+                if command.get("type") == "run.start" and request_id:
+                    request = self.get_run_request(request_id)
+                    if not (
+                        request
+                        and request.get("status") == "running"
+                        and request.get("currentCommandId") == command.get("id")
+                    ):
+                        self.mark_command_cancelled(
+                            node_id,
+                            {
+                                "type": "run.cancelled",
+                                "commandId": command["id"],
+                                "sessionId": command["sessionId"],
+                                "runId": command["runId"],
+                                "agent": command["agent"],
+                                "mode": command["mode"],
+                                "reason": "Run request became terminal before command claim.",
+                            },
+                        )
+                        continue
                 attempt = int(record.get("attempt") or 0) + 1
                 updated = {
                     **record,
@@ -2183,7 +2205,6 @@ class DatabaseDaemonStore:
                     .where(available_condition)
                     .order_by(self.commands.c.created_at)
                     .limit(limit)
-                    .with_for_update(skip_locked=True)
                 )
                 .mappings()
                 .all()
@@ -2191,6 +2212,80 @@ class DatabaseDaemonStore:
             result = []
             for row in rows:
                 record = row_to_command(row)
+                command = record.get("command") or {}
+                request_id = command.get("_runRequestId")
+                if command.get("type") == "run.start" and request_id:
+                    request_row = (
+                        conn.execute(
+                            select(self.run_requests)
+                            .where(self.run_requests.c.id == request_id)
+                            .with_for_update()
+                        )
+                        .mappings()
+                        .first()
+                    )
+                    request_is_live = bool(
+                        request_row
+                        and request_row.get("status") == "running"
+                        and str(request_row.get("current_command_id")) == record["id"]
+                    )
+                    if not request_is_live:
+                        terminal_event = {
+                            "type": "run.cancelled",
+                            "commandId": command["id"],
+                            "sessionId": command["sessionId"],
+                            "runId": command["runId"],
+                            "agent": command["agent"],
+                            "mode": command["mode"],
+                            "reason": (
+                                "Run request became terminal before command claim."
+                            ),
+                        }
+                        cancelled = {
+                            **record,
+                            "command": {
+                                **command,
+                                "_terminalEvent": terminal_event,
+                            },
+                            "status": "cancelled",
+                            "updatedAt": now,
+                            "completedAt": now,
+                            "error": terminal_event["reason"],
+                        }
+                        applied = conn.execute(
+                            update(self.commands)
+                            .where(self.commands.c.id == record["id"])
+                            .where(available_condition)
+                            .values(
+                                **command_to_row(
+                                    cancelled,
+                                    database_id=record["id"],
+                                    node_pk=node_pk,
+                                )
+                            )
+                        )
+                        if applied.rowcount == 1:
+                            conn.execute(
+                                update(self.runs)
+                                .where(self.runs.c.command_id == record["id"])
+                                .values(
+                                    status="cancelled",
+                                    completed_at=now_dt,
+                                    error=terminal_event["reason"],
+                                )
+                            )
+                            self._append_daemon_event(
+                                conn,
+                                daemon_event(
+                                    "daemon.command.cancelled",
+                                    {
+                                        "nodeId": node_id,
+                                        "commandId": record["id"],
+                                        "reason": terminal_event["reason"],
+                                    },
+                                ),
+                            )
+                        continue
                 attempt = int(record.get("attempt") or 0) + 1
                 updated = {
                     **record,
