@@ -170,7 +170,6 @@ function sessionStatusLabel(
  *  workspace pages. */
 export function WorkspaceActivities({
   brief,
-  statusPill,
   onOpenThread,
   panelId,
   labelledBy,
@@ -178,10 +177,6 @@ export function WorkspaceActivities({
   emptyPulse = false,
 }: {
   brief?: WorkspaceBriefResponse;
-  /** Optional status chip (e.g. team readiness) for callers with nowhere
-   *  else to put it. Omit when the caller already shows status elsewhere —
-   *  the agent page's RecordBand covers this for agents. */
-  statusPill?: ReactNode;
   onOpenThread: (sessionId: string) => void;
   panelId: string;
   labelledBy: string;
@@ -201,17 +196,12 @@ export function WorkspaceActivities({
       id={panelId}
       aria-labelledby={labelledBy}
     >
-      {/* The metric strip used to print active-runs / tasks / threads in the
+      {/* No metric strip. It used to print active-runs / tasks / threads in the
           loudest numerals on the page, directly above three section headers
-          carrying those same three counts. Counts now live only in the section
-          headers; the strip survives solely for a caller-supplied status chip
-          that has nowhere else to go. */}
-      {statusPill ? (
-        <div className="workspace-metric-strip" role="group" aria-label={t("workspace.metrics")}>
-          <div className="workspace-metric-item workspace-metric-item--status">{statusPill}</div>
-        </div>
-      ) : null}
-
+          carrying those same three counts; counts now live only in the section
+          headers. Its last tenant was the team page's readiness chip, which
+          restated the RecordBand's availability — and disagreed with it, since
+          a busy team rendered as "Unavailable". Status belongs to the band. */}
       <div className="workspace-activity-sections">
         {activeRuns.length ? (
           <ActivitySection title={t("workspace.activity_runs")} count={activeRuns.length} index={0}>
@@ -222,7 +212,6 @@ export function WorkspaceActivities({
                     title={run.taskGoal}
                     meta={[
                       agentLabel(run.agent),
-                      t(`mode.${run.mode}`, { defaultValue: run.mode }),
                       compactDate(run.startedAt, i18n.language),
                     ].filter(Boolean).join(" · ")}
                     onClick={() => onOpenThread(run.sessionId)}

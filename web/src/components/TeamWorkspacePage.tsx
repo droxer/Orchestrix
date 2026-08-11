@@ -10,12 +10,14 @@ import { TEAMS_QUERY_KEY } from "../hooks/useTeams";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { agentLabel } from "../lib/plan";
-import { teamAvailability, teamReady } from "../lib/taskAssignment";
+import { describeAgentPlacements } from "../lib/agentPlacements";
+import { teamAvailability } from "../lib/taskAssignment";
 import { teamMutationInput } from "../lib/teamForm";
 import { teamWorkspaceAgentId } from "../lib/teamWorkspace";
 import type { AgentTeam } from "../types";
 import { ActionEdit, AdminDelete } from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
+import { OWNERSHIP_ICON } from "./AgentPlacementBadge";
 import { PageHeader } from "./PageHeader";
 import { IdentityMonogram } from "./IdentityMonogram";
 import { TeamMark } from "./TeamMark";
@@ -40,7 +42,7 @@ const TEAM_PAGE_TABS: readonly TeamPageTab[] = ["profile", "workspace", "activit
 const TEAM_BRIEF_POLL_MS = 3000;
 
 function parseTeamTab(value: string | null): TeamPageTab {
-  return TEAM_PAGE_TABS.includes(value as TeamPageTab) ? value as TeamPageTab : "activities";
+  return TEAM_PAGE_TABS.includes(value as TeamPageTab) ? value as TeamPageTab : "profile";
 }
 
 function TeamProfile({
@@ -216,22 +218,32 @@ function TeamProfile({
       {/* Same dossier grammar as the agent record: a document column holding
           the thing you can change (the roster), an identity rail beside it,
           and record-wide management below both. Facts that only name the
-          record (status, member count, id) live in the RecordBand above. */}
+          record (status, member count, id) live in the RecordBand above.
+
+          Unlike the agent record, a team's document is a roster — a few rows,
+          not an instructions essay — so the grid is stretched to the pane and
+          management is anchored at its foot. Left to size to content, the
+          panel ended a third of the way down and the rest of the surface was
+          dead space with a Danger zone floating in the middle of it. */}
       <div className="workspace-profile-panel workspace-profile-dossier">
         <div className="workspace-dossier-doc">
           <form className="team-profile-inline-form" onSubmit={(event) => void save(event)}>
             <section aria-labelledby="team-profile-members">
               <div className="team-profile-section-head">
-                <h2 id="team-profile-members" className="workspace-dossier-section-title">{t("teams.members")}</h2>
-                <span className="team-profile-section-head-side">
+                <h2 id="team-profile-members" className="workspace-dossier-section-title">
+                  {t("teams.members")}
+                  {/* Count rides the label it counts. Parked on the far right
+                      beside the pencil it was a numeral with no subject. */}
                   <span className="tnum">{editing ? memberIds.length : team.members.length}</span>
+                </h2>
+                <span className="team-profile-section-head-side">
                   {!editing ? (
                     <Button
                       type="button"
                       variant="ghost"
                       className="workspace-dossier-icon-btn"
-                      aria-label={t("teams.edit")}
-                      title={t("teams.edit")}
+                      aria-label={t("teams.edit_members")}
+                      title={t("teams.edit_members")}
                       onClick={startEditing}
                     >
                       <ActionEdit size={14} aria-hidden="true" />
@@ -257,6 +269,7 @@ function TeamProfile({
                           agentId={agent.id}
                           displayName={agent.displayName}
                           executorKind={agent.executorKind}
+                          placements={agent.placements}
                           selected={selected}
                           disabled={busy}
                           onToggle={toggleMember}
@@ -275,6 +288,15 @@ function TeamProfile({
                 <ul className="team-profile-members">
                   {team.members.map((member) => {
                     const ready = member.enabled && member.availability === "ready";
+                    // TeamMemberSummary carries no placements; the roster's
+                    // full agent record knows the member's home computer.
+                    const computer = describeAgentPlacements(
+                      agents.find((agent) => agent.id === member.id)?.placements ?? [],
+                    )[0] ?? null;
+                    const ComputerIcon = computer ? OWNERSHIP_ICON[computer.ownership] : null;
+                    const computerTitle = computer
+                      ? `${t(`admin.v2.node_ownership_${computer.ownership}`)} · ${computer.nodeName}`
+                      : undefined;
                     return (
                       <li key={member.id} className="team-profile-member">
                         <AgentStateBadge
@@ -285,10 +307,31 @@ function TeamProfile({
                           name={member.displayName}
                         />
                         <span className="team-profile-member-copy">
-                          <strong>{member.displayName}</strong>
-                          <small>{agentLabel(member.executorKind)}</small>
+                          <span className="team-profile-member-title">
+                            <strong>{member.displayName}</strong>
+                            {member.id === team.leadAgentId ? (
+                              <span className="team-profile-member-lead">{t("teams.lead_badge")}</span>
+                            ) : null}
+                          </span>
+                          <span className="team-profile-member-meta">
+                            <span>{agentLabel(member.executorKind)}</span>
+                            {computer && ComputerIcon ? (
+                              <span className="team-profile-member-computer" translate="no" title={computerTitle}>
+                                <ComputerIcon size={12} aria-hidden="true" />
+                                {computer.nodeName}
+                              </span>
+                            ) : (
+                              <span>{t("agents_page.no_placements")}</span>
+                            )}
+                          </span>
                         </span>
-                        {member.id === team.leadAgentId ? <Badge variant="outline">{t("teams.lead_badge")}</Badge> : null}
+                        {/* Per-member readiness, not the team's — the band
+                            carries the team's own availability. */}
+                        <span className="team-profile-member-state">
+                          {member.enabled
+                            ? <StatusPill value={member.availability} />
+                            : <Badge variant="neutral">{t("teams.disabled")}</Badge>}
+                        </span>
                       </li>
                     );
                   })}
@@ -399,8 +442,8 @@ function TeamProfile({
                   type="button"
                   variant="ghost"
                   className="workspace-dossier-icon-btn"
-                  aria-label={t("teams.edit")}
-                  title={t("teams.edit")}
+                  aria-label={t("teams.rename")}
+                  title={t("teams.rename")}
                   onClick={startRename}
                 >
                   <ActionEdit size={14} aria-hidden="true" />
@@ -409,26 +452,27 @@ function TeamProfile({
             )}
           </div>
 
-          <p className="workspace-dossier-stamp">
-            {t("admin.v2.agent_meta_created", { time: formatRelativeTime(team.createdAt, t) })}
-            {" · "}
-            {t("admin.v2.agent_meta_updated", { time: formatRelativeTime(team.updatedAt, t) })}
-          </p>
+          {/* Created/updated moved to the band — the rail holds only the
+              things you can change. */}
         </aside>
 
         {/* Management spans both columns — it acts on the whole record, not
-            on the roster document or the identity rail. */}
-        <div className="workspace-dossier-admin">
-          <section className="adm-drawer-section" aria-labelledby="team-profile-danger-title">
-            <p id="team-profile-danger-title" className="workspace-dossier-section-title">
-              {t("admin.v2.danger_zone")}
-            </p>
-            <Button type="button" variant="destructive" onClick={() => void remove()} loading={deleteTeamMutation.isPending} loadingLabel={t("teams.deleting")} disabled={updateTeamMutation.isPending || imageSaving}>
-              <AdminDelete size={14} aria-hidden="true" />
-              {t("teams.delete")}
-            </Button>
-          </section>
-        </div>
+            on the roster document or the identity rail. Hidden while the
+            roster is open: a live Delete directly under Save is the wrong
+            thing to put next to the save target. */}
+        {!editing ? (
+          <div className="workspace-dossier-admin">
+            <section className="adm-drawer-section" aria-labelledby="team-profile-danger-title">
+              <p id="team-profile-danger-title" className="workspace-dossier-section-title">
+                {t("admin.v2.danger_zone")}
+              </p>
+              <Button type="button" variant="destructive" onClick={() => void remove()} loading={deleteTeamMutation.isPending} loadingLabel={t("teams.deleting")} disabled={updateTeamMutation.isPending || imageSaving}>
+                <AdminDelete size={14} aria-hidden="true" />
+                {t("teams.delete")}
+              </Button>
+            </section>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -446,7 +490,7 @@ export function TeamWorkspacePage({
   onDeleted: () => void;
 }) {
   const { t } = useTranslation();
-  const [pageTab, setPageTab] = useUrlSearchState("tab", "activities" as TeamPageTab, parseTeamTab, (value) => value === "activities" ? null : value, "push");
+  const [pageTab, setPageTab] = useUrlSearchState("tab", "profile" as TeamPageTab, parseTeamTab, (value) => value === "profile" ? null : value, "push");
   const briefQuery = useQuery({
     queryKey: ["team-workspace-brief", team.id],
     queryFn: ({ signal }) => getWorkspaceBrief({ teamId: team.id }, signal),
@@ -457,7 +501,13 @@ export function TeamWorkspacePage({
 
   /* The band is the record's read-only spine, identical on all three tabs —
      the same rule the agent record follows: facts live here and no tab panel
-     may restate them. Every field comes off the team record itself. */
+     may restate them. Every field comes off the team record itself.
+
+     Member count and lead are deliberately NOT here: the roster on the
+     profile tab already names every member and marks the lead, so a band
+     cell would be the same fact one row higher. The timestamps take those
+     slots instead — they are read-only record coordinates, which is exactly
+     what the band is for, and the rail is reserved for editable things. */
   const bandFacts: RecordFact[] = [
     {
       key: "availability",
@@ -467,14 +517,14 @@ export function TeamWorkspacePage({
         : <StatusPill value={teamAvailability(team)} />,
     },
     {
-      key: "members",
-      label: t("teams.members"),
-      value: <span className="tnum">{team.members.length}</span>,
+      key: "created",
+      label: t("workspace.band_created"),
+      value: formatRelativeTime(team.createdAt, t),
     },
     {
-      key: "lead",
-      label: t("teams.lead"),
-      value: team.lead?.displayName ?? <span className="record-band-value--empty">—</span>,
+      key: "updated",
+      label: t("workspace.band_updated"),
+      value: formatRelativeTime(team.updatedAt, t),
     },
     {
       key: "id",
@@ -569,11 +619,6 @@ export function TeamWorkspacePage({
           brief={briefQuery.data}
           panelId="team-page-panel-activities"
           labelledBy="team-page-tab-activities"
-          statusPill={(
-            <span className={`workspace-status-pill tone-${teamReady(team) ? "good" : "neutral"}`}>
-              {teamReady(team) ? t("teams.available") : t("teams.unavailable")}
-            </span>
-          )}
           emptyMark={<TeamMark size={18} />}
           onOpenThread={onOpenThread}
         />

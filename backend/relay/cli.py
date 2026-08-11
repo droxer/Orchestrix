@@ -14,6 +14,7 @@ from .core.logging_config import setup_logging
 from .core.storage_config import database_url_from_env
 from .persistence.session_import import migrate_local_sessions
 from .persistence.session_store import DatabaseSessionStore
+from .security.auth import get_admin_token
 
 load_backend_env()
 
@@ -46,16 +47,11 @@ def main(argv: list[str] | None = None) -> None:
         return
     app = create_app(args.data_dir) if args.data_dir else create_app()
     auth_store = app.state.auth_store
-    admin_token = os.environ.get("RELAY_ADMIN_TOKEN", "").strip()
     if not auth_store.has_users():
-        if admin_token:
-            logger.info(
-                "No users yet. Use /api/v1/auth/bootstrap with RELAY_ADMIN_TOKEN to create the first admin."
-            )
-        else:
-            logger.warning(
-                "No users and RELAY_ADMIN_TOKEN is not set. Login will be unavailable until a user is bootstrapped."
-            )
+        logger.info(
+            "No users yet. Bootstrap the first admin via /api/v1/auth/bootstrap with admin token: {}",
+            get_admin_token(),
+        )
     logger.info("Relay backend listening on http://{}:{}", args.host, args.port)
     logger.info("Relay backend control panel: http://{}:{}/admin", args.host, args.port)
     logger.info("Relay web UI: http://{}:{}/", args.host, args.port)

@@ -42,7 +42,6 @@ from ..tasks import (
 from .deps import AppContextDep
 from .helpers import (
     actor_can_access_record,
-    agent_task_mode,
     artifact_index_item,
     assignee_employee_id_for_task,
     assignment_list,
@@ -221,7 +220,6 @@ async def start_routine_occurrence_on_ready_node(
     actor: dict[str, Any],
     *,
     agent: str | None,
-    mode: str = "action",
     assignments: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     return await dispatch_routine_occurrence(
@@ -229,7 +227,6 @@ async def start_routine_occurrence_on_ready_node(
         routine,
         actor,
         agent=agent,
-        mode=mode,
         assignments=assignments,
         run_date=date.today(),
     )
@@ -709,7 +706,6 @@ async def start_task(
             {
                 "agentId": task["assignedAgentId"],
                 "agent": task["assignedAgent"],
-                "mode": assignments[0]["mode"],
             }
         ]
     if (
@@ -785,7 +781,6 @@ async def start_task(
             {
                 "agentId": task["assignedAgentId"],
                 "agent": task["assignedAgent"],
-                "mode": agent_task_mode(body.get("mode")),
             }
         ]
     agent = valid_agent(task.get("assignedAgent"))
@@ -811,7 +806,6 @@ async def start_task(
                 "message": "Select a named agent before starting this task.",
             },
         }
-    mode = agent_task_mode(body.get("mode"))
     if task.get("isRoutine"):
         if not (task.get("assignedAgentId") or task.get("assignedTeamId")):
             updated = ctx.task_store.record_dispatch_outcome(
@@ -830,11 +824,11 @@ async def start_task(
                 },
             }
         result = await start_routine_occurrence_on_ready_node(
-            ctx, task, actor, agent=agent, mode=mode, assignments=assignments or None
+            ctx, task, actor, agent=agent, assignments=assignments or None
         )
     else:
         result = await start_task_on_ready_node(
-            ctx, task, actor, mode=mode, assignments=assignments or None
+            ctx, task, actor, assignments=assignments or None
         )
     if not result or not result.get("session"):
         return (
@@ -874,7 +868,6 @@ async def pickup_task(
     if not logical_agent or not agent_id:
         raise HTTPException(400, "agentId is required to pick up a task.")
     agent = logical_agent["executorKind"]
-    mode = agent_task_mode(body.get("mode"))
     task = ctx.task_store.update_task(
         task_id,
         {
@@ -889,8 +882,12 @@ async def pickup_task(
         ctx,
         task,
         actor,
-        mode=mode,
-        assignments=[{"agentId": agent_id, "agent": agent, "mode": mode}],
+        assignments=[
+            {
+                "agentId": agent_id,
+                "agent": agent,
+            }
+        ],
     )
     if not result:
         raise HTTPException(409, "task_not_dispatchable")
@@ -899,7 +896,6 @@ async def pickup_task(
         task_id=task_id,
         session_id=(result.get("session") or {}).get("id"),
         agent=agent,
-        mode=mode,
     )
     return result
 

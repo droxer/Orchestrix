@@ -8,7 +8,6 @@ import {
   type AgentName,
   type AgentRunOptions,
   type AgentState,
-  type AgentTaskMode,
 } from "./state.js";
 import { extractTokenUsageFromJsonl } from "./token-usage.js";
 import { CodexCollaborationStream } from "./codex-collaboration.js";
@@ -22,30 +21,20 @@ const AGENT_RESULT_LOG_LIMIT = Number(process.env.RELAY_AGENT_RESULT_LOG_LIMIT) 
 /**
  * Run one agent assignment. Command construction, rendering, and failure
  * accounting are all driven by the agent registry, so adding an agent never
- * requires a new node function — only a registry entry. A review pass is just
- * an agent run with the review prompt; its output is captured in the agent log
- * like any other run.
+ * requires a new node function — only a registry entry.
  */
 export async function runAgentNode(
   agent: AgentName,
-  mode: AgentTaskMode,
   state: AgentState,
   options: AgentRunOptions = {},
 ): Promise<Partial<AgentState>> {
   const def = getAgent(agent);
   const execute = requiredExecStream(options);
-  const renderer = def.createRenderer(mode);
+  const renderer = def.createRenderer();
   const stderrRenderer = new StderrLineRenderer();
   const collaborationStream = agent === "codex" ? new CodexCollaborationStream() : undefined;
   const runId = options.runId;
-  const reviewMode = mode === "review";
-  const command =
-    mode === "review"
-      ? def.buildReviewCommand(state, options.workspacePath)
-      : mode === "ask"
-        ? def.buildAskCommand(state, options.workspacePath)
-        : def.buildActionCommand(state, options.workspacePath);
-  const actionLabel = mode === "ask" ? def.askLabel : def.actionLabel;
+  const command = def.buildCommand(state, options.workspacePath);
   // Daemons pass a thread-specific directory. Direct callers retain the
   // environment-backed workspace for compatibility.
   const cwd = options.workspacePath ?? agentWorkspacePath();
@@ -69,17 +58,8 @@ export async function runAgentNode(
   });
   const tokenUsage = extractTokenUsageFromJsonl(result.stdout, agent);
 
-  if (reviewMode) {
-    return {
-      agent_logs: [agentResultLog(def.reviewLabel, result)],
-      last_exit_code: result.exit_code,
-      agent_failures: withFailure(state, agent, result.exit_code !== 0),
-      token_usage: tokenUsage,
-    };
-  }
-
   return {
-    agent_logs: [agentResultLog(actionLabel, result)],
+    agent_logs: [agentResultLog(def.label, result)],
     last_exit_code: result.exit_code,
     agent_failures: withFailure(state, agent, result.exit_code !== 0),
     token_usage: tokenUsage,
@@ -87,16 +67,16 @@ export async function runAgentNode(
 }
 
 // Thin wrappers around the registry-driven node.
-export function claudeActionNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
-  return runAgentNode("claude", "action", state, options);
+export function claudeNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
+  return runAgentNode("claude", state, options);
 }
 
-export function piActionNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
-  return runAgentNode("pi", "action", state, options);
+export function piNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
+  return runAgentNode("pi", state, options);
 }
 
-export function codexActionNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
-  return runAgentNode("codex", "action", state, options);
+export function codexNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
+  return runAgentNode("codex", state, options);
 }
 
 function requiredExecStream(options: AgentRunOptions) {

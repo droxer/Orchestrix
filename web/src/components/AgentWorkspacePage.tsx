@@ -54,7 +54,7 @@ type FileSelection = { path: string; name: string };
 
 const parsePageTab = (value: string | null): WorkspacePageTab => {
   if (value === "files") return "workspace";
-  return PAGE_TABS.includes(value as WorkspacePageTab) ? value as WorkspacePageTab : "activities";
+  return PAGE_TABS.includes(value as WorkspacePageTab) ? value as WorkspacePageTab : "profile";
 };
 const parseString = (value: string | null): string => value ?? "";
 
@@ -374,7 +374,7 @@ export function AgentWorkspacePage({
   onProfileDirtyChange,
 }: AgentWorkspacePageProps) {
   const { t } = useTranslation();
-  const [pageTab, setPageTab] = useUrlSearchState("tab", "activities" as WorkspacePageTab, parsePageTab, (value) => value === "activities" ? null : value, "push");
+  const [pageTab, setPageTab] = useUrlSearchState("tab", "profile" as WorkspacePageTab, parsePageTab, (value) => value === "profile" ? null : value, "push");
 
   const query = useQuery({
     queryKey: ["agent-workspace-brief", agent.id],

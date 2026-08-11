@@ -411,45 +411,6 @@
   }
 }
 
-/* Agent-turn eyebrow — the agent label + timestamp in --type-label (12px sans,
-   the Linear model: chrome text rides the sans, mono is reserved for tool
-   lines and code). The mono tool `⏺` lines below carry the code-like signal. */
-.msg header {
-  display: flex;
-  align-items: baseline;
-  gap: var(--sp-3);
-  padding: 0;
-  color: var(--ink-3);
-  font: var(--type-label);
-}
-
-.msg header > span:first-child {
-  color: var(--ink-1);
-  font: var(--type-label);
-}
-
-.msg header .agent-title {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-}
-
-/* Live-run pulse in the agent-turn eyebrow — mirrors the conversation-row
-   working signal so long runs stay legible even when scrolled mid-output. */
-.agent-live-pulse {
-  flex: none;
-  width: 6px;
-  height: 6px;
-  border-radius: var(--r-full);
-  background: var(--live);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 40%, transparent);
-  animation: pulse-ring var(--t-pulse) var(--ease) infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .agent-live-pulse { animation: none; }
-}
-
 /* A streaming turn breathes on the rail node so liveness reads even when the
    transcript body is quiet between tool calls. */
 @media (prefers-reduced-motion: no-preference) {

@@ -482,10 +482,6 @@
     padding: var(--sp-3) var(--sp-3) var(--sp-4);
   }
 
-  .mode-chip {
-    flex: 0 1 auto;
-  }
-
   .composer-footer {
     gap: var(--sp-2);
   }

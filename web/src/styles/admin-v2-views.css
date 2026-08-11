@@ -59,10 +59,10 @@
 
 .team-member-option {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: var(--sp-3);
-  padding: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
   background: var(--surface-0);
   cursor: pointer;
 }
@@ -71,10 +71,47 @@
   background: var(--row-hover);
 }
 
-.team-member-option small {
+.team-member-option-main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-0-5);
+}
+
+.team-member-option-name {
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Meta line = kind · home computer, one quiet mono row. The middot separator
+   is generated, never typed, so both surfaces stay in lockstep. */
+.team-member-option-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--sp-1);
   color: var(--ink-3);
   font-family: var(--font-mono);
+  font-size: var(--fs-2);
   letter-spacing: var(--type-code-track);
+  white-space: nowrap;
+}
+
+.team-member-option-meta > * + *::before {
+  content: "·";
+  margin-right: var(--sp-1);
+  color: var(--ink-4);
+}
+
+.team-member-option-computer {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--sp-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .adm-employees-empty.relay-empty--fill {

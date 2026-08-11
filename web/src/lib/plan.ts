@@ -1,6 +1,6 @@
-import type { AgentName, AgentTaskMode } from "../types.js";
+import type { AgentName } from "../types.js";
 
-export type PlanStep = { agent: AgentName; mode: AgentTaskMode };
+export type PlanStep = { agent: AgentName };
 
 /**
  * Parse the JSON body of a "plan" artifact (`{ assignments: WorkflowStep[] }`)
@@ -15,11 +15,9 @@ export function parsePlanSteps(text: string, agentNames: readonly string[]): Pla
     if (!Array.isArray(data.assignments)) return null;
     const steps = data.assignments.flatMap((entry): PlanStep[] => {
       if (!entry || typeof entry !== "object") return [];
-      const { agent, mode } = entry as { agent?: unknown; mode?: unknown };
+      const { agent } = entry as { agent?: unknown };
       if (typeof agent !== "string" || !agentNames.includes(agent)) return [];
-      const taskMode: AgentTaskMode =
-        mode === "review" ? "review" : mode === "ask" ? "ask" : "action";
-      return [{ agent: agent as AgentName, mode: taskMode }];
+      return [{ agent: agent as AgentName }];
     });
     return steps.length > 0 ? steps : null;
   } catch {

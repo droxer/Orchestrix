@@ -190,7 +190,7 @@ function discordCommands(): unknown[] {
     name: "relay",
     description: "Run and manage Relay sessions",
     options: [
-      { type: 1, name: "run", description: "Run a named Relay agent", options: [string("agent", "Logical Relay agent ID", true), string("mode", "action, review, or ask"), string("prompt", "Task for the agent", true)] },
+      { type: 1, name: "run", description: "Run a named Relay agent", options: [string("agent", "Logical Relay agent ID", true), string("prompt", "Task for the agent", true)] },
       { type: 1, name: "status", description: "Show Relay session status", options: [string("session", "Relay session ID", true)] },
       { type: 1, name: "cancel", description: "Cancel a Relay session", options: [string("session", "Relay session ID", true), string("reason", "Cancellation reason")] },
     ],

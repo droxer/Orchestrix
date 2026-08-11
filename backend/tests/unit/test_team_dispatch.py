@@ -96,11 +96,10 @@ def test_team_member_assignments_sends_a_reviewer_to_review() -> None:
         _agent("lead", "codex"),
         _agent("support", "claude", defaultRole="reviewer"),
     ]
-    assert team_member_assignments(agents, mode="action") == [
+    assert team_member_assignments(agents) == [
         {
             "agentId": "lead",
             "agent": "codex",
-            "mode": "action",
             "phase": "execution",
             "coordinator": True,
             "brief": (
@@ -111,7 +110,6 @@ def test_team_member_assignments_sends_a_reviewer_to_review() -> None:
         {
             "agentId": "support",
             "agent": "claude",
-            "mode": "review",
             "phase": "review",
             "role": "reviewer",
             "brief": (
@@ -199,6 +197,5 @@ def test_accomplish_keeps_a_reviewer_lead_in_writable_coordination_mode() -> Non
     assignments = team_member_assignments(agents, mode="action", team=team)
 
     assert assignments[0]["agentId"] == "lead"
-    assert assignments[0]["mode"] == "action"
     assert assignments[0]["phase"] == "execution"
     assert assignments[0]["brief"].startswith("Coordinate the round")

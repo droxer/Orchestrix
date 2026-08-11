@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { threadNodeOffline } from "../src/lib/threadRuntime.js";
+import { teamsForThreadNode, threadNodeOffline } from "../src/lib/threadRuntime.js";
 
 type TestNode = {
   id: string;
@@ -71,5 +71,64 @@ describe("threadNodeOffline", () => {
       threadNodeOffline(session({ daemonNodeId: "sbx_old" }), [], [offline, alsoOffline]),
       true,
     );
+  });
+});
+
+type TestAgent = {
+  id: string;
+  placements: ReadonlyArray<{ daemonNodeId: string; desiredState: string }>;
+};
+
+function agent(id: string, ...nodeIds: string[]): TestAgent {
+  return {
+    id,
+    placements: nodeIds.map((daemonNodeId) => ({ daemonNodeId, desiredState: "active" })),
+  };
+}
+
+function team(overrides: Record<string, unknown> = {}) {
+  return { id: "team_1", memberAgentIds: ["agent_a", "agent_b"], ...overrides };
+}
+
+describe("teamsForThreadNode", () => {
+  const agents = [
+    agent("agent_a", "sbx_alice"),
+    agent("agent_b", "sbx_alice"),
+    agent("agent_c", "sbx_bob"),
+  ];
+
+  it("returns no teams when no computer is selected", () => {
+    assert.deepEqual(teamsForThreadNode([team()], agents, null), []);
+    assert.deepEqual(teamsForThreadNode([team()], agents, undefined), []);
+  });
+
+  it("keeps a team whose whole roster is placed on the computer", () => {
+    const teams = teamsForThreadNode([team()], agents, "sbx_alice");
+    assert.deepEqual(teams.map((item) => item.id), ["team_1"]);
+  });
+
+  it("drops a team when any member is hosted elsewhere", () => {
+    const split = team({ id: "team_split", memberAgentIds: ["agent_a", "agent_c"] });
+    assert.deepEqual(teamsForThreadNode([split], agents, "sbx_alice"), []);
+    assert.deepEqual(teamsForThreadNode([split], agents, "sbx_bob"), []);
+  });
+
+  it("drops a team whose member agent is unknown", () => {
+    const ghost = team({ memberAgentIds: ["agent_a", "agent_gone"] });
+    assert.deepEqual(teamsForThreadNode([ghost], agents, "sbx_alice"), []);
+  });
+
+  it("drops deleted and empty teams", () => {
+    const deleted = team({ id: "team_deleted", deletedAt: "2026-06-12T00:00:00.000Z" });
+    const empty = team({ id: "team_empty", memberAgentIds: [] });
+    assert.deepEqual(teamsForThreadNode([deleted, empty], agents, "sbx_alice"), []);
+  });
+
+  it("ignores placements that are not active", () => {
+    const removed = {
+      id: "agent_a",
+      placements: [{ daemonNodeId: "sbx_alice", desiredState: "removed" }],
+    };
+    assert.deepEqual(teamsForThreadNode([team()], [removed, agents[1]], "sbx_alice"), []);
   });
 });

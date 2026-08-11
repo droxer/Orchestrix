@@ -21,7 +21,7 @@ def _bootstrap(client: TestClient) -> None:
 def _create_session(client: TestClient) -> str:
     response = client.post("/api/v1/threads", json={
         "taskGoal": "demo task",
-        "assignments": [{"agent": "claude", "mode": "action"}],
+        "assignments": [{"agent": "claude"}],
         "workspacePath": "/workspace",
     })
     assert response.status_code == 201
@@ -90,7 +90,7 @@ def test_delete_removes_cancelled_session_with_orphaned_agent_run(monkeypatch) -
         session_id = _create_session(client)
         SessionController(app.state.registry.store).record_agent_started(
             session_id,
-            {"runId": "run_orphaned", "agent": "claude", "mode": "action"},
+            {"runId": "run_orphaned", "agent": "claude"},
         )
         cancelled = client.post(
             f"/api/v1/threads/{session_id}/cancellations",

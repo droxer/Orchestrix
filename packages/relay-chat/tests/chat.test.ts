@@ -18,22 +18,20 @@ import type { RelayEvent, RelaySession } from "relay-core";
 
 describe("relay-chat command parsing", () => {
   it("parses a provider-neutral run command", () => {
-    const command = parseChatCommand('/relay run --agent=agent_reviewer --mode=review "review auth flow"');
+    const command = parseChatCommand('/relay run --agent=agent_reviewer "review auth flow"');
     assert.deepEqual(command, {
       kind: "run",
       agentId: "agent_reviewer",
-      mode: "review",
       sessionId: undefined,
       taskGoal: "review auth flow",
     });
   });
 
-  it("parses ask mode for read-only chat collaboration", () => {
-    const command = parseChatCommand("/relay run --agent agent_builder --mode ask explain the failing tests");
+  it("lets the agent decide how to handle a question", () => {
+    const command = parseChatCommand("/relay run --agent agent_builder explain the failing tests");
     assert.deepEqual(command, {
       kind: "run",
       agentId: "agent_builder",
-      mode: "ask",
       sessionId: undefined,
       taskGoal: "explain the failing tests",
     });
@@ -54,7 +52,6 @@ describe("relay-chat command parsing", () => {
     assert.deepEqual(parseChatCommand('/relay new --agent agent_builder "second task"'), {
       kind: "new",
       agentId: "agent_builder",
-      mode: "action",
       taskGoal: "second task",
     });
     assert.deepEqual(parseChatCommand("/relay list"), { kind: "list" });
@@ -62,7 +59,7 @@ describe("relay-chat command parsing", () => {
     assert.equal(parseChatCommand("/relay switch"), undefined);
   });
 
-  it("rejects sandbox routing and invalid modes", () => {
+  it("rejects sandbox routing and removed mode options", () => {
     assert.equal(parseChatCommand("/relay run --sandbox sbx_alice do work"), undefined);
     assert.equal(parseChatCommand("/relay run --mode revieew do work"), undefined);
   });
@@ -121,14 +118,13 @@ describe("RelayChatClient", () => {
       agentId: "agent_builder",
       employeeId: "alice",
       taskGoal: "build it",
-      mode: "action",
     });
     assert.equal(calls[0].url, "http://relay.local/api/v1/agent-runs");
     assert.equal((calls[0].init.headers as Record<string, string>).Authorization, "Bearer svc");
     assert.equal((calls[0].init.headers as Record<string, string>)["X-Relay-Employee-Id"], "alice");
     assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
       taskGoal: "build it",
-      assignments: [{ agentId: "agent_builder", mode: "action" }],
+      assignments: [{ agentId: "agent_builder" }],
     });
   });
 
@@ -144,14 +140,13 @@ describe("RelayChatClient", () => {
       sessionId: "sess_1",
       employeeId: "alice",
       taskGoal: "follow up",
-      mode: "review",
       idempotencyKey: "discord_message_1",
     });
 
     assert.equal(calls[0].url, "http://relay.local/api/v1/threads/sess_1/messages");
     assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
       text: "follow up",
-      intent: "review",
+      intent: "accomplish",
       idempotencyKey: "discord_message_1",
     });
   });
@@ -256,7 +251,6 @@ describe("RelayChatGateway", () => {
     await gateway.run({
       ...telegramConversation({ userId: 42, chatId: 42 }),
       agentId: "agent_builder",
-      mode: "action",
       taskGoal: "ship chat support",
     });
 
@@ -282,7 +276,6 @@ describe("RelayChatGateway", () => {
     await new RelayChatGateway({ backend, identities }).run({
       ...telegramConversation({ userId: 42, chatId: 42 }),
       agentId: "agent_builder",
-      mode: "action",
       taskGoal: "build it",
     });
     assert.equal(selectedAgentId, "agent_builder");
@@ -316,7 +309,6 @@ describe("RelayChatGateway", () => {
     const run = await gateway.run({
       ...telegramConversation({ userId: 42, chatId: 42 }),
       agentId: "agent_builder",
-      mode: "action",
       taskGoal: "ship chat support",
     }, {
       event: (update) => {
@@ -382,7 +374,6 @@ describe("RelayChatGateway", () => {
     await gateway.run({
       ...discordConversation({ userId: "u1", channelId: "c1" }),
       agentId: "agent_builder",
-      mode: "action",
       taskGoal: "follow up",
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -420,7 +411,6 @@ describe("RelayChatGateway", () => {
     const run = await gateway.run({
       ...discordConversation({ userId: "u1", channelId: "c1" }),
       agentId: "agent_builder",
-      mode: "action",
       taskGoal: "continue anyway",
     }, {
       started: () => {
@@ -472,7 +462,6 @@ describe("RelayChatGateway", () => {
     await gateway.run({
       ...discordConversation({ userId: "u1", channelId: "c1" }),
       agentId: "agent_builder",
-      mode: "action",
       taskGoal: "fresh start",
       forceNew: true,
     });

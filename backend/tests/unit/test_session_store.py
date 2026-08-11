@@ -369,7 +369,7 @@ def test_database_session_delete_rechecks_active_runs_under_lock(
         relay_event(
             "agent.started",
             session["id"],
-            {"runId": "run_active", "agent": "codex", "mode": "action"},
+            {"runId": "run_active", "agent": "codex"},
         ),
     )
 
@@ -608,7 +608,6 @@ def test_agent_started_backfills_session_daemon_node() -> None:
                     {
                         "runId": "run_1",
                         "agent": "claude",
-                        "mode": "action",
                         "daemonNodeId": "node_a",
                     },
                 ),
@@ -624,7 +623,6 @@ def test_agent_started_backfills_session_daemon_node() -> None:
                     {
                         "runId": "run_2",
                         "agent": "claude",
-                        "mode": "action",
                         "daemonNodeId": "node_b",
                     },
                 ),
@@ -678,8 +676,7 @@ def test_database_session_store_persists_events_and_artifacts() -> None:
                     "runId": "run_1",
                     "agent": "codex",
                     "role": "fixer",
-                    "mode": "action",
-                },
+                    },
             ),
         )
         completed_event = relay_event(
@@ -884,8 +881,7 @@ def test_deleted_session_stays_deleted_and_retains_token_usage() -> None:
                     {
                         "runId": "run_1",
                         "agent": "codex",
-                        "mode": "action",
-                    },
+                        },
                 ),
             )
             store.append_event(

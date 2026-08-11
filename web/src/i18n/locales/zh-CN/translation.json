@@ -88,6 +88,7 @@
     "choose_computer": "选择运行电脑",
     "no_computers": "没有可用电脑",
     "talk_to_agent": "选择 Agent",
+    "talk_to_agent_or_team": "选择智能体或团队",
     "no_available_agent": "暂无可用 Agent",
     "agent_disabled_title": "{{agent}} 在该节点已被管理员禁用。",
     "agent_failed_title": "{{agent}} 在该节点尚未就绪。",
@@ -133,9 +134,9 @@
     "send": "发送",
     "cancel_run": "取消运行",
     "choose_agent": "选择 Agent",
-    "choose_mode": "选择模式",
-    "send_shortcut": "{{shortcut}} 发送",
-    "mode_toggle_label": "模式：{{mode}}——切换到{{next}}"
+    "agents_group": "智能体",
+    "teams_group": "团队",
+    "send_shortcut": "{{shortcut}} 发送"
   },
   "decision": {
     "approve": "批准",
@@ -149,7 +150,6 @@
   "handoff": {
     "title": "转交此回合",
     "route_to": "路由至",
-    "mode": "模式",
     "note_label": "备注",
     "note_placeholder": "可选备注…",
     "send": "发送移交",
@@ -322,7 +322,9 @@
     "band_id": "智能体 ID",
     "band_team_label": "团队档案",
     "band_team_id": "团队 ID",
-    "identity_label": "身份"
+    "identity_label": "身份",
+    "band_created": "创建时间",
+    "band_updated": "更新时间"
   },
   "profile_image": {
     "alt": "{{name}}的头像",
@@ -373,7 +375,9 @@
     "select_title": "选择一个团队",
     "select_body": "选择团队以查看其档案、工作区和活动。",
     "empty_title": "暂无团队",
-    "empty_body": "将智能体组成有负责人的命名团队，以便重复派发任务。"
+    "empty_body": "将智能体组成有负责人的命名团队，以便重复派发任务。",
+    "edit_members": "编辑成员",
+    "rename": "重命名团队"
   },
   "computer": {
     "title": "我的电脑",
@@ -408,8 +412,20 @@
     "connect_success": "这台电脑已注册。运行下面的命令以启动守护进程。",
     "connect_success_existing": "这台电脑已连接。运行下面的命令即可启动其守护进程。",
     "connect_success_sub": "复制下面的凭据以完成设置。",
-    "connect_token_once": "该令牌仅显示一次，请立即复制。",
-    "connect_token_on_device": "令牌在首次连接时已签发，不会再次显示——那台电脑上的守护进程已保存了它。"
+    "connect_token_once": "请立即复制该令牌——之后也可以随时在电脑的“令牌”面板中再次查看。",
+    "connect_token_on_device": "它的令牌早于令牌存储功能，无法显示——请在电脑上打开“令牌”并重新签发以获取新令牌。",
+    "token_button": "令牌",
+    "token_title": "电脑令牌",
+    "token_hidden_note": "启动令牌在你主动查看前保持隐藏。任何持有它的人都能运行这台电脑的守护进程。",
+    "token_reveal_action": "显示令牌",
+    "token_revealing": "正在显示…",
+    "token_reissue_action": "重新签发令牌",
+    "token_reissuing": "正在重新签发…",
+    "token_reissue_title": "重新签发令牌",
+    "token_reissue_message": "当前令牌将立即失效。已在这台电脑上运行的守护进程必须使用新令牌重启。",
+    "token_reissued_note": "已签发新令牌——旧令牌已失效。请使用此令牌重启守护进程。",
+    "token_unrecoverable": "这台电脑的令牌早于令牌存储功能，无法显示。请重新签发以获取新令牌。",
+    "token_error": "无法加载令牌：{{message}}"
   },
   "routine": {
     "title": "例行任务",
@@ -910,6 +926,14 @@
       "settings_rounds_label": "每个任务的默认轮次",
       "settings_rounds_hint": "取值范围 {{min}} 到 {{max}}。用完预算仍未完成的任务将等待人工处理，而不会继续运行。",
       "settings_save": "保存",
+      "settings_admin_token_title": "管理员令牌",
+      "settings_admin_token_sub": "用于引导创建首位管理员和 supervisor 的 Bearer 令牌。首次启动时从 RELAY_ADMIN_TOKEN 导入，未设置则自动生成。重新签发后旧令牌立即失效。",
+      "settings_admin_token_label": "管理员令牌",
+      "settings_admin_token_copy": "复制管理员令牌",
+      "settings_admin_token_reissue": "重新签发令牌",
+      "settings_admin_token_reissuing": "正在重新签发…",
+      "settings_admin_token_reissue_confirm": "确定重新签发管理员令牌？当前令牌将立即失效，请同步更新使用它的 supervisor 或脚本。",
+      "settings_admin_token_unset": "后端未配置管理员令牌。",
       "settings_saving": "保存中…",
       "settings_saved": "已保存",
       "settings_reset": "重置",
@@ -952,8 +976,8 @@
     "ready_for": "发送消息。",
     "ready_no_employee": "为 {{agent}} 选择员工工作区。",
     "awaiting_first": "等待首条消息",
-    "phase_agent": "{{mode}}",
-    "phase_handoff": "移交 · {{mode}}"
+    "phase_agent": "Agent",
+    "phase_handoff": "移交"
   },
   "login": {
     "lede": "管理节点、守护进程与智能体运行。",
@@ -989,11 +1013,6 @@
     "blocked": "已阻塞",
     "cancelled": "已取消",
     "unknown": "未知"
-  },
-  "mode": {
-    "action": "行动",
-    "ask": "问答",
-    "review": "审查"
   },
   "artifact": {
     "action_copy": "复制",
@@ -1091,7 +1110,7 @@
     "user_label": "你",
     "user_avatar": "我",
     "agent_header": "{{employee}}",
-    "started": "{{agent}} · {{mode}} 已启动",
+    "started": "{{agent}} 已启动",
     "artifact": "产物 · {{kind}}",
     "decision": "你 · {{kind}}",
     "cancelled": "请求已取消。",

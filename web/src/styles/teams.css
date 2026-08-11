@@ -31,6 +31,15 @@
   flex: 1;
 }
 
+/* The record surface fills the pane. Without this it sized to its own content
+   — a short roster left the panel ending a third of the way down with the
+   rest of the detail pane blank, which read as an unfinished page rather than
+   as a page with room to spare. */
+.teams-detail > .workspace-page {
+  flex: 1;
+  min-height: 0;
+}
+
 .teams-page-body {
   min-height: 0;
   flex: 1;
@@ -173,6 +182,17 @@
   font-size: var(--fs-2);
 }
 
+.team-profile-section-head h2 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.team-profile-section-head h2 .tnum {
+  color: var(--ink-3);
+  letter-spacing: var(--track-0);
+}
+
 .team-profile-members {
   display: flex;
   margin: 0;
@@ -188,6 +208,13 @@
   gap: var(--sp-3);
   padding: var(--sp-3) 0;
   border-bottom: 1px solid var(--line-2);
+}
+
+.team-profile-member-state {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-self: end;
 }
 
 .team-profile-member:last-child {
@@ -208,14 +235,60 @@
   white-space: nowrap;
 }
 
-.team-profile-member-copy strong {
+.team-profile-member-title {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.team-profile-member-title strong {
   color: var(--ink-1);
   font: var(--type-label-strong);
+}
+
+/* Lead rides the name as a quiet micro-caps marker — a bordered chip in a
+   trailing column read as a button and orphaned the row. */
+.team-profile-member-lead {
+  flex: none;
+  color: var(--action);
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
 }
 
 .team-profile-member-copy small {
   color: var(--ink-3);
   font: var(--type-label);
+}
+
+/* Same meta voice as the picker row: kind · home computer on one quiet
+   mono line, generated middot separator. */
+.team-profile-member-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2);
+  letter-spacing: var(--type-code-track);
+  white-space: nowrap;
+}
+
+.team-profile-member-meta > * + *::before {
+  content: "·";
+  margin-right: var(--sp-1);
+  color: var(--ink-4);
+}
+
+.team-profile-member-computer {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--sp-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .team-profile-member-fieldset {
@@ -225,9 +298,34 @@
   border: 0;
 }
 
-.team-profile-member-options {
+/* Chained with .team-member-options so the scroll override wins over the
+   base rule's `overflow: hidden` (admin-v2-views.css) regardless of import
+   order — equal-specificity single classes would otherwise resolve by source
+   order, and admin-v2-views.css loads after this file. */
+.team-member-options.team-profile-member-options {
   max-height: 280px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  /* The list clips mid-row, so it needs a permanent scroll affordance: macOS
+     overlay scrollbars stay hidden until you scroll, and a half-drawn agent
+     with no track reads as a broken render rather than as more list. */
+  scrollbar-gutter: stable;
+}
+
+.team-member-options.team-profile-member-options::-webkit-scrollbar {
+  width: 8px;
+}
+
+.team-member-options.team-profile-member-options::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: var(--r-2);
+  background: var(--line-1);
+  background-clip: content-box;
+}
+
+.team-member-options.team-profile-member-options::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-4);
+  background-clip: content-box;
 }
 
 .team-profile-lead-field {

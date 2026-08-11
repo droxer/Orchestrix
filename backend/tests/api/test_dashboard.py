@@ -22,7 +22,7 @@ def _bootstrap(client: TestClient) -> None:
 def _create_session(client: TestClient) -> str:
     response = client.post("/api/v1/threads", json={
         "taskGoal": "demo",
-        "assignments": [{"agent": "claude", "mode": "action"}],
+        "assignments": [{"agent": "claude"}],
         "workspacePath": "/workspace",
     })
     assert response.status_code == 201
@@ -113,8 +113,7 @@ def test_dashboard_tokens_returns_reported_usage(monkeypatch) -> None:
             "runId": "run_1",
             "agent": "codex",
             "role": "fixer",
-            "mode": "action",
-        }))
+            }))
         app.state.session_store.append_event(session_id, relay_event("agent.completed", session_id, {
             "runId": "run_1",
             "agent": "codex",
@@ -150,8 +149,7 @@ def test_dashboard_tokens_totals_only_cover_last_seven_days(monkeypatch) -> None
             "runId": "run_current",
             "agent": "codex",
             "role": "fixer",
-            "mode": "action",
-        }))
+            }))
         app.state.session_store.append_event(current_session_id, relay_event("agent.completed", current_session_id, {
             "runId": "run_current",
             "agent": "codex",
@@ -164,8 +162,7 @@ def test_dashboard_tokens_totals_only_cover_last_seven_days(monkeypatch) -> None
             "runId": "run_old",
             "agent": "codex",
             "role": "fixer",
-            "mode": "action",
-        })
+            })
         old_completed = relay_event("agent.completed", old_session_id, {
             "runId": "run_old",
             "agent": "codex",
@@ -201,8 +198,7 @@ def test_dashboard_tokens_do_not_redate_old_usage_after_unrelated_session_activi
             "runId": "run_old",
             "agent": "codex",
             "role": "fixer",
-            "mode": "action",
-        })
+            })
         completed = relay_event("agent.completed", session_id, {
             "runId": "run_old",
             "agent": "codex",
@@ -243,8 +239,7 @@ def test_dashboard_tokens_aggregate_runs_without_double_counting_sessions(monkey
                 "runId": run_id,
                 "agent": "codex",
                 "role": "fixer",
-                "mode": "action",
-            }))
+                }))
             app.state.session_store.append_event(session_id, relay_event("agent.completed", session_id, {
                 "runId": run_id,
                 "agent": "codex",

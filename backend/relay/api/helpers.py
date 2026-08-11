@@ -415,7 +415,6 @@ def assignment_list(value: Any) -> list[dict[str, Any]]:
             continue
         result.append({
             "agent": agent,
-            "mode": agent_task_mode(item.get("mode")),
             **({"agentId": item["agentId"]} if isinstance(item.get("agentId"), str) and item["agentId"] else {}),
             **({"role": item["role"]} if role_name(item.get("role")) else {}),
             **({"brief": item["brief"].strip()[:4000]} if isinstance(item.get("brief"), str) and item["brief"].strip() else {}),
@@ -432,10 +431,6 @@ def participants_for_assignments(assignments: Any, assigned_agent: str | None) -
 
 def role_name(value: Any) -> str | None:
     return value if value in ("implementer", "reviewer", "planner", "tester", "fixer") else None
-
-
-def agent_task_mode(value: Any) -> str:
-    return value if value in ("action", "review", "ask") else "action"
 
 
 def authorized_sandbox_for_token(registry: DaemonNodeRegistry, token: str | None) -> dict[str, Any] | None:
@@ -566,7 +561,6 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
             "sessionId": session_id,
             "runId": run_id,
             "agent": agent,
-            "mode": agent_task_mode(value.get("mode")),
             "sequence": int(value["sequence"]),
             "collaboration": {
                 "id": string_field(collaboration, "id"),
@@ -580,7 +574,6 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
                 "agentsStates": normalized_states,
             },
         }
-    mode = agent_task_mode(value.get("mode"))
     if event_type == "run.completed":
         if not isinstance(value.get("exitCode"), (int, float)):
             raise ValueError("daemon node run.completed exitCode must be a finite number.")
@@ -609,7 +602,6 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
             "sessionId": session_id,
             "runId": run_id,
             "agent": agent,
-            "mode": mode,
             "exitCode": int(value["exitCode"]),
             "agentLog": raw_string_field(value, "agentLog"),
             **({"tokenUsage": token_usage} if token_usage else {}),
@@ -627,7 +619,6 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
             "sessionId": session_id,
             "runId": run_id,
             "agent": agent,
-            "mode": mode,
             "error": string_field(value, "error") or "Daemon node command failed.",
             **({"agentLog": raw_string_field(value, "agentLog")} if isinstance(value.get("agentLog"), str) else {}),
             **({"exitCode": int(value["exitCode"])} if isinstance(value.get("exitCode"), (int, float)) else {}),
@@ -641,7 +632,6 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
             "sessionId": session_id,
             "runId": run_id,
             "agent": agent,
-            "mode": mode,
             "reason": string_field(value, "reason") or "Cancelled by human.",
         }
     raise ValueError(f"unknown daemon node event type {event_type}.")

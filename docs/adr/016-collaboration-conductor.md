@@ -1,4 +1,4 @@
-# ADR-015: Make the Collaboration Conductor the Workflow Authority
+# ADR-016: Make the Collaboration Conductor the Workflow Authority
 
 ## Status
 

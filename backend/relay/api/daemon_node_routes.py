@@ -277,9 +277,10 @@ async def create_local_device_enrollment(
                 "nodeLocation": "employee-device",
             }
         )
-    # A token is issued once. When an already-registered computer is adopted we
-    # cannot reproduce it — but the start command holds no secret, so it is
-    # still the thing the reader needs, pointed at the token on their disk.
+    # The launch token is persisted for control-panel computers, so adopting
+    # an already-registered computer returns the same token again — matching
+    # what the reveal endpoint would answer. The start command still prompts
+    # for it rather than embedding the secret.
     node_token = node.get("nodeToken")
     response: dict[str, Any] = {
         "node": present_computer(
@@ -296,6 +297,77 @@ async def create_local_device_enrollment(
     if node_token:
         response["nodeToken"] = node_token
     return response
+
+
+def _owned_live_node(actor: dict[str, Any], ctx: AppContextDep, sandbox_id: str) -> dict[str, Any]:
+    node = ctx.registry.get(sandbox_id)
+    if not node:
+        raise HTTPException(404, "Daemon node not found.")
+    if not actor_can_access_sandbox(actor, node):
+        raise HTTPException(403, "Daemon node access denied.")
+    if node.get("managedNodeId"):
+        # Supervisor-provisioned hardware cycles credentials through the
+        # managed node lifecycle, not through the self-service surface.
+        raise HTTPException(
+            403, "This computer is managed by an admin; its token is not available here."
+        )
+    return node
+
+
+def _token_response(request: Request, node: dict[str, Any], token: str) -> dict[str, Any]:
+    sandbox_mode = node.get("sandboxMode") or LOCAL_ENROLLMENT_SANDBOX_MODE
+    return {
+        "nodeToken": token,
+        "daemonEnv": daemon_start_env(request, {**node, "nodeToken": token}, sandbox_mode),
+        "daemonCommand": daemon_start_command(
+            request, node, sandbox_mode, prompt_for_token=True
+        ),
+    }
+
+
+@router.get("/daemon-nodes/{sandbox_id}/token")
+def reveal_daemon_node_token(
+    sandbox_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    """Self-service reveal of a computer's launch token, for reconnecting.
+
+    Enrollment shows the token once; the owner of a personal computer can read
+    it again here whenever they need to restart or move the daemon.
+    """
+    actor = request_actor(request, ctx.auth_store)
+    if not actor.get("user"):
+        raise HTTPException(401, "Authentication required.")
+    node = _owned_live_node(actor, ctx, sandbox_id)
+    token = ctx.registry.reveal_node_token(sandbox_id)
+    if not token:
+        # Nodes provisioned before tokens were persisted have no recoverable
+        # plaintext; the only way forward is a fresh one.
+        raise HTTPException(
+            409, "This computer's token is not recoverable. Reissue it instead."
+        )
+    return _token_response(request, node, token)
+
+
+@router.post("/daemon-nodes/{sandbox_id}/token/reissue")
+def reissue_daemon_node_token(
+    sandbox_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    """Rotate a computer's launch token; the old one stops working at once.
+
+    A daemon still running with the previous token must be restarted with the
+    reissued one.
+    """
+    actor = request_actor(request, ctx.auth_store)
+    if not actor.get("user"):
+        raise HTTPException(401, "Authentication required.")
+    _owned_live_node(actor, ctx, sandbox_id)
+    try:
+        updated, token = ctx.registry.reissue_node_token(sandbox_id)
+    except KeyError as error:
+        raise HTTPException(404, "Daemon node not found.") from error
+    except ValueError as error:
+        raise HTTPException(403, str(error)) from error
+    return _token_response(request, updated, token)
 
 
 @router.delete("/daemon-nodes/{sandbox_id}", status_code=204)

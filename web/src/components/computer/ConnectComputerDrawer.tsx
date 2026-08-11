@@ -135,8 +135,10 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
               onCopy={() => void copy("command", result.daemonCommand!)}
             />
           ) : null}
-          {/* This one is about the secret itself, so it stays keyed on `token`:
-              a reissued token is still shown exactly once. */}
+          {/* The note is about the secret itself, so it stays keyed on
+              `token`: present means readable now and again later from the
+              computer's Token drawer; absent means the computer predates
+              token persistence and needs a reissue there. */}
           <p className="adm-cred-note">
             {token ? t("computer.connect_token_once") : t("computer.connect_token_on_device")}
           </p>
@@ -181,9 +183,8 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
                 data-modal-initial-focus
               />
             </Field>
-            {/* Stated, not chosen: the employee should know their agents run
-                as plain processes against the installs already on this
-                machine, but the mode is not theirs to change. */}
+            {/* Agents run as plain processes against the installs already on
+                this machine. */}
             <p className="adm-form-hint">{t("computer.connect_run_hint")}</p>
           </fieldset>
 

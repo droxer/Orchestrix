@@ -1,4 +1,5 @@
 import type { AgentTeam, CurrentUser, LogicalAgentAvailability } from "../types.js";
+import { isLogicalAgentRoutable } from "./agentDisplayNames.ts";
 
 export function assignmentOptionVisible(
   ownerEmployeeId: string | undefined,
@@ -26,6 +27,14 @@ export function teamAvailability(
   if (team.members.some((member) => member.availability === "pending")) return "pending";
   if (team.members.some((member) => member.availability === "busy")) return "busy";
   return "ready";
+}
+
+/** A team must be active and fully backed by routable members, mirroring
+ *  the single-agent rule: ready and busy can take work. */
+export function isTeamRoutable(
+  team: Pick<AgentTeam, "enabled" | "deletedAt" | "members">,
+): boolean {
+  return team.enabled && !team.deletedAt && isLogicalAgentRoutable(teamAvailability(team));
 }
 
 /** Human label for a task's assignee. `employeeNames` is the resolved employee

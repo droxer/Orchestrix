@@ -103,7 +103,6 @@ def test_daemon_node_event_parser_keeps_error_messages_and_raw_logs() -> None:
             "runId": "run_1",
             "agent": "codex",
             "leaseId": "lease_1",
-            "mode": "review",
             "exitCode": 0,
             "agentLog": raw_log,
         }
@@ -120,7 +119,6 @@ def test_daemon_node_event_parser_keeps_error_messages_and_raw_logs() -> None:
             "sessionId": "ses_1",
             "runId": "run_1",
             "agent": "codex",
-            "mode": "action",
             "error": "stream post failed",
             "agentLog": raw_log,
             "generatedFiles": [
@@ -143,7 +141,6 @@ def test_daemon_node_event_parser_keeps_error_messages_and_raw_logs() -> None:
             "sessionId": "ses_1",
             "runId": "run_1",
             "agent": "codex",
-            "mode": "action",
             "exitCode": 0,
             "tokenUsage": {
                 "input": 10,

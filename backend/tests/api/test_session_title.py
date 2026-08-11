@@ -20,7 +20,7 @@ def _bootstrap(client: TestClient) -> None:
 def _create_session(client: TestClient) -> str:
     response = client.post("/api/v1/threads", json={
         "taskGoal": "demo task",
-        "assignments": [{"agent": "claude", "mode": "action"}],
+        "assignments": [{"agent": "claude"}],
         "workspacePath": "/workspace",
     })
     assert response.status_code == 201

@@ -2,8 +2,10 @@
 
 ## Status
 
-Accepted. This decision hardens the current sequential, node-scoped team
-runtime. It does not adopt the proposed discussion-plan-approval workflow in
+Accepted for durable round metadata. Its execution-mode semantics are
+superseded and removed by
+[ADR-015](015-adaptive-agent-execution.md). This decision does not adopt the
+proposed discussion-plan-approval workflow in
 [`agent-team-room-design.md`](../agent-team-room-design.md).
 
 ## Context
@@ -41,22 +43,20 @@ prompt state, `agent.started` event, Python and TypeScript materializers, and
 the browser's incremental event materializer.
 
 Exactly one assignment may publish the aggregate round verdict: the last
-writable assignment. Read-only discussion members never receive a verdict-file
-instruction. A capable task round that omits or malforms its required verdict
-parks at `waiting_for_human`; Relay does not infer completion from exit code
-zero.
+assignment. Earlier participants contribute through the shared thread and
+workspace. A task round that omits or malforms its required verdict parks at
+`waiting_for_human`; Relay does not infer completion from exit code zero.
 
 Repair is permitted only when all of the following are true:
 
 - the run belongs to a task;
 - the failed member is not the first assignment;
-- assignment zero is explicitly marked `coordinator` and is writable;
+- assignment zero is explicitly marked `coordinator`;
 - the bounded repair budget remains.
 
-An `ask` or `review` assignment failure does not silence later participants.
-Relay records the failed assignment, continues the round, and includes the
-incomplete-participation warning in the final outcome. Action failures keep the
-bounded coordinator-repair or terminal-failure behavior.
+Relay records a failed assignment and applies the same bounded coordinator
+repair or terminal-failure behavior to every run. Roles and phases shape the
+agent's contribution but do not switch execution policy.
 
 Normal messages to a team thread must pass the team's current enabled,
 ownership, membership, and agent-validity checks, including explicitly
@@ -76,8 +76,8 @@ members, acquire coordinator authority, or publish the Relay round verdict.
 - At-least-once command delivery no longer creates a new logical assignment
   identity.
 - A late or malformed member response cannot silently mark a task done.
-- Discussion and review gather the remaining members' evidence after a partial
-  participant failure, while the final outcome stays visibly incomplete.
+- Discussion, implementation, and review are choices inside one adaptive
+  execution path.
 - Team membership remains live between rounds but fixed and auditable within a
   dispatched round.
 - Relay teams and provider-native subagents can coexist without conflating
@@ -92,9 +92,8 @@ Regression coverage must include:
 
 - role-specific briefs, phases, coordinator marking, and roster snapshots;
 - assignment identity and metadata across daemon commands and session events;
-- only-final-writable verdict publication and missing/malformed verdicts;
-- bounded action repair and no inferred lead in non-team pipelines;
-- continued `ask`/`review` participation after one member fails;
+- only-final-assignment verdict publication and missing/malformed verdicts;
+- bounded repair and no inferred lead in non-team pipelines;
 - disabled-team normal messages versus explicit recovery decisions;
 - prompt and browser materialization of assignment metadata;
 - assignment-scoped provider-native collaboration events.

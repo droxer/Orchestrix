@@ -9,29 +9,29 @@ describe("parsePlanSteps", () => {
   it("parses a multi-step assignment plan", () => {
     const body = JSON.stringify({
       assignments: [
-        { agent: "claude", mode: "action" },
-        { agent: "codex", mode: "review" },
+        { agent: "claude" },
+        { agent: "codex" },
       ],
     });
     assert.deepEqual(parsePlanSteps(body, AGENTS), [
-      { agent: "claude", mode: "action" },
-      { agent: "codex", mode: "review" },
+      { agent: "claude" },
+      { agent: "codex" },
     ]);
   });
 
-  it("defaults an unknown mode to action", () => {
-    const body = JSON.stringify({ assignments: [{ agent: "pi", mode: "weird" }] });
-    assert.deepEqual(parsePlanSteps(body, AGENTS), [{ agent: "pi", mode: "action" }]);
+  it("parses a single adaptive assignment", () => {
+    const body = JSON.stringify({ assignments: [{ agent: "pi" }] });
+    assert.deepEqual(parsePlanSteps(body, AGENTS), [{ agent: "pi" }]);
   });
 
   it("drops entries with an unknown agent", () => {
     const body = JSON.stringify({
       assignments: [
-        { agent: "ghost", mode: "action" },
-        { agent: "kimi", mode: "action" },
+        { agent: "ghost" },
+        { agent: "kimi" },
       ],
     });
-    assert.deepEqual(parsePlanSteps(body, AGENTS), [{ agent: "kimi", mode: "action" }]);
+    assert.deepEqual(parsePlanSteps(body, AGENTS), [{ agent: "kimi" }]);
   });
 
   it("returns null for non-plan / invalid JSON", () => {

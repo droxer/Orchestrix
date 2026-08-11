@@ -12,11 +12,10 @@ def test_session_controller_records_review_run() -> None:
         controller = SessionController(store, workspace_path="/workspace")
         session = controller.create_session("review diff")
         state = initial_agent_state("review diff")
-        controller.record_agent_started(session["id"], {"runId": "run_1", "agent": "codex", "mode": "review"})
+        controller.record_agent_started(session["id"], {"runId": "run_1", "agent": "codex"})
         state = controller.record_agent_completed(session["id"], state, {
             "runId": "run_1",
             "agent": "codex",
-            "mode": "review",
             "status": "completed",
             "exitCode": 0,
             "agentLog": "looks fine",
@@ -94,12 +93,12 @@ def test_compute_conversation_history_excludes_current_turn() -> None:
         session = controller.create_session("first turn")
         # No prior turns yet beyond the current goal -> nothing to show.
         assert compute_conversation_history(store.get_session(session["id"]), store) is None
-        controller.record_agent_started(session["id"], {"runId": "run_1", "agent": "claude", "mode": "action"})
+        controller.record_agent_started(session["id"], {"runId": "run_1", "agent": "claude"})
         controller.record_agent_output(session["id"], "run_1", "claude", "stdout", "● answer one")
         controller.record_agent_completed(
             session["id"],
             initial_agent_state("first turn"),
-            {"runId": "run_1", "agent": "claude", "mode": "action", "status": "completed", "exitCode": 0, "agentLog": "● answer one"},
+            {"runId": "run_1", "agent": "claude", "status": "completed", "exitCode": 0, "agentLog": "● answer one"},
         )
         controller.record_user_message(session["id"], "second turn")
         history = compute_conversation_history(store.get_session(session["id"]), store)

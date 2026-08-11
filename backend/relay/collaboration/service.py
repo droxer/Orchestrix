@@ -42,6 +42,7 @@ class _PreparedRound:
     session_id: str | None
     raw_assignments: list[dict[str, Any]] | None
     mode: str
+    requested_team_id: str | None
     requested_node_id: str | None
     idempotency_key: str | None
     user_message_id: str | None
@@ -138,6 +139,7 @@ class CollaborationConductor:
                 session_id=intent.thread_id,
                 raw_assignments=raw_assignments,
                 mode=purpose_modes[intent.purpose],
+                requested_team_id=None,
                 requested_node_id=None,
                 idempotency_key=intent.idempotency_key or intent.user_message_id,
                 user_message_id=intent.user_message_id,
@@ -153,6 +155,7 @@ class CollaborationConductor:
                 session_id=intent.thread_id,
                 raw_assignments=[{"agentId": intent.target_agent_id, "mode": mode}],
                 mode=mode,
+                requested_team_id=None,
                 requested_node_id=None,
                 idempotency_key=intent.idempotency_key,
                 user_message_id=None,
@@ -179,6 +182,7 @@ class CollaborationConductor:
             session_id=intent.session_id,
             raw_assignments=raw_assignments,
             mode=_mode(intent.mode),
+            requested_team_id=intent.requested_team_id,
             requested_node_id=intent.requested_node_id,
             idempotency_key=intent.idempotency_key,
             user_message_id=intent.user_message_id,
@@ -208,7 +212,18 @@ class CollaborationConductor:
         if not isinstance(task_goal, str) or not task_goal:
             raise CollaborationError("task_goal_required", status=400)
         raw_assignments = intent.raw_assignments
-        team_id = session.get("teamId") if session else None
+        session_team_id = session.get("teamId") if session else None
+        if (
+            session
+            and intent.requested_team_id
+            and intent.requested_team_id != session_team_id
+        ):
+            raise CollaborationError(
+                "team_mismatch",
+                "teamId does not match this thread's team.",
+                status=400,
+            )
+        team_id = session_team_id or intent.requested_team_id
         team_member_ids: set[str] = set()
         team_snapshot: dict[str, Any] | None = None
         team: dict[str, Any] | None = None
@@ -381,13 +396,15 @@ class CollaborationConductor:
             session["id"], managed_node_id
         )
 
-    def _team_employee_id(self, session: dict[str, Any], actor: dict[str, Any]) -> str:
-        if actor["isAdmin"]:
+    def _team_employee_id(
+        self, session: dict[str, Any] | None, actor: dict[str, Any]
+    ) -> str:
+        if actor["isAdmin"] and session:
             return session.get("ownerEmployeeId") or actor["employeeId"]
         return actor["employeeId"]
 
     def _team_for_round(
-        self, team_id: str, session: dict[str, Any], actor: dict[str, Any]
+        self, team_id: str, session: dict[str, Any] | None, actor: dict[str, Any]
     ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         return team_agents(
             team_id,

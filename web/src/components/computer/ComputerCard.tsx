@@ -9,7 +9,7 @@ import { NodePresence } from "../admin/NodePresence";
 import { TonePill } from "../StatusPill";
 import { nodeOwnershipIcon } from "../admin/NodeProfileBadges";
 import { Button } from "@/components/ui/button";
-import { ActionApprove, ActionCopy, ActionEdit, ActionRemove, AdminManageExecutors } from "../icons";
+import { ActionApprove, ActionCopy, ActionEdit, ActionKey, ActionRemove, AdminManageExecutors } from "../icons";
 import { abbreviateNodeId, formatRunElapsed } from "../../lib/computerNodes";
 import { labelForExecutor } from "../../lib/agentDisplayNames";
 import {
@@ -40,6 +40,7 @@ export function ComputerCard({
   node,
   onRename,
   onManageExecutors,
+  onShowToken,
   onDisconnect,
   onOpenThread,
   t,
@@ -47,6 +48,7 @@ export function ComputerCard({
   node: ControlPanelDaemonNodeRecord;
   onRename: (node: ControlPanelDaemonNodeRecord) => void;
   onManageExecutors: (node: ControlPanelDaemonNodeRecord) => void;
+  onShowToken: (node: ControlPanelDaemonNodeRecord) => void;
   onDisconnect: (node: ControlPanelDaemonNodeRecord) => void;
   onOpenThread?: (sessionId: string) => void;
   t: TFunction;
@@ -115,6 +117,10 @@ export function ComputerCard({
           <Button type="button" variant="outline" size="sm" onClick={() => onManageExecutors(node)}>
             <AdminManageExecutors size={14} aria-hidden="true" />
             {t("admin.v2.manage_executors")}
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => onShowToken(node)}>
+            <ActionKey size={14} aria-hidden="true" />
+            {t("computer.token_button")}
           </Button>
           {/* Removal is the counterpart to self-service enrollment, but it is
               not the action the reader came for — ghost keeps it reachable

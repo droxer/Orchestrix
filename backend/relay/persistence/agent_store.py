@@ -5,7 +5,6 @@ from threading import RLock
 from typing import Any, Callable
 
 from sqlalchemy import (
-    JSON,
     BigInteger,
     Boolean,
     Column,
@@ -22,6 +21,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError
 
+from ..core.agent_names import generate_agent_name
 from ..core.ids import new_database_id, now_iso
 from ..core.models import AGENT_NAMES, AGENT_ROLES
 from .store_common import (
@@ -32,15 +32,15 @@ from .store_common import (
     _read_json,
     _read_jsonl,
     _write_json,
+    create_all_tables,
     database_id_column,
     entity_uuid_type,
-    create_all_tables,
     json_type,
+    safe_name,
     shared_engine,
     store_transaction,
-    metadata as shared_metadata,
-    safe_name,
 )
+from .store_common import metadata as shared_metadata
 
 AGENT_PATCH_FIELDS = frozenset(
     {
@@ -71,7 +71,11 @@ class LocalAgentStore:
     def create_agent(
         self, supervisor_employee_id: str, payload: dict[str, Any]
     ) -> dict[str, Any]:
-        agent = _new_agent(supervisor_employee_id, payload)
+        agent = _new_agent(
+            supervisor_employee_id,
+            payload,
+            name_taken=_name_taken(self, supervisor_employee_id),
+        )
         return self._create_agent(agent)
 
     def _create_agent(self, agent: dict[str, Any]) -> dict[str, Any]:
@@ -324,7 +328,11 @@ class DatabaseAgentStore:
     def create_agent(
         self, supervisor_employee_id: str, payload: dict[str, Any]
     ) -> dict[str, Any]:
-        agent = _new_agent(supervisor_employee_id, payload)
+        agent = _new_agent(
+            supervisor_employee_id,
+            payload,
+            name_taken=_name_taken(self, supervisor_employee_id),
+        )
         return self._create_agent(agent)
 
     def _create_agent(self, agent: dict[str, Any]) -> dict[str, Any]:
@@ -563,9 +571,27 @@ class DatabaseAgentStore:
             )
 
 
-def _new_agent(supervisor_employee_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+def _name_taken(store: Any, supervisor_employee_id: str) -> Callable[[str], bool]:
+    existing = {
+        agent.get("displayName", "").casefold()
+        for agent in store.list_agents(supervisor_employee_id=supervisor_employee_id)
+    }
+    return lambda candidate: candidate.casefold() in existing
+
+
+def _new_agent(
+    supervisor_employee_id: str,
+    payload: dict[str, Any],
+    *,
+    name_taken: Callable[[str], bool] | None = None,
+) -> dict[str, Any]:
     supervisor_employee_id = supervisor_employee_id.strip()
-    display_name = _required_string(payload, "displayName")
+    raw_display_name = payload.get("displayName")
+    if raw_display_name is not None and not isinstance(raw_display_name, str):
+        raise ValueError("displayName must be a string.")
+    display_name = raw_display_name.strip() if isinstance(raw_display_name, str) else ""
+    if not display_name:
+        display_name = generate_agent_name(taken=name_taken or (lambda _: False))
     executor_kind = _required_string(payload, "executorKind")
     default_role = _optional_string(payload, "defaultRole")
     if not supervisor_employee_id:
@@ -651,7 +677,7 @@ def _normalize_agent_identity_patch(
     if "defaultRole" in patch:
         raw_role = patch["defaultRole"]
         # null or "" clears the role: an agent that was given the wrong one has
-        # to be able to go back to taking each round's mode as given.
+        # to be able to return to the default team contribution behavior.
         if raw_role is None or (isinstance(raw_role, str) and not raw_role.strip()):
             normalized["defaultRole"] = None
         else:

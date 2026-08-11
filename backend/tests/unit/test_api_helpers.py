@@ -35,7 +35,6 @@ def test_assignment_list_preserves_and_bounds_per_assignment_briefs() -> None:
         [
             {
                 "agent": "codex",
-                "mode": "action",
                 "brief": f"  {'x' * 4100}  ",
             }
         ]

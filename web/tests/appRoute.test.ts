@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  browserUrlForAppState,
   canonicalBrowserUrl,
   hrefForRoute,
   parseAppPath,
@@ -67,11 +68,11 @@ describe("app pathname routes", () => {
     );
     assert.equal(
       canonicalBrowserUrl("/agents/agent-1", "?tab=profile&scope=shared&path=src&item=file%3Aa.ts"),
-      "/agents/agent-1?tab=profile",
+      "/agents/agent-1",
     );
     assert.equal(
       canonicalBrowserUrl("/teams/team-1", "?tab=profile&artifact=art-1&dialog=create"),
-      "/teams/team-1?tab=profile",
+      "/teams/team-1",
     );
     assert.equal(
       canonicalBrowserUrl("/teams/team-1", "?tab=workspace&scope=shared&path=src&item=file%3Aa.ts"),
@@ -112,5 +113,40 @@ describe("app pathname routes", () => {
     assert.equal(pathKeepsThreadSpaceParams("/threads"), true);
     assert.equal(pathKeepsThreadSpaceParams("/threads/new"), false);
     assert.equal(pathKeepsThreadSpaceParams("/backlog"), false);
+  });
+
+  it("keeps the open space panel when a state change stays on the same thread", () => {
+    const onThread = {
+      route: "main" as const,
+      mobileView: "chat" as const,
+      sessionId: "ses-1",
+      composingNew: false,
+    };
+    // Sending another turn in the thread re-syncs the same path — the panel
+    // must survive it. This is the team-room case: the room accumulates
+    // artifacts, and every follow-up message re-syncs the thread URL.
+    assert.equal(
+      browserUrlForAppState(onThread, "/threads/ses-1", "?space=1&artifact=art-9"),
+      "/threads/ses-1?space=1&artifact=art-9",
+    );
+    // Switching to a different thread drops the previous thread's selection.
+    assert.equal(
+      browserUrlForAppState(onThread, "/threads/ses-2", "?space=1&artifact=art-9"),
+      "/threads/ses-1",
+    );
+    // Staging a new thread has no artifacts to describe.
+    assert.equal(
+      browserUrlForAppState(
+        { route: "main", mobileView: "chat", sessionId: null, composingNew: true },
+        "/threads/ses-1",
+        "?space=1",
+      ),
+      "/threads/new",
+    );
+    // Params the path does not own are still canonicalized away.
+    assert.equal(
+      browserUrlForAppState(onThread, "/threads/ses-1", "?artifact=art-9"),
+      "/threads/ses-1",
+    );
   });
 });

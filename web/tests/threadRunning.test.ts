@@ -15,7 +15,6 @@ const activeRun = {
   sessionId: "ses_1",
   runId: "run_1",
   agent: "claude",
-  mode: "action",
   taskGoal: "do work",
   startedAt: "2026-06-12T00:00:00.000Z",
 } as const;

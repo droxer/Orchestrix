@@ -144,8 +144,7 @@ html[data-theme="dark"] .rail-node { background: var(--surface-3); }
   background: transparent;
 }
 
-.backlog-stats,
-.workspace-metric-strip {
+.backlog-stats {
   border: 0;
   border-bottom: 1px solid var(--line-1);
   border-radius: 0;

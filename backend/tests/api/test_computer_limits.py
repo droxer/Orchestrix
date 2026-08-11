@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
@@ -111,6 +112,105 @@ def test_settings_report_whether_employee_edits_are_storable(
         assert (
             client.get("/api/v1/admin/settings").json()["capabilities"]["employeeEdits"]
             is True
+        )
+
+
+def test_settings_expose_admin_token_to_admins_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _client(monkeypatch, database_auth=False) as client:
+        body = client.get("/api/v1/admin/settings").json()
+        assert body["adminToken"] == "admin_token"
+
+        _create_employee(client, "alice")
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert client.get("/api/v1/admin/settings").status_code == 401
+
+        _login(client, "alice")
+        assert client.get("/api/v1/admin/settings").status_code == 403
+
+
+def test_admin_token_is_generated_on_first_boot_and_persisted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("RELAY_ADMIN_TOKEN", raising=False)
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        token_path = Path(root) / "auth" / "admin-token"
+        token = token_path.read_text(encoding="utf-8").strip()
+        assert token
+
+        response = client.post(
+            "/api/v1/auth/bootstrap",
+            json={"token": token, "username": "admin", "password": "secret123"},
+        )
+        assert response.status_code == 200
+        assert client.get("/api/v1/admin/settings").json()["adminToken"] == token
+
+        restarted = TestClient(create_app(root))
+        _login(restarted, "admin", "secret123")
+        body = restarted.get("/api/v1/admin/settings").json()
+        assert body["adminToken"] == token
+        assert token_path.read_text(encoding="utf-8").strip() == token
+
+
+def test_admin_token_reissue_rotates_and_invalidates_the_old_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("RELAY_ADMIN_TOKEN", raising=False)
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        old_token = (Path(root) / "auth" / "admin-token").read_text(
+            encoding="utf-8"
+        ).strip()
+        client.post(
+            "/api/v1/auth/bootstrap",
+            json={"token": old_token, "username": "admin", "password": "secret123"},
+        )
+
+        assert client.post("/api/v1/admin/admin-token/reissue").status_code == 200
+        new_token = client.get("/api/v1/admin/settings").json()["adminToken"]
+        assert new_token and new_token != old_token
+
+        anonymous = TestClient(client.app)
+        assert (
+            anonymous.get(
+                "/api/v1/admin/settings",
+                headers={"authorization": f"Bearer {old_token}"},
+            ).status_code
+            == 401
+        )
+        assert (
+            anonymous.get(
+                "/api/v1/admin/settings",
+                headers={"authorization": f"Bearer {new_token}"},
+            ).status_code
+            == 200
+        )
+
+
+def test_admin_token_reissue_rotates_an_env_seeded_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _client(monkeypatch, database_auth=False) as client:
+        assert client.post("/api/v1/admin/admin-token/reissue").status_code == 200
+        new_token = client.get("/api/v1/admin/settings").json()["adminToken"]
+        assert new_token and new_token != "admin_token"
+
+        anonymous = TestClient(client.app)
+        assert (
+            anonymous.get(
+                "/api/v1/admin/settings",
+                headers={"authorization": "Bearer admin_token"},
+            ).status_code
+            == 401
+        )
+        assert (
+            anonymous.get(
+                "/api/v1/admin/settings",
+                headers={"authorization": f"Bearer {new_token}"},
+            ).status_code
+            == 200
         )
 
 

@@ -66,7 +66,7 @@ from .persistence.stores import (
     LocalDaemonStore,
 )
 from .persistence.team_store import DatabaseTeamStore, LocalTeamStore
-from .security.auth import auth_store_from_env
+from .security.auth import auth_store_from_env, configure_admin_token
 from .services.event_notifier import (
     CONTROL_PLANE_NOTIFICATION_CHANNEL,
     KeyedEventNotifier,
@@ -117,6 +117,7 @@ class ServerTimingMiddleware:
 def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     root_dir = Path(root_dir)
     logger.info("Relay backend starting", root_dir=str(root_dir))
+    configure_admin_token(root_dir)
 
     session_store = session_store_from_env(root_dir)
     task_store = task_store_from_env(root_dir)

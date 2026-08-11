@@ -15,7 +15,7 @@ from ..persistence.org_settings_store import (
     normalize_max_local_computers,
     normalize_max_task_rounds,
 )
-from ..security.auth import require_admin_session
+from ..security.auth import get_admin_token, reissue_admin_token, require_admin_session
 from ..services.computer_limits import (
     assert_local_computer_allowed,
     decorate_employee_limits,
@@ -118,7 +118,22 @@ def get_org_settings(request: Request, ctx: AppContextDep) -> dict[str, Any]:
         "capabilities": {
             "employeeEdits": hasattr(ctx.auth_store, "update_employee"),
         },
+        # The bootstrap/supervisor bearer token, surfaced so an admin can copy
+        # it from the console instead of digging through backend env files.
+        # Seeded from RELAY_ADMIN_TOKEN on first boot, generated otherwise,
+        # and reissuable via the route below.
+        "adminToken": get_admin_token(),
     }
+
+
+@router.post("/admin/admin-token/reissue")
+def reissue_admin_token_route(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    require_admin_session(request, ctx.auth_store)
+    try:
+        token = reissue_admin_token()
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+    return {"adminToken": token}
 
 
 @router.put("/admin/settings")

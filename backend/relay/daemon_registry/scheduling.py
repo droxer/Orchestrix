@@ -5,8 +5,6 @@ from typing import Any
 
 from ..core.models import AGENT_NAMES, AGENT_ROLES
 
-AGENT_TASK_MODES = ("action", "review", "ask")
-
 
 def normalize_agent_role_map(value: Any) -> dict[str, str]:
     if not isinstance(value, dict):
@@ -23,7 +21,7 @@ def normalize_agent_role_map(value: Any) -> dict[str, str]:
 
 
 def effective_role_for_assignment(
-    node: dict[str, Any], assignment: dict[str, Any], _mode: str
+    node: dict[str, Any], assignment: dict[str, Any]
 ) -> str | None:
     explicit_role = assignment.get("role")
     if explicit_role in AGENT_ROLES:
@@ -42,27 +40,14 @@ def effective_role_for_assignment(
     return overrides.get(agent) or defaults.get(agent)
 
 
-def normalize_run_capacity(payload: dict[str, Any]) -> tuple[int, dict[str, int]]:
-    raw_by_mode = (
-        payload.get("runCapacityByMode")
-        if isinstance(payload.get("runCapacityByMode"), dict)
-        else {}
-    )
-    by_mode: dict[str, int] = {}
-    for mode in AGENT_TASK_MODES:
-        raw = raw_by_mode.get(mode)
-        by_mode[mode] = raw if isinstance(raw, int) and raw > 0 else 1
+def normalize_run_capacity(payload: dict[str, Any]) -> int:
     raw_max = payload.get("maxConcurrentRuns")
-    max_concurrent = (
-        raw_max if isinstance(raw_max, int) and raw_max > 0 else max(by_mode.values())
-    )
-    return max(1, max_concurrent), by_mode
+    return raw_max if isinstance(raw_max, int) and raw_max > 0 else 1
 
 
 def node_accepts_run(
     node: dict[str, Any],
     *,
-    assignments: list[dict[str, Any]],
     active_runs: list[dict[str, Any]],
     session_id: str | None = None,
 ) -> bool:
@@ -70,16 +55,7 @@ def node_accepts_run(
         return False
     if session_id and any(run.get("sessionId") == session_id for run in active_runs):
         return False
-    requested_modes = [assignment.get("mode") or "action" for assignment in assignments]
-    exclusive_request = any(mode != "ask" for mode in requested_modes)
-    active_exclusive = any(run.get("mode") != "ask" for run in active_runs)
-    if exclusive_request:
-        return not active_runs
-    if active_exclusive:
-        return False
-    max_concurrent, by_mode = normalize_run_capacity(node)
-    active_ask = sum(1 for run in active_runs if run.get("mode") == "ask")
-    return len(active_runs) < max_concurrent and active_ask < by_mode["ask"]
+    return len(active_runs) < normalize_run_capacity(node)
 
 
 def node_status_for_active_runs(

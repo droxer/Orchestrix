@@ -145,6 +145,24 @@
   border-right: 0;
 }
 
+/* Mobile: four coordinates across a phone leaves the id flush against the
+   screen edge with nowhere to ellipsis. Two up, two down. */
+@media (max-width: 820px) {
+  .record-band {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .record-band-cell:nth-child(2n) {
+    border-right: 0;
+  }
+
+  /* Row rule only when a second row exists below it. */
+  .record-band-cell:nth-child(-n + 2):nth-last-child(n + 3) {
+    border-bottom: 1px solid var(--line-1);
+  }
+}
+
 .record-band-label {
   color: var(--ink-4);
   font: var(--type-micro);
@@ -207,18 +225,6 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-}
-
-/* ---- status strip ---------------------------------------------------- */
-/* What is left of the old metric strip: a single band for a caller-supplied
-   status chip. The three KPI numerals it used to carry (and their pulse
-   animation) are gone — they restated the section headers directly below. */
-
-.workspace-metric-strip {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  border-bottom: 1px solid var(--line-1);
 }
 
 /* ---- two-pane grid: browse · preview desk ------------------------- */
@@ -413,6 +419,28 @@
   }
 }
 
+/* A team's document is a roster — three rows, not an instructions essay — so
+   this record stretches its grid to the pane instead of sizing to content:
+   the rail rule runs the full height as a real column rule, and management
+   sits at the foot rather than floating in the middle of a dead half-page.
+   Scoped to the team record on purpose; the agent record's document grows on
+   its own and does not want a stretched row. */
+.team-workspace-page .workspace-profile {
+  display: flex;
+  flex-direction: column;
+}
+
+.team-workspace-page .workspace-profile .workspace-profile-dossier {
+  flex: 1;
+  min-height: 0;
+}
+
+@container record (min-width: 768px) {
+  .team-workspace-page .workspace-profile .workspace-profile-dossier {
+    grid-template-rows: minmax(min-content, 1fr) auto;
+  }
+}
+
 .workspace-dossier-doc {
   min-width: 0;
 }
@@ -480,9 +508,26 @@
 .workspace-dossier-admin {
   display: flex;
   flex-direction: column;
+  /* Controls size to their label. Left to stretch, a lone destructive button
+     becomes the widest element on the record. */
+  align-items: start;
   gap: var(--sp-5);
   padding-top: var(--sp-5);
   border-top: 1px solid var(--line-2);
+}
+
+/* The band's own rule is the separator. A first child that also draws one
+   (.adm-drawer-section carries border-top + margin-top for stacking inside a
+   drawer) printed a second hairline with an empty gap between the two. */
+.workspace-dossier-admin > :first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.workspace-dossier-admin > .adm-drawer-section {
+  align-self: stretch;
+  align-items: start;
 }
 
 .workspace-profile .adm-cred-row {
@@ -528,31 +573,6 @@
   font-size: var(--fs-2);
 }
 
-/* The strip used to hold three count cells with this status chip pushed to
-   the far end. The counts are gone (the section headers carry them), so the
-   chip is the only occupant and has no reason to hug the right edge of an
-   otherwise empty band — it reads as a status line now. */
-.workspace-metric-item--status {
-  flex-direction: row;
-  align-items: center;
-  justify-content: flex-start;
-  border-right: 0;
-  gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-4);
-}
-
-.workspace-status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  min-height: 22px;
-  border: 1px solid currentColor;
-  border-radius: var(--r-2);
-  background: transparent;
-  padding: 0 var(--sp-3);
-  font: var(--type-label-strong);
-}
-
 /* Readiness pip: a standalone toned dot that carries availability at a glance.
     The status text moves to the element's title/aria-label so the hero stays
     uncluttered. Same 7px as the spec's status-dot and the placement badge. */
@@ -569,12 +589,6 @@
 .workspace-status-pip.tone-warn { color: var(--warn); }
 .workspace-status-pip.tone-bad { color: var(--err); }
 .workspace-status-pip.tone-neutral { color: var(--ink-3); }
-
-.workspace-status-pill.tone-good { color: var(--ok); }
-.workspace-status-pill.tone-info { color: var(--info); }
-.workspace-status-pill.tone-warn { color: var(--warn); }
-.workspace-status-pill.tone-bad { color: var(--err); }
-.workspace-status-pill.tone-neutral { color: var(--ink-3); }
 
 /* ---- browse pane: files + snapshot banner --------------------------- */
 

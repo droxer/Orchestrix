@@ -2,9 +2,9 @@
 
 import { useMemo, type Dispatch, RefObject, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionRoute, ModeAsk, ModeReview } from "./icons";
+import { ActionRoute } from "./icons";
 import { RelayMark } from "./RelayMark";
-import type { AgentName, AgentTaskMode, DaemonNodeMonitorRecord, EmployeeAgent, RelayArtifact, RelaySession } from "../types";
+import type { AgentName, AgentTeam, DaemonNodeMonitorRecord, EmployeeAgent, RelayArtifact, RelaySession } from "../types";
 import {
   buildExecutorDisplayNameMap,
   buildLogicalAgentImageMap,
@@ -42,6 +42,10 @@ export type ThreadsViewProps = {
   selectableLogicalAgents: EmployeeAgent[];
   activeLogicalAgentId: string | null;
   onLogicalAgentPicked: (agent: EmployeeAgent) => void;
+  composerTeams: AgentTeam[];
+  activeTeamId: string | null;
+  onTeamPicked: (team: AgentTeam) => void;
+  teamLocked: boolean;
   artifactCount: number;
   visibleArtifacts: RelayArtifact[];
   spaceOpen: boolean;
@@ -64,21 +68,17 @@ export type ThreadsViewProps = {
   activeRuntimeNode: DaemonNodeMonitorRecord | null;
   onRuntimeNodeChange: (nodeId: string) => void;
   agentDescriptors: Record<AgentName, { blurb: string }>;
-  composerMode: AgentTaskMode;
-  setComposerMode: Dispatch<SetStateAction<AgentTaskMode>>;
   handoffOpen: boolean;
   setHandoffOpen: Dispatch<SetStateAction<boolean>>;
   handoffAgentId: string;
   setHandoffAgentId: Dispatch<SetStateAction<string>>;
-  handoffMode: AgentTaskMode;
-  setHandoffMode: Dispatch<SetStateAction<AgentTaskMode>>;
   handoffNote: string;
   setHandoffNote: Dispatch<SetStateAction<string>>;
   sendDecision: (kind: "approve" | "reject" | "rerun" | "mark_done") => Promise<void>;
   sendHandoff: () => Promise<void>;
   onSend: () => void;
   onCancelRun: () => void;
-  onRetryAgent: (agent: AgentName, mode: AgentTaskMode, agentId?: string) => void;
+  onRetryAgent: (agent: AgentName, agentId?: string) => void;
   running: boolean;
 };
 
@@ -102,6 +102,10 @@ export function ThreadsView({
   selectableLogicalAgents,
   activeLogicalAgentId,
   onLogicalAgentPicked,
+  composerTeams,
+  activeTeamId,
+  onTeamPicked,
+  teamLocked,
   artifactCount,
   visibleArtifacts,
   spaceOpen,
@@ -124,14 +128,10 @@ export function ThreadsView({
   activeRuntimeNode,
   onRuntimeNodeChange,
   agentDescriptors,
-  composerMode,
-  setComposerMode,
   handoffOpen,
   setHandoffOpen,
   handoffAgentId,
   setHandoffAgentId,
-  handoffMode,
-  setHandoffMode,
   handoffNote,
   setHandoffNote,
   sendDecision,
@@ -195,29 +195,14 @@ export function ThreadsView({
                   const prev = i > 0 ? displayMessages[i - 1] : undefined;
                   const isHandoff =
                     msg.kind === "agent" && prev?.kind === "agent" && prev.agent !== msg.agent;
-                  // The generic agent-phase marker carries the Relay product
-                  // mark — "the agent" as a product — while each turn header
-                  // keeps its specific executor glyph. Ask/Review/Handoff keep
-                  // their own semantic lucide icons.
-                  const isAgentPhase =
-                    msg.kind === "agent" && !isHandoff && msg.mode === "action";
-                  const PhaseIcon =
-                    msg.kind === "agent"
-                      ? isHandoff
-                        ? ActionRoute
-                        : msg.mode === "ask"
-                          ? ModeAsk
-                          : msg.mode === "review"
-                            ? ModeReview
-                            : null
-                      : null;
+                  const PhaseIcon = msg.kind === "agent" && isHandoff ? ActionRoute : null;
                   return (
                     <div key={msg.id} className="transcript-turn">
                       {phaseLabel ? (
                         <div className="transcript-phase" role="separator" aria-label={phaseLabel}>
                           <span className="transcript-phase-node" aria-hidden="true" />
                           <span className="transcript-phase-label">
-                            {isAgentPhase ? (
+                            {!isHandoff ? (
                               <RelayMark width={12} height={12} className="transcript-phase-icon transcript-phase-mark" />
                             ) : PhaseIcon ? (
                               <PhaseIcon size={12} className="transcript-phase-icon" aria-hidden="true" />
@@ -248,8 +233,6 @@ export function ThreadsView({
                     setHandoffOpen={setHandoffOpen}
                     handoffAgentId={handoffAgentId}
                     setHandoffAgentId={setHandoffAgentId}
-                    handoffMode={handoffMode}
-                    setHandoffMode={setHandoffMode}
                     handoffNote={handoffNote}
                     setHandoffNote={setHandoffNote}
                     sendHandoff={sendHandoff}
@@ -270,11 +253,13 @@ export function ThreadsView({
 
         <Composer
           ref={composerRef}
-          composerMode={composerMode}
-          setComposerMode={setComposerMode}
           logicalAgents={selectableLogicalAgents}
           activeLogicalAgentId={activeLogicalAgentId}
           onLogicalAgentPicked={onLogicalAgentPicked}
+          teams={composerTeams}
+          activeTeamId={activeTeamId}
+          onTeamPicked={onTeamPicked}
+          teamLocked={teamLocked}
           activeAgentDisplayName={activeAgentDisplayName}
           selectedEmployee={selectedEmployee}
           initializingThread={initializingThread}

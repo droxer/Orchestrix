@@ -1,4 +1,4 @@
-import type { AgentName, AgentTaskMode } from "relay-core";
+import type { AgentName } from "relay-core";
 import type { RelayEvent, RelaySession } from "relay-core";
 
 export type ChatProvider = "discord" | "telegram" | "lark";
@@ -26,7 +26,6 @@ export interface ChatIdentityResolver {
 export interface ChatAgentRequest extends ChatConversationRef {
   taskGoal: string;
   agentId?: string;
-  mode: AgentTaskMode;
   sessionId?: string;
   /** Start a fresh conversation, ignoring any existing thread->session binding. */
   forceNew?: boolean;
@@ -43,8 +42,8 @@ export interface ChatStatusRequest extends ChatConversationRef {
 }
 
 export type ChatCommand =
-  | { kind: "run"; taskGoal: string; agentId?: string; mode: AgentTaskMode; sessionId?: string }
-  | { kind: "new"; taskGoal: string; agentId?: string; mode: AgentTaskMode }
+  | { kind: "run"; taskGoal: string; agentId?: string; sessionId?: string }
+  | { kind: "new"; taskGoal: string; agentId?: string }
   | { kind: "list" }
   | { kind: "switch"; sessionId: string }
   | { kind: "status"; sessionId: string }
@@ -85,7 +84,6 @@ export interface RelayChatBackend {
   startAgentRun?(input: {
     agentId: string;
     taskGoal: string;
-    mode?: AgentTaskMode;
     sessionId?: string;
     employeeId?: string;
     idempotencyKey?: string;
@@ -94,7 +92,6 @@ export interface RelayChatBackend {
   continueThread?(input: {
     sessionId: string;
     taskGoal: string;
-    mode?: AgentTaskMode;
     employeeId?: string;
     idempotencyKey?: string;
     signal?: AbortSignal;

@@ -177,7 +177,6 @@ class ServerDaemonNodeBackend:
                             if status == "ready"
                         ],
                         "maxConcurrentRuns": existing.get("maxConcurrentRuns"),
-                        "runCapacityByMode": existing.get("runCapacityByMode"),
                         "status": "busy"
                         if existing["status"] == "running"
                         else existing["status"],
@@ -202,7 +201,6 @@ class ServerDaemonNodeBackend:
             "status": "provisioning",
             "agents": {agent: "unknown" for agent in AGENT_NAMES},
             "maxConcurrentRuns": 1,
-            "runCapacityByMode": {"action": 1, "review": 1, "ask": 1},
             "token": payload["token"],
             "createdAt": now,
             "updatedAt": now,
@@ -519,7 +517,6 @@ class ServerDaemonNodeBackend:
                 )
             if not node_accepts_run(
                 node,
-                assignments=[assignment],
                 active_runs=active_runs_by_node[node_id],
                 session_id=request.get("sessionId"),
             ):

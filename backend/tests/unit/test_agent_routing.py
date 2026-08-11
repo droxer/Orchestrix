@@ -55,8 +55,8 @@ def test_rejects_collaboration_across_nodes_even_with_shared_workspace(
     with pytest.raises(AgentRoutingError) as error:
         resolve_agent_assignments(
             [
-                {"agentId": researcher["id"], "mode": "ask"},
-                {"agentId": builder["id"], "mode": "action"},
+                {"agentId": researcher["id"]},
+                {"agentId": builder["id"]},
             ],
             employee_id="alice",
             is_admin=False,
@@ -90,8 +90,8 @@ def test_agents_on_same_computer_resolve_together(tmp_path: Path) -> None:
 
     resolved = resolve_agent_assignments(
         [
-            {"agentId": researcher["id"], "mode": "ask"},
-            {"agentId": builder["id"], "mode": "action"},
+            {"agentId": researcher["id"]},
+            {"agentId": builder["id"]},
         ],
         employee_id="alice",
         is_admin=False,
@@ -113,7 +113,7 @@ def test_employee_cannot_route_another_employees_agent(tmp_path: Path) -> None:
 
     with pytest.raises(AgentRoutingError) as error:
         resolve_agent_assignments(
-            [{"agentId": agent["id"], "mode": "ask"}],
+            [{"agentId": agent["id"]}],
             employee_id="bob",
             is_admin=False,
             agent_store=agents,
@@ -141,7 +141,7 @@ def test_managed_capacity_does_not_replace_a_healthy_local_placement(
     }
 
     [resolved] = resolve_agent_assignments(
-        [{"agentId": agent["id"], "mode": "action"}],
+        [{"agentId": agent["id"]}],
         employee_id="alice",
         is_admin=False,
         agent_store=agents,
@@ -181,7 +181,7 @@ def test_managed_capacity_does_not_move_an_offline_agent_to_another_computer(
 
     with pytest.raises(AgentRoutingError) as error:
         resolve_agent_assignments(
-            [{"agentId": agent["id"], "mode": "action"}],
+            [{"agentId": agent["id"]}],
             employee_id="alice",
             is_admin=False,
             agent_store=agents,
@@ -216,7 +216,7 @@ def test_legacy_nonempty_policy_blocks_dispatch(
 
     with pytest.raises(AgentRoutingError) as error:
         resolve_agent_assignments(
-            [{"agentId": agent["id"], "mode": "action"}],
+            [{"agentId": agent["id"]}],
             employee_id="alice",
             is_admin=False,
             agent_store=agents,
@@ -352,7 +352,7 @@ def test_node_affine_session_rejects_followup_on_different_node(
 
     with pytest.raises(AgentRoutingError) as error:
         resolve_agent_assignments(
-            [{"agentId": second["id"], "mode": "action"}],
+            [{"agentId": second["id"]}],
             employee_id="alice",
             is_admin=False,
             agent_store=agents,
@@ -378,7 +378,7 @@ def test_session_without_prior_run_does_not_invent_node_affinity(
     placements.create_placement(agent, "node_a")
 
     resolved = resolve_agent_assignments(
-        [{"agentId": agent["id"], "mode": "action"}],
+        [{"agentId": agent["id"]}],
         employee_id="alice",
         is_admin=False,
         agent_store=agents,
@@ -425,7 +425,7 @@ def test_node_affine_session_rejects_workspace_drift_on_same_node_id(
 
     with pytest.raises(AgentRoutingError) as error:
         resolve_agent_assignments(
-            [{"agentId": agent["id"], "mode": "action"}],
+            [{"agentId": agent["id"]}],
             employee_id="alice",
             is_admin=False,
             agent_store=agents,
@@ -465,7 +465,7 @@ def test_managed_runtime_replacement_keeps_existing_session_affinity(
     placements.rebind_placement(placement["id"], "node_new")
 
     resolved = resolve_agent_assignments(
-        [{"agentId": agent["id"], "mode": "action"}],
+        [{"agentId": agent["id"]}],
         employee_id="alice",
         is_admin=False,
         agent_store=agents,
@@ -509,7 +509,7 @@ def test_managed_runtime_replacement_keeps_pre_run_session_affinity(
     }
 
     resolved = resolve_agent_assignments(
-        [{"agentId": agent["id"], "mode": "action"}],
+        [{"agentId": agent["id"]}],
         employee_id="alice",
         is_admin=False,
         agent_store=agents,
@@ -555,7 +555,7 @@ def test_legacy_pre_run_session_follows_managed_runtime_history(
     }
 
     resolved = resolve_agent_assignments(
-        [{"agentId": agent["id"], "mode": "action"}],
+        [{"agentId": agent["id"]}],
         employee_id="alice",
         is_admin=False,
         agent_store=agents,
@@ -603,7 +603,7 @@ def test_shared_path_session_rejects_followup_on_different_node(
 
     with pytest.raises(AgentRoutingError) as error:
         resolve_agent_assignments(
-            [{"agentId": second["id"], "mode": "action"}],
+            [{"agentId": second["id"]}],
             employee_id="alice",
             is_admin=False,
             agent_store=agents,
@@ -628,7 +628,7 @@ def test_offline_agent_returns_stable_reason(tmp_path: Path) -> None:
 
     with pytest.raises(AgentRoutingError) as error:
         resolve_agent_assignments(
-            [{"agentId": agent["id"], "mode": "action"}],
+            [{"agentId": agent["id"]}],
             employee_id="alice",
             is_admin=False,
             agent_store=agents,
@@ -649,12 +649,12 @@ def test_saturated_placement_returns_capacity_exhausted(tmp_path: Path) -> None:
     saturated = {
         **node("node_a", "codex"),
         "status": "running",
-        "activeRuns": [{"sessionId": "ses_other", "mode": "action"}],
+        "activeRuns": [{"sessionId": "ses_other"}],
     }
 
     with pytest.raises(AgentRoutingError) as error:
         resolve_agent_assignments(
-            [{"agentId": agent["id"], "mode": "action"}],
+            [{"agentId": agent["id"]}],
             employee_id="alice",
             is_admin=False,
             agent_store=agents,
@@ -693,7 +693,7 @@ def test_device_compatibility_agent_does_not_borrow_managed_capacity(
 
     with pytest.raises(AgentRoutingError) as error:
         resolve_agent_assignments(
-            [{"agentId": agent["id"], "mode": "action"}],
+            [{"agentId": agent["id"]}],
             employee_id="alice",
             is_admin=False,
             agent_store=agents,

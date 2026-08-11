@@ -452,7 +452,7 @@ def test_assigned_backlog_waits_for_scheduler_and_start_can_dispatch_manually(
         assert command["taskGoal"] == "Run from backlog"
 
 
-def test_task_start_preserves_ask_mode(monkeypatch) -> None:
+def test_task_start_uses_agent_selected_execution(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
@@ -485,9 +485,7 @@ def test_task_start_preserves_ask_mode(monkeypatch) -> None:
         )
         assert created.status_code == 201
 
-        started = client.post(
-            f"/api/v1/tasks/{created.json()['id']}/runs", json={"mode": "ask"}
-        )
+        started = client.post(f"/api/v1/tasks/{created.json()['id']}/runs", json={})
         assert started.status_code == 202
 
         commands = client.get(
@@ -497,7 +495,7 @@ def test_task_start_preserves_ask_mode(monkeypatch) -> None:
         assert commands.status_code == 200
         [command] = commands.json()["commands"]
         assert command["agent"] == "codex"
-        assert command["mode"] == "ask"
+        assert "mode" not in command
         assert command["state"]["task_goal"] == "Explain backlog"
 
 
@@ -565,7 +563,7 @@ def test_task_start_reports_restart_of_stopped_managed_capacity(monkeypatch) -> 
         assert restarted["phase"] == "requested"
 
 
-def test_task_start_discussion_runs_multi_agent_ask_and_keeps_task_open(
+def test_task_start_runs_multi_agent_adaptive_pipeline(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
@@ -607,8 +605,8 @@ def test_task_start_discussion_runs_multi_agent_ask_and_keeps_task_open(
             f"/api/v1/tasks/{created.json()['id']}/runs",
             json={
                 "assignments": [
-                    {"agentId": claude_agent["id"], "agent": "claude", "mode": "ask"},
-                    {"agentId": codex_agent["id"], "agent": "codex", "mode": "ask"},
+                    {"agentId": claude_agent["id"], "agent": "claude"},
+                    {"agentId": codex_agent["id"], "agent": "codex"},
                 ],
             },
         )
@@ -624,7 +622,7 @@ def test_task_start_discussion_runs_multi_agent_ask_and_keeps_task_open(
         assert commands.status_code == 200
         [first] = commands.json()["commands"]
         assert first["agent"] == "claude"
-        assert first["mode"] == "ask"
+        assert "mode" not in first
         assert (
             first["taskGoal"]
             == "Plan onboarding\n\nDiscuss rollout and implementation."
@@ -639,7 +637,6 @@ def test_task_start_discussion_runs_multi_agent_ask_and_keeps_task_open(
                 "sessionId": first["sessionId"],
                 "runId": first["runId"],
                 "agent": "claude",
-                "mode": "ask",
                 "exitCode": 0,
                 "agentLog": "Planner says define milestones.",
             },
@@ -654,7 +651,7 @@ def test_task_start_discussion_runs_multi_agent_ask_and_keeps_task_open(
         assert commands.status_code == 200
         [second] = commands.json()["commands"]
         assert second["agent"] == "codex"
-        assert second["mode"] == "ask"
+        assert "mode" not in second
         assert "prior_agent_bridge" in second["state"]
 
         completed_second = client.post(
@@ -666,7 +663,6 @@ def test_task_start_discussion_runs_multi_agent_ask_and_keeps_task_open(
                 "sessionId": second["sessionId"],
                 "runId": second["runId"],
                 "agent": "codex",
-                "mode": "ask",
                 "exitCode": 0,
                 "agentLog": "Engineer says implementation is feasible.",
             },
@@ -676,14 +672,15 @@ def test_task_start_discussion_runs_multi_agent_ask_and_keeps_task_open(
 
         task = client.get(f"/api/v1/tasks/{created.json()['id']}")
         assert task.status_code == 200
-        assert task.json()["status"] == "waiting_for_human"
+        assert task.json()["status"] == "done"
         assert task.json()["linkedSessionIds"] == [session_id]
-        assert any(
-            item["message"] == "Discussion started." for item in task.json()["activity"]
+        assert all(
+            item["message"] != "Discussion started."
+            for item in task.json()["activity"]
         )
 
 
-def test_task_start_without_agent_runs_ready_team_discussion(monkeypatch) -> None:
+def test_task_start_without_agent_runs_ready_team_pipeline(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
@@ -770,7 +767,7 @@ def test_task_start_without_agent_runs_ready_team_discussion(monkeypatch) -> Non
         assert first["state"]["agent_instructions"] == (
             "Act as Alice's claude teammate."
         )
-        assert first["mode"] == "ask"
+        assert "mode" not in first
         assert (
             first["taskGoal"]
             == "Design checkout recovery\n\nFind the right implementation plan and risks."
@@ -785,7 +782,6 @@ def test_task_start_without_agent_runs_ready_team_discussion(monkeypatch) -> Non
                 "sessionId": first["sessionId"],
                 "runId": first["runId"],
                 "agent": "claude",
-                "mode": "ask",
                 "exitCode": 0,
                 "agentLog": "Planner recommends a staged rollout.",
             },
@@ -804,7 +800,7 @@ def test_task_start_without_agent_runs_ready_team_discussion(monkeypatch) -> Non
         assert second["state"]["agent_instructions"] == (
             "Act as Alice's codex teammate."
         )
-        assert second["mode"] == "ask"
+        assert "mode" not in second
         assert "prior_agent_bridge" in second["state"]
 
         completed_second = client.post(
@@ -816,7 +812,6 @@ def test_task_start_without_agent_runs_ready_team_discussion(monkeypatch) -> Non
                 "sessionId": second["sessionId"],
                 "runId": second["runId"],
                 "agent": "codex",
-                "mode": "ask",
                 "exitCode": 0,
                 "agentLog": "Engineer identifies the implementation steps.",
             },
@@ -826,15 +821,16 @@ def test_task_start_without_agent_runs_ready_team_discussion(monkeypatch) -> Non
 
         task = client.get(f"/api/v1/tasks/{created.json()['id']}")
         assert task.status_code == 200
-        assert task.json()["status"] == "waiting_for_human"
+        assert task.json()["status"] == "done"
         assert task.json()["linkedSessionIds"] == [session_id]
         assert "assignedAgent" not in task.json()
-        assert any(
-            item["message"] == "Discussion started." for item in task.json()["activity"]
+        assert all(
+            item["message"] != "Discussion started."
+            for item in task.json()["activity"]
         )
 
 
-def test_review_run_leaves_task_in_review_for_human(monkeypatch) -> None:
+def test_agent_selected_review_work_uses_normal_task_completion(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
@@ -870,7 +866,7 @@ def test_review_run_leaves_task_in_review_for_human(monkeypatch) -> None:
             f"/api/v1/tasks/{created.json()['id']}/runs",
             json={
                 "assignments": [
-                    {"agentId": agent["id"], "agent": "codex", "mode": "review"}
+                    {"agentId": agent["id"], "agent": "codex"}
                 ],
             },
         )
@@ -882,7 +878,7 @@ def test_review_run_leaves_task_in_review_for_human(monkeypatch) -> None:
         )
         assert commands.status_code == 200
         [command] = commands.json()["commands"]
-        assert command["mode"] == "review"
+        assert "mode" not in command
 
         completed = client.post(
             "/api/v1/daemon-nodes/sbx_alice/events",
@@ -893,7 +889,6 @@ def test_review_run_leaves_task_in_review_for_human(monkeypatch) -> None:
                 "sessionId": command["sessionId"],
                 "runId": command["runId"],
                 "agent": "codex",
-                "mode": "review",
                 "exitCode": 0,
                 "agentLog": "Review passed with notes.",
             },
@@ -903,7 +898,7 @@ def test_review_run_leaves_task_in_review_for_human(monkeypatch) -> None:
 
         task = client.get(f"/api/v1/tasks/{created.json()['id']}")
         assert task.status_code == 200
-        assert task.json()["status"] == "review"
+        assert task.json()["status"] == "done"
 
 
 def test_agentless_routine_cannot_start_as_team_discussion(monkeypatch) -> None:
@@ -952,8 +947,8 @@ def test_agentless_routine_cannot_start_as_team_discussion(monkeypatch) -> None:
             f"/api/v1/tasks/{created.json()['id']}/runs",
             json={
                 "assignments": [
-                    {"agent": "claude", "mode": "ask"},
-                    {"agent": "codex", "mode": "ask"},
+                    {"agent": "claude"},
+                    {"agent": "codex"},
                 ],
             },
         )
@@ -1218,7 +1213,7 @@ def test_assigned_task_rejects_run_assignment_override(monkeypatch) -> None:
             f"/api/v1/tasks/{task['id']}/runs",
             json={
                 "assignments": [
-                    {"agentId": override["id"], "agent": "claude", "mode": "action"}
+                    {"agentId": override["id"], "agent": "claude"}
                 ]
             },
         )

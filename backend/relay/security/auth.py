@@ -87,6 +87,56 @@ def hash_session_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+_admin_token_path: Path | None = None
+
+
+def configure_admin_token(root_dir: str | Path) -> None:
+    """Point the admin-token store at this app's data dir and make sure a
+    token exists.
+
+    Called once from create_app. On first boot the token is seeded from
+    RELAY_ADMIN_TOKEN when set, otherwise generated; either way it lands next
+    to the auth data so the console can show and reissue it.
+    """
+    global _admin_token_path
+    _admin_token_path = Path(root_dir) / "auth" / "admin-token"
+    get_admin_token()
+
+
+def get_admin_token() -> str | None:
+    """The bearer token for bootstrap, supervisor, and admin API calls.
+
+    The persisted token is authoritative once written; RELAY_ADMIN_TOKEN only
+    seeds the very first boot. That keeps the value the console displays the
+    one that actually authenticates, including after a console reissue.
+    """
+    if _admin_token_path is None:
+        return os.environ.get("RELAY_ADMIN_TOKEN", "").strip() or None
+    if _admin_token_path.exists():
+        persisted = _admin_token_path.read_text(encoding="utf-8").strip()
+        if persisted:
+            return persisted
+    seed = os.environ.get("RELAY_ADMIN_TOKEN", "").strip()
+    return _persist_admin_token(seed or secrets.token_urlsafe(32))
+
+
+def reissue_admin_token() -> str:
+    """Rotate the persisted admin token; the old value stops working
+    immediately, including one seeded from RELAY_ADMIN_TOKEN."""
+    if _admin_token_path is None:
+        raise ValueError("Admin token store is not configured.")
+    return _persist_admin_token(secrets.token_urlsafe(32))
+
+
+def _persist_admin_token(token: str) -> str:
+    assert _admin_token_path is not None
+    _admin_token_path.parent.mkdir(parents=True, exist_ok=True)
+    _admin_token_path.write_text(token, encoding="utf-8")
+    os.chmod(_admin_token_path, 0o600)
+    logger.info("Admin token persisted", path=str(_admin_token_path))
+    return token
+
+
 class UserAuthStore:
     def __init__(
         self,
@@ -210,9 +260,9 @@ class UserAuthStore:
     def bootstrap_with_token(
         self, token: str, username: str, password: str
     ) -> dict[str, Any]:
-        expected = os.environ.get("RELAY_ADMIN_TOKEN", "").strip()
+        expected = get_admin_token()
         if not expected:
-            raise HTTPException(503, "RELAY_ADMIN_TOKEN is not configured.")
+            raise HTTPException(503, "Admin token is not configured.")
         if (
             not token
             or len(token) != len(expected)
@@ -683,9 +733,9 @@ class DatabaseUserAuthStore:
     def bootstrap_with_token(
         self, token: str, username: str, password: str
     ) -> dict[str, Any]:
-        expected = os.environ.get("RELAY_ADMIN_TOKEN", "").strip()
+        expected = get_admin_token()
         if not expected:
-            raise HTTPException(503, "RELAY_ADMIN_TOKEN is not configured.")
+            raise HTTPException(503, "Admin token is not configured.")
         if (
             not token
             or len(token) != len(expected)
@@ -1118,7 +1168,7 @@ def require_admin_session(
     request: Request, auth_store: UserAuthStore
 ) -> dict[str, Any]:
     bearer = _bearer_token(request)
-    expected = os.environ.get("RELAY_ADMIN_TOKEN", "").strip()
+    expected = get_admin_token()
     if (
         bearer
         and expected

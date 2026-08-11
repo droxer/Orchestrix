@@ -1,4 +1,4 @@
-import type { AgentName, AgentTaskMode, RelaySession } from "../types.js";
+import type { AgentName, RelaySession } from "../types.js";
 
 export function isAwaitingFeedbackDecision(session: RelaySession | undefined): boolean {
   return session?.status === "waiting_for_human" && session.pendingDecision === "feedback";
@@ -9,12 +9,10 @@ export function isAwaitingFeedbackDecision(session: RelaySession | undefined): b
 export function rerunAssignmentForSession(
   session: RelaySession,
   fallbackAgent: AgentName,
-  fallbackMode: AgentTaskMode = "action",
-): { agent: AgentName; agentId?: string; mode: AgentTaskMode } {
+): { agent: AgentName; agentId?: string } {
   const lastRun = session.agentRuns[session.agentRuns.length - 1];
   return {
     agent: lastRun?.agent ?? session.currentAgent ?? fallbackAgent,
     ...(lastRun?.logicalAgentId ? { agentId: lastRun.logicalAgentId } : {}),
-    mode: lastRun?.mode ?? fallbackMode,
   };
 }

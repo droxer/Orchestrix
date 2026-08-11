@@ -177,7 +177,6 @@ New assignments carry logical identity and retain executor kind for compatibilit
 interface AgentAssignment {
   agentId?: string;
   agent: "claude" | "pi" | "codex" | "kimi";
-  mode: "action" | "review" | "ask";
   role?: AgentRole;
 }
 ```
@@ -215,7 +214,7 @@ For each assignment, the control plane:
 3. Rejects placements whose daemon heartbeat, executor capability, protocol,
    or policy is incompatible.
 4. Rejects placements without access to the session workspace.
-5. Rejects placements without capacity for the requested mode.
+5. Rejects placements without run capacity.
 6. Prefers existing session affinity, then placement priority, available
    capacity, recent health, and stable placement ID.
 7. Acquires or verifies the daemon command lease and dispatches the run.

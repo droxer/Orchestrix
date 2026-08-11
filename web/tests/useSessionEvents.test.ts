@@ -104,7 +104,6 @@ describe("mergeSessionEventIntoSessions", () => {
         timestamp: "2026-06-20T00:00:01.000Z",
         runId: "run_1",
         agent: "pi",
-        mode: "action",
       },
       {
         id: "evt_output_1",

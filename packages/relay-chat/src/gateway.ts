@@ -43,7 +43,6 @@ export class RelayChatGateway {
         session = await this.backend.continueThread({
           sessionId,
           taskGoal: request.taskGoal,
-          mode: request.mode,
           employeeId: identity.employeeId,
           idempotencyKey: request.idempotencyKey,
           signal,
@@ -56,7 +55,6 @@ export class RelayChatGateway {
         session = await this.backend.startAgentRun({
             agentId,
             taskGoal: request.taskGoal,
-            mode: request.mode,
             employeeId: identity.employeeId,
             idempotencyKey: request.idempotencyKey,
             signal,

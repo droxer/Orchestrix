@@ -1,4 +1,4 @@
-import type { AgentName, AgentTaskMode } from "./state.js";
+import type { AgentName } from "./state.js";
 import { mergeTokenUsage, type TokenUsage } from "./token-usage.js";
 import type { CodexCollaborationEvent } from "./codex-collaboration.js";
 
@@ -35,7 +35,6 @@ export interface AgentRun {
     leadAgentId?: string;
   };
   teamPhase?: "discussion" | "execution" | "review";
-  mode: AgentTaskMode;
   status: "running" | "completed" | "failed" | "cancelled";
   startedAt: string;
   completedAt?: string;
@@ -104,7 +103,7 @@ export interface CollaborationRoundManifest {
   assignments: Array<{
     assignmentId: string;
     agentId: string;
-    mode?: AgentTaskMode;
+    mode?: "action" | "ask" | "review";
     phase?: AgentRun["teamPhase"];
     role?: AgentRole;
     brief?: string;
@@ -231,7 +230,6 @@ export type RelayEvent =
       synthesizer?: boolean;
       teamSnapshot?: AgentRun["teamSnapshot"];
       teamPhase?: AgentRun["teamPhase"];
-      mode: AgentTaskMode;
     }
   | {
       id: string;
@@ -267,7 +265,6 @@ export type RelayEvent =
       logicalAgentId?: string;
       collaborationScope?: "assignment";
       agent: AgentName;
-      mode: AgentTaskMode;
       sequence: number;
       collaboration: CodexCollaborationEvent;
     }
@@ -404,7 +401,7 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
       if (event.daemonNodeId && !session.daemonNodeId) session.daemonNodeId = event.daemonNodeId;
       if (event.managedNodeId && !session.managedNodeId) session.managedNodeId = event.managedNodeId;
       session.status = "running";
-      session.phase = `${event.agent}:${event.mode}`;
+      session.phase = event.agent;
       session.currentAgent = event.agent;
       session.agentRuns.push({
         id: event.runId,
@@ -425,7 +422,6 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
         ...(event.synthesizer ? { synthesizer: true } : {}),
         ...(event.teamSnapshot ? { teamSnapshot: event.teamSnapshot } : {}),
         ...(event.teamPhase ? { teamPhase: event.teamPhase } : {}),
-        mode: event.mode,
         status: "running",
         startedAt: event.timestamp,
         artifactIds: [],

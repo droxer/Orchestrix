@@ -934,7 +934,7 @@ def test_fastapi_daemon_routes_register_and_poll(monkeypatch) -> None:
             "/api/v1/sandboxes/sbx_alice/runs",
             json={
                 "taskGoal": "review auth",
-                "assignments": [{"agent": "codex", "mode": "review"}],
+                "assignments": [{"agent": "codex"}],
             },
             headers={"Authorization": "Bearer ui_token"},
         )
@@ -994,7 +994,7 @@ def test_explicit_command_leases_redeliver_work_missing_from_daemon_heartbeat(
             "/api/v1/sandboxes/sbx_alice/runs",
             json={
                 "taskGoal": "recover this run",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
             },
             headers={"Authorization": "Bearer ui_token"},
         )
@@ -1082,7 +1082,7 @@ def test_output_event_does_not_replace_explicit_lease_heartbeat(monkeypatch) -> 
             "/api/v1/sandboxes/sbx_alice/runs",
             json={
                 "taskGoal": "recover after output",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
             },
             headers={"Authorization": "Bearer ui_token"},
         )
@@ -1154,7 +1154,7 @@ def test_run_completed_finalizes_even_when_token_usage_is_unusable(monkeypatch) 
             "/api/v1/sandboxes/sbx_alice/runs",
             json={
                 "taskGoal": "report broken usage",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
             },
             headers={"Authorization": "Bearer ui_token"},
         )
@@ -1173,9 +1173,7 @@ def test_run_completed_finalizes_even_when_token_usage_is_unusable(monkeypatch) 
                 "leaseId": command["leaseId"],
                 "sessionId": command["sessionId"],
                 "runId": command["runId"],
-                "agent": command["agent"],
-                "mode": command["mode"],
-                "exitCode": 0,
+                "agent": command["agent"],                "exitCode": 0,
                 "agentLog": "[Codex Action Exit 0]",
                 "tokenUsage": {"input": 1, "output": 1, "cache": 0, "total": 9},
             },
@@ -1222,7 +1220,7 @@ def test_daemon_delivery_output_reaches_the_canonical_session_stream(
             "/api/v1/sandboxes/sbx_alice/runs",
             json={
                 "taskGoal": "stream this answer",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
             },
             headers={"Authorization": "Bearer ui_token"},
         )
@@ -1270,9 +1268,7 @@ def test_daemon_delivery_output_reaches_the_canonical_session_stream(
                 "leaseId": command["leaseId"],
                 "sessionId": command["sessionId"],
                 "runId": command["runId"],
-                "agent": command["agent"],
-                "mode": command["mode"],
-                "collaboration": collaboration_payload,
+                "agent": command["agent"],                "collaboration": collaboration_payload,
                 "sequence": 1,
             },
             headers={"Authorization": "Bearer node_token"},
@@ -1286,9 +1282,7 @@ def test_daemon_delivery_output_reaches_the_canonical_session_stream(
                 "leaseId": command["leaseId"],
                 "sessionId": command["sessionId"],
                 "runId": command["runId"],
-                "agent": command["agent"],
-                "mode": command["mode"],
-                "exitCode": 0,
+                "agent": command["agent"],                "exitCode": 0,
             },
             headers={"Authorization": "Bearer node_token"},
         )
@@ -1340,7 +1334,7 @@ def test_cancel_command_is_redelivered_until_run_termination_confirms_it(
             "/api/v1/sandboxes/sbx_alice/runs",
             json={
                 "taskGoal": "cancel this run reliably",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
             },
             headers={"Authorization": "Bearer ui_token"},
         )
@@ -1385,9 +1379,7 @@ def test_cancel_command_is_redelivered_until_run_termination_confirms_it(
                 "leaseId": start["leaseId"],
                 "sessionId": start["sessionId"],
                 "runId": start["runId"],
-                "agent": start["agent"],
-                "mode": start["mode"],
-                "reason": "no longer needed",
+                "agent": start["agent"],                "reason": "no longer needed",
             },
             headers={"Authorization": "Bearer node_token"},
         )
@@ -1430,7 +1422,7 @@ def test_session_cancel_uses_durable_run_when_node_monitor_is_stale(
             "/api/v1/sandboxes/sbx_alice/runs",
             json={
                 "taskGoal": "stop while the monitor snapshot is stale",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
             },
             headers={"Authorization": "Bearer ui_token"},
         )
@@ -1493,7 +1485,7 @@ def test_cancel_returns_terminal_session_when_run_finishes_before_request(
             "/api/v1/sandboxes/sbx_alice/runs",
             json={
                 "taskGoal": "finish before stop click",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
             },
             headers={"Authorization": "Bearer ui_token"},
         )
@@ -1511,9 +1503,7 @@ def test_cancel_returns_terminal_session_when_run_finishes_before_request(
                 "leaseId": command["leaseId"],
                 "sessionId": session_id,
                 "runId": command["runId"],
-                "agent": command["agent"],
-                "mode": command["mode"],
-                "exitCode": 0,
+                "agent": command["agent"],                "exitCode": 0,
                 "agentLog": "done",
             },
             headers={"Authorization": "Bearer node_token"},
@@ -1609,7 +1599,7 @@ def test_daemon_registration_stores_agent_health_and_rejects_unready_runs(
             "/api/v1/sandboxes/sbx_alice/runs",
             json={
                 "taskGoal": "try kimi",
-                "assignments": [{"agent": "kimi", "mode": "action"}],
+                "assignments": [{"agent": "kimi"}],
             },
             headers={"Authorization": "Bearer ui_token"},
         )
@@ -2282,12 +2272,13 @@ def test_local_enrollment_adopts_the_workspace_of_a_pathless_computer(
         assert body["node"]["workspacePath"] == "/Users/alice/project"
 
 
-def test_local_enrollment_returns_a_start_command_without_a_reissued_token(
+def test_local_enrollment_returns_the_persisted_token_on_adoption(
     monkeypatch,
 ) -> None:
-    # A token is issued once. Re-enrolling a computer whose plaintext token is
-    # no longer recoverable must still hand back the command that starts it —
-    # the command carries no secret, and without it the panel is a dead end.
+    # Launch tokens are persisted for control-panel computers, so re-enrolling
+    # an already-connected computer hands back the same token — identical to
+    # what the reveal endpoint answers. The command still prompts for the
+    # secret instead of embedding it.
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
@@ -2302,8 +2293,8 @@ def test_local_enrollment_returns_a_start_command_without_a_reissued_token(
         node_id = first.json()["node"]["id"]
         node_token = first.json()["nodeToken"]
         # Finish the enrollment: an unfinished one legitimately rotates its
-        # credential, so only a computer that actually registered can reach
-        # the branch where no token can be handed back.
+        # credential, so only a computer that actually registered exercises
+        # the adoption path.
         app.state.registry.register(
             {
                 "sandboxId": node_id,
@@ -2314,8 +2305,8 @@ def test_local_enrollment_returns_a_start_command_without_a_reissued_token(
                 "status": "ready",
             }
         )
-        # Plaintext launch credentials live in memory only; a restart drops
-        # them, which is what makes this branch reachable in production.
+        # The in-memory cache is process-local; dropping it proves the answer
+        # comes from the persisted secret, not the cache.
         app.state.registry.plain_node_tokens.pop(node_id, None)
 
         response = client.post(
@@ -2327,10 +2318,11 @@ def test_local_enrollment_returns_a_start_command_without_a_reissued_token(
         body = response.json()
         assert body["reused"] is True
         assert body["node"]["id"] == node_id
+        assert body["nodeToken"] == node_token
         assert body["daemonCommand"]
         assert node_id in body["daemonCommand"]
-        # No token to prompt for — the daemon reads the one on its own disk.
-        assert "read -rsp" not in body["daemonCommand"]
+        # The command prompts for the token rather than carrying the secret.
+        assert "read -rsp" in body["daemonCommand"]
 
 
 def test_employee_can_disconnect_own_computer(monkeypatch) -> None:
@@ -2396,6 +2388,236 @@ def test_employee_cannot_disconnect_an_admin_managed_computer(monkeypatch) -> No
 
         assert response.status_code == 403
         assert "managed by an admin" in response.json()["detail"]
+
+
+def test_employee_can_reveal_own_computer_token(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _enroll_employee(client, "alice")
+        enrolled = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
+        )
+        assert enrolled.status_code == 201
+        node_id = enrolled.json()["node"]["id"]
+        node_token = enrolled.json()["nodeToken"]
+
+        response = client.get(f"/api/v1/daemon-nodes/{node_id}/token")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["nodeToken"] == node_token
+        assert body["daemonEnv"]["RELAY_DAEMON_NODE_TOKEN"] == node_token
+        assert body["daemonEnv"]["RELAY_SANDBOX_ID"] == node_id
+        # The start command prompts for the secret instead of embedding it.
+        assert "read -rsp" in body["daemonCommand"]
+        assert node_token not in body["daemonCommand"]
+
+
+def test_employee_can_reveal_token_after_a_backend_restart(monkeypatch) -> None:
+    # The whole point of persisting the secret: a new backend process over the
+    # same data root still answers the reveal.
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        first_app = create_app(root)
+        client = TestClient(first_app)
+        _bootstrap_admin(client)
+        _enroll_employee(client, "alice")
+        enrolled = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
+        )
+        assert enrolled.status_code == 201
+        node_id = enrolled.json()["node"]["id"]
+        node_token = enrolled.json()["nodeToken"]
+
+        restarted = TestClient(create_app(root))
+        _login_admin(restarted)
+        assert (
+            restarted.post(
+                "/api/v1/auth/login",
+                json={"username": "alice", "password": "userpass"},
+            ).status_code
+            == 200
+        )
+
+        response = restarted.get(f"/api/v1/daemon-nodes/{node_id}/token")
+
+        assert response.status_code == 200
+        assert response.json()["nodeToken"] == node_token
+
+
+def test_employee_cannot_reveal_another_employees_token(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _enroll_employee(client, "alice")
+        enrolled = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
+        )
+        assert enrolled.status_code == 201
+        node_id = enrolled.json()["node"]["id"]
+        _enroll_employee(client, "bob")
+
+        assert client.get(f"/api/v1/daemon-nodes/{node_id}/token").status_code == 403
+        assert (
+            client.post(
+                f"/api/v1/daemon-nodes/{node_id}/token/reissue"
+            ).status_code
+            == 403
+        )
+
+
+def test_reveal_requires_authentication(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _enroll_employee(client, "alice")
+        enrolled = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
+        )
+        assert enrolled.status_code == 201
+        node_id = enrolled.json()["node"]["id"]
+        assert client.post("/api/v1/auth/logout").status_code == 200
+
+        assert client.get(f"/api/v1/daemon-nodes/{node_id}/token").status_code == 401
+
+
+def test_employee_can_reissue_own_computer_token(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _enroll_employee(client, "alice")
+        enrolled = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
+        )
+        assert enrolled.status_code == 201
+        node_id = enrolled.json()["node"]["id"]
+        old_token = enrolled.json()["nodeToken"]
+
+        response = client.post(f"/api/v1/daemon-nodes/{node_id}/token/reissue")
+
+        assert response.status_code == 200
+        body = response.json()
+        new_token = body["nodeToken"]
+        assert new_token != old_token
+        assert body["daemonEnv"]["RELAY_DAEMON_NODE_TOKEN"] == new_token
+        # The reveal now answers the reissued token...
+        revealed = client.get(f"/api/v1/daemon-nodes/{node_id}/token")
+        assert revealed.status_code == 200
+        assert revealed.json()["nodeToken"] == new_token
+        # ...and the rotated-out token no longer authenticates the daemon.
+        try:
+            app.state.registry.register(
+                {
+                    "sandboxId": node_id,
+                    "employeeId": "alice",
+                    "token": old_token,
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "status": "ready",
+                }
+            )
+        except PermissionError:
+            pass
+        else:
+            raise AssertionError("rotated-out token still authenticates")
+
+
+def test_reveal_without_a_recoverable_token_points_at_reissue(monkeypatch) -> None:
+    # Nodes provisioned before tokens were persisted have no plaintext to
+    # reveal; the answer is 409 and the way forward is a reissue.
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _enroll_employee(client, "alice")
+        enrolled = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
+        )
+        assert enrolled.status_code == 201
+        node_id = enrolled.json()["node"]["id"]
+        registry = app.state.registry
+        legacy = {**registry.sandboxes[node_id]}
+        legacy.pop("nodeTokenSecret", None)
+        registry.sandboxes[node_id] = legacy
+        registry.plain_node_tokens.pop(node_id, None)
+
+        response = client.get(f"/api/v1/daemon-nodes/{node_id}/token")
+
+        assert response.status_code == 409
+        assert "Reissue" in response.json()["detail"]
+        reissued = client.post(f"/api/v1/daemon-nodes/{node_id}/token/reissue")
+        assert reissued.status_code == 200
+        assert (
+            client.get(f"/api/v1/daemon-nodes/{node_id}/token").json()["nodeToken"]
+            == reissued.json()["nodeToken"]
+        )
+
+
+def test_employee_cannot_reveal_a_managed_computer_token(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _enroll_employee(client, "alice")
+        enrolled = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
+        )
+        assert enrolled.status_code == 201
+        node_id = enrolled.json()["node"]["id"]
+        registry = app.state.registry
+        registry.sandboxes[node_id] = {
+            **registry.sandboxes[node_id],
+            "managedNodeId": "managed-1",
+        }
+
+        assert client.get(f"/api/v1/daemon-nodes/{node_id}/token").status_code == 403
+        assert (
+            client.post(
+                f"/api/v1/daemon-nodes/{node_id}/token/reissue"
+            ).status_code
+            == 403
+        )
+
+
+def test_disconnecting_a_computer_destroys_its_token_secret(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _enroll_employee(client, "alice")
+        enrolled = client.post(
+            "/api/v1/daemon-node-enrollments/local",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "none"},
+        )
+        assert enrolled.status_code == 201
+        node_id = enrolled.json()["node"]["id"]
+
+        assert client.delete(f"/api/v1/daemon-nodes/{node_id}").status_code == 204
+
+        stored = app.state.registry.daemon_store.get_node(node_id)
+        assert stored is not None
+        assert stored.get("nodeTokenSecret") is None
+        assert client.get(f"/api/v1/daemon-nodes/{node_id}/token").status_code == 404
+        # The secret must not leak into the audit events either.
+        events_dir = app.state.registry.daemon_store.events_dir
+        for path in events_dir.glob("*.json"):
+            assert "nodeTokenSecret" not in path.read_text()
 
 
 def test_employee_can_manage_own_computer_executors(monkeypatch) -> None:
@@ -2689,7 +2911,6 @@ def test_sandbox_ui_token_can_manage_owned_sessions(monkeypatch) -> None:
             f"/api/v1/threads/{session_id}/handoffs",
             json={
                 "targetAgent": "codex",
-                "mode": "review",
                 "note": "check it",
             },
             headers=headers,
@@ -2807,7 +3028,7 @@ def test_employee_can_ask_assigned_daemon_node_without_daemon_node_token(
             "/api/v1/sandboxes/sbx_alice/runs",
             json={
                 "taskGoal": "answer this",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
             },
         )
         assert run.status_code == 202
@@ -2842,7 +3063,7 @@ def test_employee_can_ask_assigned_daemon_node_without_daemon_node_token(
             "/api/v1/threads",
             json={
                 "taskGoal": "bob asks alice node",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
                 "workspacePath": "/workspace/alice",
             },
         )
@@ -2851,7 +3072,7 @@ def test_employee_can_ask_assigned_daemon_node_without_daemon_node_token(
             "/api/v1/sandboxes/sbx_alice/runs",
             json={
                 "taskGoal": "bob asks alice node",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
                 "sessionId": bob_session.json()["id"],
             },
         )
@@ -3210,7 +3431,7 @@ def test_sandbox_run_accepts_decision_metadata(monkeypatch) -> None:
             "/api/v1/sandboxes/sbx_alice/runs",
             json={
                 "taskGoal": "fix auth",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
                 "sessionId": created.json()["id"],
                 "decision": {"kind": "rerun", "targetAgent": "codex"},
             },
@@ -3252,7 +3473,7 @@ def test_sandbox_run_accepts_fresh_new_conversation_payload(monkeypatch) -> None
             "/api/v1/sandboxes/sbx_alice/runs",
             json={
                 "taskGoal": "start a fresh thread",
-                "assignments": [{"agent": "claude", "mode": "action"}],
+                "assignments": [{"agent": "claude"}],
             },
         )
 
@@ -3309,7 +3530,7 @@ def test_admin_can_start_existing_employee_session_on_employee_daemon_node(
             json={
                 "taskGoal": "alice asks through admin",
                 "ownerEmployeeId": "alice",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
                 "workspacePath": "/workspace/alice",
             },
         )
@@ -3323,7 +3544,7 @@ def test_admin_can_start_existing_employee_session_on_employee_daemon_node(
             "/api/v1/sandboxes/sbx_alice/runs",
             json={
                 "taskGoal": "alice asks through admin",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
                 "sessionId": session_id,
             },
         )
@@ -3333,7 +3554,7 @@ def test_admin_can_start_existing_employee_session_on_employee_daemon_node(
             "/api/v1/sandboxes/sbx_bob/runs",
             json={
                 "taskGoal": "alice asks through admin",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
                 "sessionId": session_id,
             },
         )
@@ -3647,7 +3868,7 @@ def test_run_completed_generated_files_flow_over_http(monkeypatch) -> None:
             "/api/v1/sandboxes/sbx_alice/runs",
             json={
                 "taskGoal": "generate the quarterly report",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
             },
             headers={"Authorization": "Bearer ui_token"},
         )
@@ -3667,7 +3888,6 @@ def test_run_completed_generated_files_flow_over_http(monkeypatch) -> None:
                 "sessionId": command["sessionId"],
                 "runId": command["runId"],
                 "agent": "codex",
-                "mode": "action",
                 "exitCode": 0,
                 "agentLog": "created q2.pdf",
                 "generatedFiles": [
@@ -3767,7 +3987,7 @@ def test_cancel_recovers_a_session_whose_run_request_is_stuck_finalizing(
             "/api/v1/sandboxes/sbx_alice/runs",
             json={
                 "taskGoal": "stop a thread wedged in finalizing",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
             },
             headers={"Authorization": "Bearer ui_token"},
         )

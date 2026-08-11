@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { CodexCollaborationEvent, RelayArtifact } from "relay-core";
-import type { AgentName, AgentTaskMode, RelaySession, TokenUsage, Tone } from "../types.js";
+import type { AgentName, RelaySession, TokenUsage, Tone } from "../types.js";
 
 export type DerivedMessage =
   | {
@@ -17,7 +17,6 @@ export type DerivedMessage =
       /** Logical (employee) agent that produced the turn. `agent` is only the
        * executor kind, which several named agents can share. */
       agentId?: string;
-      mode: AgentTaskMode;
       runId: string;
       streaming: boolean;
       stdout: string;
@@ -82,12 +81,11 @@ export function phaseDividerLabel(
   const prev = previousTranscriptTurn(messages, index);
   if (!prev) return null;
 
-  const mode = t(`mode.${message.mode}`);
   if (prev.kind === "agent" && !isSameAgentTurn(prev, message)) {
-    return t("transcript.phase_handoff", { mode });
+    return t("transcript.phase_handoff");
   }
   if (prev.kind === "user") {
-    return t("transcript.phase_agent", { mode });
+    return t("transcript.phase_agent");
   }
   return null;
 }
@@ -292,7 +290,6 @@ export class ProjectMessagesAccumulator {
     runId: string,
     agent: AgentName,
     timestamp: string,
-    mode: AgentTaskMode = "action",
   ): { index: number; created: boolean } {
     const existing = this.runState.get(runId);
     if (existing) return { index: existing.index, created: false };
@@ -301,7 +298,6 @@ export class ProjectMessagesAccumulator {
       id: `${this.sessionId}:run:${runId}`,
       timestamp,
       agent,
-      mode,
       runId,
       streaming: true,
       stdout: "",
@@ -331,12 +327,11 @@ export class ProjectMessagesAccumulator {
         this.out.push({ kind: "user", id: event.id, timestamp: event.timestamp, text: event.text });
         return true;
       case "agent.started": {
-        const ensured = this.ensureRun(event.runId, event.agent, event.timestamp, event.mode);
+        const ensured = this.ensureRun(event.runId, event.agent, event.timestamp);
         const block = this.out[ensured.index];
-        if (block.kind === "agent" && (block.mode !== event.mode || block.agentId !== event.logicalAgentId)) {
+        if (block.kind === "agent" && block.agentId !== event.logicalAgentId) {
           this.out[ensured.index] = {
             ...block,
-            mode: event.mode,
             ...(event.logicalAgentId ? { agentId: event.logicalAgentId } : {}),
           };
           return true;
@@ -372,7 +367,7 @@ export class ProjectMessagesAccumulator {
         return ensured.created;
       }
       case "agent.collaboration": {
-        const ensured = this.ensureRun(event.runId, event.agent, event.timestamp, event.mode);
+        const ensured = this.ensureRun(event.runId, event.agent, event.timestamp);
         const state = this.runState.get(event.runId);
         if (!state) return ensured.created;
         state.collaborations.push(event.collaboration);

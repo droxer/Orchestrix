@@ -3,8 +3,10 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { getOrgSettings, updateOrgSettings } from "../../api";
+import { getOrgSettings, reissueAdminToken, updateOrgSettings } from "../../api";
 import { CheckIcon } from "../icons";
+import { CredCopyRow } from "./CredCopyRow";
+import { useCopyFeedback } from "@/hooks/useCopyFeedback";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -75,6 +77,82 @@ export function SettingsView() {
           await settingsQuery.refetch();
         }}
       />
+      <AdminTokenCard
+        token={settingsQuery.data?.adminToken ?? null}
+        isLoading={settingsQuery.isLoading}
+        onReissued={() => void settingsQuery.refetch()}
+      />
+    </div>
+  );
+}
+
+/** The admin bearer token for bootstrap and supervisor requests. Seeded from
+    RELAY_ADMIN_TOKEN on first boot, generated otherwise, and persisted by the
+    backend; reissuing rotates it and kills the old value immediately. */
+function AdminTokenCard({
+  token,
+  isLoading,
+  onReissued,
+}: {
+  token: string | null;
+  isLoading: boolean;
+  onReissued: () => void;
+}) {
+  const { t } = useTranslation();
+  const { copiedField, copy } = useCopyFeedback();
+  const [isBusy, setIsBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleReissue() {
+    if (!window.confirm(t("admin.v2.settings_admin_token_reissue_confirm"))) return;
+    setIsBusy(true);
+    setError(null);
+    try {
+      await reissueAdminToken();
+      onReissued();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  return (
+    <div className="adm-settings-item">
+      <div className="adm-settings-head">
+        <h2 className="adm-settings-title">{t("admin.v2.settings_admin_token_title")}</h2>
+        <p className="adm-settings-sub">{t("admin.v2.settings_admin_token_sub")}</p>
+      </div>
+      {error ? (
+        <p className="adm-view-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {isLoading ? null : token ? (
+        <>
+          <CredCopyRow
+            label={t("admin.v2.settings_admin_token_label")}
+            value={token}
+            copyLabel={t("admin.v2.settings_admin_token_copy")}
+            copied={copiedField === "admin-token"}
+            onCopy={() => void copy("admin-token", token)}
+          />
+          <div className="adm-settings-control">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isBusy}
+              onClick={() => void handleReissue()}
+            >
+              {isBusy
+                ? t("admin.v2.settings_admin_token_reissuing")
+                : t("admin.v2.settings_admin_token_reissue")}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <p className="adm-settings-sub">{t("admin.v2.settings_admin_token_unset")}</p>
+      )}
     </div>
   );
 }

@@ -333,7 +333,6 @@ def run_start_command(command_id: str, run_id: str) -> dict[str, str]:
         "sessionId": f"ses_{run_id}",
         "runId": run_id,
         "agent": "codex",
-        "mode": "action",
         "taskGoal": "fix auth",
     }
 
@@ -363,9 +362,11 @@ def test_daemon_store_retains_managed_runtime_identity_after_delete(
 
 
 @pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
-def test_pending_employee_device_enrollment_rotates_token_after_restart(
+def test_pending_employee_device_enrollment_returns_persisted_token_after_restart(
     daemon_store_factory,
 ) -> None:
+    # The launch token is persisted, so a restarted backend answers a retried
+    # enrollment with the same token instead of rotating it.
     with TemporaryDirectory() as root:
         first = DaemonNodeRegistry(LocalSessionStore(root), daemon_store_factory(root))
         node, _, first_token = first.provision_pending(
@@ -381,7 +382,7 @@ def test_pending_employee_device_enrollment_rotates_token_after_restart(
 
         assert retried["id"] == node["id"]
         assert replacement_token
-        assert replacement_token != first_token
+        assert replacement_token == first_token
         registration = {
             "sandboxId": node["id"],
             "employeeId": "alice",
@@ -391,12 +392,83 @@ def test_pending_employee_device_enrollment_rotates_token_after_restart(
             "capabilities": ["thread-workspaces", "round-result"],
             "status": "ready",
         }
-        with pytest.raises(PermissionError):
-            restarted.register({**registration, "token": first_token})
         assert (
             restarted.register({**registration, "token": replacement_token})["status"]
             == "ready"
         )
+
+
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_reveal_and_reissue_node_token_survive_restart(daemon_store_factory) -> None:
+    with TemporaryDirectory() as root:
+        registry = DaemonNodeRegistry(LocalSessionStore(root), daemon_store_factory(root))
+        node, _, token = registry.provision_pending(
+            "alice", "/Users/alice/project", "none", "employee-device"
+        )
+
+        restarted = DaemonNodeRegistry(
+            LocalSessionStore(root), daemon_store_factory(root)
+        )
+        assert restarted.reveal_node_token(node["id"]) == token
+
+        updated, new_token = restarted.reissue_node_token(node["id"])
+
+        assert new_token != token
+        assert updated["credentialVersion"] == 2
+        assert restarted.reveal_node_token(node["id"]) == new_token
+        registration = {
+            "sandboxId": node["id"],
+            "employeeId": "alice",
+            "workspacePath": "/Users/alice/project",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }
+        with pytest.raises(PermissionError):
+            restarted.register({**registration, "token": token})
+        # The reissued secret is persisted too: a third process still reveals it.
+        third = DaemonNodeRegistry(LocalSessionStore(root), daemon_store_factory(root))
+        assert third.reveal_node_token(node["id"]) == new_token
+
+
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_managed_node_token_is_neither_persisted_nor_reissuable(
+    daemon_store_factory,
+) -> None:
+    with TemporaryDirectory() as root:
+        registry = DaemonNodeRegistry(LocalSessionStore(root), daemon_store_factory(root))
+        node, _ = registry.enroll_managed_node(
+            {"id": "managed_one", "employeeId": "alice"},
+            {"id": "attempt_one"},
+            {"workspacePath": "/Users/alice/project"},
+        )
+
+        assert registry.reveal_node_token(node["id"]) is None
+        with pytest.raises(ValueError):
+            registry.reissue_node_token(node["id"])
+
+
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_node_token_secret_stays_out_of_daemon_events(daemon_store_factory) -> None:
+    with TemporaryDirectory() as root:
+        store = daemon_store_factory(root)
+        registry = DaemonNodeRegistry(LocalSessionStore(root), store)
+        node, _, token = registry.provision_pending(
+            "alice", "/Users/alice/project", "none", "employee-device"
+        )
+        registry.reissue_node_token(node["id"])
+
+        events_dir = getattr(store, "events_dir", None)
+        if events_dir is not None:
+            events_path = events_dir / "events.jsonl"
+            raw = events_path.read_text() if events_path.exists() else ""
+        else:
+            with store.engine.begin() as conn:
+                raw = " ".join(
+                    json.dumps(row) for row in conn.scalars(select(store.events.c.payload))
+                )
+        assert token not in raw
+        assert "nodeTokenSecret" not in raw
 
 
 def test_explicit_sandbox_provision_targets_requested_node() -> None:
@@ -461,7 +533,7 @@ def test_daemon_registration_poll_and_completion_updates_session() -> None:
                     "sbx_alice",
                     {
                         "taskGoal": "review auth",
-                        "assignments": [{"agent": "codex", "mode": "review"}],
+                        "assignments": [{"agent": "codex"}],
                     },
                 )
             )
@@ -492,7 +564,6 @@ def test_daemon_registration_poll_and_completion_updates_session() -> None:
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": "codex",
-                    "mode": "review",
                     "exitCode": 0,
                     "agentLog": "looks fine",
                 },
@@ -530,7 +601,7 @@ def test_first_dispatch_refuses_to_downgrade_thread_layout_for_old_daemon() -> N
                 "sbx_legacy",
                 {
                     "taskGoal": "continue during rolling upgrade",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             assert registry.take_commands("sbx_legacy", "node_token") == []
@@ -583,7 +654,7 @@ def test_command_poll_cannot_observe_run_before_request_links_command() -> None:
                         "sbx_alice",
                         {
                             "taskGoal": "dispatch atomically",
-                            "assignments": [{"agent": "codex", "mode": "action"}],
+                            "assignments": [{"agent": "codex"}],
                         },
                     )
                 )
@@ -654,7 +725,7 @@ def test_dispatch_claim_prevents_reaper_from_creating_second_command() -> None:
                         "sbx_alice",
                         {
                             "taskGoal": "dispatch once",
-                            "assignments": [{"agent": "codex", "mode": "action"}],
+                            "assignments": [{"agent": "codex"}],
                         },
                     )
                 )
@@ -711,7 +782,7 @@ def test_staged_command_is_published_after_dispatcher_crash() -> None:
                     "sbx_alice",
                     {
                         "taskGoal": "recover dispatch",
-                        "assignments": [{"agent": "codex", "mode": "action"}],
+                        "assignments": [{"agent": "codex"}],
                     },
                 )
 
@@ -771,7 +842,7 @@ def test_staged_command_is_relinked_after_dispatcher_crash_before_link() -> None
                     "sbx_alice",
                     {
                         "taskGoal": "recover orphaned stage",
-                        "assignments": [{"agent": "codex", "mode": "action"}],
+                        "assignments": [{"agent": "codex"}],
                     },
                 )
 
@@ -816,7 +887,7 @@ def test_daemon_output_batch_is_persisted_in_order_and_deduplicated_after_restar
                 "sbx_alice",
                 {
                     "taskGoal": "stream ordered output",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -906,7 +977,7 @@ def test_daemon_output_dedupe_hydrates_existing_sequences_once_after_restart(
                 "sbx_alice",
                 {
                     "taskGoal": "review auth",
-                    "assignments": [{"agent": "codex", "mode": "review"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -1031,7 +1102,7 @@ def test_daemon_collaboration_retry_after_registry_restart_is_deduplicated() -> 
                 "sbx_alice",
                 {
                     "taskGoal": "coordinate agents",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -1041,7 +1112,6 @@ def test_daemon_collaboration_retry_after_registry_restart_is_deduplicated() -> 
                 "sessionId": command["sessionId"],
                 "runId": command["runId"],
                 "agent": "codex",
-                "mode": "action",
                 "sequence": 0,
                 "collaboration": {"tool": "spawnAgent", "status": "completed"},
             }
@@ -1087,7 +1157,7 @@ def test_daemon_fallback_output_buffer_is_bounded(monkeypatch) -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "stream a lot",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -1136,7 +1206,7 @@ def test_daemon_output_retry_survives_event_log_write_failure(monkeypatch) -> No
                 "sbx_alice",
                 {
                     "taskGoal": "persist output",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -1213,7 +1283,7 @@ def test_daemon_completion_indexes_generated_pptx_artifact() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "generate a deck",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -1235,7 +1305,6 @@ def test_daemon_completion_indexes_generated_pptx_artifact() -> None:
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "created quarterly-review.pptx",
                 },
@@ -1292,7 +1361,7 @@ def test_daemon_completion_indexes_text_files_under_output_folder() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "generate a markdown report",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -1314,7 +1383,6 @@ def test_daemon_completion_indexes_text_files_under_output_folder() -> None:
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "created output/summary.md",
                 },
@@ -1408,7 +1476,7 @@ def test_daemon_reported_generated_files_index_without_shared_filesystem() -> No
                 "sbx_alice",
                 {
                     "taskGoal": "generate a report",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -1420,7 +1488,6 @@ def test_daemon_reported_generated_files_index_without_shared_filesystem() -> No
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "created report.pdf",
                     "generatedFiles": [
@@ -1517,7 +1584,7 @@ def test_generated_file_replay_fills_in_partially_indexed_report() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "index both files",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -1601,7 +1668,7 @@ def test_regenerated_workspace_file_gets_artifact_per_producing_run() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "generate a report",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [first_command] = registry.take_commands("sbx_alice", "node_token")
@@ -1614,7 +1681,6 @@ def test_regenerated_workspace_file_gets_artifact_per_producing_run() -> None:
                     "sessionId": first_command["sessionId"],
                     "runId": first_command["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "created report.pdf",
                 },
@@ -1626,7 +1692,7 @@ def test_regenerated_workspace_file_gets_artifact_per_producing_run() -> None:
                 {
                     "taskGoal": "refresh the report",
                     "sessionId": session["id"],
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [second_command] = registry.take_commands("sbx_alice", "node_token")
@@ -1639,7 +1705,6 @@ def test_regenerated_workspace_file_gets_artifact_per_producing_run() -> None:
                     "sessionId": second_command["sessionId"],
                     "runId": second_command["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "refreshed report.pdf",
                 },
@@ -1666,7 +1731,7 @@ def test_regenerated_workspace_file_gets_artifact_per_producing_run() -> None:
     asyncio.run(run_flow())
 
 
-def test_daemon_capacity_allows_concurrent_ask_runs_only() -> None:
+def test_daemon_capacity_allows_concurrent_runs() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
             session_store = LocalSessionStore(root)
@@ -1683,7 +1748,6 @@ def test_daemon_capacity_allows_concurrent_ask_runs_only() -> None:
                     "supportedAgents": ["codex"],
                     "capabilities": ["thread-workspaces"],
                     "maxConcurrentRuns": 2,
-                    "runCapacityByMode": {"ask": 2, "review": 1, "action": 1},
                     "status": "ready",
                 },
                 "ui_token",
@@ -1693,19 +1757,19 @@ def test_daemon_capacity_allows_concurrent_ask_runs_only() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "explain auth",
-                    "assignments": [{"agent": "codex", "mode": "ask"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             second = await backend.run(
                 "sbx_alice",
                 {
                     "taskGoal": "explain billing",
-                    "assignments": [{"agent": "codex", "mode": "ask"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             assert first["id"] != second["id"]
             commands = registry.take_commands("sbx_alice", "node_token")
-            assert [command["mode"] for command in commands] == ["ask", "ask"]
+            assert all("mode" not in command for command in commands)
             assert len(registry.monitor_nodes()[0]["activeRuns"]) == 2
 
             with pytest.raises(ValueError, match="no available execution slot"):
@@ -1713,7 +1777,7 @@ def test_daemon_capacity_allows_concurrent_ask_runs_only() -> None:
                     "sbx_alice",
                     {
                         "taskGoal": "edit files",
-                        "assignments": [{"agent": "codex", "mode": "action"}],
+                        "assignments": [{"agent": "codex"}],
                     },
                 )
 
@@ -1745,7 +1809,7 @@ def test_legacy_daemon_capacity_remains_single_slot() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "explain auth",
-                    "assignments": [{"agent": "codex", "mode": "ask"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             with pytest.raises(ValueError, match="no available execution slot"):
@@ -1753,7 +1817,7 @@ def test_legacy_daemon_capacity_remains_single_slot() -> None:
                     "sbx_alice",
                     {
                         "taskGoal": "explain billing",
-                        "assignments": [{"agent": "codex", "mode": "ask"}],
+                        "assignments": [{"agent": "codex"}],
                     },
                 )
 
@@ -1785,7 +1849,7 @@ def test_daemon_rejects_event_agent_metadata_mismatch() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "review auth",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -1799,7 +1863,6 @@ def test_daemon_rejects_event_agent_metadata_mismatch() -> None:
                         "sessionId": command["sessionId"],
                         "runId": command["runId"],
                         "agent": "claude",
-                        "mode": "action",
                         "exitCode": 0,
                         "agentLog": "wrong agent",
                     },
@@ -1836,7 +1899,7 @@ def test_daemon_rejects_event_lease_mismatch() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "review auth",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -1852,7 +1915,6 @@ def test_daemon_rejects_event_lease_mismatch() -> None:
                         "sessionId": command["sessionId"],
                         "runId": command["runId"],
                         "agent": "codex",
-                        "mode": "action",
                         "exitCode": 0,
                         "agentLog": "stale completion",
                     },
@@ -1868,7 +1930,6 @@ def test_daemon_rejects_event_lease_mismatch() -> None:
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "current completion",
                 },
@@ -1905,7 +1966,7 @@ def test_daemon_poll_renews_known_active_command_before_reclaim() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "review auth",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands(
@@ -1942,7 +2003,6 @@ def test_daemon_poll_renews_known_active_command_before_reclaim() -> None:
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "final response",
                 },
@@ -1988,7 +2048,7 @@ def test_daemon_heartbeat_renews_command_dispatched_by_another_backend_replica()
                 "sbx_alice",
                 {
                     "taskGoal": "survive backend load balancing",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = first.take_commands(
@@ -2050,7 +2110,7 @@ def test_active_run_survives_heartbeat_seen_by_another_backend_replica() -> None
                 "sbx_alice",
                 {
                     "taskGoal": "survive backend load balancing",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = first.take_commands(
@@ -2131,7 +2191,7 @@ def test_daemon_cancel_finds_run_dispatched_by_another_backend_replica() -> None
                 "sbx_alice",
                 {
                     "taskGoal": "cancel across backend replicas",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [start] = first.take_commands(
@@ -2193,7 +2253,7 @@ def test_daemon_events_are_accepted_by_a_replica_that_did_not_dispatch_the_comma
                 "sbx_alice",
                 {
                     "taskGoal": "survive event load balancing",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = first.take_commands(
@@ -2265,7 +2325,6 @@ def test_daemon_events_are_accepted_by_a_replica_that_did_not_dispatch_the_comma
                     "sessionId": redelivered["sessionId"],
                     "runId": redelivered["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "exitCode": 0,
                 },
                 "node_token",
@@ -2308,7 +2367,7 @@ def test_daemon_failed_event_preserves_agent_log_without_artifact() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "implement auth",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -2320,7 +2379,6 @@ def test_daemon_failed_event_preserves_agent_log_without_artifact() -> None:
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "error": "stream post failed",
                     "agentLog": raw_log,
                     "exitCode": 1,
@@ -2362,7 +2420,7 @@ def test_daemon_failed_event_indexes_reported_generated_files() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "write the guide",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -2374,7 +2432,6 @@ def test_daemon_failed_event_indexes_reported_generated_files() -> None:
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "error": "Daemon lost agent output: stream post failed",
                     # The agent process itself succeeded and wrote this file;
                     # the terminal event reports failure because live-output
@@ -2435,7 +2492,7 @@ def test_daemon_follow_up_run_gets_prior_conversation_state() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "first question",
-                    "assignments": [{"agent": "claude", "mode": "action"}],
+                    "assignments": [{"agent": "claude"}],
                 },
             )
             [first_command] = registry.take_commands("sbx_alice", "node_token")
@@ -2448,7 +2505,6 @@ def test_daemon_follow_up_run_gets_prior_conversation_state() -> None:
                     "sessionId": first_command["sessionId"],
                     "runId": first_command["runId"],
                     "agent": "claude",
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "● first answer",
                 },
@@ -2460,7 +2516,7 @@ def test_daemon_follow_up_run_gets_prior_conversation_state() -> None:
                 {
                     "taskGoal": "follow up",
                     "sessionId": session["id"],
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [follow_up_command] = registry.take_commands("sbx_alice", "node_token")
@@ -2502,9 +2558,9 @@ def test_daemon_multi_agent_same_turn_shares_full_handoff_context() -> None:
                 {
                     "taskGoal": "ship it",
                     "assignments": [
-                        {"agent": "claude", "mode": "action"},
-                        {"agent": "codex", "mode": "action"},
-                        {"agent": "claude", "mode": "action"},
+                        {"agent": "claude"},
+                        {"agent": "codex"},
+                        {"agent": "claude"},
                     ],
                 },
             )
@@ -2528,7 +2584,6 @@ def test_daemon_multi_agent_same_turn_shares_full_handoff_context() -> None:
                     "sessionId": first_command["sessionId"],
                     "runId": first_command["runId"],
                     "agent": "claude",
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "● implementation note",
                 },
@@ -2551,7 +2606,6 @@ def test_daemon_multi_agent_same_turn_shares_full_handoff_context() -> None:
                     "sessionId": second_command["sessionId"],
                     "runId": second_command["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "● review note",
                 },
@@ -2603,7 +2657,7 @@ def test_daemon_run_records_decision_metadata_after_validation() -> None:
                 {
                     "taskGoal": "fix auth",
                     "sessionId": session["id"],
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                     "decision": {"kind": "rerun", "targetAgent": "codex"},
                 },
             )
@@ -2651,7 +2705,7 @@ def test_daemon_handoff_decision_injects_note_without_duplicate_user_turn() -> N
                 {
                     "taskGoal": "fix auth\n\nHandoff note:\nverify the fix",
                     "sessionId": session["id"],
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                     "decision": {
                         "kind": "handoff",
                         "targetAgent": "codex",
@@ -2706,7 +2760,7 @@ def test_daemon_prerecorded_handoff_decision_skips_duplicate_user_turn() -> None
             SessionController(session_store, owner_employee_id="alice").handoff_session(
                 session["id"],
                 "codex",
-                [{"agent": "codex", "mode": "action"}],
+                [{"agent": "codex"}],
                 "verify the fix",
             )
 
@@ -2715,7 +2769,7 @@ def test_daemon_prerecorded_handoff_decision_skips_duplicate_user_turn() -> None
                 {
                     "taskGoal": "fix auth",
                     "sessionId": session["id"],
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
 
@@ -2767,7 +2821,7 @@ def test_daemon_run_does_not_record_decision_when_validation_fails() -> None:
                     {
                         "taskGoal": "fix auth",
                         "sessionId": session["id"],
-                        "assignments": [{"agent": "kimi", "mode": "action"}],
+                        "assignments": [{"agent": "kimi"}],
                         "decision": {"kind": "handoff", "targetAgent": "kimi"},
                     },
                 )
@@ -2802,7 +2856,7 @@ def test_daemon_terminal_event_after_registry_restart_finalizes_session() -> Non
                 "sbx_alice",
                 {
                     "taskGoal": "implement auth",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -2816,7 +2870,6 @@ def test_daemon_terminal_event_after_registry_restart_finalizes_session() -> Non
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "done",
                 },
@@ -2846,7 +2899,7 @@ def test_active_session_run_request_is_global_after_cross_node_handoff() -> None
                 "nodeId": "node_a",
                 "sessionId": session["id"],
                 "taskGoal": session["taskGoal"],
-                "assignments": [{"agent": "claude", "mode": "ask"}],
+                "assignments": [{"agent": "claude"}],
                 "state": {},
             }
         )
@@ -2857,7 +2910,7 @@ def test_active_session_run_request_is_global_after_cross_node_handoff() -> None
                 "node_a",
                 session["id"],
                 session["taskGoal"],
-                [{"agent": "claude", "mode": "ask"}],
+                [{"agent": "claude"}],
                 {},
             )
 
@@ -2878,7 +2931,7 @@ def test_active_session_run_request_claim_is_atomic_across_store_instances(
                     "nodeId": "sbx_alice",
                     "sessionId": "ses_shared",
                     "taskGoal": "do one thing",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                     "state": {},
                 }
             )["id"]
@@ -3296,9 +3349,7 @@ def test_run_request_creation_reserves_node_capacity_atomically(store_factory) -
         store.register_node(
             {
                 **store_node_payload(),
-                "maxConcurrentRuns": 2,
-                "runCapacityByMode": {"action": 1, "review": 1, "ask": 2},
-            }
+                "maxConcurrentRuns": 2,            }
         )
 
         for index in range(2):
@@ -3307,7 +3358,7 @@ def test_run_request_creation_reserves_node_capacity_atomically(store_factory) -
                     "nodeId": "sbx_alice",
                     "sessionId": f"ses_capacity_{index}",
                     "taskGoal": "answer independently",
-                    "assignments": [{"agent": "codex", "mode": "ask"}],
+                    "assignments": [{"agent": "codex"}],
                     "state": {},
                 }
             )
@@ -3318,7 +3369,7 @@ def test_run_request_creation_reserves_node_capacity_atomically(store_factory) -
                     "nodeId": "sbx_alice",
                     "sessionId": "ses_capacity_overflow",
                     "taskGoal": "one request too many",
-                    "assignments": [{"agent": "codex", "mode": "ask"}],
+                    "assignments": [{"agent": "codex"}],
                     "state": {},
                 }
             )
@@ -3333,7 +3384,7 @@ def test_backend_run_does_not_block_the_asyncio_event_loop() -> None:
             backend = ServerDaemonNodeBackend(registry)
             request = {
                 "taskGoal": "exercise admission",
-                "assignments": [{"agent": "codex", "mode": "ask"}],
+                "assignments": [{"agent": "codex"}],
             }
             original = backend._normalize_run_request
 
@@ -3458,7 +3509,7 @@ def test_daemon_output_retry_after_registry_restart_is_deduplicated() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "implement auth",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -3514,7 +3565,7 @@ def test_daemon_cancel_event_clears_active_run_request() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "stop this",
-                    "assignments": [{"agent": "claude", "mode": "action"}],
+                    "assignments": [{"agent": "claude"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -3529,7 +3580,6 @@ def test_daemon_cancel_event_clears_active_run_request() -> None:
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": "claude",
-                    "mode": "action",
                     "reason": "no longer needed",
                 },
                 "node_token",
@@ -3579,7 +3629,7 @@ def test_terminal_event_wins_over_stale_reaper_on_another_registry(monkeypatch) 
                 "sbx_alice",
                 {
                     "taskGoal": "cancel safely",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -3599,7 +3649,6 @@ def test_terminal_event_wins_over_stale_reaper_on_another_registry(monkeypatch) 
                 "sessionId": command["sessionId"],
                 "runId": command["runId"],
                 "agent": "codex",
-                "mode": "action",
                 "reason": "user requested",
             }
 
@@ -3651,7 +3700,7 @@ def test_terminal_event_retry_recovers_after_handler_crash() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "recover terminal",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -3661,7 +3710,6 @@ def test_terminal_event_retry_recovers_after_handler_crash() -> None:
                 "sessionId": command["sessionId"],
                 "runId": command["runId"],
                 "agent": "codex",
-                "mode": "action",
                 "reason": "user requested",
             }
             assert daemon_store.mark_command_cancelled("sbx_alice", event)
@@ -3701,7 +3749,7 @@ def test_terminal_event_retry_fails_orphaned_run_when_session_was_deleted() -> N
                 "sbx_alice",
                 {
                     "taskGoal": "finish after deletion",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -3711,7 +3759,6 @@ def test_terminal_event_retry_fails_orphaned_run_when_session_was_deleted() -> N
                 "sessionId": command["sessionId"],
                 "runId": command["runId"],
                 "agent": "codex",
-                "mode": "action",
                 "exitCode": 1,
                 "agentLog": "agent failed",
             }
@@ -3767,7 +3814,7 @@ def test_terminal_event_replay_is_claimed_by_only_one_backend_replica() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "finalize once",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -3777,7 +3824,6 @@ def test_terminal_event_replay_is_claimed_by_only_one_backend_replica() -> None:
                 "sessionId": command["sessionId"],
                 "runId": command["runId"],
                 "agent": "codex",
-                "mode": "action",
                 "exitCode": 0,
                 "agentLog": "done",
             }
@@ -3840,7 +3886,7 @@ def test_daemon_run_timeout_marks_session_failed(monkeypatch) -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "hang",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -3917,9 +3963,7 @@ def _finish_run(registry: Any, command: dict[str, Any], exit_code: int) -> None:
             "commandId": command["id"],
             "sessionId": command["sessionId"],
             "runId": command["runId"],
-            "agent": command["agent"],
-            "mode": command["mode"],
-            "exitCode": exit_code,
+            "agent": command["agent"],            "exitCode": exit_code,
             "agentLog": f"{command['agent']} exit {exit_code}",
         },
         "node_token",
@@ -3939,10 +3983,9 @@ def test_lead_repairs_a_failed_teammate_and_the_pipeline_resumes() -> None:
                     "assignments": [
                         {
                             "agent": "codex",
-                            "mode": "action",
                             "coordinator": True,
                         },
-                        {"agent": "claude", "mode": "action"},
+                        {"agent": "claude"},
                     ],
                     "taskId": task["id"],
                 },
@@ -3990,10 +4033,9 @@ def test_repair_budget_is_spent_once_and_then_the_run_fails() -> None:
                     "assignments": [
                         {
                             "agent": "codex",
-                            "mode": "action",
                             "coordinator": True,
                         },
-                        {"agent": "claude", "mode": "action"},
+                        {"agent": "claude"},
                     ],
                     "taskId": task["id"],
                 },
@@ -4029,8 +4071,8 @@ def test_a_failing_lead_is_not_sent_back_to_repair_itself() -> None:
                 {
                     "taskGoal": "ship it",
                     "assignments": [
-                        {"agent": "codex", "mode": "action"},
-                        {"agent": "claude", "mode": "action"},
+                        {"agent": "codex"},
+                        {"agent": "claude"},
                     ],
                     "taskId": task["id"],
                 },
@@ -4055,8 +4097,8 @@ def test_a_task_less_room_does_not_send_the_lead_back_to_repair() -> None:
                 {
                     "taskGoal": "what do you two think?",
                     "assignments": [
-                        {"agent": "codex", "mode": "action"},
-                        {"agent": "claude", "mode": "action"},
+                        {"agent": "codex"},
+                        {"agent": "claude"},
                     ],
                 },
             )
@@ -4084,8 +4126,8 @@ def test_a_non_team_pipeline_does_not_invent_a_lead_for_repair() -> None:
                 {
                     "taskGoal": "ship it",
                     "assignments": [
-                        {"agent": "codex", "mode": "action"},
-                        {"agent": "claude", "mode": "action"},
+                        {"agent": "codex"},
+                        {"agent": "claude"},
                     ],
                     "taskId": task["id"],
                 },
@@ -4102,7 +4144,7 @@ def test_a_non_team_pipeline_does_not_invent_a_lead_for_repair() -> None:
     asyncio.run(run_flow())
 
 
-def test_a_read_only_team_discussion_does_not_attempt_a_write_repair() -> None:
+def test_an_adaptive_team_uses_bounded_coordinator_repair() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
             session_store, _daemon_store, registry = _pipeline_registry(root)
@@ -4115,10 +4157,9 @@ def test_a_read_only_team_discussion_does_not_attempt_a_write_repair() -> None:
                     "assignments": [
                         {
                             "agent": "codex",
-                            "mode": "ask",
                             "coordinator": True,
                         },
-                        {"agent": "claude", "mode": "ask"},
+                        {"agent": "claude"},
                     ],
                     "taskId": task["id"],
                 },
@@ -4129,18 +4170,16 @@ def test_a_read_only_team_discussion_does_not_attempt_a_write_repair() -> None:
             [member] = registry.take_commands("sbx_alice", "node_token")
             _finish_run(registry, member, 3)
 
-            assert registry.take_commands("sbx_alice", "node_token") == []
-            completed = session_store.get_session(session["id"])
-            assert completed["status"] == "completed"
-            assert "participant failures" in completed["finalOutcome"]
-            assert registry.task_store.get_task(task["id"])["status"] == (
-                "waiting_for_human"
-            )
+            [repair] = registry.take_commands("sbx_alice", "node_token")
+            assert repair["agent"] == "codex"
+            assert repair["state"]["repair_note"]
+            assert "mode" not in repair
+            assert session_store.get_session(session["id"])["status"] == "running"
 
     asyncio.run(run_flow())
 
 
-def test_a_discussion_continues_after_an_earlier_member_fails() -> None:
+def test_an_adaptive_round_stops_when_its_coordinator_fails() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
             session_store, _daemon_store, registry = _pipeline_registry(root)
@@ -4151,8 +4190,8 @@ def test_a_discussion_continues_after_an_earlier_member_fails() -> None:
                 {
                     "taskGoal": "discuss it",
                     "assignments": [
-                        {"agent": "codex", "mode": "ask", "coordinator": True},
-                        {"agent": "claude", "mode": "ask"},
+                        {"agent": "codex", "coordinator": True},
+                        {"agent": "claude"},
                     ],
                     "taskId": task["id"],
                 },
@@ -4161,19 +4200,13 @@ def test_a_discussion_continues_after_an_earlier_member_fails() -> None:
             [lead] = registry.take_commands("sbx_alice", "node_token")
             _finish_run(registry, lead, 3)
 
-            [member] = registry.take_commands("sbx_alice", "node_token")
-            assert member["agent"] == "claude"
-            _finish_run(registry, member, 0)
-
             assert registry.take_commands("sbx_alice", "node_token") == []
-            completed = session_store.get_session(session["id"])
-            assert completed["status"] == "completed"
-            assert "participant assignment(s) failed" in completed["finalOutcome"]
+            assert session_store.get_session(session["id"])["status"] == "failed"
 
     asyncio.run(run_flow())
 
 
-def test_a_review_verdict_still_surfaces_an_earlier_participant_failure() -> None:
+def test_an_adaptive_round_does_not_run_later_members_after_terminal_failure() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
             session_store, _daemon_store, registry = _pipeline_registry(root)
@@ -4184,8 +4217,8 @@ def test_a_review_verdict_still_surfaces_an_earlier_participant_failure() -> Non
                 {
                     "taskGoal": "review it",
                     "assignments": [
-                        {"agent": "codex", "mode": "review"},
-                        {"agent": "claude", "mode": "review"},
+                        {"agent": "codex"},
+                        {"agent": "claude"},
                     ],
                     "taskId": task["id"],
                 },
@@ -4193,32 +4226,14 @@ def test_a_review_verdict_still_surfaces_an_earlier_participant_failure() -> Non
 
             [first] = registry.take_commands("sbx_alice", "node_token")
             _finish_run(registry, first, 3)
-            [final] = registry.take_commands("sbx_alice", "node_token")
-            registry.handle_event(
-                "sbx_alice",
-                {
-                    "type": "run.completed",
-                    "commandId": final["id"],
-                    "sessionId": final["sessionId"],
-                    "runId": final["runId"],
-                    "agent": final["agent"],
-                    "mode": final["mode"],
-                    "exitCode": 0,
-                    "agentLog": "reviewed",
-                    "roundResult": {"status": "done", "note": "review complete"},
-                },
-                "node_token",
-            )
-
-            completed = session_store.get_session(session["id"])
-            assert completed["status"] == "completed"
-            assert "participant assignment(s) failed" in completed["finalOutcome"]
-            assert registry.task_store.get_task(task["id"])["status"] == "review"
+            assert registry.take_commands("sbx_alice", "node_token") == []
+            assert session_store.get_session(session["id"])["status"] == "failed"
+            assert registry.task_store.get_task(task["id"])["status"] == "blocked"
 
     asyncio.run(run_flow())
 
 
-def test_a_failed_final_reviewer_cannot_publish_a_success_verdict() -> None:
+def test_a_failed_final_agent_cannot_publish_a_success_verdict() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
             session_store, _daemon_store, registry = _pipeline_registry(root)
@@ -4228,7 +4243,7 @@ def test_a_failed_final_reviewer_cannot_publish_a_success_verdict() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "review it",
-                    "assignments": [{"agent": "codex", "mode": "review"}],
+                    "assignments": [{"agent": "codex"}],
                     "taskId": task["id"],
                 },
             )
@@ -4242,7 +4257,6 @@ def test_a_failed_final_reviewer_cannot_publish_a_success_verdict() -> None:
                     "sessionId": reviewer["sessionId"],
                     "runId": reviewer["runId"],
                     "agent": reviewer["agent"],
-                    "mode": reviewer["mode"],
                     "exitCode": 3,
                     "agentLog": "review failed",
                     "roundResult": {"status": "done", "note": "do not trust"},
@@ -4251,15 +4265,14 @@ def test_a_failed_final_reviewer_cannot_publish_a_success_verdict() -> None:
             )
 
             completed = session_store.get_session(session["id"])
-            assert "without its required aggregate verdict" in completed["finalOutcome"]
-            assert registry.task_store.get_task(task["id"])["status"] == (
-                "waiting_for_human"
-            )
+            assert completed["status"] == "failed"
+            assert completed["finalOutcome"] == "codex failed with exit code 3."
+            assert registry.task_store.get_task(task["id"])["status"] == "blocked"
 
     asyncio.run(run_flow())
 
 
-def test_only_the_final_writable_assignment_reports_the_round_result() -> None:
+def test_only_the_final_assignment_reports_the_round_result() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
             sessions, _daemon_store, registry = _pipeline_registry(root)
@@ -4272,13 +4285,11 @@ def test_only_the_final_writable_assignment_reports_the_round_result() -> None:
                     "assignments": [
                         {
                             "agent": "codex",
-                            "mode": "action",
                             "coordinator": True,
                             "brief": "Implement the change.",
                         },
                         {
                             "agent": "claude",
-                            "mode": "review",
                             "brief": "Review and synthesize the round.",
                         },
                     ],
@@ -4331,7 +4342,7 @@ async def _run_task_round(registry: Any, backend: Any, task_id: str) -> dict[str
         "sbx_alice",
         {
             "taskGoal": "migrate the billing tables",
-            "assignments": [{"agent": "codex", "mode": "action"}],
+            "assignments": [{"agent": "codex"}],
             "taskId": task_id,
         },
     )
@@ -4356,7 +4367,6 @@ def test_a_round_that_reports_done_closes_the_task() -> None:
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "migrated",
                     "roundResult": {"status": "done", "note": "tables migrated"},
@@ -4384,7 +4394,6 @@ def test_a_blocked_round_waits_for_a_human_instead_of_closing() -> None:
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "partial",
                     "roundResult": {"status": "blocked", "note": "needs credentials"},
@@ -4418,7 +4427,6 @@ def test_an_unfinished_round_queues_the_task_for_another_round() -> None:
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "partial",
                     "roundResult": {"status": "continue", "note": "schema left"},
@@ -4452,7 +4460,6 @@ def test_a_round_that_reports_no_verdict_waits_for_a_human() -> None:
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "migrated",
                 },
@@ -4484,7 +4491,6 @@ def test_a_malformed_round_result_is_ignored_rather_than_steering_the_task() -> 
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "migrated",
                     "roundResult": {"status": "whatever-i-want", "note": "trust me"},
@@ -4531,7 +4537,7 @@ def test_task_runs_carry_a_progress_log_and_chat_runs_do_not() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "just chatting",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [chat_command] = registry.take_commands("sbx_alice", "node_token")
@@ -4544,7 +4550,6 @@ def test_task_runs_carry_a_progress_log_and_chat_runs_do_not() -> None:
                     "sessionId": chat_command["sessionId"],
                     "runId": chat_command["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "exitCode": 0,
                     "agentLog": "chatted",
                 },
@@ -4555,7 +4560,7 @@ def test_task_runs_carry_a_progress_log_and_chat_runs_do_not() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "migrate the billing tables",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                     "taskId": "tsk_billing",
                 },
             )
@@ -4591,7 +4596,7 @@ def test_streaming_output_defers_the_run_timeout(monkeypatch) -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "a long job",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -4660,7 +4665,7 @@ def test_a_silent_run_stays_alive_while_its_daemon_holds_the_lease() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "a long silent build",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -4708,7 +4713,7 @@ def test_run_progress_is_persisted_at_most_once_per_interval(monkeypatch) -> Non
                 "sbx_alice",
                 {
                     "taskGoal": "a chatty job",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
             [command] = registry.take_commands("sbx_alice", "node_token")
@@ -4784,7 +4789,6 @@ def test_logical_assignment_validation_fails_closed_without_stores() -> None:
                         "assignments": [
                             {
                                 "agent": "codex",
-                                "mode": "action",
                                 "agentId": "agent_1",
                                 "placementId": "placement_1",
                                 "daemonNodeId": "sbx_alice",
@@ -5088,12 +5092,10 @@ def test_multi_node_workflow_is_rejected_even_with_shared_workspace_id() -> None
                         "assignments": [
                             {
                                 "agent": "claude",
-                                "mode": "ask",
                                 "daemonNodeId": "node_a",
                             },
                             {
                                 "agent": "codex",
-                                "mode": "action",
                                 "daemonNodeId": "node_b",
                             },
                         ],
@@ -5163,8 +5165,7 @@ def test_same_node_workflow_revalidates_placement_before_next_enqueue() -> None:
                             "placementId": first_placement["id"],
                             "daemonNodeId": "node_a",
                             "workspacePolicy": {"kind": "shared-path"},
-                            "mode": "ask",
-                        },
+                            },
                         {
                             "agentId": builder["id"],
                             "agent": "codex",
@@ -5172,8 +5173,7 @@ def test_same_node_workflow_revalidates_placement_before_next_enqueue() -> None:
                             "placementId": second_placement["id"],
                             "daemonNodeId": "node_a",
                             "workspacePolicy": {"kind": "shared-path"},
-                            "mode": "action",
-                        },
+                            },
                     ],
                 },
             )
@@ -5189,7 +5189,6 @@ def test_same_node_workflow_revalidates_placement_before_next_enqueue() -> None:
                     "sessionId": session["id"],
                     "runId": first["runId"],
                     "agent": "claude",
-                    "mode": "ask",
                     "exitCode": 0,
                     "agentLog": "findings",
                 },
@@ -5227,7 +5226,6 @@ def test_database_daemon_store_claims_queued_commands_once() -> None:
                 "sessionId": "ses_1",
                 "runId": "00000000-0000-4000-8000-000000000002",
                 "agent": "codex",
-                "mode": "action",
                 "taskGoal": "fix auth",
             },
         )
@@ -5266,7 +5264,7 @@ def test_database_daemon_store_preserves_artifact_snapshot_state() -> None:
                 "nodeId": "sbx_alice",
                 "sessionId": "ses_1",
                 "taskGoal": "generate deck",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
                 "state": {"task_goal": "generate deck"},
             }
         )
@@ -5276,9 +5274,7 @@ def test_database_daemon_store_preserves_artifact_snapshot_state() -> None:
             {
                 "currentCommandId": "00000000-0000-4000-8000-000000000003",
                 "currentRunId": "00000000-0000-4000-8000-000000000004",
-                "currentAgent": "codex",
-                "currentMode": "action",
-                "currentStartedAt": "2026-06-30T00:00:00.000Z",
+                "currentAgent": "codex",                "currentStartedAt": "2026-06-30T00:00:00.000Z",
                 "state": {
                     "task_goal": "generate deck",
                     "_relay_artifact_snapshot": {
@@ -5346,7 +5342,6 @@ def test_daemon_store_prunes_terminal_records_but_keeps_active_records(
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": "codex",
-                    "mode": "action",
                     "exitCode": 0,
                 },
             )
@@ -5408,7 +5403,6 @@ def test_daemon_store_prunes_command_events_but_keeps_node_lifecycle(
                 "sessionId": command["sessionId"],
                 "runId": command["runId"],
                 "agent": "codex",
-                "mode": "action",
                 "exitCode": 0,
             },
         )
@@ -5709,9 +5703,9 @@ def test_backend_dispatch_loads_active_runs_once_for_all_assignments() -> None:
                 {
                     "taskGoal": "dispatch a pipeline",
                     "assignments": [
-                        {"agent": "claude", "mode": "action"},
-                        {"agent": "codex", "mode": "review"},
-                        {"agent": "pi", "mode": "action"},
+                        {"agent": "claude"},
+                        {"agent": "codex"},
+                        {"agent": "pi"},
                     ],
                 },
             )
@@ -5755,7 +5749,6 @@ def test_daemon_store_reclaims_expired_command_leases(store_factory) -> None:
                 "sessionId": "ses_1",
                 "runId": "00000000-0000-4000-8000-000000000041",
                 "agent": "codex",
-                "mode": "action",
                 "taskGoal": "fix auth",
             },
         )
@@ -5813,7 +5806,6 @@ def test_daemon_store_retries_cancel_until_target_run_is_terminal(
                 "sessionId": "ses_1",
                 "runId": "00000000-0000-4000-8000-000000000052",
                 "agent": "codex",
-                "mode": "action",
                 "reason": "no longer needed",
             },
         )
@@ -5867,7 +5859,6 @@ def test_daemon_store_renews_active_command_leases(store_factory) -> None:
                 "sessionId": "ses_1",
                 "runId": "00000000-0000-4000-8000-000000000061",
                 "agent": "codex",
-                "mode": "action",
                 "taskGoal": "fix auth",
             },
         )
@@ -5915,7 +5906,6 @@ def test_daemon_store_does_not_renew_a_superseded_delivery(store_factory) -> Non
                 "sessionId": "ses_1",
                 "runId": "00000000-0000-4000-8000-000000000071",
                 "agent": "codex",
-                "mode": "action",
                 "taskGoal": "fix auth",
             },
         )
@@ -5999,7 +5989,7 @@ def test_daemon_run_rejects_ownerless_sessions() -> None:
                     {
                         "sessionId": session["id"],
                         "taskGoal": "legacy ownerless session",
-                        "assignments": [{"agent": "claude", "mode": "action"}],
+                        "assignments": [{"agent": "claude"}],
                     },
                 )
 
@@ -6033,7 +6023,7 @@ def test_daemon_run_dispatch_rejects_concurrent_second_claim() -> None:
                         "sbx_alice",
                         {
                             "taskGoal": "fix auth",
-                            "assignments": [{"agent": "codex", "mode": "action"}],
+                            "assignments": [{"agent": "codex"}],
                         },
                     )
                 )
@@ -6088,7 +6078,7 @@ def test_set_disabled_agents_blocks_dispatch_and_survives_restart() -> None:
                     "sbx_alice",
                     {
                         "taskGoal": "review auth",
-                        "assignments": [{"agent": "codex", "mode": "review"}],
+                        "assignments": [{"agent": "codex"}],
                     },
                 )
 
@@ -6096,7 +6086,7 @@ def test_set_disabled_agents_blocks_dispatch_and_survives_restart() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "implement auth",
-                    "assignments": [{"agent": "claude", "mode": "action"}],
+                    "assignments": [{"agent": "claude"}],
                 },
             )
             assert session["status"] == "running"
@@ -6135,16 +6125,15 @@ def test_effective_agent_roles_use_only_explicit_or_configured_roles() -> None:
         "agentRoleDefaults": {"codex": "planner", "claude": "fixer"},
         "agentRoleOverrides": {"codex": "tester"},
     }
-    assert effective_role_for_assignment(node, {"agent": "codex"}, "action") == "tester"
-    assert effective_role_for_assignment(node, {"agent": "claude"}, "action") == "fixer"
+    assert effective_role_for_assignment(node, {"agent": "codex"}) == "tester"
+    assert effective_role_for_assignment(node, {"agent": "claude"}) == "fixer"
     assert (
         effective_role_for_assignment(
-            node, {"agent": "codex", "role": "reviewer"}, "action"
+            node, {"agent": "codex", "role": "reviewer"}
         )
         == "reviewer"
     )
-    assert effective_role_for_assignment(node, {"agent": "codex"}, "review") == "tester"
-    assert effective_role_for_assignment({}, {"agent": "pi"}, "action") is None
+    assert effective_role_for_assignment({}, {"agent": "pi"}) is None
 
 
 def test_daemon_run_records_effective_agent_role_override() -> None:
@@ -6174,7 +6163,7 @@ def test_daemon_run_records_effective_agent_role_override() -> None:
                 "sbx_alice",
                 {
                     "taskGoal": "implement auth",
-                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "assignments": [{"agent": "codex"}],
                 },
             )
 

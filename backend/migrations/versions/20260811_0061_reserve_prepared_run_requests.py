@@ -1,7 +1,7 @@
 """reserve prepared daemon run requests as active session work
 
-Revision ID: 20260811_0059
-Revises: 20260807_0058
+Revision ID: 20260811_0061
+Revises: 20260810_0060
 """
 
 from __future__ import annotations
@@ -9,8 +9,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "20260811_0059"
-down_revision = "20260807_0058"
+revision = "20260811_0061"
+down_revision = "20260810_0060"
 branch_labels = None
 depends_on = None
 

@@ -1,32 +1,39 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  askPrompt,
+  agentTaskPrompt,
   claudeTaskPrompt,
   piTaskPrompt,
   kimiTaskPrompt,
-  codexActionPrompt,
+  codexTaskPrompt,
   prependPriorAgentBridge,
-  reviewPrompt,
 } from "../src/prompts.js";
 import { initialAgentState } from "../src/state.js";
 
 describe("prior agent bridge in prompts", () => {
-  it("returns prompt unchanged when bridge is absent", () => {
+  it("always gives the agent an adaptive execution policy", () => {
     const state = initialAgentState("do thing");
-    assert.equal(claudeTaskPrompt(state), "do thing");
-    assert.equal(piTaskPrompt(state), "do thing");
-    assert.equal(kimiTaskPrompt(state), "do thing");
-    assert.equal(codexActionPrompt(state), "do thing");
+    for (const prompt of [
+      claudeTaskPrompt(state),
+      piTaskPrompt(state),
+      kimiTaskPrompt(state),
+      codexTaskPrompt(state),
+    ]) {
+      assert.match(prompt, /\[Execution policy\]/);
+      assert.match(prompt, /\[User\]\ndo thing$/);
+    }
   });
 
   it("prepends the bridge with a [User] block when present", () => {
     const state = { ...initialAgentState("do thing"), prior_agent_bridge: "[Previous from @codex]\nreview note" };
-    const expected = "[Previous from @codex]\nreview note\n\n[User]\ndo thing";
-    assert.equal(claudeTaskPrompt(state), expected);
-    assert.equal(piTaskPrompt(state), expected);
-    assert.equal(kimiTaskPrompt(state), expected);
-    assert.equal(codexActionPrompt(state), expected);
+    for (const prompt of [
+      claudeTaskPrompt(state),
+      piTaskPrompt(state),
+      kimiTaskPrompt(state),
+      codexTaskPrompt(state),
+    ]) {
+      assert.match(prompt, /\[Previous from @codex\]\nreview note\n\n\[User\]\ndo thing$/);
+    }
   });
 
   it("prependPriorAgentBridge is a no-op without bridge", () => {
@@ -36,9 +43,9 @@ describe("prior agent bridge in prompts", () => {
 
   it("prepends prior conversation with a [User] block when present", () => {
     const state = { ...initialAgentState("next thing"), prior_conversation: "[Conversation so far]\n\n[User]\nfirst thing" };
-    const expected = "[Conversation so far]\n\n[User]\nfirst thing\n\n[User]\nnext thing";
-    assert.equal(claudeTaskPrompt(state), expected);
-    assert.equal(codexActionPrompt(state), expected);
+    for (const prompt of [claudeTaskPrompt(state), codexTaskPrompt(state)]) {
+      assert.match(prompt, /\[Conversation so far\]\n\n\[User\]\nfirst thing\n\n\[User\]\nnext thing$/);
+    }
   });
 
   it("orders prior conversation before the within-run bridge", () => {
@@ -48,10 +55,8 @@ describe("prior agent bridge in prompts", () => {
       prior_agent_bridge: "[Previous from @codex]\nreview note",
     };
     const out = claudeTaskPrompt(state);
-    assert.equal(
-      out,
-      "[Conversation so far]\n\n[User]\nfirst thing\n\n[Previous from @codex]\nreview note\n\n[User]\nnext thing",
-    );
+    assert.ok(out.indexOf("[Conversation so far]") < out.indexOf("[Previous from @codex]"));
+    assert.match(out, /\[Previous from @codex\]\nreview note\n\n\[User\]\nnext thing$/);
   });
 
   it("places handoff notes after prior agent context", () => {
@@ -61,33 +66,31 @@ describe("prior agent bridge in prompts", () => {
       prior_handoff_note: "[Handoff note]\ncheck the auth edge case",
     };
 
-    assert.equal(
-      codexActionPrompt(state),
-      "[Previous from @claude]\nimplementation note\n\n[Handoff note]\ncheck the auth edge case\n\n[User]\ncontinue the fix",
-    );
+    const out = codexTaskPrompt(state);
+    assert.ok(out.indexOf("[Previous from @claude]") < out.indexOf("[Handoff note]"));
+    assert.match(out, /\[Handoff note\]\ncheck the auth edge case\n\n\[User\]\ncontinue the fix$/);
   });
 
-  it("includes conversation preludes in review prompts", () => {
+  it("includes conversation preludes in an adaptive prompt", () => {
     const state = {
       ...initialAgentState("review the branch"),
       prior_conversation: "[Conversation so far]\n\n[User]\nfix auth",
       prior_handoff_note: "[Handoff note]\nfocus on token refresh",
     };
-    const out = reviewPrompt(state);
+    const out = agentTaskPrompt(state);
 
     assert.match(out, /\[Conversation so far\]\n\n\[User\]\nfix auth/);
     assert.match(out, /\[Handoff note\]\nfocus on token refresh/);
-    assert.match(out, /User task:\nreview the branch/);
+    assert.match(out, /\[User\]\nreview the branch$/);
   });
 
-  it("uses prior agent messages as discussion context in ask mode", () => {
+  it("uses prior agent messages as collaboration context", () => {
     const state = {
       ...initialAgentState("design the rollout"),
       prior_agent_bridge: "[Previous from @claude]\nStart with a read-only audit.",
     };
-    const out = askPrompt(state);
-    assert.match(out, /planning discussion/);
-    assert.match(out, /respond to them directly/);
+    const out = agentTaskPrompt(state);
+    assert.match(out, /Decide the smallest useful way/);
     assert.match(out, /\[Previous from @claude\]\nStart with a read-only audit/);
     assert.match(out, /\[User\]\ndesign the rollout/);
   });

@@ -4,7 +4,6 @@ from .controller import (
     SessionController,
     SessionRunInFlightError,
     initial_agent_state,
-    is_review_assignment,
     merge_agent_state,
 )
 from .conversation import compute_conversation_history
@@ -19,6 +18,5 @@ __all__ = [
     "compute_prior_handoff_note",
     "extract_last_assistant_text",
     "initial_agent_state",
-    "is_review_assignment",
     "merge_agent_state",
 ]

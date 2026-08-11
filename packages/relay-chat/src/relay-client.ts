@@ -1,4 +1,4 @@
-import { relayApiUrl, type AgentName, type AgentTaskMode, type RelayEvent, type RelaySession } from "relay-core";
+import { relayApiUrl, type AgentName, type RelayEvent, type RelaySession } from "relay-core";
 import type { ChatConversationBinding, ChatConversationRef, RelayChatBackend, RelayChatRequestContext } from "./types.js";
 
 function conversationBody(ref: ChatConversationRef): Record<string, unknown> {
@@ -40,7 +40,6 @@ export class RelayChatClient implements RelayChatBackend {
   async startAgentRun(input: {
     agentId: string;
     taskGoal: string;
-    mode?: AgentTaskMode;
     sessionId?: string;
     employeeId?: string;
     idempotencyKey?: string;
@@ -52,7 +51,7 @@ export class RelayChatClient implements RelayChatBackend {
       employeeId: input.employeeId,
       body: {
         taskGoal: input.taskGoal,
-        assignments: [{ agentId: input.agentId, mode: input.mode ?? "action" }],
+        assignments: [{ agentId: input.agentId }],
         sessionId: input.sessionId,
         idempotencyKey: input.idempotencyKey,
       },
@@ -62,14 +61,10 @@ export class RelayChatClient implements RelayChatBackend {
   async continueThread(input: {
     sessionId: string;
     taskGoal: string;
-    mode?: AgentTaskMode;
     employeeId?: string;
     idempotencyKey?: string;
     signal?: AbortSignal;
   }): Promise<RelaySession> {
-    const intent = input.mode === "ask"
-      ? "discuss"
-      : input.mode === "review" ? "review" : "accomplish";
     return this.request<RelaySession>(
       `/threads/${encodeURIComponent(input.sessionId)}/messages`,
       {
@@ -78,7 +73,7 @@ export class RelayChatClient implements RelayChatBackend {
         employeeId: input.employeeId,
         body: {
           text: input.taskGoal,
-          intent,
+          intent: "accomplish",
           idempotencyKey: input.idempotencyKey,
         },
       },

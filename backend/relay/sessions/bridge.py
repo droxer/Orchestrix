@@ -8,6 +8,7 @@ agent runs' last assistant text. See
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any, Protocol
 
@@ -40,6 +41,48 @@ def extract_last_assistant_text(transcript: str) -> str | None:
         ).strip()
         if cleaned:
             return cleaned
+    return _extract_stream_json_assistant_text(transcript)
+
+
+def _extract_stream_json_assistant_text(transcript: str) -> str | None:
+    """Extract the terminal answer when an agent log retained raw JSONL.
+
+    Rendered command logs use ``●`` markers, but completed Claude logs can be
+    capped from the head while still retaining their final stream-json result.
+    Continuity must understand both forms or a successful teammate is bridged
+    as ``<no output>``.
+    """
+    for line in reversed(transcript.splitlines()):
+        candidate = line.strip()
+        if not candidate.startswith("{"):
+            continue
+        try:
+            event = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict):
+            continue
+        result = event.get("result")
+        if event.get("type") == "result" and isinstance(result, str) and result.strip():
+            return result.strip()
+        if event.get("type") != "assistant":
+            continue
+        message = event.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+        if isinstance(content, str) and content.strip():
+            return content.strip()
+        if not isinstance(content, list):
+            continue
+        text = "\n".join(
+            block["text"].strip()
+            for block in content
+            if isinstance(block, dict)
+            and block.get("type") == "text"
+            and isinstance(block.get("text"), str)
+            and block["text"].strip()
+        )
+        if text:
+            return text
     return None
 
 

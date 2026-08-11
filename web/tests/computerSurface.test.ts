@@ -93,6 +93,23 @@ describe("My Computer record card", () => {
     assert.match(page, /tone: "danger"/, "removal is confirmed destructively");
   });
 
+  it("lets the owner see the token again for reconnecting", async () => {
+    // Enrollment shows the token once; the card carries a labelled Token
+    // action that opens the reveal/reissue drawer against the owner-scoped
+    // token subresource.
+    const [card, page, drawer] = await Promise.all([
+      read("web/src/components/computer/ComputerCard.tsx"),
+      read("web/src/components/ComputerPage.tsx"),
+      read("web/src/components/computer/ComputerTokenDrawer.tsx"),
+    ]);
+    assert.match(card, /\{t\("computer\.token_button"\)\}/);
+    assert.match(page, /<ComputerTokenDrawer/);
+    assert.match(drawer, /revealComputerToken\(node!\.id\)/);
+    assert.match(drawer, /reissueComputerToken\(node!\.id\)/);
+    // Reissue burns the current token, so it is confirmed destructively.
+    assert.match(drawer, /tone: "danger"/);
+  });
+
   it("connects a personal computer as direct-run, with no runtime to pick", async () => {
     // BoxLite is provisioned on admin hardware. Offering "Isolated" here let an
     // employee ask their own laptop for a sandbox it was never set up to boot,

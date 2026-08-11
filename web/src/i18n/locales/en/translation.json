@@ -88,6 +88,7 @@
     "choose_computer": "Choose running computer",
     "no_computers": "No computer available",
     "talk_to_agent": "Talk to agent",
+    "talk_to_agent_or_team": "Talk to an agent or team",
     "no_available_agent": "No agent available",
     "agent_disabled_title": "{{agent}} is disabled on this node by an admin.",
     "agent_failed_title": "{{agent}} is not ready on this node.",
@@ -133,9 +134,9 @@
     "send": "Send",
     "cancel_run": "Cancel run",
     "choose_agent": "Choose agent",
-    "choose_mode": "Choose mode",
-    "send_shortcut": "{{shortcut}} to send",
-    "mode_toggle_label": "Mode: {{mode}}, switch to {{next}}"
+    "agents_group": "Agents",
+    "teams_group": "Teams",
+    "send_shortcut": "{{shortcut}} to send"
   },
   "decision": {
     "approve": "Approve",
@@ -149,7 +150,6 @@
   "handoff": {
     "title": "Hand off this turn",
     "route_to": "Route to",
-    "mode": "Mode",
     "note_label": "Note",
     "note_placeholder": "Optional handoff note…",
     "send": "Send handoff",
@@ -322,7 +322,9 @@
     "band_id": "Agent ID",
     "band_team_label": "Team record",
     "band_team_id": "Team ID",
-    "identity_label": "Identity"
+    "identity_label": "Identity",
+    "band_created": "Created",
+    "band_updated": "Updated"
   },
   "profile_image": {
     "alt": "{{name}} profile image",
@@ -373,7 +375,9 @@
     "select_title": "Select a team",
     "select_body": "Choose a team to inspect its profile, workspace, and activity.",
     "empty_title": "No teams yet",
-    "empty_body": "Group agents under a named lead for repeatable task dispatch."
+    "empty_body": "Group agents under a named lead for repeatable task dispatch.",
+    "edit_members": "Edit members",
+    "rename": "Rename team"
   },
   "computer": {
     "title": "My Computer",
@@ -408,8 +412,20 @@
     "connect_success": "This computer is registered. Run the command below to start the daemon.",
     "connect_success_existing": "This computer is already connected. Run the command below to start its daemon.",
     "connect_success_sub": "Copy the credentials below to finish setting it up.",
-    "connect_token_once": "This token is shown once — copy it now.",
-    "connect_token_on_device": "Its token was issued when it was first connected and is not shown again — the daemon on that machine already stores it."
+    "connect_token_once": "Copy this token now — you can reveal it again anytime from the computer's Token panel.",
+    "connect_token_on_device": "Its token predates token storage and cannot be shown — open Token on the computer and reissue it to get a new one.",
+    "token_button": "Token",
+    "token_title": "Computer token",
+    "token_hidden_note": "The launch token stays hidden until you ask for it. Anyone holding it can run this computer's daemon.",
+    "token_reveal_action": "Reveal token",
+    "token_revealing": "Revealing…",
+    "token_reissue_action": "Reissue token",
+    "token_reissuing": "Reissuing…",
+    "token_reissue_title": "Reissue token",
+    "token_reissue_message": "The current token stops working immediately. A daemon already running on this computer must be restarted with the new token.",
+    "token_reissued_note": "New token issued — the previous one no longer works. Restart the daemon with this token.",
+    "token_unrecoverable": "This computer's token predates token storage and cannot be shown. Reissue it to get a new one.",
+    "token_error": "Couldn't load the token: {{message}}"
   },
   "routine": {
     "title": "Routines",
@@ -910,6 +926,14 @@
       "settings_rounds_label": "Default rounds per task",
       "settings_rounds_hint": "Between {{min}} and {{max}}. A task that uses its budget without finishing waits for a person instead of running again.",
       "settings_save": "Save",
+      "settings_admin_token_title": "Admin token",
+      "settings_admin_token_sub": "Bearer token for bootstrap and the supervisor. Seeded from RELAY_ADMIN_TOKEN on first boot, generated otherwise. Reissuing replaces it and the old value stops working immediately.",
+      "settings_admin_token_label": "Admin token",
+      "settings_admin_token_copy": "Copy admin token",
+      "settings_admin_token_reissue": "Reissue token",
+      "settings_admin_token_reissuing": "Reissuing…",
+      "settings_admin_token_reissue_confirm": "Reissue the admin token? The current token stops working immediately — update any supervisor or scripts using it.",
+      "settings_admin_token_unset": "The admin token is not configured on the backend.",
       "settings_saving": "Saving…",
       "settings_saved": "Saved",
       "settings_reset": "Reset",
@@ -953,8 +977,8 @@
     "ready_for": "Send a message.",
     "ready_no_employee": "Select an employee workspace for {{agent}}.",
     "awaiting_first": "waiting for first message",
-    "phase_agent": "{{mode}}",
-    "phase_handoff": "Handoff · {{mode}}"
+    "phase_agent": "Agent",
+    "phase_handoff": "Handoff"
   },
   "login": {
     "lede": "Manage nodes, daemons, and agent runs.",
@@ -990,11 +1014,6 @@
     "blocked": "Blocked",
     "cancelled": "Cancelled",
     "unknown": "Unknown"
-  },
-  "mode": {
-    "action": "Action",
-    "ask": "Ask",
-    "review": "Review"
   },
   "artifact": {
     "action_copy": "Copy",
@@ -1093,7 +1112,7 @@
     "user_label": "You",
     "user_avatar": "Y",
     "agent_header": "{{employee}}",
-    "started": "{{agent}} · {{mode}} started",
+    "started": "{{agent}} started",
     "artifact": "Artifact · {{kind}}",
     "decision": "You · {{kind}}",
     "cancelled": "Request cancelled.",

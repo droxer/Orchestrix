@@ -64,7 +64,6 @@ def task_thread_assignments(
             {
                 "agentId": assigned_agent_id,
                 "agent": assigned_agent,
-                "mode": "action",
             }
         ]
     return supplied_assignments
@@ -77,7 +76,6 @@ def resolve_team_task_assignments(
     agent_store: Any,
     placement_store: Any,
     daemon_nodes: list[dict[str, Any]],
-    mode: str = "action",
 ) -> list[dict[str, Any]]:
     team, agents = _task_team_agents(
         task,
@@ -85,7 +83,7 @@ def resolve_team_task_assignments(
         agent_store=agent_store,
     )
     return resolve_agent_assignments(
-        team_member_assignments(agents, mode=mode, team=team),
+        team_member_assignments(agents, team=team),
         employee_id=task_execution_employee_id(task),
         is_admin=False,
         agent_store=agent_store,
@@ -219,7 +217,6 @@ def _team_member_assignment(
     return {
         "agentId": agent["id"],
         "agent": agent["executorKind"],
-        "mode": _member_mode(role, mode, coordinator),
         "phase": _member_phase(role, mode, coordinator),
         **({"role": role} if role else {}),
         **({"coordinator": True} if coordinator else {}),
@@ -260,17 +257,3 @@ def _member_phase(
     if requested_mode == "review" or (role == "reviewer" and not coordinator):
         return "review"
     return "execution"
-
-
-def _member_mode(
-    role: str | None, requested_mode: str, coordinator: bool = False
-) -> str:
-    """Pick the mode a member runs in, given its role and what was asked for.
-
-    Only a plain "do the work" request is specialized: a reviewer asked to act
-    reviews instead. An explicit review or ask request already describes the
-    whole round, so every member honors it as given.
-    """
-    if requested_mode == "action" and role == "reviewer" and not coordinator:
-        return "review"
-    return requested_mode

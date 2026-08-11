@@ -205,9 +205,7 @@ async def create_agent_placement(
     if not node:
         raise HTTPException(404, "Daemon node not found.")
     try:
-        placement = create_node_placement(
-            ctx.agent_placement_store, agent, node, body
-        )
+        placement = create_node_placement(ctx.agent_placement_store, agent, node, body)
     except ValueError as error:
         raise HTTPException(
             409 if "already has" in str(error) else 400, str(error)
@@ -264,6 +262,9 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
                 or None,
                 raw_assignments=raw_assignments,
                 mode=string_field(body, "mode") or "action",
+                requested_team_id=string_field(body, "teamId")
+                or string_field(body, "team_id")
+                or None,
                 requested_node_id=string_field(body, "daemonNodeId")
                 or string_field(body, "daemon_node_id")
                 or None,
@@ -346,9 +347,8 @@ def _agent_with_placements(ctx: AppContextDep, agent: dict[str, Any]) -> dict[st
         availability = "busy"
     elif any(placement["status"] == "pending" for placement in placements):
         availability = "pending"
-    # defaultRole used to be withheld because nothing acted on it. It now
-    # decides what a team member is told to do and which mode it runs in, so
-    # the people who own the agent need to see it.
+    # The role shapes what a team member is told to contribute, so the people
+    # who own the agent need to see it.
     return {
         **agent,
         "availability": availability,

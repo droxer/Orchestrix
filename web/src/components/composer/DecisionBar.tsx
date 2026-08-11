@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { AgentTaskMode, EmployeeAgent } from "../../types";
+import type { EmployeeAgent } from "../../types";
 import { isEmployeeAgentRoutable } from "../../lib/agentDisplayNames";
 import { ActionApprove, ActionHandoff, ActionRoute } from "../icons";
 import { Button } from "@/components/ui/button";
@@ -17,12 +17,11 @@ import { useDialogs } from "@/components/ui/DialogProvider";
 
 type DecisionAction = "approve" | "reject" | "rerun" | "mark_done" | "handoff";
 
-export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHandoffOpen, handoffAgentId, setHandoffAgentId, handoffMode, setHandoffMode, handoffNote, setHandoffNote, sendHandoff }: {
+export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHandoffOpen, handoffAgentId, setHandoffAgentId, handoffNote, setHandoffNote, sendHandoff }: {
   logicalAgents: EmployeeAgent[];
   sendDecision: (kind: "approve" | "reject" | "rerun" | "mark_done") => Promise<void>;
   handoffOpen: boolean; setHandoffOpen: (v: boolean) => void;
   handoffAgentId: string; setHandoffAgentId: (id: string) => void;
-  handoffMode: AgentTaskMode; setHandoffMode: (m: AgentTaskMode) => void;
   handoffNote: string; setHandoffNote: (v: string) => void;
   sendHandoff: () => Promise<void>;
 }) {
@@ -75,12 +74,6 @@ export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHando
     };
   });
 
-  const modeOptions: { value: AgentTaskMode; label: string }[] = [
-    { value: "action", label: t("mode.action") },
-    { value: "ask", label: t("mode.ask") },
-    { value: "review", label: t("mode.review") },
-  ];
-
   return (
     <>
       <div className="decision-bar">
@@ -109,21 +102,6 @@ export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHando
               <SelectContent>
                 {agentOptions.map((option) => (
                   <SelectItem key={option.value} value={option.value} label={option.label} disabled={option.disabled}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="handoff-row">
-            <Label htmlFor="handoff-mode">{t("handoff.mode")}</Label>
-            <Select value={handoffMode} items={modeOptions} onValueChange={(value) => { if (value != null) setHandoffMode(value as AgentTaskMode); }}>
-              <SelectTrigger id="handoff-mode" name="handoff-mode" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {modeOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value} label={option.label}>
                     {option.label}
                   </SelectItem>
                 ))}

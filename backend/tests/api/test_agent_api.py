@@ -313,7 +313,7 @@ def test_legacy_sandbox_run_blocks_unenforced_agent_policy(monkeypatch) -> None:
             "/api/v1/sandboxes/node_a/runs",
             json={
                 "taskGoal": "Blocked legacy policy",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
             },
         )
 
@@ -654,7 +654,7 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
             "/api/v1/agent-runs",
             json={
                 "taskGoal": "Build the feature",
-                "assignments": [{"agentId": agent["id"], "mode": "action"}],
+                "assignments": [{"agentId": agent["id"]}],
                 "idempotencyKey": "telegram:chat_1:42",
             },
         )
@@ -664,7 +664,7 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
             "/api/v1/agent-runs",
             json={
                 "taskGoal": "Build the feature",
-                "assignments": [{"agentId": agent["id"], "mode": "action"}],
+                "assignments": [{"agentId": agent["id"]}],
                 "idempotencyKey": "telegram:chat_1:42",
             },
         )
@@ -697,6 +697,8 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
         assert command["state"]["agent_instructions"] == (
             "Use the repository tests as evidence."
         )
+        assert "mode" not in command
+        assert "adaptive_execution" not in command["state"]
         assert client.post("/api/v1/auth/logout").status_code == 200
         assert (
             client.post(
@@ -1154,7 +1156,7 @@ def test_existing_thread_resumes_after_managed_runtime_replacement_without_read(
                 "taskGoal": "Continue immediately",
                 "sessionId": session["id"],
                 "daemonNodeId": old_runtime_id,
-                "assignments": [{"agentId": agent["id"], "mode": "action"}],
+                "assignments": [{"agentId": agent["id"]}],
             },
         )
 
@@ -1226,7 +1228,7 @@ def test_existing_session_dispatch_normalizes_legacy_agent_supervisor(
             json={
                 "taskGoal": "Continue the feature",
                 "sessionId": session["id"],
-                "assignments": [{"agentId": agent["id"], "mode": "action"}],
+                "assignments": [{"agentId": agent["id"]}],
             },
         )
 
@@ -1284,7 +1286,7 @@ def test_logical_agent_handoff_records_the_target_agent_id(monkeypatch) -> None:
             json={
                 "taskGoal": session["taskGoal"],
                 "sessionId": session["id"],
-                "assignments": [{"agentId": reviewer["id"], "mode": "review"}],
+                "assignments": [{"agentId": reviewer["id"]}],
                 "decision": {"kind": "handoff", "targetAgent": "codex"},
             },
         )
@@ -1327,9 +1329,7 @@ def test_employee_cannot_dispatch_a_team_across_shared_workspace_nodes(
                     "protocolVersion": 1,
                     "supportedAgents": [executor],
                     "capabilities": ["thread-workspaces"],
-                    "maxConcurrentRuns": 2,
-                    "runCapacityByMode": {"ask": 2},
-                    "status": "ready",
+                    "maxConcurrentRuns": 2,                    "status": "ready",
                 }
             )
         planner = app.state.agent_store.create_agent(
@@ -1356,7 +1356,7 @@ def test_employee_cannot_dispatch_a_team_across_shared_workspace_nodes(
             "/api/v1/agent-runs",
             json={
                 "taskGoal": "Research the feature",
-                "assignments": [{"agentId": planner["id"], "mode": "ask"}],
+                "assignments": [{"agentId": planner["id"]}],
             },
         )
         assert seeded.status_code == 202, seeded.text
@@ -1366,8 +1366,8 @@ def test_employee_cannot_dispatch_a_team_across_shared_workspace_nodes(
             json={
                 "taskGoal": "Plan and build the feature",
                 "assignments": [
-                    {"agentId": planner["id"], "mode": "ask"},
-                    {"agentId": builder["id"], "mode": "action"},
+                    {"agentId": planner["id"]},
+                    {"agentId": builder["id"]},
                 ],
             },
         )
@@ -1423,7 +1423,7 @@ def test_new_thread_runs_on_the_selected_computer(monkeypatch) -> None:
             json={
                 "taskGoal": "Build on computer B",
                 "daemonNodeId": "node_b",
-                "assignments": [{"agentId": builder["id"], "mode": "action"}],
+                "assignments": [{"agentId": builder["id"]}],
             },
         )
 
@@ -1441,7 +1441,7 @@ def test_new_thread_runs_on_the_selected_computer(monkeypatch) -> None:
                 "taskGoal": "Try to move the existing thread",
                 "sessionId": session["id"],
                 "daemonNodeId": "node_a",
-                "assignments": [{"agentId": builder["id"], "mode": "action"}],
+                "assignments": [{"agentId": builder["id"]}],
             },
         )
 
@@ -1498,7 +1498,7 @@ def test_new_thread_rejects_an_agent_outside_the_selected_computer(
             json={
                 "taskGoal": "Build on computer A",
                 "daemonNodeId": "node_a",
-                "assignments": [{"agentId": builder["id"], "mode": "action"}],
+                "assignments": [{"agentId": builder["id"]}],
             },
         )
 
@@ -1564,7 +1564,7 @@ def test_employee_cannot_list_or_dispatch_another_employees_agent(monkeypatch) -
             "/api/v1/agent-runs",
             json={
                 "taskGoal": "Use Alice's agent",
-                "assignments": [{"agentId": agent["id"], "mode": "action"}],
+                "assignments": [{"agentId": agent["id"]}],
             },
         )
         assert denied.status_code == 409
@@ -1615,7 +1615,7 @@ def test_legacy_run_materializes_compatibility_agent_without_get_side_effects(
             "/api/v1/sandboxes/node_a/runs",
             json={
                 "taskGoal": "Build it",
-                "assignments": [{"agent": "codex", "mode": "action"}],
+                "assignments": [{"agent": "codex"}],
             },
         )
 
@@ -2088,7 +2088,7 @@ def test_failed_agent_first_run_finalizes_instead_of_wedging(monkeypatch) -> Non
             "/api/v1/agent-runs",
             json={
                 "taskGoal": "Build the feature",
-                "assignments": [{"agentId": agent["id"], "mode": "action"}],
+                "assignments": [{"agentId": agent["id"]}],
             },
         )
         assert run.status_code == 202
@@ -2107,7 +2107,6 @@ def test_failed_agent_first_run_finalizes_instead_of_wedging(monkeypatch) -> Non
                 "sessionId": session_id,
                 "runId": command["runId"],
                 "agent": command["agent"],
-                "mode": command["mode"],
                 "exitCode": 1,
                 "agentLog": "boom",
             },

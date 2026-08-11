@@ -53,7 +53,7 @@ def _active_integration(client: TestClient) -> str:
 def _create_session(client: TestClient, owner: str) -> str:
     response = client.post("/api/v1/threads", json={
         "taskGoal": f"task for {owner}",
-        "assignments": [{"agent": "claude", "mode": "action"}],
+        "assignments": [{"agent": "claude"}],
         "ownerEmployeeId": owner,
     })
     assert response.status_code == 201
