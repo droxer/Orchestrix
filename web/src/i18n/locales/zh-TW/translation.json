@@ -1117,7 +1117,10 @@
     "actions_label": "訊息操作",
     "copy": "複製",
     "copied": "已複製",
-    "retry": "重試"
+    "retry": "重試",
+    "copy_code": "複製程式碼",
+    "copy_code_failed": "複製失敗",
+    "diagram": "圖表"
   },
   "nodes": {
     "agent_presence_title": "{{agent}}：{{presence}}",

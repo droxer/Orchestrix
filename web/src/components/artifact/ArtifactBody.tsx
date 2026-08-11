@@ -71,7 +71,7 @@ function renderBody(artifact: RelayArtifact, text: string, view: ArtifactView) {
       // Agent-authored plans, reviews, and summaries are Markdown; source view
       // keeps the plain monospace reading they have always had.
       return view === "preview" && artifactRenderMode(artifact) === "markdown" ? (
-        <Markdown text={text} />
+        <Markdown text={text} variant="document" />
       ) : (
         <PlainBody text={text} />
       );
@@ -102,7 +102,7 @@ function WorkspaceFileContent({
   return renderMode === "html" ? (
     <SandboxedHtml html={text} title={artifact.title} />
   ) : (
-    <Markdown text={text} />
+    <Markdown text={text} variant="document" />
   );
 }
 

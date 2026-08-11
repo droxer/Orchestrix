@@ -10,7 +10,9 @@ describe("streaming prose continuity", () => {
   it("uses one canonical Markdown document before and after settlement", () => {
     const source = readFileSync("web/src/components/AgentStream.tsx", "utf8");
 
-    assert.match(source, /<MarkdownContent text=\{visibleText\} \/>/);
+    // `live` is a render condition (suppresses diagram/copy on a partial
+    // fence), not a second document — the text passed is still the one string.
+    assert.match(source, /<MarkdownContent text=\{visibleText\} live=\{live\} \/>/);
     assert.doesNotMatch(source, /splitStreamingMarkdown/);
     assert.doesNotMatch(source, /parts\.map/);
   });

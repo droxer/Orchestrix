@@ -1,0 +1,435 @@
+/* ========================== markdown ==========================
+   Shared rendering for every Markdown surface: the transcript turn
+   (.agent-prose) and the thread space / workspace document preview
+   (.doc-prose). Element rules live on .md-body so a fix to tables, fences,
+   footnotes, or math lands on both surfaces at once; the two companion
+   classes carry nothing but typographic scale and measure.
+
+   Structural wrappers (.md-table, .md-fence) are emitted unconditionally by
+   components/Markdown.tsx — the streaming caret at the end of
+   agent-stream.css matches through them, so their shape is load-bearing. */
+
+.md-body {
+  /* Long unbroken tokens (URLs, hashes, file paths) must wrap inside the
+     message column instead of forcing a horizontal overflow. */
+  overflow-wrap: anywhere;
+}
+
+.md-body p {
+  margin: 0 0 var(--sp-2);
+}
+
+.md-body p:last-child {
+  margin-bottom: 0;
+}
+
+.md-body code {
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-1);
+  background: var(--surface-2);
+  color: var(--ink-1);
+  font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
+  font-size: var(--fs-3);
+  font-weight: 500;
+}
+
+.md-body strong {
+  font-weight: 600;
+}
+
+.md-body em {
+  font-style: italic;
+}
+
+.md-body h1,
+.md-body h2,
+.md-body h3,
+.md-body h4,
+.md-body h5,
+.md-body h6 {
+  margin: var(--sp-4) 0 var(--sp-2);
+  color: var(--ink-1);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: var(--track-0);
+}
+
+.md-body h1:first-child,
+.md-body h2:first-child,
+.md-body h3:first-child,
+.md-body h4:first-child,
+.md-body h5:first-child,
+.md-body h6:first-child {
+  margin-top: 0;
+}
+
+/* In-message heading ladder stays under the 20px conversation title so a
+   content heading never visually rivals the page title: 17 / 15 / 14. The
+   ladder lost a rung when the 16px and 18px steps were retired from the scale
+   (they sat 1px from their neighbours and bought no hierarchy). h3 and below
+   now share the body size and separate by weight, which is how the rest of the
+   system already distinguishes roles inside one size. */
+.md-body h1 { font-size: var(--fs-heading); } /* 17px */
+.md-body h2 { font-size: var(--fs-4); } /* 15px */
+.md-body h3,
+.md-body h4,
+.md-body h5,
+.md-body h6 { font-size: var(--fs-3); } /* 14px */
+
+.md-body ul,
+.md-body ol {
+  margin: 0 0 var(--sp-2);
+  padding-left: 1.4em;
+}
+
+.md-body ul { list-style: disc; }
+.md-body ol { list-style: decimal; }
+
+.md-body li {
+  margin-bottom: var(--sp-1);
+  line-height: var(--leading-loose);
+}
+
+.md-body li:last-child {
+  margin-bottom: 0;
+}
+
+.md-body li > p {
+  margin: 0 0 var(--sp-1);
+}
+
+.md-body li > p:last-child {
+  margin-bottom: 0;
+}
+
+.md-body li > ul,
+.md-body li > ol {
+  margin-top: var(--sp-1);
+}
+
+/* GFM task lists — the checkbox is the marker; drop the disc so items don't
+   read double-bulleted. */
+.md-body ul.contains-task-list {
+  padding-left: var(--sp-2);
+  list-style: none;
+}
+
+.md-body li.task-list-item {
+  list-style: none;
+}
+
+.md-body li.task-list-item input[type="checkbox"] {
+  margin: 0 var(--sp-2) 0 0;
+  vertical-align: -1.5px;
+  accent-color: var(--action);
+}
+
+.md-body img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: var(--sp-2) 0;
+  border-radius: var(--r-2);
+}
+
+.md-body blockquote {
+  margin: 0 0 var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  border-left: 3px solid var(--line-1);
+  color: var(--ink-2);
+  font-style: italic;
+}
+
+.md-body blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.md-body hr {
+  margin: var(--sp-3) 0;
+  border: 0;
+  border-top: 1px solid var(--line-2);
+}
+
+.md-body a {
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.md-body a:hover {
+  color: var(--link-hover);
+  text-decoration-thickness: 2px;
+}
+
+/* The table lives inside .md-table, which owns the scrolling. `max-content`
+   lets columns take the width their content needs instead of being crushed
+   into the transcript's measure; `min-width: 100%` keeps a narrow table
+   filling the column rather than shrinking to its text. */
+.md-body table {
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  font-size: var(--fs-3);
+}
+
+.md-body th,
+.md-body td {
+  padding: var(--sp-1) var(--sp-2);
+  border-bottom: 1px solid var(--line-2);
+  text-align: left;
+  vertical-align: top;
+}
+
+.md-body thead th {
+  color: var(--ink-3);
+  font-weight: 600;
+  border-bottom-color: var(--line-1);
+}
+
+.md-body del {
+  color: var(--ink-3);
+  text-decoration: line-through;
+}
+
+.agent-code {
+  position: relative;
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  color: var(--ink-1);
+  font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
+  font-size: var(--fs-3);
+  line-height: var(--leading-loose);
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.agent-code code {
+  font: inherit;
+  background: transparent;
+  padding: 0;
+}
+
+/* Syntax-highlight token colors live in styles/syntax.css (highlight.js
+   `hljs-*` classes), shared with the workspace file preview. */
+
+/* The language label is plain muted micro text on the code's own left edge —
+   no chip, no border — so it reads as a caption of the block, not chrome
+   competing with the snippet. `sticky left:0` keeps it anchored when a wide
+   snippet scrolls sideways. */
+.agent-code-lang {
+  position: sticky;
+  left: 0;
+  display: block;
+  width: max-content;
+  margin-bottom: var(--sp-1);
+  color: var(--ink-4);
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+/* ---- table scroll region ----
+   The one block that cannot be reflowed to fit a narrow column. It scrolls
+   inside its own box so the transcript column never scrolls sideways.
+   `tabindex` is set by the browser's scrollable-region heuristics; the border
+   makes the clipped edge legible rather than looking like a truncated table. */
+.md-table {
+  max-width: 100%;
+  margin: 0 0 var(--sp-2);
+  overflow-x: auto;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+}
+
+.md-table:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
+}
+
+/* Headers are labels — wrapping one turns a two-word column into two rows of
+   chrome. Cells hold real content, so they wrap, capped at a readable measure
+   so one long cell cannot stretch the table past the point of scrolling. */
+.md-table th {
+  white-space: nowrap;
+}
+
+.md-table td {
+  max-width: var(--measure-tight);
+}
+
+/* ---- fence ----
+   Wraps the <pre> so the copy control can be positioned against it. */
+.md-fence {
+  position: relative;
+  margin: var(--sp-2) 0 0;
+}
+
+.md-fence .agent-code {
+  margin: 0;
+}
+
+.md-fence-copy {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-1);
+  background: var(--surface-1);
+  color: var(--ink-3);
+  font: var(--type-micro);
+  cursor: pointer;
+  /* Chrome for a block the reader may only be skimming: it resolves on hover
+     or keyboard focus, and never sits over the first line of code uninvited. */
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.md-fence:hover .md-fence-copy,
+.md-fence-copy:focus-visible {
+  opacity: 1;
+}
+
+.md-fence-copy:hover {
+  color: var(--ink-1);
+}
+
+.md-fence-copy:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
+}
+
+/* Touch has no hover to resolve the control, so it stays visible there. */
+@media (hover: none) {
+  .md-fence-copy {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .md-fence-copy {
+    transition: none;
+  }
+}
+
+/* ---- diagrams ----
+   Mermaid output. The SVG carries its own intrinsic size, which can exceed a
+   narrow transcript column, so the figure scrolls rather than overflowing. */
+.md-diagram {
+  margin: var(--sp-3) 0;
+  padding: var(--sp-3);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+  overflow-x: auto;
+}
+
+.md-diagram-canvas svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+/* ---- footnotes ----
+   GFM footnotes arrive as a trailing <section data-footnotes> holding an
+   ordered list. Unstyled it reads as an unexplained second document; the rule
+   and the muted scale mark it as apparatus rather than more body copy. */
+.md-body sup a[data-footnote-ref] {
+  padding: 0 2px;
+  color: var(--link);
+  text-decoration: none;
+  font-size: var(--fs-1);
+}
+
+.md-body section[data-footnotes] {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line-2);
+  color: var(--ink-3);
+  font-size: var(--fs-2);
+}
+
+.md-body section[data-footnotes] h2 {
+  margin: 0 0 var(--sp-2);
+  color: var(--ink-3);
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+.md-body a[data-footnote-backref] {
+  text-decoration: none;
+}
+
+/* ---- math ----
+   KaTeX ships its own stylesheet; these rules only place the output in the
+   reading. A display equation can be wider than the column, so it scrolls. */
+.md-body .katex {
+  font-size: 1.05em;
+}
+
+.md-body .katex-display {
+  margin: var(--sp-3) 0;
+  padding-bottom: var(--sp-1);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* ---- document variant ----
+   The thread space preview and the workspace file preview render whole
+   artifacts, not chat turns. The transcript's 14px body and 17px h1 exist to
+   sit under the conversation title; a standalone plan has no such neighbour,
+   so the ladder moves up a step (20 / 17 / 15) and the body gains a reading
+   measure. Element rules above are untouched — only scale and rhythm differ. */
+.doc-prose {
+  max-width: var(--measure-wide);
+  color: var(--ink-1);
+  font-family: var(--font-sans);
+  font-size: var(--fs-4);
+  line-height: var(--leading-loose);
+}
+
+.doc-prose p,
+.doc-prose ul,
+.doc-prose ol,
+.doc-prose blockquote {
+  margin-bottom: var(--sp-3);
+}
+
+.doc-prose h1,
+.doc-prose h2,
+.doc-prose h3,
+.doc-prose h4,
+.doc-prose h5,
+.doc-prose h6 {
+  margin: var(--sp-5) 0 var(--sp-2);
+}
+
+.doc-prose h1 { font-size: var(--fs-title); } /* 20px */
+.doc-prose h2 { font-size: var(--fs-heading); } /* 17px */
+.doc-prose h3,
+.doc-prose h4,
+.doc-prose h5,
+.doc-prose h6 { font-size: var(--fs-4); } /* 15px */
+
+/* A document h1 is the artifact's own title line — give it the rule that a
+   chat turn cannot afford, since there it would compete with the thread name. */
+.doc-prose h1 {
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--line-2);
+}
+
+.doc-prose li {
+  line-height: var(--leading-loose);
+}

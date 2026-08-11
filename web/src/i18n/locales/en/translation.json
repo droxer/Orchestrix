@@ -1120,7 +1120,10 @@
     "actions_label": "Message actions",
     "copy": "Copy",
     "copied": "Copied",
-    "retry": "Retry"
+    "retry": "Retry",
+    "copy_code": "Copy code",
+    "copy_code_failed": "Copy failed",
+    "diagram": "Diagram"
   },
   "nodes": {
     "agent_presence_title": "{{agent}}: {{presence}}",
