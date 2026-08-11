@@ -76,7 +76,9 @@ class LocalSessionStore:
 
     def create_session(self, payload: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
-            session_id = new_database_id()
+            session_id = payload.get("id") or new_database_id()
+            if self._events_path(session_id).exists():
+                return self.get_session(session_id)
             (self._session_dir(session_id) / "artifacts").mkdir(
                 parents=True, exist_ok=True
             )
@@ -629,7 +631,7 @@ class DatabaseSessionStore:
                 )
 
     def create_session(self, payload: dict[str, Any]) -> dict[str, Any]:
-        session_id = new_database_id()
+        session_id = payload.get("id") or new_database_id()
         logger.debug(
             "Creating database session",
             session_id=session_id,
@@ -689,15 +691,20 @@ class DatabaseSessionStore:
                 )
             )
         session = materialize_events(events)
-        with store_transaction(self.engine) as conn:
-            session_row = session_to_row(session, version=len(events))
-            conn.execute(insert(self.sessions).values(**session_row))
-            for sequence, event in enumerate(events):
-                conn.execute(
-                    insert(self.events).values(
-                        **session_event_to_row(session_row["id"], sequence, event)
+        try:
+            with store_transaction(self.engine) as conn:
+                session_row = session_to_row(session, version=len(events))
+                conn.execute(insert(self.sessions).values(**session_row))
+                for sequence, event in enumerate(events):
+                    conn.execute(
+                        insert(self.events).values(
+                            **session_event_to_row(session_row["id"], sequence, event)
+                        )
                     )
-                )
+        except IntegrityError:
+            if payload.get("id"):
+                return self.get_session(session_id)
+            raise
         return session
 
     def import_session(
@@ -1165,7 +1172,9 @@ class DatabaseSessionStore:
         completed = func.sum(case((self.sessions.c.status == "completed", 1), else_=0))
         failed = func.sum(case((self.sessions.c.status == "failed", 1), else_=0))
         with store_transaction(self.engine) as conn:
-            total = int(conn.scalar(select(func.count()).select_from(self.sessions)) or 0)
+            total = int(
+                conn.scalar(select(func.count()).select_from(self.sessions)) or 0
+            )
             last_24h = int(
                 conn.scalar(
                     select(func.count())
@@ -1183,8 +1192,9 @@ class DatabaseSessionStore:
                 or 0
             )
             status_rows = conn.execute(
-                select(self.sessions.c.status, func.count())
-                .group_by(self.sessions.c.status)
+                select(self.sessions.c.status, func.count()).group_by(
+                    self.sessions.c.status
+                )
             ).all()
             employee_rows = conn.execute(
                 select(self.sessions.c.owner_employee_id, func.count().label("count"))
@@ -1193,17 +1203,21 @@ class DatabaseSessionStore:
                 .order_by(text("count DESC"))
                 .limit(5)
             ).all()
-            daily_rows = conn.execute(
-                select(
-                    day.label("day"),
-                    func.count().label("count"),
-                    completed.label("completed"),
-                    failed.label("failed"),
+            daily_rows = (
+                conn.execute(
+                    select(
+                        day.label("day"),
+                        func.count().label("count"),
+                        completed.label("completed"),
+                        failed.label("failed"),
+                    )
+                    .where(self.sessions.c.created_at >= window_start_at)
+                    .group_by(day)
+                    .order_by(day)
                 )
-                .where(self.sessions.c.created_at >= window_start_at)
-                .group_by(day)
-                .order_by(day)
-            ).mappings().all()
+                .mappings()
+                .all()
+            )
         daily_by_day = {
             str(row["day"]): {
                 "count": int(row["count"] or 0),

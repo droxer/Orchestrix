@@ -60,6 +60,8 @@ truncate either projection.
 ```text
 PATCH  /api/v1/threads/{id}                         { title } or { archived: true }
 POST   /api/v1/threads/{id}/cancellations
+POST   /api/v1/threads/{id}/messages               { text, intent, addressAgentId?, userMessageId?, idempotencyKey? }
+POST   /api/v1/threads/{id}/recoveries             { kind, targetAgentId, mode, note?, idempotencyKey? }
 PUT    /api/v1/tasks/{id}/assignment
 POST   /api/v1/tasks/{id}/runs
 POST   /api/v1/tasks/{id}/pickups
@@ -70,6 +72,12 @@ POST   /api/v1/admin/chat-integrations/{id}/health-checks
 POST   /api/v1/admin/chat-integrations/{id}/webhook-secret-rotations
 DELETE /api/v1/admin/managed-nodes/{id}/record
 ```
+
+Thread collaboration inputs are semantic. `intent` is `accomplish`, `discuss`,
+or `review`; omitting `addressAgentId` addresses the current room. Recovery
+`kind` is `rerun` or `handoff`. The backend resolves membership, executor,
+placement, and immutable round assignments; clients do not send those transport
+details.
 
 Daemon runtimes renew their backend-advertised liveness lease independently of
 command polling:

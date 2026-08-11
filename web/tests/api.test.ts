@@ -18,9 +18,11 @@ import {
   reissueComputerToken,
   RelayApiError,
   renameSession,
+  requestThreadRecovery,
   revealComputerToken,
   runLogicalAgents,
   startTask,
+  submitThreadMessage,
   updateAgentProfileImage,
   updateComputerDisplayName,
   updateOwnEmployeeAgent,
@@ -554,5 +556,71 @@ describe("agent run payloads", () => {
       taskGoal: "one more pass",
       sessionId: "ses_1",
     });
+  });
+});
+
+describe("thread collaboration messages", () => {
+  it("sends semantic intent without assignment transport details", async () => {
+    const calls: Array<{ url: string; body: unknown }> = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), body: JSON.parse(String(init?.body ?? "{}")) });
+      return new Response(JSON.stringify({ id: "ses_1" }), {
+        status: 202,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      await submitThreadMessage("ses_1", {
+        text: "@Support check this",
+        intent: "review",
+        addressAgentId: "agent_support",
+        userMessageId: "evt_1",
+      });
+    } finally {
+      globalThis.fetch = original;
+    }
+
+    assert.deepEqual(calls, [{
+      url: "/api/v1/threads/ses_1/messages",
+      body: {
+        text: "@Support check this",
+        intent: "review",
+        addressAgentId: "agent_support",
+        userMessageId: "evt_1",
+      },
+    }]);
+  });
+
+  it("requests recovery without sending assignments or executor details", async () => {
+    const calls: Array<{ url: string; body: unknown }> = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), body: JSON.parse(String(init?.body ?? "{}")) });
+      return new Response(JSON.stringify({ id: "ses_1" }), {
+        status: 202,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      await requestThreadRecovery("ses_1", {
+        kind: "handoff",
+        targetAgentId: "agent_support",
+        note: "fresh eyes",
+        idempotencyKey: "recovery_1",
+      });
+    } finally {
+      globalThis.fetch = original;
+    }
+
+    assert.deepEqual(calls, [{
+      url: "/api/v1/threads/ses_1/recoveries",
+      body: {
+        kind: "handoff",
+        targetAgentId: "agent_support",
+        note: "fresh eyes",
+        idempotencyKey: "recovery_1",
+      },
+    }]);
   });
 });

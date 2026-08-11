@@ -5,7 +5,7 @@ import json
 import os
 from collections import defaultdict
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timedelta
 from pathlib import Path
 from threading import RLock
@@ -79,7 +79,9 @@ def daemon_event_is_prunable(event_type: str) -> bool:
     )
 
 
-ACTIVE_RUN_REQUEST_STATUSES = frozenset({"running", "dispatching", "finalizing"})
+ACTIVE_RUN_REQUEST_STATUSES = frozenset(
+    {"prepared", "running", "dispatching", "finalizing"}
+)
 DISPATCH_CLAIM_ID_STATE_KEY = "_relay_dispatch_claim_id"
 DISPATCH_CLAIM_EXPIRES_STATE_KEY = "_relay_dispatch_claim_expires_at"
 TERMINAL_EVENT_STATE_KEY = "_relay_terminal_event"
@@ -336,7 +338,9 @@ class LocalDaemonStore:
         try:
             self._workspace_listener(command_id)
         except Exception:  # noqa: BLE001 - notification hints must not fail writes
-            logger.exception("Workspace response listener failed", command_id=command_id)
+            logger.exception(
+                "Workspace response listener failed", command_id=command_id
+            )
 
     def register_node(self, sandbox: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
@@ -347,7 +351,9 @@ class LocalDaemonStore:
             # an event. See node_registration_changed.
             if changed:
                 self.append_daemon_event(
-                    daemon_event("daemon.node.registered", {"node": _node_for_event(node)})
+                    daemon_event(
+                        "daemon.node.registered", {"node": _node_for_event(node)}
+                    )
                 )
             return node
 
@@ -529,11 +535,15 @@ class LocalDaemonStore:
         request_id: str | None = None,
         claim_id: str | None = None,
     ) -> dict[str, Any] | None:
-        with self._lock:
+        claim_scope = (
+            self._run_request_claim_lock() if request_id is not None else nullcontext()
+        )
+        with self._lock, claim_scope:
             if request_id is not None:
                 request = self.get_run_request(request_id)
                 if (
                     not request
+                    or request.get("status") != "dispatching"
                     or (request.get("state") or {}).get(DISPATCH_CLAIM_ID_STATE_KEY)
                     != claim_id
                 ):
@@ -584,8 +594,21 @@ class LocalDaemonStore:
             )
             return record
 
-    def publish_command(self, command_id: str) -> dict[str, Any]:
-        with self._lock:
+    def publish_command(
+        self, command_id: str, *, request_id: str | None = None
+    ) -> dict[str, Any] | None:
+        claim_scope = (
+            self._run_request_claim_lock() if request_id is not None else nullcontext()
+        )
+        with self._lock, claim_scope:
+            if request_id is not None:
+                request = self.get_run_request(request_id)
+                if not (
+                    request
+                    and request.get("status") == "running"
+                    and request.get("currentCommandId") == command_id
+                ):
+                    return None
             record = self._get_command(command_id)
             if not record:
                 raise KeyError(command_id)
@@ -607,9 +630,7 @@ class LocalDaemonStore:
         self._notify_command(record["nodeId"])
         return updated
 
-    def record_workspace_response(
-        self, node_id: str, response: dict[str, Any]
-    ) -> None:
+    def record_workspace_response(self, node_id: str, response: dict[str, Any]) -> None:
         command_id = str(response["commandId"])
         with self._lock:
             record = self._get_command(command_id)
@@ -635,9 +656,7 @@ class LocalDaemonStore:
                 "updatedAt": now_iso(),
                 "completedAt": now_iso(),
             }
-            _write_json(
-                self.commands_dir / f"{safe_name(command_id)}.json", completed
-            )
+            _write_json(self.commands_dir / f"{safe_name(command_id)}.json", completed)
             self._remove_command_from_index(node_id, command_id)
             self.append_daemon_event(
                 daemon_event(
@@ -691,7 +710,7 @@ class LocalDaemonStore:
     def take_queued_commands(
         self, node_id: str, limit: int = 2**53, lease_seconds: float = 60.0
     ) -> list[dict[str, Any]]:
-        with self._lock:
+        with self._lock, self._run_request_claim_lock():
             now = now_iso()
             # Safe only inside the single backend process that owns this store.
             records = [
@@ -702,6 +721,27 @@ class LocalDaemonStore:
             records = sorted(records, key=lambda item: item["createdAt"])[:limit]
             result = []
             for record in records:
+                command = record.get("command") or {}
+                request_id = command.get("_runRequestId")
+                if command.get("type") == "run.start" and request_id:
+                    request = self.get_run_request(request_id)
+                    if not (
+                        request
+                        and request.get("status") == "running"
+                        and request.get("currentCommandId") == command.get("id")
+                    ):
+                        self.mark_command_cancelled(
+                            node_id,
+                            {
+                                "type": "run.cancelled",
+                                "commandId": command["id"],
+                                "sessionId": command["sessionId"],
+                                "runId": command["runId"],
+                                "agent": command["agent"],
+                                "reason": "Run request became terminal before command claim.",
+                            },
+                        )
+                        continue
                 attempt = int(record.get("attempt") or 0) + 1
                 updated = {
                     **record,
@@ -814,6 +854,9 @@ class LocalDaemonStore:
             **request,
         }
         with self._lock, self._run_request_claim_lock():
+            existing = self.get_run_request(record["id"])
+            if existing:
+                return existing
             if self.active_run_request_for_session_any_node(record["sessionId"]):
                 raise ValueError(
                     f"Session {record['sessionId']} already has an active daemon run."
@@ -943,7 +986,7 @@ class LocalDaemonStore:
     def claim_run_request_dispatch(
         self, request_id: str, claim_id: str, lease_seconds: float
     ) -> dict[str, Any] | None:
-        with self._lock:
+        with self._lock, self._run_request_claim_lock():
             request = self.get_run_request(request_id)
             if (
                 not request
@@ -995,6 +1038,16 @@ class LocalDaemonStore:
             )
             return updated
 
+    def update_run_request_if_status(
+        self, request_id: str, expected_status: str, patch: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """Apply a run-request transition only from the expected state."""
+        with self._lock, self._run_request_claim_lock():
+            current = self.get_run_request(request_id)
+            if not current or current.get("status") != expected_status:
+                return None
+            return self.update_run_request(request_id, patch)
+
     def update_run_request_if_claimed(
         self,
         request_id: str,
@@ -1002,9 +1055,16 @@ class LocalDaemonStore:
         claim_id: str,
         patch: dict[str, Any],
     ) -> dict[str, Any] | None:
-        with self._lock:
+        with self._lock, self._run_request_claim_lock():
             current = self.get_run_request(request_id)
-            if not current or (current.get("state") or {}).get(claim_key) != claim_id:
+            if (
+                not current
+                or (current.get("state") or {}).get(claim_key) != claim_id
+                or (
+                    claim_key == DISPATCH_CLAIM_ID_STATE_KEY
+                    and current.get("status") != "dispatching"
+                )
+            ):
                 return None
             return self.update_run_request(request_id, patch)
 
@@ -1505,7 +1565,9 @@ class DatabaseDaemonStore:
         try:
             self._workspace_listener(command_id)
         except Exception:  # noqa: BLE001 - notification hints must not fail writes
-            logger.exception("Workspace response listener failed", command_id=command_id)
+            logger.exception(
+                "Workspace response listener failed", command_id=command_id
+            )
 
     def _write_node_agents(self, conn: Any, node_pk: str, node: dict[str, Any]) -> None:
         """Replace a node's daemon_node_agents rows, but only if they changed.
@@ -1603,7 +1665,10 @@ class DatabaseDaemonStore:
             # an event. See node_registration_changed.
             if changed:
                 self._append_daemon_event(
-                    conn, daemon_event("daemon.node.registered", {"node": _node_for_event(node)})
+                    conn,
+                    daemon_event(
+                        "daemon.node.registered", {"node": _node_for_event(node)}
+                    ),
                 )
         return node
 
@@ -1877,6 +1942,7 @@ class DatabaseDaemonStore:
                 )
                 if (
                     not request_row
+                    or request_row.get("status") != "dispatching"
                     or (request_row.get("state") or {}).get(DISPATCH_CLAIM_ID_STATE_KEY)
                     != claim_id
                 ):
@@ -1922,9 +1988,27 @@ class DatabaseDaemonStore:
             )
         return record
 
-    def publish_command(self, command_id: str) -> dict[str, Any]:
+    def publish_command(
+        self, command_id: str, *, request_id: str | None = None
+    ) -> dict[str, Any] | None:
         now = now_iso()
         with store_transaction(self.engine) as conn:
+            if request_id is not None:
+                request_row = (
+                    conn.execute(
+                        select(self.run_requests)
+                        .where(self.run_requests.c.id == request_id)
+                        .with_for_update()
+                    )
+                    .mappings()
+                    .first()
+                )
+                if not (
+                    request_row
+                    and request_row.get("status") == "running"
+                    and str(request_row.get("current_command_id")) == command_id
+                ):
+                    return None
             row = (
                 conn.execute(
                     select(self.commands)
@@ -1973,9 +2057,7 @@ class DatabaseDaemonStore:
         self._notify_command(record["nodeId"])
         return updated
 
-    def record_workspace_response(
-        self, node_id: str, response: dict[str, Any]
-    ) -> None:
+    def record_workspace_response(self, node_id: str, response: dict[str, Any]) -> None:
         command_id = str(response["commandId"])
         with store_transaction(self.engine) as conn:
             row = (
@@ -2107,7 +2189,6 @@ class DatabaseDaemonStore:
                     .where(available_condition)
                     .order_by(self.commands.c.created_at)
                     .limit(limit)
-                    .with_for_update(skip_locked=True)
                 )
                 .mappings()
                 .all()
@@ -2115,6 +2196,79 @@ class DatabaseDaemonStore:
             result = []
             for row in rows:
                 record = row_to_command(row)
+                command = record.get("command") or {}
+                request_id = command.get("_runRequestId")
+                if command.get("type") == "run.start" and request_id:
+                    request_row = (
+                        conn.execute(
+                            select(self.run_requests)
+                            .where(self.run_requests.c.id == request_id)
+                            .with_for_update()
+                        )
+                        .mappings()
+                        .first()
+                    )
+                    request_is_live = bool(
+                        request_row
+                        and request_row.get("status") == "running"
+                        and str(request_row.get("current_command_id")) == record["id"]
+                    )
+                    if not request_is_live:
+                        terminal_event = {
+                            "type": "run.cancelled",
+                            "commandId": command["id"],
+                            "sessionId": command["sessionId"],
+                            "runId": command["runId"],
+                            "agent": command["agent"],
+                            "reason": (
+                                "Run request became terminal before command claim."
+                            ),
+                        }
+                        cancelled = {
+                            **record,
+                            "command": {
+                                **command,
+                                "_terminalEvent": terminal_event,
+                            },
+                            "status": "cancelled",
+                            "updatedAt": now,
+                            "completedAt": now,
+                            "error": terminal_event["reason"],
+                        }
+                        applied = conn.execute(
+                            update(self.commands)
+                            .where(self.commands.c.id == record["id"])
+                            .where(available_condition)
+                            .values(
+                                **command_to_row(
+                                    cancelled,
+                                    database_id=record["id"],
+                                    node_pk=node_pk,
+                                )
+                            )
+                        )
+                        if applied.rowcount == 1:
+                            conn.execute(
+                                update(self.runs)
+                                .where(self.runs.c.command_id == record["id"])
+                                .values(
+                                    status="cancelled",
+                                    completed_at=now_dt,
+                                    error=terminal_event["reason"],
+                                )
+                            )
+                            self._append_daemon_event(
+                                conn,
+                                daemon_event(
+                                    "daemon.command.cancelled",
+                                    {
+                                        "nodeId": node_id,
+                                        "commandId": record["id"],
+                                        "reason": terminal_event["reason"],
+                                    },
+                                ),
+                            )
+                        continue
                 attempt = int(record.get("attempt") or 0) + 1
                 updated = {
                     **record,
@@ -2281,18 +2435,21 @@ class DatabaseDaemonStore:
                         select(self.run_requests)
                         .where(self.run_requests.c.node_id == node_pk)
                         .where(
-                            self.run_requests.c.status.in_(
-                                ACTIVE_RUN_REQUEST_STATUSES
-                            )
+                            self.run_requests.c.status.in_(ACTIVE_RUN_REQUEST_STATUSES)
                         )
                     )
                     .mappings()
                     .all()
                 )
                 active_requests = [row_to_run_request(row) for row in active_rows]
+                idempotent = next(
+                    (item for item in active_requests if item["id"] == record["id"]),
+                    None,
+                )
+                if idempotent:
+                    return idempotent
                 if any(
-                    item["sessionId"] == record["sessionId"]
-                    for item in active_requests
+                    item["sessionId"] == record["sessionId"] for item in active_requests
                 ):
                     raise ValueError(
                         f"Session {record['sessionId']} already has an active daemon run."
@@ -2317,6 +2474,9 @@ class DatabaseDaemonStore:
                     ),
                 )
         except IntegrityError as error:
+            existing = self.get_run_request(record["id"])
+            if existing:
+                return existing
             if self.active_run_request_for_session_any_node(record["sessionId"]):
                 raise ValueError(
                     f"Session {record['sessionId']} already has an active daemon run."
@@ -2569,6 +2729,55 @@ class DatabaseDaemonStore:
             )
         return updated
 
+    def update_run_request_if_status(
+        self, request_id: str, expected_status: str, patch: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """Atomically apply a run-request transition from one status."""
+        now = now_iso()
+        with store_transaction(self.engine) as conn:
+            row = (
+                conn.execute(
+                    select(self.run_requests)
+                    .where(self.run_requests.c.id == request_id)
+                    .with_for_update()
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                return None
+            current = row_to_run_request(row)
+            if current.get("status") != expected_status:
+                return None
+            updated = {**current, **patch, "updatedAt": now}
+            if patch.get("status") in TERMINAL_DAEMON_STATUSES:
+                updated["completedAt"] = now
+            node_pk = self._node_pk(conn, updated["nodeId"])
+            applied = conn.execute(
+                update(self.run_requests)
+                .where(self.run_requests.c.id == row["id"])
+                .where(self.run_requests.c.status == expected_status)
+                .values(
+                    **run_request_to_row(
+                        updated, database_id=row["id"], node_pk=node_pk
+                    )
+                )
+            )
+            if applied.rowcount != 1:
+                return None
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    "daemon.run_request.updated",
+                    {
+                        "nodeId": updated["nodeId"],
+                        "runRequestId": updated["id"],
+                        "status": updated["status"],
+                    },
+                ),
+            )
+        return updated
+
     def update_run_request_if_claimed(
         self,
         request_id: str,
@@ -2590,7 +2799,10 @@ class DatabaseDaemonStore:
             if not row:
                 return None
             current = row_to_run_request(row)
-            if (current.get("state") or {}).get(claim_key) != claim_id:
+            if (current.get("state") or {}).get(claim_key) != claim_id or (
+                claim_key == DISPATCH_CLAIM_ID_STATE_KEY
+                and current.get("status") != "dispatching"
+            ):
                 return None
             updated = {**current, **patch, "updatedAt": now}
             if patch.get("status") in TERMINAL_DAEMON_STATUSES:

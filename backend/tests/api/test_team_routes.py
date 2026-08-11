@@ -781,6 +781,7 @@ def test_team_task_start_has_no_execution_mode(monkeypatch) -> None:
         assert started.status_code == 202
         [lead_command] = app.state.registry.take_commands("node_alice", "node_token")
         assert "mode" not in lead_command
+        assert lead_command["logicalAgentId"] == lead["id"]
         app.state.registry.handle_event(
             "node_alice",
             {
@@ -790,12 +791,13 @@ def test_team_task_start_has_no_execution_mode(monkeypatch) -> None:
                 "runId": lead_command["runId"],
                 "agent": "codex",
                 "exitCode": 0,
-                "agentLog": "lead review",
+                "agentLog": "support review",
             },
             "node_token",
         )
         [support_command] = app.state.registry.take_commands("node_alice", "node_token")
         assert "mode" not in support_command
+        assert support_command["logicalAgentId"] == support["id"]
 
 
 def test_unroutable_team_start_requests_capacity_and_queues_scheduler_retry(
@@ -1443,6 +1445,13 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
         )
         lead = _agent(client, "alice", "Lead", "codex")
         support = _agent(client, "alice", "Support", "claude")
+        assert (
+            client.patch(
+                f"/api/v1/admin/agents/{lead['id']}",
+                json={"defaultRole": "reviewer"},
+            ).status_code
+            == 200
+        )
         for agent in (lead, support):
             assert (
                 client.post(
@@ -1471,6 +1480,17 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
         ).json()
         started = client.post(f"/api/v1/tasks/{task['id']}/runs", json={})
         session_id = started.json()["session"]["id"]
+        task_round = next(
+            event
+            for event in app.state.session_store.get_session(session_id)["events"]
+            if event["type"] == "collaboration.round.started"
+        )
+        assert task_round["manifest"]["source"] == "task"
+        assert task_round["manifest"]["strategy"] == "coordinate"
+        assert all(
+            assignment["assignmentId"]
+            for assignment in task_round["manifest"]["assignments"]
+        )
         first = app.state.registry.take_commands("node_alice", "node_token")[0]
         assert "mode" not in first
         app.state.registry.handle_event(
@@ -1502,8 +1522,12 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
         )
 
         answered = client.post(
-            "/api/v1/agent-runs",
-            json={"taskGoal": "one more pass please", "sessionId": session_id},
+            f"/api/v1/threads/{session_id}/messages",
+            json={
+                "text": "one more pass please",
+                "intent": "accomplish",
+                "idempotencyKey": "message_room_1",
+            },
         )
 
         assert answered.status_code == 202
@@ -1519,6 +1543,7 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
             support["id"],
         ]
         assert request["assignments"][0]["coordinator"] is True
+        assert request["assignments"][0]["mode"] == "action"
         assert "adaptive" not in request["assignments"][0]
         assert request["assignments"][0]["phase"] == "execution"
         assert request["assignments"][0]["brief"]
@@ -1528,11 +1553,51 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
             "memberAgentIds": [lead["id"], support["id"]],
             "leadAgentId": lead["id"],
         }
+        round_events = [
+            event
+            for event in app.state.session_store.get_session(session_id)["events"]
+            if event["type"] == "collaboration.round.started"
+            and event["manifest"]["source"] == "message"
+        ]
+        assert len(round_events) == 1
+        manifest = round_events[0]["manifest"]
+        assert room_command["delivery"] == {
+            "type": "assignment-attempt",
+            "attemptId": room_command["runId"],
+            "collaborationId": manifest["collaborationId"],
+            "roundId": manifest["roundId"],
+            "assignmentId": manifest["assignments"][0]["assignmentId"],
+            "workItemId": manifest["assignments"][0]["assignmentId"],
+        }
+        assert manifest["strategy"] == "coordinate"
+        assert manifest["source"] == "message"
+        assert manifest["teamSnapshot"] == request["assignments"][0]["teamSnapshot"]
+        assert [item["assignmentId"] for item in manifest["assignments"]] == [
+            item["assignmentId"] for item in request["assignments"]
+        ]
+        assert all(item["assignmentId"] for item in request["assignments"])
         assert (
             room_command["state"]["assignment_brief"]
             == (request["assignments"][0]["brief"])
         )
         assert room_command["state"]["team_phase"] == "execution"
+        work_graph = manifest["workGraph"]
+        assert [item["ownerAgentId"] for item in work_graph["items"]] == [
+            lead["id"],
+            support["id"],
+        ]
+        assert work_graph["items"][1]["delegationAuthority"] == "conductor"
+        assert work_graph["items"][1]["dependsOnWorkItemIds"] == [
+            work_graph["items"][0]["workItemId"]
+        ]
+        assert (
+            room_command["state"]["work_item_id"]
+            == work_graph["items"][0]["workItemId"]
+        )
+        assert room_command["state"]["depends_on_work_item_ids"] == []
+        first_run = app.state.session_store.get_session(session_id)["agentRuns"][-1]
+        assert first_run["dependsOnWorkItemIds"] == []
+        assert first_run["teamPhase"] == "execution"
         assert "adaptive_execution" not in room_command["state"]
 
 
@@ -1686,20 +1751,32 @@ def test_explicit_assignment_to_a_disabled_team_requires_a_recovery_decision(
         assert answered.json()["detail"]["code"] == "team_disabled"
 
         recovered = client.post(
-            "/api/v1/agent-runs",
+            f"/api/v1/threads/{session_id}/recoveries",
             json={
-                "taskGoal": "another pass",
-                "sessionId": session_id,
-                "assignments": [{"agentId": lead["id"]}],
-                "decision": {
-                    "kind": "rerun",
-                    "targetAgent": "codex",
-                    "targetAgentId": lead["id"],
-                },
+                "kind": "rerun",
+                "targetAgentId": lead["id"],
+                "mode": "action",
+                "note": "try the same participant again",
             },
         )
 
         assert recovered.status_code == 202
+        request = (
+            app.state.registry.daemon_store.active_run_request_for_session_any_node(
+                session_id
+            )
+        )
+        assert [item["agentId"] for item in request["assignments"]] == [lead["id"]]
+        recovery_round = [
+            event
+            for event in recovered.json()["events"]
+            if event["type"] == "collaboration.round.started"
+        ][-1]
+        assert recovery_round["manifest"]["source"] == "recovery"
+        assert recovery_round["manifest"]["address"] == {
+            "kind": "members",
+            "agentIds": [lead["id"]],
+        }
 
 
 def test_agent_runs_still_requires_an_assignment_for_a_solo_thread(monkeypatch) -> None:
@@ -1986,11 +2063,12 @@ def test_a_team_thread_accepts_an_assignment_naming_one_member(monkeypatch) -> N
             )
 
         answered = client.post(
-            "/api/v1/agent-runs",
+            f"/api/v1/threads/{session_id}/messages",
             json={
-                "taskGoal": "just you, Support",
-                "sessionId": session_id,
-                "assignments": [{"agentId": support["id"]}],
+                "text": "just you, Support",
+                "intent": "accomplish",
+                "addressAgentId": support["id"],
+                "idempotencyKey": "message_support_1",
             },
         )
 
@@ -2001,6 +2079,18 @@ def test_a_team_thread_accepts_an_assignment_naming_one_member(monkeypatch) -> N
             )
         )
         assert [item["agentId"] for item in request["assignments"]] == [support["id"]]
+        round_event = next(
+            event
+            for event in reversed(
+                app.state.session_store.get_session(session_id)["events"]
+            )
+            if event["type"] == "collaboration.round.started"
+        )
+        assert round_event["manifest"]["strategy"] == "direct"
+        assert round_event["manifest"]["address"] == {
+            "kind": "members",
+            "agentIds": [support["id"]],
+        }
 
 
 def test_message_to_a_team_thread_runs_every_member_as_the_owning_employee(

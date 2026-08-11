@@ -11,6 +11,10 @@ export type WorkspaceLayout = "node-root" | "thread";
 export interface AgentRun {
   id: string;
   assignmentId?: string;
+  workItemId?: string;
+  delegationAuthority?: "conductor";
+  dependsOnWorkItemIds?: string[];
+  workKind?: CollaborationWorkKind;
   agent: AgentName;
   /** Logical (employee) agent that ran this step. `agent` is only its executor
    * kind, which several named agents can share — this is the identity. */
@@ -23,6 +27,7 @@ export interface AgentRun {
   role?: AgentRole;
   brief?: string;
   coordinator?: boolean;
+  synthesizer?: boolean;
   teamSnapshot?: {
     teamId: string;
     teamRevision?: string;
@@ -65,6 +70,64 @@ export interface HumanDecision {
   actorEmployeeId?: string;
 }
 
+export type CollaborationPurpose = "accomplish" | "discuss" | "review";
+export type CollaborationStrategy = "direct" | "room" | "review" | "coordinate";
+export type CollaborationWorkKind = "coordination" | "discussion" | "planning" | "implementation" | "verification" | "review" | "repair" | "synthesis";
+
+export interface CollaborationWorkItem {
+  workItemId: string;
+  assignmentId: string;
+  ownerAgentId: string;
+  delegationAuthority: "conductor";
+  kind: CollaborationWorkKind;
+  objective: string;
+  dependsOnWorkItemIds: string[];
+  required: boolean;
+}
+
+export interface CollaborationRoundManifest {
+  /** Absent only on rounds persisted before the conductor contract shipped. */
+  contract?: {
+    name: "relay.collaboration.round";
+    version: number;
+  };
+  collaborationId: string;
+  roundId: string;
+  source: string;
+  purpose: CollaborationPurpose;
+  strategy: CollaborationStrategy;
+  address:
+    | { kind: "room" }
+    | { kind: "members"; agentIds: string[] };
+  teamSnapshot?: AgentRun["teamSnapshot"];
+  assignments: Array<{
+    assignmentId: string;
+    agentId: string;
+    mode?: "action" | "ask" | "review";
+    phase?: AgentRun["teamPhase"];
+    role?: AgentRole;
+    brief?: string;
+    coordinator?: boolean;
+    synthesizer?: boolean;
+  }>;
+  completionPolicy: string;
+  workGraph?: {
+    contract: {
+      name: "relay.collaboration.work-graph";
+      version: number;
+    };
+    items: CollaborationWorkItem[];
+    completion: {
+      kind: "all_required" | "synthesize";
+      resultOwnerWorkItemId?: string;
+    };
+    delegationPolicy: {
+      authority: "conductor";
+      policy: "sequential-role-delegation-v1";
+    };
+  };
+}
+
 export interface RelaySession {
   id: string;
   workspacePath: string;
@@ -91,6 +154,11 @@ export interface RelaySession {
   agentRuns: AgentRun[];
   artifacts: RelayArtifact[];
   decisions: HumanDecision[];
+  collaborationRounds: CollaborationRoundManifest[];
+  /** Monotonic count of authoritative collaboration rounds. */
+  collaborationRevision?: number;
+  activeCollaborationId?: string;
+  activeRoundId?: string;
   events: RelayEvent[];
   finalOutcome?: string;
   archived?: boolean;
@@ -131,11 +199,22 @@ export type RelayEvent =
     }
   | {
       id: string;
+      type: "collaboration.round.started";
+      sessionId: string;
+      timestamp: string;
+      manifest: CollaborationRoundManifest;
+    }
+  | {
+      id: string;
       type: "agent.started";
       sessionId: string;
       timestamp: string;
       runId: string;
       assignmentId?: string;
+      workItemId?: string;
+      delegationAuthority?: "conductor";
+      dependsOnWorkItemIds?: string[];
+      workKind?: CollaborationWorkKind;
       agent: AgentName;
       /** Logical (employee) agent dispatched for this run; absent on legacy
        * runs and workflow dispatches that name only an executor kind. */
@@ -148,6 +227,7 @@ export type RelayEvent =
       role?: AgentRole;
       brief?: string;
       coordinator?: boolean;
+      synthesizer?: boolean;
       teamSnapshot?: AgentRun["teamSnapshot"];
       teamPhase?: AgentRun["teamPhase"];
     }
@@ -293,6 +373,8 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
     agentRuns: [],
     artifacts: [],
     decisions: [],
+    collaborationRounds: [],
+    collaborationRevision: 0,
     events: [],
     archived: false,
   };
@@ -306,6 +388,13 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
       session.pendingDecision = event.pendingDecision;
       if (!event.pendingDecision) delete session.pendingDecision;
       if (event.status !== "completed" && event.status !== "failed") delete session.finalOutcome;
+    } else if (event.type === "collaboration.round.started") {
+      if (!session.collaborationRounds.some((round) => round.roundId === event.manifest.roundId)) {
+        session.collaborationRounds.push(event.manifest);
+      }
+      session.collaborationRevision = session.collaborationRounds.length;
+      session.activeCollaborationId = event.manifest.collaborationId;
+      session.activeRoundId = event.manifest.roundId;
     } else if (event.type === "agent.started") {
       // Threads created before node pinning adopt the computer their first
       // stamped run executed on.
@@ -317,6 +406,10 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
       session.agentRuns.push({
         id: event.runId,
         ...(event.assignmentId ? { assignmentId: event.assignmentId } : {}),
+        ...(event.workItemId ? { workItemId: event.workItemId } : {}),
+        ...(event.delegationAuthority ? { delegationAuthority: event.delegationAuthority } : {}),
+        ...(event.dependsOnWorkItemIds ? { dependsOnWorkItemIds: event.dependsOnWorkItemIds } : {}),
+        ...(event.workKind ? { workKind: event.workKind } : {}),
         agent: event.agent,
         ...(event.logicalAgentId ? { logicalAgentId: event.logicalAgentId } : {}),
         ...(event.role ? { role: event.role } : {}),
@@ -326,6 +419,7 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
         ...(event.workspaceIdentity ? { workspaceIdentity: event.workspaceIdentity } : {}),
         ...(event.brief ? { brief: event.brief } : {}),
         ...(event.coordinator ? { coordinator: true } : {}),
+        ...(event.synthesizer ? { synthesizer: true } : {}),
         ...(event.teamSnapshot ? { teamSnapshot: event.teamSnapshot } : {}),
         ...(event.teamPhase ? { teamPhase: event.teamPhase } : {}),
         status: "running",

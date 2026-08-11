@@ -16,3 +16,5 @@ sync with [`docs/implementation-plan.md`](../implementation-plan.md).
 | [ADR-012](012-canonical-web-and-api-urls.md) | Clean browser paths and versioned API namespaces |
 | [ADR-013](013-thread-scoped-workspaces.md) | Thread-scoped workspaces for local and cloud computers |
 | [ADR-014](014-agent-team-round-contracts.md) | Explicit, auditable agent-team round contracts |
+| [ADR-015](015-adaptive-agent-execution.md) | Adaptive agent execution by default |
+| [ADR-016](016-collaboration-conductor.md) | Event-sourced collaboration conductor as workflow authority |

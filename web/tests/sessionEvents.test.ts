@@ -23,6 +23,52 @@ function session(partial: Partial<RelaySession> = {}): RelaySession {
 }
 
 describe("applySessionEvent", () => {
+  it("materializes collaboration round identity and strategy from SSE", () => {
+    const updated = applySessionEvent(session(), {
+      id: "evt_round",
+      type: "collaboration.round.started",
+      sessionId: "ses_1",
+      timestamp: "2026-06-20T00:00:00.500Z",
+      manifest: {
+        contract: { name: "relay.collaboration.round", version: 2 },
+        collaborationId: "col_1",
+        roundId: "round_1",
+        source: "message",
+        purpose: "review",
+        strategy: "review",
+        address: { kind: "room" },
+        assignments: [{
+          assignmentId: "assignment_1",
+          agentId: "agent_1",
+          mode: "review",
+          phase: "review",
+        }],
+        completionPolicy: "synthesize",
+        workGraph: {
+          contract: { name: "relay.collaboration.work-graph", version: 1 },
+          items: [{
+            workItemId: "assignment_1",
+            assignmentId: "assignment_1",
+            ownerAgentId: "agent_1",
+            delegationAuthority: "conductor",
+            kind: "review",
+            objective: "Review the result.",
+            dependsOnWorkItemIds: [],
+            required: true,
+          }],
+          completion: { kind: "synthesize", resultOwnerWorkItemId: "assignment_1" },
+          delegationPolicy: { authority: "conductor", policy: "sequential-role-delegation-v1" },
+        },
+      },
+    });
+
+    assert.equal(updated.activeCollaborationId, "col_1");
+    assert.equal(updated.activeRoundId, "round_1");
+    assert.equal(updated.collaborationRevision, 1);
+    assert.equal(updated.collaborationRounds[0]?.strategy, "review");
+    assert.equal(updated.collaborationRounds[0]?.workGraph?.items[0]?.kind, "review");
+  });
+
   it("preserves runtime affinity from streamed run starts", () => {
     const workspaceIdentity = { kind: "host", workspacePath: "/workspace" };
     const updated = applySessionEvent(session(), {
@@ -32,6 +78,10 @@ describe("applySessionEvent", () => {
       timestamp: "2026-06-20T00:00:01.000Z",
       runId: "run_1",
       assignmentId: "assignment_1",
+      workItemId: "assignment_1",
+      delegationAuthority: "conductor",
+      dependsOnWorkItemIds: ["work_plan"],
+      workKind: "implementation",
       agent: "codex",
       logicalAgentId: "agent_1",
       placementId: "placement_1",
@@ -41,6 +91,7 @@ describe("applySessionEvent", () => {
       role: "implementer",
       brief: "Implement only the migration.",
       coordinator: true,
+      synthesizer: true,
       teamSnapshot: {
         teamId: "team_1",
         teamRevision: "2026-06-20T00:00:00.000Z",
@@ -51,12 +102,17 @@ describe("applySessionEvent", () => {
     });
 
     assert.equal(updated.agentRuns[0]?.assignmentId, "assignment_1");
+    assert.equal(updated.agentRuns[0]?.workItemId, "assignment_1");
+    assert.equal(updated.agentRuns[0]?.delegationAuthority, "conductor");
+    assert.deepEqual(updated.agentRuns[0]?.dependsOnWorkItemIds, ["work_plan"]);
+    assert.equal(updated.agentRuns[0]?.workKind, "implementation");
     assert.equal(updated.agentRuns[0]?.daemonNodeId, "node_1");
     assert.equal(updated.agentRuns[0]?.placementId, "placement_1");
     assert.equal(updated.agentRuns[0]?.agentVersion, 3);
     assert.deepEqual(updated.agentRuns[0]?.workspaceIdentity, workspaceIdentity);
     assert.equal(updated.agentRuns[0]?.brief, "Implement only the migration.");
     assert.equal(updated.agentRuns[0]?.coordinator, true);
+    assert.equal(updated.agentRuns[0]?.synthesizer, true);
     assert.equal(updated.agentRuns[0]?.teamPhase, "execution");
     assert.deepEqual(updated.agentRuns[0]?.teamSnapshot?.memberAgentIds, [
       "agent_1",

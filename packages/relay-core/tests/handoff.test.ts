@@ -263,6 +263,20 @@ describe("prompts", () => {
       "the assignment boundary should precede the shared team goal",
     );
   });
+  it("carries a durable delegated work item and its dependencies into prompts", () => {
+    const prompt = codexTaskPrompt(state({
+      task_goal: "Ship the feature",
+      work_item_id: "work_builder",
+      delegation_authority: "conductor",
+      depends_on_work_item_ids: ["work_plan"],
+      assignment_brief: "Implement the API slice.",
+    }));
+
+    assert.match(prompt, /\[Delegated work item\]/);
+    assert.match(prompt, /work_builder/);
+    assert.match(prompt, /collaboration conductor/);
+    assert.match(prompt, /work_plan/);
+  });
   it("lets an agent choose the smallest useful response and coordinate with teammates", () => {
     const prompt = claudeTaskPrompt(state({
       task_goal: "Improve the release workflow",
@@ -1590,9 +1604,41 @@ describe("token usage accounting", () => {
         taskGoal: "count tokens",
         participants: ["human", "codex"],
       }),
+      relayEvent("collaboration.round.started", sessionId, {
+        manifest: {
+          contract: { name: "relay.collaboration.round", version: 2 },
+          collaborationId: "col_1",
+          roundId: "round_1",
+          source: "task",
+          purpose: "accomplish",
+          strategy: "coordinate",
+          address: { kind: "room" },
+          assignments: [{ assignmentId: "assignment_1", agentId: "agent_builder", mode: "action", phase: "execution" }],
+          completionPolicy: "assigned_work",
+          workGraph: {
+            contract: { name: "relay.collaboration.work-graph", version: 1 },
+            items: [{
+              workItemId: "assignment_1",
+              assignmentId: "assignment_1",
+              ownerAgentId: "agent_builder",
+              delegationAuthority: "conductor",
+              kind: "coordination",
+              objective: "Implement the migration.",
+              dependsOnWorkItemIds: [],
+              required: true,
+            }],
+            completion: { kind: "all_required", resultOwnerWorkItemId: "assignment_1" },
+            delegationPolicy: { authority: "conductor", policy: "sequential-role-delegation-v1" },
+          },
+        },
+      }),
       relayEvent("agent.started", sessionId, {
         runId: "run_1",
         assignmentId: "assignment_1",
+        workItemId: "assignment_1",
+        delegationAuthority: "conductor",
+        dependsOnWorkItemIds: ["work_plan"],
+        workKind: "implementation",
         agent: "codex",
         role: "fixer",
         logicalAgentId: "agent_builder",
@@ -1627,10 +1673,19 @@ describe("token usage accounting", () => {
     assert.equal(session.agentRuns[0].agentVersion, 7);
     assert.deepEqual(session.agentRuns[0].workspaceIdentity, { workspacePath: "/workspace" });
     assert.equal(session.agentRuns[0].assignmentId, "assignment_1");
+    assert.equal(session.agentRuns[0].workItemId, "assignment_1");
+    assert.equal(session.agentRuns[0].delegationAuthority, "conductor");
+    assert.deepEqual(session.agentRuns[0].dependsOnWorkItemIds, ["work_plan"]);
+    assert.equal(session.agentRuns[0].workKind, "implementation");
     assert.equal(session.agentRuns[0].brief, "Implement the migration.");
     assert.equal(session.agentRuns[0].coordinator, true);
     assert.equal(session.agentRuns[0].teamPhase, "execution");
     assert.deepEqual(session.agentRuns[0].teamSnapshot?.memberAgentIds, ["agent_builder", "agent_reviewer"]);
+    assert.equal(session.activeCollaborationId, "col_1");
+    assert.equal(session.activeRoundId, "round_1");
+    assert.equal(session.collaborationRevision, 1);
+    assert.equal(session.collaborationRounds[0]?.strategy, "coordinate");
+    assert.equal(session.collaborationRounds[0]?.workGraph?.items[0]?.ownerAgentId, "agent_builder");
     assert.deepEqual(session.tokenUsage, { input: 5, output: 7, cache: 3, total: 15 });
   });
 

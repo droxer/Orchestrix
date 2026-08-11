@@ -13,13 +13,15 @@ import {
   RelayApiError,
   recordDecision,
   renameSession,
+  requestThreadRecovery,
   runSandbox,
   runLogicalAgents,
   startTask,
+  submitThreadMessage,
   updateTask,
   updateTeam,
 } from "../api";
-import type { AgentRunInput, CreateTaskInput, RelaySession, RelayTask, RelayTaskSummary, RunInput, TaskMutationInput, TeamMutationInput } from "../types";
+import type { AgentRunInput, CreateTaskInput, RelaySession, RelayTask, RelayTaskSummary, RunInput, TaskMutationInput, TeamMutationInput, ThreadMessageInput, ThreadRecoveryInput } from "../types";
 import { NODES_QUERY_KEY, RELAY_QUERY_KEY, SESSIONS_QUERY_KEY, TASKS_QUERY_KEY } from "./useRelayData";
 import { useMutationError } from "./useMutationError";
 import { useDialogs } from "../components/ui/DialogProvider";
@@ -134,6 +136,25 @@ export function useRelayMutations() {
     },
   });
 
+  const submitThreadMessageMutation = useMutation({
+    mutationFn: ({ sessionId, input }: { sessionId: string; input: ThreadMessageInput }) =>
+      submitThreadMessage(sessionId, input),
+    onSuccess: (session) => {
+      cacheSession(session);
+      void invalidateNodes();
+    },
+  });
+
+  const requestThreadRecoveryMutation = useMutation({
+    mutationFn: ({ sessionId, input }: { sessionId: string; input: ThreadRecoveryInput }) =>
+      requestThreadRecovery(sessionId, input),
+    onSuccess: (session) => {
+      cacheSession(session);
+      void invalidateNodes();
+      void invalidateTasks();
+    },
+  });
+
   const createTaskMutation = useMutation({
     mutationFn: (input: CreateTaskInput) => createTask(input),
     onSuccess: cacheTask,
@@ -245,6 +266,8 @@ export function useRelayMutations() {
     recordDecisionMutation,
     runSandboxMutation,
     runLogicalAgentsMutation,
+    submitThreadMessageMutation,
+    requestThreadRecoveryMutation,
     createTaskMutation,
     updateTaskMutation,
     deleteTaskMutation,

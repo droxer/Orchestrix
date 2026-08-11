@@ -58,6 +58,28 @@ export class RelayChatClient implements RelayChatBackend {
     });
   }
 
+  async continueThread(input: {
+    sessionId: string;
+    taskGoal: string;
+    employeeId?: string;
+    idempotencyKey?: string;
+    signal?: AbortSignal;
+  }): Promise<RelaySession> {
+    return this.request<RelaySession>(
+      `/threads/${encodeURIComponent(input.sessionId)}/messages`,
+      {
+        method: "POST",
+        signal: input.signal,
+        employeeId: input.employeeId,
+        body: {
+          text: input.taskGoal,
+          intent: "accomplish",
+          idempotencyKey: input.idempotencyKey,
+        },
+      },
+    );
+  }
+
   async cancelSessionRun(input: {
     sessionId: string;
     reason?: string;

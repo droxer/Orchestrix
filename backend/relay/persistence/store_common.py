@@ -299,6 +299,8 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         "agentRuns": [],
         "artifacts": [],
         "decisions": [],
+        "collaborationRounds": [],
+        "collaborationRevision": 0,
         "events": [],
         "archived": False,
     }
@@ -343,6 +345,23 @@ def _apply_session_status(session: dict[str, Any], event: dict[str, Any]) -> Non
         session.pop("finalOutcome", None)
 
 
+def _apply_collaboration_round_started(
+    session: dict[str, Any], event: dict[str, Any]
+) -> None:
+    manifest = event.get("manifest")
+    if not isinstance(manifest, dict):
+        return
+    rounds = session.setdefault("collaborationRounds", [])
+    round_id = manifest.get("roundId")
+    if not any(item.get("roundId") == round_id for item in rounds):
+        rounds.append(manifest)
+    session["collaborationRevision"] = len(rounds)
+    if isinstance(manifest.get("collaborationId"), str):
+        session["activeCollaborationId"] = manifest["collaborationId"]
+    if isinstance(round_id, str):
+        session["activeRoundId"] = round_id
+
+
 def _apply_agent_started(session: dict[str, Any], event: dict[str, Any]) -> None:
     if event.get("daemonNodeId") and not session.get("daemonNodeId"):
         session["daemonNodeId"] = event["daemonNodeId"]
@@ -366,8 +385,13 @@ def _apply_agent_started(session: dict[str, Any], event: dict[str, Any]) -> None
         "workspaceIdentity",
         "brief",
         "coordinator",
+        "synthesizer",
         "teamSnapshot",
         "assignmentId",
+        "workItemId",
+        "delegationAuthority",
+        "dependsOnWorkItemIds",
+        "workKind",
         "teamPhase",
     ):
         if event.get(key) is not None:
@@ -453,6 +477,7 @@ def _apply_session_renamed(session: dict[str, Any], event: dict[str, Any]) -> No
 SessionEventHandler = Callable[[dict[str, Any], dict[str, Any]], None]
 SESSION_EVENT_HANDLERS: dict[str, SessionEventHandler] = {
     "session.status": _apply_session_status,
+    "collaboration.round.started": _apply_collaboration_round_started,
     "agent.started": _apply_agent_started,
     "agent.completed": _apply_agent_completed,
     "artifact.created": _apply_artifact_created,

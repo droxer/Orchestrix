@@ -25,11 +25,11 @@ from relay.daemon_registry import (
 from relay.daemon_registry.artifacts import _is_generated_artifact_path
 from relay.daemon_registry.registry import task_progress_file
 from relay.persistence.agent_placement_store import LocalAgentPlacementStore
-from relay.persistence.task_store import LocalTaskStore
 from relay.persistence.agent_store import LocalAgentStore
 from relay.persistence.daemon_store import DatabaseDaemonStore, LocalDaemonStore
 from relay.persistence.session_store import LocalSessionStore
 from relay.persistence.store_common import _read_jsonl, new_database_id
+from relay.persistence.task_store import LocalTaskStore
 from relay.sessions import SessionController
 from sqlalchemy import event, select
 
@@ -50,6 +50,112 @@ def stored_daemon_event_types(store: object) -> list[str]:
         return [event["type"] for event in _read_jsonl(events_path)]
     with store.engine.begin() as conn:
         return list(conn.scalars(select(store.events.c.type)))
+
+
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_daemon_store_run_request_status_transition_is_compare_and_set(
+    daemon_store_factory,
+) -> None:
+    with TemporaryDirectory() as root:
+        store = daemon_store_factory(root)
+        store.register_node(store_node_payload())
+        request = store.create_run_request(
+            {
+                "nodeId": "sbx_alice",
+                "sessionId": "ses_compare_and_set",
+                "taskGoal": "transition once",
+                "assignments": [{"executorKind": "codex", "mode": "action"}],
+                "state": {},
+                "status": "prepared",
+            }
+        )
+
+        transitioned = store.update_run_request_if_status(
+            request["id"], "prepared", {"status": "running"}
+        )
+        rejected = store.update_run_request_if_status(
+            request["id"], "prepared", {"status": "cancelled"}
+        )
+
+        assert transitioned and transitioned["status"] == "running"
+        assert rejected is None
+        assert store.get_run_request(request["id"])["status"] == "running"
+
+
+def test_database_run_request_status_transition_moves_the_node_reference() -> None:
+    with TemporaryDirectory() as root:
+        store = database_daemon_store(root)
+        store.register_node(store_node_payload())
+        store.register_node(
+            {
+                **store_node_payload(),
+                "id": "sbx_bob",
+                "employeeId": "bob",
+                "workspacePath": "/workspace/bob",
+                "workspaceId": "repo:bob",
+            }
+        )
+        request = store.create_run_request(
+            {
+                "nodeId": "sbx_alice",
+                "sessionId": "ses_move_node",
+                "taskGoal": "move once",
+                "assignments": [{"executorKind": "codex", "mode": "action"}],
+                "state": {},
+                "status": "prepared",
+            }
+        )
+
+        moved = store.update_run_request_if_status(
+            request["id"],
+            "prepared",
+            {"status": "running", "nodeId": "sbx_bob"},
+        )
+
+        assert moved and moved["nodeId"] == "sbx_bob"
+        assert store.get_run_request(request["id"])["nodeId"] == "sbx_bob"
+
+
+def test_local_run_request_status_cas_is_shared_across_store_instances() -> None:
+    with TemporaryDirectory() as root:
+        first = LocalDaemonStore(root)
+        second = LocalDaemonStore(root)
+        first.register_node(store_node_payload())
+        request = first.create_run_request(
+            {
+                "nodeId": "sbx_alice",
+                "sessionId": "ses_cross_instance_cas",
+                "taskGoal": "choose one transition",
+                "assignments": [{"executorKind": "codex", "mode": "action"}],
+                "state": {},
+                "status": "prepared",
+            }
+        )
+        for store in (first, second):
+            original_get = store.get_run_request
+
+            def slow_get(request_id, original_get=original_get):
+                value = original_get(request_id)
+                time.sleep(0.03)
+                return value
+
+            store.get_run_request = slow_get
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            transitions = list(
+                executor.map(
+                    lambda item: item[0].update_run_request_if_status(
+                        request["id"], "prepared", {"status": item[1]}
+                    ),
+                    ((first, "running"), (second, "cancelled")),
+                )
+            )
+
+        assert sum(item is not None for item in transitions) == 1
+        assert first.get_run_request(request["id"])["status"] in (
+            "running",
+            "cancelled",
+        )
 
 
 @pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
@@ -513,10 +619,12 @@ def test_command_poll_cannot_observe_run_before_request_links_command() -> None:
             self.enqueued = Event()
             self.release_enqueue = Event()
 
-        def publish_command(self, command_id: str) -> dict[str, object]:
+        def publish_command(
+            self, command_id: str, *, request_id: str | None = None
+        ) -> dict[str, object] | None:
             self.enqueued.set()
             assert self.release_enqueue.wait(timeout=1)
-            return super().publish_command(command_id)
+            return super().publish_command(command_id, request_id=request_id)
 
     with TemporaryDirectory() as root:
         database_url = f"sqlite:///{root}/daemon.db"
@@ -623,6 +731,8 @@ def test_dispatch_claim_prevents_reaper_from_creating_second_command() -> None:
                 )
             )
             assert daemon_store.claimed.wait(timeout=1)
+            active_request = daemon_store.list_active_run_requests()[0]
+            assert active_request["status"] == "dispatching"
             second.reap_stale_runs()
             assert second.take_commands("sbx_alice", "node_token") == []
             daemon_store.release_claim.set()
@@ -639,11 +749,13 @@ def test_staged_command_is_published_after_dispatcher_crash() -> None:
             super().__init__(database_url, create_schema=True)
             self.fail_once = True
 
-        def publish_command(self, command_id: str) -> dict[str, object]:
+        def publish_command(
+            self, command_id: str, *, request_id: str | None = None
+        ) -> dict[str, object] | None:
             if self.fail_once:
                 self.fail_once = False
                 raise RuntimeError("dispatcher crashed before publish")
-            return super().publish_command(command_id)
+            return super().publish_command(command_id, request_id=request_id)
 
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
@@ -1255,7 +1367,9 @@ def test_daemon_completion_indexes_text_files_under_output_folder() -> None:
             [command] = registry.take_commands("sbx_alice", "node_token")
             generated = output / "summary.md"
             generated.write_text("# Summary\n", encoding="utf-8")
-            (workspace / "notes.md").write_text("a root deliverable\n", encoding="utf-8")
+            (workspace / "notes.md").write_text(
+                "a root deliverable\n", encoding="utf-8"
+            )
             (workspace / "checkout").mkdir()
             (workspace / "checkout" / "README.md").write_text(
                 "a repo file the run merely touched\n", encoding="utf-8"
@@ -2831,6 +2945,401 @@ def test_active_session_run_request_claim_is_atomic_across_store_instances(
         )
         assert isinstance(failure, ValueError)
         assert "already has an active daemon run" in str(failure)
+
+
+@pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
+def test_same_idempotent_run_request_is_get_or_create_across_store_instances(
+    store_factory,
+) -> None:
+    with TemporaryDirectory() as root:
+        stores = (store_factory(root), store_factory(root))
+        stores[0].register_node(store_node_payload())
+        barrier = Barrier(2)
+        request_id = new_database_id()
+        session_id = new_database_id()
+
+        def create(store) -> str:
+            barrier.wait()
+            return store.create_run_request(
+                {
+                    "id": request_id,
+                    "nodeId": "sbx_alice",
+                    "sessionId": session_id,
+                    "taskGoal": "do one thing",
+                    "assignments": [{"executorKind": "codex", "mode": "action"}],
+                    "state": {"fingerprint": "same"},
+                    "status": "prepared",
+                }
+            )["id"]
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(create, stores))
+
+        assert results == [request_id, request_id]
+
+
+def test_reaper_activates_a_prepared_request_only_after_its_round_is_durable() -> None:
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        registry.register(
+            {
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            },
+            "ui_token",
+        )
+        session = session_store.create_session(
+            {
+                "workspacePath": "/workspace/alice",
+                "ownerEmployeeId": "alice",
+                "taskGoal": "reconcile admission",
+            }
+        )
+        manifest = {"collaborationId": "col_1", "roundId": "round_1"}
+        prepared = registry.prepare_run_request(
+            "sbx_alice",
+            session["id"],
+            session["taskGoal"],
+            [{"executorKind": "codex", "mode": "action"}],
+            {"_relay_collaboration_manifest": manifest},
+        )
+        SessionController(session_store).record_collaboration_round_started(
+            session["id"], manifest
+        )
+
+        registry.reap_stale_runs()
+
+        assert daemon_store.get_run_request(prepared["id"])["status"] == "running"
+        assert len(registry.take_commands("sbx_alice", "node_token")) == 1
+
+
+def test_reaper_expires_a_prepared_request_without_a_durable_round(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "relay.daemon_registry.registry.PREPARED_ADMISSION_LEASE_SECONDS", 0
+    )
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        session = session_store.create_session(
+            {"workspacePath": "/workspace", "taskGoal": "expire admission"}
+        )
+        prepared = daemon_store.create_run_request(
+            {
+                "nodeId": "sbx_alice",
+                "sessionId": session["id"],
+                "taskGoal": session["taskGoal"],
+                "assignments": [],
+                "state": {},
+                "status": "prepared",
+            }
+        )
+
+        registry.reap_stale_runs()
+
+        expired = daemon_store.get_run_request(prepared["id"])
+        assert expired["status"] == "failed"
+        assert "expired" in expired["error"]
+
+
+def test_cancelling_a_prepared_request_prevents_later_reaper_activation() -> None:
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        backend = ServerDaemonNodeBackend(registry)
+        registry.register(
+            {
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            },
+            "ui_token",
+        )
+        session = session_store.create_session(
+            {
+                "workspacePath": "/workspace/alice",
+                "ownerEmployeeId": "alice",
+                "taskGoal": "cancel admission",
+            }
+        )
+        manifest = {"collaborationId": "col_1", "roundId": "round_1"}
+        prepared = registry.prepare_run_request(
+            "sbx_alice",
+            session["id"],
+            session["taskGoal"],
+            [{"executorKind": "codex", "mode": "action"}],
+            {"_relay_collaboration_manifest": manifest},
+        )
+        SessionController(session_store).record_collaboration_round_started(
+            session["id"], manifest
+        )
+
+        assert backend.cancel_run("sbx_alice", session["id"], "stop") is None
+        SessionController(session_store).cancel_session(session["id"], "stop")
+        registry.reap_stale_runs()
+
+        assert daemon_store.get_run_request(prepared["id"])["status"] == "cancelled"
+        assert registry.take_commands("sbx_alice", "node_token") == []
+
+
+def test_direct_activation_refuses_a_cancelled_prepared_request() -> None:
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        registry.register(
+            {
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            },
+            "ui_token",
+        )
+        session = session_store.create_session(
+            {"workspacePath": "/workspace/alice", "taskGoal": "cancel admission"}
+        )
+        prepared = registry.prepare_run_request(
+            "sbx_alice",
+            session["id"],
+            session["taskGoal"],
+            [{"executorKind": "codex", "mode": "action"}],
+            {},
+        )
+        daemon_store.update_run_request(prepared["id"], {"status": "cancelled"})
+
+        with pytest.raises(ValueError, match="cannot activate.*cancelled"):
+            registry.activate_run_request(prepared["id"])
+
+        assert registry.take_commands("sbx_alice", "node_token") == []
+
+
+def test_expired_admission_cannot_revive_after_a_newer_terminal_decision() -> None:
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        session = session_store.create_session(
+            {"workspacePath": "/workspace", "taskGoal": "do not revive"}
+        )
+        prepared = daemon_store.create_run_request(
+            {
+                "nodeId": "sbx_alice",
+                "sessionId": session["id"],
+                "taskGoal": session["taskGoal"],
+                "assignments": [],
+                "state": {"_relay_collaboration_admission_expired": True},
+                "status": "failed",
+                "error": (
+                    "Collaboration admission expired before its authoritative "
+                    "round event was committed."
+                ),
+            }
+        )
+        SessionController(session_store).cancel_session(session["id"], "stop")
+
+        with pytest.raises(ValueError, match="terminal session"):
+            registry.prepare_run_request(
+                "sbx_alice",
+                session["id"],
+                session["taskGoal"],
+                [],
+                {},
+                request_id=prepared["id"],
+            )
+
+        assert daemon_store.get_run_request(prepared["id"])["status"] == "failed"
+
+
+def test_cancelled_expired_request_cannot_revive_even_before_session_cancel_event() -> (
+    None
+):
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        session = session_store.create_session(
+            {"workspacePath": "/workspace", "taskGoal": "expire then cancel"}
+        )
+        SessionController(session_store).fail_session(
+            session["id"], "Collaboration admission expired before the round started."
+        )
+        request = daemon_store.create_run_request(
+            {
+                "nodeId": "sbx_alice",
+                "sessionId": session["id"],
+                "taskGoal": session["taskGoal"],
+                "assignments": [],
+                "state": {
+                    "_relay_collaboration_admission_expired": True,
+                    "_relay_collaboration_new_session": True,
+                },
+                "status": "cancelled",
+            }
+        )
+
+        with pytest.raises(ValueError, match="expired failure"):
+            registry.prepare_run_request(
+                "sbx_alice",
+                session["id"],
+                session["taskGoal"],
+                [],
+                {},
+                request_id=request["id"],
+            )
+
+        assert daemon_store.get_run_request(request["id"])["status"] == "cancelled"
+
+
+def test_reaper_never_dispatches_a_running_request_for_a_terminal_session() -> None:
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        registry.register(
+            {
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            },
+            "ui_token",
+        )
+        session = session_store.create_session(
+            {"workspacePath": "/workspace/alice", "taskGoal": "stay cancelled"}
+        )
+        request = daemon_store.create_run_request(
+            {
+                "nodeId": "sbx_alice",
+                "sessionId": session["id"],
+                "taskGoal": session["taskGoal"],
+                "assignments": [
+                    {
+                        "assignmentId": "assignment_terminal",
+                        "executorKind": "codex",
+                        "mode": "action",
+                    }
+                ],
+                "state": {},
+                "status": "running",
+            }
+        )
+        SessionController(session_store).cancel_session(session["id"], "stop")
+
+        registry.reap_stale_runs()
+
+        assert daemon_store.get_run_request(request["id"])["status"] == "cancelled"
+        assert registry.take_commands("sbx_alice", "node_token") == []
+
+
+def test_stale_activation_cannot_publish_after_persistent_cancellation_fence() -> None:
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        backend = ServerDaemonNodeBackend(registry)
+        registry.register(
+            {
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            },
+            "ui_token",
+        )
+        session = session_store.create_session(
+            {"workspacePath": "/workspace/alice", "taskGoal": "cancel before queue"}
+        )
+        stale_running = daemon_store.create_run_request(
+            {
+                "nodeId": "sbx_alice",
+                "sessionId": session["id"],
+                "taskGoal": session["taskGoal"],
+                "assignments": [
+                    {
+                        "assignmentId": "assignment_cancel_fence",
+                        "executorKind": "codex",
+                        "mode": "action",
+                    }
+                ],
+                "state": {},
+                "status": "running",
+            }
+        )
+
+        assert backend.cancel_run("sbx_alice", session["id"], "stop") is None
+        registry._enqueue_current_assignment(stale_running)
+
+        assert daemon_store.get_run_request(stale_running["id"])["status"] == (
+            "cancelled"
+        )
+        assert registry.take_commands("sbx_alice", "node_token") == []
+
+
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_command_claim_rejects_queued_work_after_session_terminalization(
+    daemon_store_factory,
+) -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = daemon_store_factory(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            registry.register(
+                {
+                    "sandboxId": "sbx_alice",
+                    "employeeId": "alice",
+                    "token": "node_token",
+                    "workspacePath": "/workspace/alice",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "capabilities": ["thread-workspaces"],
+                    "status": "ready",
+                },
+                "ui_token",
+            )
+            session = await ServerDaemonNodeBackend(registry).run(
+                "sbx_alice",
+                {
+                    "taskGoal": "finish before daemon claim",
+                    "assignments": [{"agent": "codex", "mode": "action"}],
+                },
+            )
+            SessionController(session_store).complete_session(
+                session["id"], "finished elsewhere"
+            )
+
+            assert registry.take_commands("sbx_alice", "node_token") == []
+
+    asyncio.run(run_flow())
 
 
 @pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)

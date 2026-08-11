@@ -5,6 +5,7 @@ from typing import Any
 
 from loguru import logger
 
+from ..collaboration.models import COLLABORATION_ADMISSION_EXPIRED_OUTCOME
 from ..core.ids import new_relay_id, now_iso
 from ..persistence.protocols import SessionStore, TaskStore
 from ..persistence.stores import relay_event, relay_task_event
@@ -73,9 +74,11 @@ class SessionController:
         task_goal: str,
         participants: list[str] | None = None,
         pending_start: bool = False,
+        session_id: str | None = None,
     ) -> dict[str, Any]:
         session = self.store.create_session(
             {
+                **({"id": session_id} if session_id else {}),
                 "workspacePath": self.workspace_path,
                 **(
                     {"ownerEmployeeId": self.owner_employee_id}
@@ -128,6 +131,27 @@ class SessionController:
         )
         return session
 
+    def record_collaboration_round_started(
+        self, session_id: str, manifest: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Persist the immutable collaboration plan before daemon delivery."""
+        round_id = manifest.get("roundId")
+        current = self.store.get_session(session_id)
+        if round_id and any(
+            event.get("type") == "collaboration.round.started"
+            and (event.get("manifest") or {}).get("roundId") == round_id
+            for event in current.get("events", [])
+        ):
+            return current
+        return self._append(
+            session_id,
+            relay_event(
+                "collaboration.round.started",
+                session_id,
+                {"manifest": manifest},
+            ),
+        )
+
     def complete_session(
         self, session_id: str, outcome: str, task_status: str = "done"
     ) -> dict[str, Any]:
@@ -146,6 +170,47 @@ class SessionController:
         self._update_task_status("blocked", outcome, {"sessionId": session_id})
         logger.info("Session failed", session_id=session_id, outcome=outcome)
         return session
+
+    def reopen_expired_admission(self, session_id: str) -> dict[str, Any]:
+        """Authoritatively reopen only a session failed by admission expiry."""
+        current = self.store.get_session(session_id)
+        if current.get("status") == "running" and not current.get("finalOutcome"):
+            return current
+        if not (
+            current.get("status") == "failed"
+            and current.get("finalOutcome") == COLLABORATION_ADMISSION_EXPIRED_OUTCOME
+        ):
+            raise ValueError(
+                f"Cannot reopen terminal session {session_id} after collaboration admission expiry."
+            )
+        session = self._append(
+            session_id,
+            relay_event(
+                "session.status",
+                session_id,
+                {"status": "running", "phase": "admission:retry"},
+            ),
+        )
+        self._update_task_status(
+            "running",
+            "Collaboration admission retry started.",
+            {"sessionId": session_id},
+        )
+        return session
+
+    def continue_session(self, session_id: str) -> dict[str, Any]:
+        """Reopen a terminal thread because a new user contribution was accepted."""
+        current = self.store.get_session(session_id)
+        if current.get("status") not in ("completed", "failed", "cancelled"):
+            return current
+        return self._append(
+            session_id,
+            relay_event(
+                "session.status",
+                session_id,
+                {"status": "running", "phase": "continued"},
+            ),
+        )
 
     def cancel_session(
         self, session_id: str, note: str = "Cancelled by human."
@@ -178,11 +243,20 @@ class SessionController:
         kind: str,
         note: str | None = None,
         target_agent: str | None = None,
+        *,
+        decision_id: str | None = None,
     ) -> dict[str, Any]:
         if kind == "cancel":
             return self.cancel_session(session_id, note or "Cancelled by human.")
+        if decision_id:
+            current = self.store.get_session(session_id)
+            if any(
+                decision.get("id") == decision_id
+                for decision in current.get("decisions", [])
+            ):
+                return current
         decision = {
-            "id": new_relay_id("dec"),
+            "id": decision_id or new_relay_id("dec"),
             "kind": kind,
             "createdAt": now_iso(),
             **({"note": note} if note else {}),
@@ -257,7 +331,16 @@ class SessionController:
         assignments: list[dict[str, Any]],
         note: str | None = None,
         target_agent_id: str | None = None,
+        *,
+        decision_id: str | None = None,
     ) -> dict[str, Any]:
+        if decision_id:
+            current = self.store.get_session(session_id)
+            if any(
+                decision.get("id") == decision_id
+                for decision in current.get("decisions", [])
+            ):
+                return current
         self._validate_assignment(session_id)
         self._append(
             session_id,
@@ -266,7 +349,7 @@ class SessionController:
                 session_id,
                 {
                     "decision": {
-                        "id": new_relay_id("dec"),
+                        "id": decision_id or new_relay_id("dec"),
                         "kind": "handoff",
                         "createdAt": now_iso(),
                         **({"note": note} if note else {}),
@@ -446,6 +529,11 @@ class SessionController:
                         if step.get("assignmentId")
                         else {}
                     ),
+                    **(
+                        {"workItemId": step["workItemId"]}
+                        if step.get("workItemId")
+                        else {}
+                    ),
                     "agent": step["agent"],
                     **({"role": role} if role else {}),
                     **(
@@ -485,7 +573,21 @@ class SessionController:
                     ),
                     **({"brief": step["brief"]} if step.get("brief") else {}),
                     **(
+                        {"delegationAuthority": step["delegationAuthority"]}
+                        if step.get("delegationAuthority")
+                        else {}
+                    ),
+                    **(
+                        {"dependsOnWorkItemIds": step["dependsOnWorkItemIds"]}
+                        if "dependsOnWorkItemIds" in step
+                        else {}
+                    ),
+                    **({"workKind": step["workKind"]} if step.get("workKind") else {}),
+                    **(
                         {"coordinator": True} if step.get("coordinator") is True else {}
+                    ),
+                    **(
+                        {"synthesizer": True} if step.get("synthesizer") is True else {}
                     ),
                     **(
                         {"teamSnapshot": step["teamSnapshot"]}

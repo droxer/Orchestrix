@@ -127,8 +127,10 @@ def team_agents(
 def team_member_assignments(
     agents: list[dict[str, Any]],
     *,
+    mode: str = "action",
     team: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
+    lead_agent_id = team.get("leadAgentId") if team else None
     snapshot = (
         {
             "teamId": team["id"],
@@ -139,13 +141,53 @@ def team_member_assignments(
         if team
         else None
     )
+    synthesis_round = mode in ("ask", "review")
+    ordered_agents = (
+        [
+            *(agent for agent in agents if agent["id"] != lead_agent_id),
+            *(agent for agent in agents if agent["id"] == lead_agent_id),
+        ]
+        if synthesis_round and lead_agent_id
+        else _ordered_accomplish_agents(agents, lead_agent_id)
+    )
     return [
         _team_member_assignment(
             agent,
-            coordinator=index == 0,
+            mode=mode,
+            coordinator=(agent["id"] == lead_agent_id if lead_agent_id else index == 0),
+            synthesizer=bool(
+                synthesis_round and lead_agent_id and agent["id"] == lead_agent_id
+            ),
             team_snapshot=snapshot,
         )
-        for index, agent in enumerate(agents)
+        for index, agent in enumerate(ordered_agents)
+    ]
+
+
+def _ordered_accomplish_agents(
+    agents: list[dict[str, Any]], lead_agent_id: str | None
+) -> list[dict[str, Any]]:
+    """Produce a stable topological order for delegated team work.
+
+    The lead establishes the boundary first. Implementers then create the
+    change, testers validate that accumulated work, and reviewers inspect the
+    completed result. Stable sorting preserves the team's chosen order inside
+    each phase.
+    """
+    if not lead_agent_id:
+        return agents
+    lead = [agent for agent in agents if agent["id"] == lead_agent_id]
+    members = [agent for agent in agents if agent["id"] != lead_agent_id]
+    stage = {
+        "planner": 0,
+        "implementer": 1,
+        "fixer": 1,
+        "tester": 2,
+        "reviewer": 3,
+    }
+    return [
+        *lead,
+        *sorted(members, key=lambda agent: stage.get(agent.get("defaultRole"), 1)),
     ]
 
 
@@ -166,22 +208,34 @@ def _task_team_agents(
 def _team_member_assignment(
     agent: dict[str, Any],
     *,
+    mode: str = "action",
     coordinator: bool = False,
+    synthesizer: bool = False,
     team_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     role = agent.get("defaultRole")
     return {
         "agentId": agent["id"],
         "agent": agent["executorKind"],
-        "phase": _member_phase(role),
+        "phase": _member_phase(role, mode, coordinator),
         **({"role": role} if role else {}),
         **({"coordinator": True} if coordinator else {}),
-        "brief": _member_brief(role, coordinator),
+        **({"synthesizer": True} if synthesizer else {}),
+        "brief": _member_brief(role, coordinator, synthesizer),
         **({"teamSnapshot": team_snapshot} if team_snapshot else {}),
     }
 
 
-def _member_brief(role: str | None, coordinator: bool) -> str:
+def _member_brief(
+    role: str | None, coordinator: bool, synthesizer: bool = False
+) -> str:
+    if synthesizer:
+        return (
+            "Synthesize the room's evidence into one coherent final response, "
+            "including disagreements, risks, and the recommended next step."
+        )
+    if coordinator:
+        return "Coordinate the round, establish clear boundaries, and keep the shared work coherent."
     if role == "planner":
         return "Develop the plan, dependencies, risks, and open questions for the shared goal."
     if role == "reviewer":
@@ -192,14 +246,14 @@ def _member_brief(role: str | None, coordinator: bool) -> str:
         return "Fix confirmed defects in the accumulated implementation without duplicating completed work."
     if role == "implementer":
         return "Implement the part of the shared goal that fits your role and preserve earlier teammates' work."
-    if coordinator:
-        return "Coordinate the round, establish clear boundaries, and keep the shared work coherent."
     return "Contribute a distinct part of the shared goal and avoid duplicating completed teammate work."
 
 
-def _member_phase(role: str | None) -> str:
-    if role == "planner":
+def _member_phase(
+    role: str | None, requested_mode: str, coordinator: bool = False
+) -> str:
+    if requested_mode == "ask":
         return "discussion"
-    if role == "reviewer":
+    if requested_mode == "review" or (role == "reviewer" and not coordinator):
         return "review"
     return "execution"

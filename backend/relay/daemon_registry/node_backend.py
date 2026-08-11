@@ -6,6 +6,14 @@ from uuid import UUID, uuid5
 
 from starlette.concurrency import run_in_threadpool
 
+from ..collaboration.models import (
+    COLLABORATION_ADMISSION_EXPIRED_OUTCOME,
+    COLLABORATION_ADMISSION_EXPIRED_STATE_KEY,
+    COLLABORATION_FINGERPRINT_STATE_KEY,
+    COLLABORATION_MANIFEST_STATE_KEY,
+    COLLABORATION_NEW_SESSION_STATE_KEY,
+    CollaborationIdempotencyError,
+)
 from ..core.ids import new_sandbox_id, now_iso
 from ..core.models import AGENT_NAMES, DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS
 from ..persistence.protocols import AgentPlacementStore, AgentStore, SessionStore
@@ -44,7 +52,12 @@ class ServerDaemonNodeBackend:
         self.registry.logical_assignment_validator = self._validate_logical_assignment
 
     def idempotent_run(
-        self, idempotency_key: str, actor_employee_id: str | None
+        self,
+        idempotency_key: str,
+        actor_employee_id: str | None,
+        *,
+        actor_is_admin: bool = False,
+        expected_fingerprint: str | None = None,
     ) -> dict[str, Any] | None:
         with self.registry.dispatch_lock:
             request = self.registry.daemon_store.get_run_request(
@@ -52,8 +65,44 @@ class ServerDaemonNodeBackend:
             )
             if not request:
                 return None
+            self._validate_idempotency_fingerprint(request, expected_fingerprint)
+            if (request.get("state") or {}).get(
+                COLLABORATION_ADMISSION_EXPIRED_STATE_KEY
+            ):
+                return None
+            if request.get("status") == "prepared":
+                return None
             session = self.registry.store.get_session(request["sessionId"])
-            if actor_employee_id:
+            if actor_employee_id and not actor_is_admin:
+                assert_session_owned_by_employee(
+                    self.registry.store, session["id"], actor_employee_id
+                )
+            return session
+
+    def idempotent_session_run(
+        self,
+        session_id: str,
+        actor_employee_id: str | None,
+        *,
+        actor_is_admin: bool = False,
+        expected_fingerprint: str | None = None,
+    ) -> dict[str, Any] | None:
+        with self.registry.dispatch_lock:
+            request = (
+                self.registry.daemon_store.active_run_request_for_session_any_node(
+                    session_id
+                )
+            )
+            if not request:
+                return None
+            try:
+                self._validate_idempotency_fingerprint(request, expected_fingerprint)
+            except CollaborationIdempotencyError:
+                return None
+            if request.get("status") == "prepared":
+                return None
+            session = self.registry.store.get_session(request["sessionId"])
+            if actor_employee_id and not actor_is_admin:
                 assert_session_owned_by_employee(
                     self.registry.store, session["id"], actor_employee_id
                 )
@@ -216,6 +265,9 @@ class ServerDaemonNodeBackend:
                 return idempotent_session
 
             active_runs_by_node = self._active_runs_by_node()
+            prepared_request = self._prepared_run_request(request, run_request_id)
+            if prepared_request:
+                request = self._resume_prepared_request(request, prepared_request)
             sandbox = self._validate_run_target(sandbox_id, request)
             existing_session = self._existing_session(request)
             self._validate_run_assignments(
@@ -227,7 +279,11 @@ class ServerDaemonNodeBackend:
             actor_employee_id, owner_agent_id, owner_employee_id = self._run_owner(
                 request, sandbox
             )
-            self._validate_existing_session(request, owner_employee_id)
+            self._validate_existing_session(
+                request,
+                owner_employee_id,
+                run_request_id=(prepared_request or {}).get("id") or run_request_id,
+            )
             controller = self._run_controller(
                 sandbox_id,
                 sandbox,
@@ -235,7 +291,34 @@ class ServerDaemonNodeBackend:
                 owner_employee_id,
                 owner_agent_id,
             )
-            session_id = self._run_session_id(controller, request)
+            session_id = self._run_session_id(
+                controller, request, run_request_id=run_request_id
+            )
+            run_request = prepared_request or self._prepare_run_request(
+                sandbox_id,
+                session_id,
+                request["taskGoal"],
+                request,
+                active_runs_by_node,
+                run_request_id,
+            )
+            self._validate_idempotency_fingerprint(
+                run_request, request.get("idempotencyFingerprint")
+            )
+            if run_request.get("status") != "prepared":
+                return self.registry.store.get_session(run_request["sessionId"])
+            request = self._resume_prepared_request(request, run_request)
+            session_id = run_request["sessionId"]
+            current_session = self.registry.store.get_session(session_id)
+            if (
+                (run_request.get("state") or {}).get(
+                    COLLABORATION_NEW_SESSION_STATE_KEY
+                )
+                and current_session.get("status") == "failed"
+                and current_session.get("finalOutcome")
+                == COLLABORATION_ADMISSION_EXPIRED_OUTCOME
+            ):
+                controller.reopen_expired_admission(session_id)
             dispatch_task_goal = self._record_run_intent(
                 controller,
                 session_id,
@@ -243,13 +326,10 @@ class ServerDaemonNodeBackend:
                 request,
                 actor_employee_id,
             )
-            self._start_run_request(
-                sandbox_id,
-                session_id,
-                dispatch_task_goal,
-                request,
-                active_runs_by_node,
-                run_request_id,
+            self.registry.activate_run_request(
+                run_request["id"],
+                task_goal=dispatch_task_goal,
+                active_runs=active_runs_by_node[run_request["nodeId"]],
             )
             return self.registry.store.get_session(session_id)
 
@@ -283,18 +363,89 @@ class ServerDaemonNodeBackend:
     def _idempotent_session(
         self, request: dict[str, Any], run_request_id: str | None
     ) -> dict[str, Any] | None:
-        if not run_request_id:
-            return None
-        existing_request = self.registry.daemon_store.get_run_request(run_request_id)
+        existing_request = (
+            self.registry.daemon_store.get_run_request(run_request_id)
+            if run_request_id
+            else self.registry.daemon_store.active_run_request_for_session_any_node(
+                request.get("sessionId")
+            )
+            if isinstance(request.get("sessionId"), str)
+            else None
+        )
         if not existing_request:
+            return None
+        self._validate_idempotency_fingerprint(
+            existing_request, request.get("idempotencyFingerprint")
+        )
+        if (existing_request.get("state") or {}).get(
+            COLLABORATION_ADMISSION_EXPIRED_STATE_KEY
+        ):
+            return None
+        if existing_request.get("status") == "prepared":
             return None
         session = self.registry.store.get_session(existing_request["sessionId"])
         actor_employee_id = request.get("actorEmployeeId")
-        if actor_employee_id:
+        if actor_employee_id and request.get("actorIsAdmin") is not True:
             assert_session_owned_by_employee(
                 self.registry.store, session["id"], actor_employee_id
             )
         return session
+
+    @staticmethod
+    def _validate_idempotency_fingerprint(
+        run_request: dict[str, Any], expected_fingerprint: str | None
+    ) -> None:
+        if not expected_fingerprint:
+            return
+        actual = (run_request.get("state") or {}).get(
+            COLLABORATION_FINGERPRINT_STATE_KEY
+        )
+        if actual and actual != expected_fingerprint:
+            raise CollaborationIdempotencyError(
+                "The idempotency key already belongs to a different collaboration intent."
+            )
+
+    def _prepared_run_request(
+        self, request: dict[str, Any], run_request_id: str | None
+    ) -> dict[str, Any] | None:
+        if not run_request_id:
+            session_id = request.get("sessionId")
+            existing = (
+                self.registry.daemon_store.active_run_request_for_session_any_node(
+                    session_id
+                )
+                if isinstance(session_id, str) and session_id
+                else None
+            )
+        else:
+            existing = self.registry.daemon_store.get_run_request(run_request_id)
+        if not existing or existing.get("status") != "prepared":
+            return None
+        self._validate_idempotency_fingerprint(
+            existing, request.get("idempotencyFingerprint")
+        )
+        return existing
+
+    @staticmethod
+    def _resume_prepared_request(
+        request: dict[str, Any], prepared: dict[str, Any]
+    ) -> dict[str, Any]:
+        state = prepared.get("state") or {}
+        manifest = state.get(COLLABORATION_MANIFEST_STATE_KEY)
+        resumes_new_thread = not request.get("sessionId")
+        return {
+            **request,
+            "assignments": prepared["assignments"],
+            "daemonNodeId": prepared["nodeId"],
+            "sessionId": prepared["sessionId"],
+            "_admissionId": prepared["id"],
+            **({"_resumedPreparedNewThread": True} if resumes_new_thread else {}),
+            **(
+                {"collaboration": {"manifest": manifest}}
+                if isinstance(manifest, dict)
+                else {}
+            ),
+        }
 
     def _active_runs_by_node(self) -> dict[str, list[dict[str, Any]]]:
         active_runs_by_node: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -395,7 +546,11 @@ class ServerDaemonNodeBackend:
         return actor_employee_id, owner_agent_id, owner_employee_id
 
     def _validate_existing_session(
-        self, request: dict[str, Any], owner_employee_id: str | None
+        self,
+        request: dict[str, Any],
+        owner_employee_id: str | None,
+        *,
+        run_request_id: str | None = None,
     ) -> None:
         session_id = request.get("sessionId")
         if not session_id:
@@ -405,9 +560,10 @@ class ServerDaemonNodeBackend:
         assert_session_owned_by_employee(
             self.registry.store, session_id, owner_employee_id
         )
-        if self.registry.daemon_store.active_run_request_for_session_any_node(
+        active = self.registry.daemon_store.active_run_request_for_session_any_node(
             session_id
-        ):
+        )
+        if active and active.get("id") != run_request_id:
             raise ValueError(f"Session {session_id} already has an active daemon run.")
 
     def _run_controller(
@@ -439,7 +595,12 @@ class ServerDaemonNodeBackend:
         )
 
     @staticmethod
-    def _run_session_id(controller: SessionController, request: dict[str, Any]) -> str:
+    def _run_session_id(
+        controller: SessionController,
+        request: dict[str, Any],
+        *,
+        run_request_id: str | None = None,
+    ) -> str:
         existing_session_id = request.get("sessionId")
         if existing_session_id:
             return existing_session_id
@@ -449,7 +610,11 @@ class ServerDaemonNodeBackend:
                 assignment["executorKind"] for assignment in request["assignments"]
             ),
         ]
-        return controller.create_session(request["taskGoal"], participants)["id"]
+        return controller.create_session(
+            request["taskGoal"],
+            participants,
+            session_id=run_request_id,
+        )["id"]
 
     def _record_run_intent(
         self,
@@ -459,6 +624,25 @@ class ServerDaemonNodeBackend:
         request: dict[str, Any],
         actor_employee_id: str | None,
     ) -> str:
+        collaboration = request.get("collaboration")
+        manifest = (
+            collaboration.get("manifest")
+            if isinstance(collaboration, dict)
+            and isinstance(collaboration.get("manifest"), dict)
+            else None
+        )
+        round_id = manifest.get("roundId") if manifest else None
+        current_session = self.registry.store.get_session(session_id)
+        if round_id and any(
+            event.get("type") == "collaboration.round.started"
+            and (event.get("manifest") or {}).get("roundId") == round_id
+            for event in current_session.get("events", [])
+        ):
+            return (
+                current_session.get("taskGoal")
+                if request.get("decision")
+                else request["taskGoal"]
+            )
         decision = (
             request.get("decision")
             if isinstance(request.get("decision"), dict)
@@ -479,17 +663,37 @@ class ServerDaemonNodeBackend:
         )
         if existing_session and is_decision_dispatch:
             dispatch_task_goal = existing_session.get("taskGoal") or request["taskGoal"]
-        elif existing_session:
-            controller.record_user_message(
-                session_id,
-                request["taskGoal"],
-                actor_employee_id=actor_employee_id,
-                message_id=request.get("userMessageId"),
+        elif existing_session and request.get("_resumedPreparedNewThread") is not True:
+            stable_event_id = request.get("_admissionId") or round_id
+            message_id = request.get("userMessageId") or (
+                f"evt_{stable_event_id}" if stable_event_id else None
             )
+            message_exists = bool(
+                message_id
+                and any(
+                    event.get("type") == "user.message"
+                    and event.get("id") == message_id
+                    for event in current_session.get("events", [])
+                )
+            )
+            if not message_exists:
+                controller.record_user_message(
+                    session_id,
+                    request["taskGoal"],
+                    actor_employee_id=actor_employee_id,
+                    message_id=message_id,
+                )
+            controller.continue_session(session_id)
         if decision:
             self._record_run_decision(
-                controller, session_id, decision, request["assignments"]
+                controller,
+                session_id,
+                decision,
+                request["assignments"],
+                round_id=request.get("_admissionId") or round_id,
             )
+        if manifest:
+            controller.record_collaboration_round_started(session_id, manifest)
         return dispatch_task_goal
 
     @staticmethod
@@ -498,12 +702,21 @@ class ServerDaemonNodeBackend:
         session_id: str,
         decision: dict[str, Any],
         assignments: list[dict[str, Any]],
+        *,
+        round_id: str | None = None,
     ) -> None:
         kind = decision.get("kind")
         note = decision.get("note") if isinstance(decision.get("note"), str) else None
         target_agent = valid_agent(decision.get("targetAgent"))
+        decision_id = f"dec_{round_id}" if round_id else None
         if kind == "rerun":
-            controller.record_decision(session_id, "rerun", note, target_agent)
+            controller.record_decision(
+                session_id,
+                "rerun",
+                note,
+                target_agent,
+                decision_id=decision_id,
+            )
         elif kind == "handoff" and target_agent:
             controller.handoff_session(
                 session_id,
@@ -511,9 +724,10 @@ class ServerDaemonNodeBackend:
                 assignments,
                 note,
                 decision.get("targetAgentId"),
+                decision_id=decision_id,
             )
 
-    def _start_run_request(
+    def _prepare_run_request(
         self,
         sandbox_id: str,
         session_id: str,
@@ -521,19 +735,30 @@ class ServerDaemonNodeBackend:
         request: dict[str, Any],
         active_runs_by_node: dict[str, list[dict[str, Any]]],
         run_request_id: str | None,
-    ) -> None:
+    ) -> dict[str, Any]:
         task_id = request.get("taskId")
         if not isinstance(task_id, str) or not task_id:
             task_id = None
         node_id = sandbox_id
         if request["assignments"]:
             node_id = request["assignments"][0].get("daemonNodeId") or sandbox_id
-        self.registry.start_run_request(
+        state = initial_agent_state(task_goal)
+        if not request.get("sessionId"):
+            state[COLLABORATION_NEW_SESSION_STATE_KEY] = True
+        collaboration = request.get("collaboration")
+        if isinstance(collaboration, dict) and isinstance(
+            collaboration.get("manifest"), dict
+        ):
+            state[COLLABORATION_MANIFEST_STATE_KEY] = collaboration["manifest"]
+        fingerprint = request.get("idempotencyFingerprint")
+        if isinstance(fingerprint, str) and fingerprint:
+            state[COLLABORATION_FINGERPRINT_STATE_KEY] = fingerprint
+        return self.registry.prepare_run_request(
             sandbox_id,
             session_id,
             task_goal,
             request["assignments"],
-            initial_agent_state(task_goal),
+            state,
             task_id,
             active_runs=active_runs_by_node[node_id],
             request_id=run_request_id,
@@ -561,6 +786,11 @@ class ServerDaemonNodeBackend:
             assert_session_owned_by_employee(
                 self.registry.store, session_id, actor_employee_id
             )
+        request = self.registry.daemon_store.active_run_request_for_session_any_node(
+            session_id
+        )
+        if request:
+            self.registry.cancel_run_request_before_delivery(request["id"], reason)
         active = self.registry.cancel_active_run(sandbox_id, session_id, reason)
         if not active:
             session = self.registry.store.get_session(session_id)

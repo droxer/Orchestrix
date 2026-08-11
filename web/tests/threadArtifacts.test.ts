@@ -28,6 +28,7 @@ function session(artifacts: RelayArtifact[]): RelaySession {
     agentRuns: [],
     artifacts,
     decisions: [],
+    collaborationRounds: [],
     events: [],
   };
 }

@@ -5,27 +5,16 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
+from ..collaboration.models import RunIntent
+from ..collaboration.service import CollaborationConductor, CollaborationError
 from ..persistence.agent_placement_store import create_node_placement, placement_status
 from ..security.auth import require_admin_session
-from ..services.agent_routing import (
-    AgentRoutingError,
-    resolve_agent_assignments,
-    resolve_session_daemon_node_id,
-)
 from ..services.computer_names import computer_display_name
-from ..services.team_dispatch import (
-    TeamDispatchError,
-    team_agents,
-    team_member_assignments,
-)
 from ..services.team_membership import remove_agent_from_teams
-from ..sessions.controller import SessionController
 from .deps import AppContextDep
 from .helpers import (
-    get_session_for_actor,
     json_body,
     request_actor,
-    role_name,
     string_field,
 )
 
@@ -36,7 +25,6 @@ router = APIRouter()
 # personality: both describe how their agent works, and the supervisor is the
 # person who knows what job it should do on their team.
 AGENT_META_FIELDS = frozenset({"displayName", "instructions", "defaultRole"})
-ASSIGNMENT_BRIEF_MAX_CHARS = 4000
 
 
 @router.get("/agents")
@@ -217,9 +205,7 @@ async def create_agent_placement(
     if not node:
         raise HTTPException(404, "Daemon node not found.")
     try:
-        placement = create_node_placement(
-            ctx.agent_placement_store, agent, node, body
-        )
+        placement = create_node_placement(ctx.agent_placement_store, agent, node, body)
     except ValueError as error:
         raise HTTPException(
             409 if "already has" in str(error) else 400, str(error)
@@ -266,262 +252,39 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
     raw_assignments = body.get("assignments")
     if raw_assignments is not None and not isinstance(raw_assignments, list):
         raise HTTPException(400, "assignments must be a list.")
-    idempotency_key = string_field(body, "idempotencyKey") or string_field(
-        body, "idempotency_key"
-    )
-    if idempotency_key:
-        existing = ctx.backend.idempotent_run(idempotency_key, actor["employeeId"])
-        if existing:
-            return existing
-    session_id = string_field(body, "sessionId") or string_field(body, "session_id")
-    session = (
-        get_session_for_actor(ctx.session_store, session_id, actor)
-        if session_id
-        else None
-    )
-    if session and not session.get("managedNodeId") and session.get("daemonNodeId"):
-        managed_node_id = ctx.registry.daemon_store.historical_managed_node_id(
-            session["daemonNodeId"]
-        )
-        if managed_node_id:
-            session = SessionController(ctx.session_store).record_runtime_affinity(
-                session["id"], managed_node_id
-            )
-    requested_team_id = string_field(body, "teamId") or string_field(body, "team_id")
-    if (
-        requested_team_id
-        and session
-        and session.get("teamId") != requested_team_id
-    ):
-        raise HTTPException(400, "teamId does not match this thread's team.")
-    team_id = (session.get("teamId") if session else None) or requested_team_id or None
-    team_member_ids: set[str] = set()
-    team_snapshot: dict[str, Any] | None = None
     decision = body.get("decision")
-    is_recovery_decision = isinstance(decision, dict) and decision.get("kind") in (
-        "rerun",
-        "handoff",
-    )
-    if team_id and not raw_assignments:
-        team_employee_id = (
-            ((session.get("ownerEmployeeId") if session else None) or actor["employeeId"])
-            if actor["isAdmin"]
-            else actor["employeeId"]
-        )
-        try:
-            team, members = team_agents(
-                team_id,
-                team_employee_id,
-                team_store=ctx.team_store,
-                agent_store=ctx.agent_store,
-            )
-        except TeamDispatchError as error:
-            raise HTTPException(
-                409, {"code": error.code, "message": str(error)}
-            ) from error
-        team_member_ids = {agent["id"] for agent in members}
-        team_snapshot = {
-            "teamId": team["id"],
-            "teamRevision": team.get("updatedAt") or team.get("createdAt"),
-            "memberAgentIds": [agent["id"] for agent in members],
-            "leadAgentId": team.get("leadAgentId"),
-        }
-        raw_assignments = team_member_assignments(members, team=team)
-    elif team_id and raw_assignments:
-        team_employee_id = (
-            ((session.get("ownerEmployeeId") if session else None) or actor["employeeId"])
-            if actor["isAdmin"]
-            else actor["employeeId"]
-        )
-        if is_recovery_decision:
-            # A named recovery may target a surviving member after a team was
-            # disabled, but it still cannot inject an outsider into the room.
-            team = ctx.team_store.get_team(team_id)
-            if not team or team.get("deletedAt"):
-                raise HTTPException(
-                    409,
-                    {"code": "team_not_found", "message": "team_not_found"},
-                )
-            if team.get("ownerEmployeeId") != team_employee_id:
-                raise HTTPException(
-                    409,
-                    {"code": "team_forbidden", "message": "team_forbidden"},
-                )
-            team_member_ids = set(team.get("memberAgentIds") or [])
-        else:
-            try:
-                team, members = team_agents(
-                    team_id,
-                    team_employee_id,
-                    team_store=ctx.team_store,
-                    agent_store=ctx.agent_store,
-                )
-            except TeamDispatchError as error:
-                raise HTTPException(
-                    409, {"code": error.code, "message": str(error)}
-                ) from error
-            team_member_ids = {agent["id"] for agent in members}
-        if team:
-            team_snapshot = {
-                "teamId": team["id"],
-                "teamRevision": team.get("updatedAt") or team.get("createdAt"),
-                "memberAgentIds": list(team.get("memberAgentIds") or []),
-                "leadAgentId": team.get("leadAgentId"),
-            }
-    if not raw_assignments:
-        raise HTTPException(400, "At least one assignment is required.")
-    requested_node_id = string_field(body, "daemonNodeId") or string_field(
-        body, "daemon_node_id"
-    )
-    daemon_nodes = ctx.registry.monitor_nodes()
-    session_node_id = resolve_session_daemon_node_id(
-        session,
-        ctx.agent_placement_store,
-        daemon_nodes,
-        ctx.registry.daemon_store,
-    )
-    requested_original_runtime = bool(
-        session
-        and session.get("managedNodeId")
-        and requested_node_id == session.get("daemonNodeId")
-    )
-    if (
-        session_node_id
-        and requested_node_id
-        and requested_node_id != session_node_id
-        and not requested_original_runtime
-    ):
-        raise HTTPException(
-            409,
-            {
-                "code": "workspace_unavailable",
-                "message": (
-                    "This thread already runs on another computer. "
-                    "Start a new thread to use the selected computer."
-                ),
-            },
-        )
-    required_node_id = session_node_id or requested_node_id
-    assignments = []
-    for item in raw_assignments:
-        if (
-            not isinstance(item, dict)
-            or not isinstance(item.get("agentId"), str)
-            or not item["agentId"]
-        ):
-            raise HTTPException(400, "Each assignment requires agentId.")
-        if team_id and item["agentId"] not in team_member_ids:
-            raise HTTPException(
-                409,
-                {
-                    "code": "agent_forbidden",
-                    "message": "This thread belongs to a team; only its members can answer it.",
-                },
-            )
-        role = role_name(item.get("role"))
-        phase = item.get("phase")
-        if phase not in ("discussion", "execution", "review"):
-            phase = (
-                "discussion"
-                if role == "planner"
-                else "review"
-                if role == "reviewer"
-                else "execution"
-            )
-        assignments.append(
-            {
-                "agentId": item["agentId"],
-                **(
-                    {"executorKind": item["executorKind"]}
-                    if isinstance(item.get("executorKind"), str)
-                    and item["executorKind"]
-                    else {}
-                ),
-                "phase": phase,
-                **({"role": role} if role else {}),
-                **(
-                    {"brief": item["brief"].strip()[:ASSIGNMENT_BRIEF_MAX_CHARS]}
-                    if isinstance(item.get("brief"), str) and item["brief"].strip()
-                    else {}
-                ),
-                **(
-                    {"coordinator": True}
-                    if team_snapshot
-                    and item["agentId"] == team_snapshot.get("leadAgentId")
-                    else {}
-                ),
-                **({"teamSnapshot": team_snapshot} if team_snapshot else {}),
-            }
-        )
     try:
-        resolved = resolve_agent_assignments(
-            assignments,
-            employee_id=actor["employeeId"],
-            is_admin=actor["isAdmin"],
-            agent_store=ctx.agent_store,
-            placement_store=ctx.agent_placement_store,
-            daemon_nodes=daemon_nodes,
-            session=session,
-            required_node_id=required_node_id,
-            daemon_store=ctx.registry.daemon_store,
+        return await CollaborationConductor(ctx).submit(
+            RunIntent(
+                task_goal=task_goal,
+                session_id=string_field(body, "sessionId")
+                or string_field(body, "session_id")
+                or None,
+                raw_assignments=raw_assignments,
+                mode=string_field(body, "mode") or "action",
+                requested_team_id=string_field(body, "teamId")
+                or string_field(body, "team_id")
+                or None,
+                requested_node_id=string_field(body, "daemonNodeId")
+                or string_field(body, "daemon_node_id")
+                or None,
+                idempotency_key=string_field(body, "idempotencyKey")
+                or string_field(body, "idempotency_key")
+                or None,
+                user_message_id=string_field(body, "userMessageId")
+                or string_field(body, "user_message_id")
+                or None,
+                decision=decision if isinstance(decision, dict) else None,
+            ),
+            actor,
         )
-        parsed: dict[str, Any] = {
-            "taskGoal": task_goal,
-            "assignments": resolved,
-            "actorEmployeeId": actor["employeeId"],
-            "actorIsAdmin": actor["isAdmin"],
-            "agentFirst": True,
-            "daemonNodeId": required_node_id or resolved[0]["daemonNodeId"],
-        }
-        if session_id:
-            parsed["sessionId"] = session_id
-        if team_id:
-            parsed["teamId"] = team_id
-        user_message_id = string_field(body, "userMessageId") or string_field(
-            body, "user_message_id"
+    except CollaborationError as error:
+        detail: Any = (
+            str(error)
+            if error.status in (400, 403)
+            else {"code": error.code, "message": str(error)}
         )
-        if user_message_id:
-            parsed["userMessageId"] = user_message_id
-        if idempotency_key:
-            parsed["idempotencyKey"] = idempotency_key
-        if isinstance(decision, dict):
-            kind = decision.get("kind")
-            target_agent = decision.get("targetAgent")
-            if kind not in ("rerun", "handoff") or not isinstance(target_agent, str):
-                raise HTTPException(
-                    400, "decision requires rerun or handoff and targetAgent."
-                )
-            target_assignment = resolved[0]
-            if target_agent != target_assignment["executorKind"]:
-                raise HTTPException(
-                    400, "decision targetAgent does not match assignment."
-                )
-            requested_target_id = decision.get("targetAgentId")
-            if (
-                requested_target_id
-                and requested_target_id != target_assignment["agentId"]
-            ):
-                raise HTTPException(
-                    400, "decision targetAgentId does not match assignment."
-                )
-            parsed["decision"] = {
-                "kind": kind,
-                "targetAgent": target_assignment["executorKind"],
-                "targetAgentId": target_assignment["agentId"],
-                **(
-                    {"note": decision["note"]}
-                    if isinstance(decision.get("note"), str)
-                    and decision["note"].strip()
-                    else {}
-                ),
-            }
-        return await ctx.backend.run(resolved[0]["daemonNodeId"], parsed)
-    except AgentRoutingError as error:
-        raise HTTPException(409, {"code": error.code, "message": str(error)}) from error
-    except PermissionError as error:
-        raise HTTPException(403, str(error)) from error
-    except ValueError as error:
-        raise HTTPException(409, str(error)) from error
+        raise HTTPException(error.status, detail) from error
 
 
 def _employee_exists(auth_store: Any, employee_id: str) -> bool:

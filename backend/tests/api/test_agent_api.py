@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from tempfile import TemporaryDirectory
 
+import pytest
 from fastapi.testclient import TestClient
 from relay.app import create_app
 from relay.persistence.store_common import _write_json
 from relay.services.node_agents import sync_node_agents
+from relay.sessions.controller import SessionController
 
 
 def _bootstrap_admin(client: TestClient) -> None:
@@ -708,6 +710,371 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
         deleting = client.delete(f"/api/v1/admin/agents/{agent['id']}")
         assert deleting.status_code == 409
         assert not app.state.agent_store.get_agent(agent["id"]).get("deletedAt")
+
+
+def test_normal_solo_message_cannot_address_an_agent_outside_the_room(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        node = app.state.registry.register(
+            {
+                "sandboxId": "node_admin",
+                "employeeId": "admin",
+                "token": "node_token",
+                "workspacePath": "/workspace/admin",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex", "claude"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        sync_node_agents(app.state, node)
+        agents = app.state.agent_store.list_agents(supervisor_employee_id="admin")
+        owner = next(agent for agent in agents if agent["executorKind"] == "codex")
+        outsider = next(agent for agent in agents if agent["executorKind"] == "claude")
+        session = app.state.session_store.create_session(
+            {
+                "daemonNodeId": node["id"],
+                "workspacePath": "/workspace/admin",
+                "ownerEmployeeId": "admin",
+                "ownerAgentId": owner["id"],
+                "taskGoal": "Keep one room",
+            }
+        )
+
+        response = client.post(
+            f"/api/v1/threads/{session['id']}/messages",
+            json={
+                "text": "bring in somebody else",
+                "intent": "accomplish",
+                "addressAgentId": outsider["id"],
+            },
+        )
+
+        assert response.status_code == 409
+        assert response.json()["detail"]["code"] == "agent_forbidden"
+
+
+@pytest.mark.parametrize(
+    "operation_fields",
+    [{"idempotencyKey": "message_retry_1"}, {}],
+)
+def test_semantic_message_retry_reconciles_a_prepared_attempt_without_duplicate_events(
+    monkeypatch, operation_fields
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        node = app.state.registry.register(
+            {
+                "sandboxId": "node_admin",
+                "employeeId": "admin",
+                "token": "node_token",
+                "workspacePath": "/workspace/admin",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        sync_node_agents(app.state, node)
+        owner = next(
+            agent
+            for agent in app.state.agent_store.list_agents(
+                supervisor_employee_id="admin"
+            )
+            if agent["executorKind"] == "codex"
+        )
+        session = app.state.session_store.create_session(
+            {
+                "daemonNodeId": node["id"],
+                "workspacePath": "/workspace/admin",
+                "ownerEmployeeId": "admin",
+                "ownerAgentId": owner["id"],
+                "taskGoal": "Keep one room",
+            }
+        )
+        original = SessionController.record_collaboration_round_started
+        attempts = 0
+
+        def fail_once(controller, session_id, manifest):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                prepared = app.state.registry.daemon_store.active_run_request_for_session_any_node(
+                    session_id
+                )
+                assert prepared and prepared["status"] == "prepared"
+                assert app.state.daemon_store.take_queued_commands(node["id"]) == []
+                raise ValueError("simulated event-store interruption")
+            return original(controller, session_id, manifest)
+
+        monkeypatch.setattr(
+            SessionController, "record_collaboration_round_started", fail_once
+        )
+        body = {
+            "text": "continue safely",
+            "intent": "accomplish",
+            **operation_fields,
+        }
+
+        interrupted = client.post(
+            f"/api/v1/threads/{session['id']}/messages", json=body
+        )
+        if operation_fields:
+            prepared_id = app.state.daemon_store.list_active_run_requests()[0]["id"]
+            monkeypatch.setattr(
+                "relay.daemon_registry.registry.PREPARED_ADMISSION_LEASE_SECONDS", 0
+            )
+            app.state.registry.reap_stale_runs()
+            assert app.state.daemon_store.get_run_request(prepared_id)["status"] == (
+                "failed"
+            )
+        retried = client.post(f"/api/v1/threads/{session['id']}/messages", json=body)
+
+        assert interrupted.status_code == 409
+        assert retried.status_code == 202, retried.text
+        persisted = app.state.session_store.get_session(session["id"])
+        assert (
+            len(
+                [
+                    event
+                    for event in persisted["events"]
+                    if event["type"] == "user.message"
+                ]
+            )
+            == 1
+        )
+        assert (
+            len(
+                [
+                    event
+                    for event in persisted["events"]
+                    if event["type"] == "collaboration.round.started"
+                ]
+            )
+            == 1
+        )
+        assert len(app.state.daemon_store.take_queued_commands(node["id"])) == 1
+
+        if operation_fields:
+            conflict = client.post(
+                f"/api/v1/threads/{session['id']}/messages",
+                json={**body, "text": "a different operation"},
+            )
+            assert conflict.status_code == 409
+            assert conflict.json()["detail"]["code"] == "idempotency_conflict"
+        else:
+            replay = client.post(f"/api/v1/threads/{session['id']}/messages", json=body)
+            assert replay.status_code == 202, replay.text
+
+
+def test_new_thread_retry_resumes_the_session_owned_by_its_prepared_admission(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        node = app.state.registry.register(
+            {
+                "sandboxId": "node_admin",
+                "employeeId": "admin",
+                "token": "node_token",
+                "workspacePath": "/workspace/admin",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        sync_node_agents(app.state, node)
+        agent = next(
+            item
+            for item in app.state.agent_store.list_agents(
+                supervisor_employee_id="admin"
+            )
+            if item["executorKind"] == "codex"
+        )
+        original = SessionController.record_collaboration_round_started
+        attempts = 0
+
+        def fail_once(controller, session_id, manifest):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise ValueError("simulated event-store interruption")
+            return original(controller, session_id, manifest)
+
+        monkeypatch.setattr(
+            SessionController, "record_collaboration_round_started", fail_once
+        )
+        body = {
+            "taskGoal": "start exactly once",
+            "assignments": [{"agentId": agent["id"], "mode": "action"}],
+            "idempotencyKey": "new_thread_retry_1",
+        }
+
+        interrupted = client.post("/api/v1/agent-runs", json=body)
+        prepared = app.state.daemon_store.list_active_run_requests()[0]
+        monkeypatch.setattr(
+            "relay.daemon_registry.registry.PREPARED_ADMISSION_LEASE_SECONDS", 0
+        )
+        app.state.registry.reap_stale_runs()
+        assert app.state.session_store.get_session(prepared["sessionId"])["status"] == (
+            "failed"
+        )
+        retried = client.post("/api/v1/agent-runs", json=body)
+
+        assert interrupted.status_code == 409
+        assert retried.status_code == 202, retried.text
+        assert retried.json()["id"] == prepared["sessionId"]
+        assert retried.json()["status"] == "running"
+        assert "finalOutcome" not in retried.json()
+        assert len(app.state.daemon_store.take_queued_commands(node["id"])) == 1
+        assert len(app.state.session_store.list_sessions()) == 1
+
+
+def test_completed_thread_retry_reopens_after_message_commit_interruption(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        node = app.state.registry.register(
+            {
+                "sandboxId": "node_admin",
+                "employeeId": "admin",
+                "token": "node_token",
+                "workspacePath": "/workspace/admin",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        sync_node_agents(app.state, node)
+        owner = next(
+            agent
+            for agent in app.state.agent_store.list_agents(
+                supervisor_employee_id="admin"
+            )
+            if agent["executorKind"] == "codex"
+        )
+        session = app.state.session_store.create_session(
+            {
+                "daemonNodeId": node["id"],
+                "workspacePath": "/workspace/admin",
+                "ownerEmployeeId": "admin",
+                "ownerAgentId": owner["id"],
+                "taskGoal": "finished once",
+            }
+        )
+        SessionController(app.state.session_store).complete_session(
+            session["id"], "first answer"
+        )
+        original = SessionController.continue_session
+        attempts = 0
+
+        def fail_once(controller, session_id):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise ValueError("simulated interruption after message commit")
+            return original(controller, session_id)
+
+        monkeypatch.setattr(SessionController, "continue_session", fail_once)
+        body = {
+            "text": "continue after completion",
+            "intent": "accomplish",
+            "userMessageId": "message_completed_retry_1",
+        }
+
+        interrupted = client.post(
+            f"/api/v1/threads/{session['id']}/messages", json=body
+        )
+        retried = client.post(f"/api/v1/threads/{session['id']}/messages", json=body)
+
+        assert interrupted.status_code == 409
+        assert retried.status_code == 202, retried.text
+        assert retried.json()["status"] == "running"
+        assert "finalOutcome" not in retried.json()
+        assert len(app.state.daemon_store.take_queued_commands(node["id"])) == 1
+        assert (
+            sum(event["type"] == "user.message" for event in retried.json()["events"])
+            == 1
+        )
+
+
+def test_admin_can_replay_a_scoped_message_for_an_employee_owned_thread(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                },
+            ).status_code
+            == 201
+        )
+        node = app.state.registry.register(
+            {
+                "sandboxId": "node_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        sync_node_agents(app.state, node)
+        agent = next(
+            item
+            for item in app.state.agent_store.list_agents(
+                supervisor_employee_id="alice"
+            )
+            if item["executorKind"] == "codex"
+        )
+        session = app.state.session_store.create_session(
+            {
+                "daemonNodeId": node["id"],
+                "workspacePath": "/workspace/alice",
+                "ownerEmployeeId": "alice",
+                "ownerAgentId": agent["id"],
+                "taskGoal": "Admin-assisted room",
+            }
+        )
+        body = {
+            "text": "continue under supervision",
+            "intent": "accomplish",
+            "idempotencyKey": "admin_retry_1",
+        }
+
+        first = client.post(f"/api/v1/threads/{session['id']}/messages", json=body)
+        replay = client.post(f"/api/v1/threads/{session['id']}/messages", json=body)
+
+        assert first.status_code == 202
+        assert replay.status_code == 202, replay.text
+        assert replay.json()["id"] == session["id"]
 
 
 def test_existing_thread_resumes_after_managed_runtime_replacement_without_read(
@@ -1789,9 +2156,10 @@ def test_agent_role_is_visible_and_can_be_cleared(monkeypatch) -> None:
         # The role decides what a team member is told to do, so the view that
         # renders the agent has to carry it.
         listed = client.get("/api/v1/admin/agents").json()["agents"]
-        assert next(item for item in listed if item["id"] == agent["id"])[
-            "defaultRole"
-        ] == "reviewer"
+        assert (
+            next(item for item in listed if item["id"] == agent["id"])["defaultRole"]
+            == "reviewer"
+        )
 
         cleared = client.patch(
             f"/api/v1/admin/agents/{agent['id']}", json={"defaultRole": None}
@@ -1821,6 +2189,10 @@ def test_agent_role_is_visible_and_can_be_cleared(monkeypatch) -> None:
         )
         assert owned.status_code == 200, owned.text
         assert owned.json()["agent"]["defaultRole"] == "planner"
-        assert not client.patch(
-            f"/api/v1/agents/{agent['id']}", json={"defaultRole": None}
-        ).json()["agent"].get("defaultRole")
+        assert (
+            not client.patch(
+                f"/api/v1/agents/{agent['id']}", json={"defaultRole": None}
+            )
+            .json()["agent"]
+            .get("defaultRole")
+        )

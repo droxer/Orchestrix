@@ -6,13 +6,32 @@ from collections import defaultdict
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from threading import RLock
 from typing import Any
 
 from loguru import logger
 
+from ..collaboration.models import (
+    COLLABORATION_ADMISSION_EXPIRED_ERROR,
+    COLLABORATION_ADMISSION_EXPIRED_OUTCOME,
+    COLLABORATION_ADMISSION_EXPIRED_STATE_KEY,
+    COLLABORATION_FINGERPRINT_STATE_KEY,
+    COLLABORATION_MANIFEST_STATE_KEY,
+    COLLABORATION_NEW_SESSION_STATE_KEY,
+)
+from ..collaboration.policy import (
+    PARTICIPANT_FAILURES_STATE_KEY,
+    REPAIR_COUNT_STATE_KEY,
+    REPAIR_NOTE_STATE_KEY,
+    REPAIR_RESUME_INDEX_STATE_KEY,
+    ROUND_RESULT_STATE_KEY,
+    advance_after_success,
+    assignment_reports_round_result,
+    decide_failure,
+    validate_round_result,
+)
 from ..core.environment import load_backend_env
 from ..core.ids import new_database_id, new_relay_id, new_sandbox_id, now_iso
 from ..core.models import (
@@ -131,11 +150,6 @@ def task_progress_file(session_id: str, workspace_layout: str) -> str:
 
 
 ARTIFACT_SNAPSHOT_STATE_KEY = "_relay_artifact_snapshot"
-REPAIR_COUNT_STATE_KEY = "_relay_repair_count"
-REPAIR_RESUME_INDEX_STATE_KEY = "_relay_repair_resume_index"
-REPAIR_NOTE_STATE_KEY = "_relay_repair_note"
-ROUND_RESULT_STATE_KEY = "_relay_round_result"
-PARTICIPANT_FAILURES_STATE_KEY = "_relay_participant_failures"
 # Run-request bookkeeping that has to survive being re-staged. Command state is
 # filtered down to the agent-visible keys, so anything not listed here is lost
 # the moment the next command is staged.
@@ -146,13 +160,13 @@ CARRIED_RUN_REQUEST_STATE_KEYS = frozenset(
         REPAIR_NOTE_STATE_KEY,
         ROUND_RESULT_STATE_KEY,
         PARTICIPANT_FAILURES_STATE_KEY,
+        COLLABORATION_MANIFEST_STATE_KEY,
+        COLLABORATION_FINGERPRINT_STATE_KEY,
     }
 )
 # Mirrors ROUND_RESULT_RELATIVE_PATH in relay-daemon: `.relay/` is excluded
 # from the artifact scan, so the control file never becomes a deliverable.
 ROUND_RESULT_RELATIVE_PATH = ".relay/round-result.json"
-ROUND_RESULT_STATUSES = frozenset({"done", "continue", "blocked"})
-ROUND_RESULT_NOTE_MAX_CHARS = 2000
 # How many times the lead may be sent back to repair a failed teammate before
 # the run is allowed to fail. Each repair costs a full agent turn.
 DAEMON_RUN_MAX_REPAIRS = int(os.environ.get("RELAY_DAEMON_RUN_MAX_REPAIRS", "1"))
@@ -164,6 +178,9 @@ TERMINAL_CLAIM_LEASE_SECONDS = float(
 )
 DISPATCH_CLAIM_LEASE_SECONDS = float(
     os.environ.get("RELAY_DISPATCH_CLAIM_LEASE_SECONDS", "60")
+)
+PREPARED_ADMISSION_LEASE_SECONDS = float(
+    os.environ.get("RELAY_PREPARED_ADMISSION_LEASE_SECONDS", "60")
 )
 RUN_OUTPUT_BUFFER_MAX_CHARS = int(
     os.environ.get("RELAY_RUN_OUTPUT_BUFFER_MAX_CHARS", str(2 * 1024 * 1024))
@@ -1114,9 +1131,9 @@ class DaemonNodeRegistry:
         if employee_id:
             existing = self.find_by_employee(employee_id, workspace_path)
             if existing:
-                node_token = existing.get("nodeTokenSecret") or self.plain_node_tokens.get(
-                    existing["id"]
-                )
+                node_token = existing.get(
+                    "nodeTokenSecret"
+                ) or self.plain_node_tokens.get(existing["id"])
                 updates: dict[str, Any] = {}
                 if not existing.get("sandboxMode"):
                     updates["sandboxMode"] = sandbox_mode
@@ -1297,8 +1314,7 @@ class DaemonNodeRegistry:
             seen_at = 0.0
         return (
             0
-            if liveness["online"]
-            and node_accepts_run(sandbox, active_runs=active_runs)
+            if liveness["online"] and node_accepts_run(sandbox, active_runs=active_runs)
             else 1,
             0 if liveness["online"] else 1,
             -seen_at,
@@ -1429,6 +1445,67 @@ class DaemonNodeRegistry:
         records = self.daemon_store.take_queued_commands(
             sandbox_id, limit=limit, lease_seconds=lease_seconds
         )
+        deliverable_records: list[dict[str, Any]] = []
+        for record in records:
+            command = record["command"]
+            if command.get("type") != "run.start":
+                deliverable_records.append(record)
+                continue
+            request_id = command.get("_runRequestId")
+            run_request = (
+                self.daemon_store.get_run_request(request_id) if request_id else None
+            )
+            try:
+                session = self.store.get_session(command["sessionId"])
+            except KeyError:
+                session = None
+            request_is_live = bool(
+                run_request
+                and run_request.get("status") == "running"
+                and run_request.get("currentCommandId") == command.get("id")
+            )
+            session_is_live = bool(
+                session
+                and session.get("status") not in ("completed", "failed", "cancelled")
+            )
+            if request_is_live and session_is_live:
+                deliverable_records.append(record)
+                continue
+            reason = (
+                "Run delivery suppressed because its request or session is terminal."
+            )
+            self.daemon_store.mark_command_cancelled(
+                sandbox_id,
+                {
+                    "type": "run.cancelled",
+                    "commandId": command["id"],
+                    "sessionId": command["sessionId"],
+                    "runId": command["runId"],
+                    "agent": command["agent"],
+                    "reason": reason,
+                    **({"leaseId": record["leaseId"]} if record.get("leaseId") else {}),
+                },
+            )
+            if run_request and run_request.get("status") in (
+                "prepared",
+                "running",
+                "dispatching",
+            ):
+                self.daemon_store.update_run_request_if_status(
+                    run_request["id"],
+                    run_request["status"],
+                    {
+                        "status": (
+                            session["status"]
+                            if session
+                            and session.get("status")
+                            in ("completed", "failed", "cancelled")
+                            else "cancelled"
+                        ),
+                        "error": reason,
+                    },
+                )
+        records = deliverable_records
         logger.debug(
             "Commands taken by daemon node",
             sandbox_id=sandbox_id,
@@ -1526,6 +1603,32 @@ class DaemonNodeRegistry:
         active_runs: list[dict[str, Any]] | None = None,
         request_id: str | None = None,
     ) -> dict[str, Any]:
+        request = self.prepare_run_request(
+            sandbox_id,
+            session_id,
+            task_goal,
+            assignments,
+            state,
+            task_id,
+            active_runs=active_runs,
+            request_id=request_id,
+        )
+        return self.activate_run_request(
+            request["id"], task_goal=task_goal, active_runs=active_runs
+        )
+
+    def prepare_run_request(
+        self,
+        sandbox_id: str,
+        session_id: str,
+        task_goal: str,
+        assignments: list[dict[str, Any]],
+        state: dict[str, Any],
+        task_id: str | None = None,
+        *,
+        active_runs: list[dict[str, Any]] | None = None,
+        request_id: str | None = None,
+    ) -> dict[str, Any]:
         assignments = [
             {
                 **assignment,
@@ -1542,7 +1645,7 @@ class DaemonNodeRegistry:
             ),
         ]
         with self.dispatch_scope(node_ids):
-            return self._start_run_request_unlocked(
+            return self._prepare_run_request_unlocked(
                 sandbox_id,
                 session_id,
                 task_goal,
@@ -1553,7 +1656,7 @@ class DaemonNodeRegistry:
                 request_id,
             )
 
-    def _start_run_request_unlocked(
+    def _prepare_run_request_unlocked(
         self,
         sandbox_id: str,
         session_id: str,
@@ -1564,9 +1667,63 @@ class DaemonNodeRegistry:
         active_runs: list[dict[str, Any]] | None,
         request_id: str | None,
     ) -> dict[str, Any]:
-        if self.daemon_store.active_run_request_for_session_any_node(session_id):
+        existing = self.daemon_store.get_run_request(request_id) if request_id else None
+        if existing and (existing.get("state") or {}).get(
+            COLLABORATION_ADMISSION_EXPIRED_STATE_KEY
+        ):
+            if not (
+                existing.get("status") == "failed"
+                and existing.get("error") == COLLABORATION_ADMISSION_EXPIRED_ERROR
+            ):
+                raise ValueError(
+                    "Cannot revive a collaboration request that is not the expired failure."
+                )
+            session = self.store.get_session(existing["sessionId"])
+            is_expired_new_session = bool(
+                (existing.get("state") or {}).get(COLLABORATION_NEW_SESSION_STATE_KEY)
+                and session.get("status") == "failed"
+                and session.get("finalOutcome")
+                == COLLABORATION_ADMISSION_EXPIRED_OUTCOME
+            )
+            if session.get("status") in ("completed", "failed", "cancelled") and not (
+                is_expired_new_session
+            ):
+                raise ValueError(
+                    "Cannot revive an expired collaboration admission for a terminal session."
+                )
+            revived = self.daemon_store.update_run_request_if_status(
+                existing["id"],
+                existing["status"],
+                {
+                    "nodeId": sandbox_id,
+                    "sessionId": session_id,
+                    "taskGoal": task_goal,
+                    "assignments": assignments,
+                    "state": {
+                        **state,
+                        COLLABORATION_ADMISSION_EXPIRED_STATE_KEY: True,
+                    },
+                    "status": "prepared",
+                    "currentIndex": 0,
+                    "currentCommandId": None,
+                    "currentRunId": None,
+                    "currentAgent": None,
+                    "currentMode": None,
+                    "currentStartedAt": None,
+                    "currentProgressAt": None,
+                    "error": None,
+                    "completedAt": None,
+                },
+            )
+            if revived:
+                return revived
+            return self.daemon_store.get_run_request(existing["id"]) or existing
+        active = self.daemon_store.active_run_request_for_session_any_node(session_id)
+        if active and request_id and active.get("id") == request_id:
+            return active
+        if active:
             raise ValueError(f"Session {session_id} already has an active daemon run.")
-        request = self.daemon_store.create_run_request(
+        return self.daemon_store.create_run_request(
             {
                 **({"id": request_id} if request_id else {}),
                 "nodeId": sandbox_id,
@@ -1574,16 +1731,115 @@ class DaemonNodeRegistry:
                 "taskGoal": task_goal,
                 "assignments": assignments,
                 "state": state,
+                "status": "prepared",
                 **({"taskId": task_id} if task_id else {}),
             }
         )
-        return self._enqueue_current_assignment(request, active_runs=active_runs)
+
+    def activate_run_request(
+        self,
+        request_id: str,
+        *,
+        task_goal: str | None = None,
+        active_runs: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        request = self.daemon_store.get_run_request(request_id)
+        if not request:
+            raise KeyError(request_id)
+        with self.dispatch_scope([request["nodeId"]]):
+            request = self.daemon_store.get_run_request(request_id)
+            if not request:
+                raise KeyError(request_id)
+            session = self.store.get_session(request["sessionId"])
+            if session.get("status") in ("completed", "failed", "cancelled"):
+                if request.get("status") == "prepared":
+                    self.daemon_store.update_run_request_if_status(
+                        request_id,
+                        "prepared",
+                        {
+                            "status": session["status"],
+                            "error": (
+                                "Prepared collaboration was not activated because "
+                                f"the session is {session['status']}."
+                            ),
+                        },
+                    )
+                raise ValueError(
+                    f"cannot activate collaboration request for {session['status']} session"
+                )
+            if request.get("status") == "prepared":
+                activation_state = dict(request.get("state") or {})
+                activation_state.pop(COLLABORATION_ADMISSION_EXPIRED_STATE_KEY, None)
+                patch: dict[str, Any] = {
+                    "status": "running",
+                    "state": activation_state,
+                }
+                if task_goal is not None:
+                    patch["taskGoal"] = task_goal
+                    patch["state"] = {
+                        **activation_state,
+                        "task_goal": task_goal,
+                    }
+                activated = self.daemon_store.update_run_request_if_status(
+                    request_id, "prepared", patch
+                )
+                request = activated or self.daemon_store.get_run_request(request_id)
+                if not request:
+                    raise KeyError(request_id)
+            if request.get("status") not in ("running", "dispatching"):
+                raise ValueError(
+                    "cannot activate collaboration request in "
+                    f"{request.get('status')} state"
+                )
+            if request.get("currentCommandId"):
+                return request
+            session = self.store.get_session(request["sessionId"])
+            if session.get("status") in ("completed", "failed", "cancelled"):
+                raise ValueError(
+                    f"cannot activate collaboration request for {session['status']} session"
+                )
+            return self._enqueue_current_assignment(request, active_runs=active_runs)
 
     def cancel_active_run(
         self, sandbox_id: str, session_id: str, reason: str
     ) -> dict[str, Any] | None:
         with self.dispatch_lock:
             return self._cancel_active_run_unlocked(sandbox_id, session_id, reason)
+
+    def cancel_run_request_before_delivery(
+        self, request_id: str, reason: str
+    ) -> dict[str, Any] | None:
+        """Persist a cancellation fence before any staged command is published."""
+        request = self.daemon_store.get_run_request(request_id)
+        if not request:
+            return None
+        with self.dispatch_scope([request["nodeId"]]):
+            request = self.daemon_store.get_run_request(request_id)
+            if not request or request.get("status") not in (
+                "prepared",
+                "running",
+                "dispatching",
+            ):
+                return None
+            state = dict(request.get("state") or {})
+            state.pop("_relay_dispatch_claim_id", None)
+            state.pop("_relay_dispatch_claim_expires_at", None)
+            cancelled = self.daemon_store.update_run_request_if_status(
+                request_id,
+                request["status"],
+                {"status": "cancelled", "error": reason, "state": state},
+            )
+            if not cancelled:
+                return None
+            command_id = cancelled.get("currentCommandId")
+            staged = (
+                self.daemon_store.get_command(command_id)
+                if command_id
+                else self.daemon_store.pending_command_for_run_request(request_id)
+            )
+            if staged and staged.get("status") == "pending":
+                self.daemon_store.discard_staged_command(staged["id"])
+            return cancelled
 
     def _cancel_active_run_unlocked(
         self, sandbox_id: str, session_id: str, reason: str
@@ -1949,6 +2205,72 @@ class DaemonNodeRegistry:
         self._maybe_prune_terminal_records(monotonic_now)
         self._reap_orphaned_runs_unlocked()
         for request in self.daemon_store.list_active_run_requests():
+            if request.get("status") == "prepared":
+                manifest = (request.get("state") or {}).get(
+                    COLLABORATION_MANIFEST_STATE_KEY
+                )
+                try:
+                    session = self.store.get_session(request["sessionId"])
+                except KeyError:
+                    self.daemon_store.update_run_request(
+                        request["id"],
+                        {
+                            "status": "failed",
+                            "error": "Prepared collaboration session no longer exists.",
+                        },
+                    )
+                    continue
+                if session.get("status") in ("completed", "failed", "cancelled"):
+                    self.daemon_store.update_run_request(
+                        request["id"],
+                        {
+                            "status": session["status"],
+                            "error": (
+                                "Prepared collaboration was not activated because "
+                                f"the session is {session['status']}."
+                            ),
+                        },
+                    )
+                    continue
+                round_id = (
+                    manifest.get("roundId") if isinstance(manifest, dict) else None
+                )
+                round_is_durable = bool(
+                    round_id
+                    and any(
+                        event.get("type") == "collaboration.round.started"
+                        and (event.get("manifest") or {}).get("roundId") == round_id
+                        for event in session.get("events", [])
+                    )
+                )
+                if round_is_durable:
+                    self.activate_run_request(request["id"])
+                    continue
+                updated_at = datetime.fromisoformat(request["updatedAt"])
+                age_seconds = (datetime.now(timezone.utc) - updated_at).total_seconds()
+                if age_seconds >= PREPARED_ADMISSION_LEASE_SECONDS:
+                    state = {
+                        **(request.get("state") or {}),
+                        COLLABORATION_ADMISSION_EXPIRED_STATE_KEY: True,
+                    }
+                    self.daemon_store.update_run_request(
+                        request["id"],
+                        {
+                            "status": "failed",
+                            "error": COLLABORATION_ADMISSION_EXPIRED_ERROR,
+                            "state": state,
+                        },
+                    )
+                    if state.get(COLLABORATION_NEW_SESSION_STATE_KEY):
+                        SessionController(
+                            self.store,
+                            task_store=self.task_store,
+                            task_id=request.get("taskId"),
+                        ).fail_session(
+                            request["sessionId"],
+                            COLLABORATION_ADMISSION_EXPIRED_OUTCOME,
+                        )
+                continue
             if request.get("status") == "finalizing":
                 terminal_event = (request.get("state") or {}).get(
                     TERMINAL_EVENT_STATE_KEY
@@ -1968,6 +2290,45 @@ class DaemonNodeRegistry:
                             error=str(error),
                         )
                 continue
+            session = self.store.get_session(request["sessionId"])
+            if session.get("status") in ("completed", "failed", "cancelled"):
+                terminalized = self.daemon_store.update_run_request_if_status(
+                    request["id"],
+                    request["status"],
+                    {
+                        "status": session["status"],
+                        "error": (
+                            "Collaboration delivery was suppressed because "
+                            f"the session is {session['status']}."
+                        ),
+                    },
+                )
+                if terminalized:
+                    command_id = request.get("currentCommandId")
+                    staged = (
+                        self.daemon_store.get_command(command_id)
+                        if command_id
+                        else self.daemon_store.pending_command_for_run_request(
+                            request["id"]
+                        )
+                    )
+                    if staged and staged.get("status") == "pending":
+                        self.daemon_store.discard_staged_command(staged["id"])
+                continue
+            if request.get("status") == "dispatching":
+                claim_expires_at = (request.get("state") or {}).get(
+                    "_relay_dispatch_claim_expires_at"
+                )
+                staged_for_request = self.daemon_store.pending_command_for_run_request(
+                    request["id"]
+                )
+                if (
+                    not staged_for_request
+                    and isinstance(claim_expires_at, str)
+                    and datetime.fromisoformat(claim_expires_at)
+                    > datetime.now(timezone.utc)
+                ):
+                    continue
             command_id = request.get("currentCommandId")
             if not command_id:
                 staged = self.daemon_store.pending_command_for_run_request(
@@ -2020,17 +2381,23 @@ class DaemonNodeRegistry:
                         )
                         if not request:
                             continue
-                    self.daemon_store.publish_command(command["id"])
-                    self._track_active_command(staged["nodeId"], command)
+                    published = self.daemon_store.publish_command(
+                        command["id"], request_id=request["id"]
+                    )
+                    if published:
+                        self._track_active_command(staged["nodeId"], command)
                 else:
                     self._enqueue_current_assignment(request)
                 continue
             command_record = self.daemon_store.get_command(command_id)
             if command_record and command_record.get("status") == "pending":
-                self.daemon_store.publish_command(command_id)
-                self._track_active_command(
-                    command_record["nodeId"], command_record["command"]
+                published = self.daemon_store.publish_command(
+                    command_id, request_id=request["id"]
                 )
+                if published:
+                    self._track_active_command(
+                        command_record["nodeId"], command_record["command"]
+                    )
             if command_record and command_record.get("status") in (
                 "completed",
                 "failed",
@@ -2229,6 +2596,15 @@ class DaemonNodeRegistry:
         if assignment.get("brief"):
             state["assignment_brief"] = assignment["brief"]
         state["assignment_id"] = assignment["assignmentId"]
+        state["work_item_id"] = (
+            assignment.get("workItemId") or assignment["assignmentId"]
+        )
+        if assignment.get("delegationAuthority"):
+            state["delegation_authority"] = assignment["delegationAuthority"]
+        if "dependsOnWorkItemIds" in assignment:
+            state["depends_on_work_item_ids"] = assignment["dependsOnWorkItemIds"]
+        if assignment.get("workKind"):
+            state["work_kind"] = assignment["workKind"]
         state["team_phase"] = assignment.get("phase") or "execution"
         request_state = run_request["state"] or {}
         if request_state.get(REPAIR_NOTE_STATE_KEY) and index == 0:
@@ -2288,6 +2664,17 @@ class DaemonNodeRegistry:
             "_runRequestId": run_request["id"],
             "_nodeId": node_id,
         }
+        collaboration_manifest = request_state.get(COLLABORATION_MANIFEST_STATE_KEY)
+        if isinstance(collaboration_manifest, dict):
+            command["delivery"] = {
+                "type": "assignment-attempt",
+                "attemptId": run_id,
+                "collaborationId": collaboration_manifest.get("collaborationId"),
+                "roundId": collaboration_manifest.get("roundId"),
+                "assignmentId": assignment["assignmentId"],
+                "workItemId": assignment.get("workItemId")
+                or assignment["assignmentId"],
+            }
         # Daemons that report generated files themselves make the backend-side
         # workspace walk unnecessary (and it only works on a shared filesystem).
         artifact_snapshot = (
@@ -2330,7 +2717,11 @@ class DaemonNodeRegistry:
             return self.daemon_store.get_run_request(run_request["id"]) or run_request
         # A staged command is not claimable. Publish it only after its durable
         # run-request link exists; reaping can safely publish after a crash.
-        self.daemon_store.publish_command(command["id"])
+        published = self.daemon_store.publish_command(
+            command["id"], request_id=updated["id"]
+        )
+        if not published:
+            return self.daemon_store.get_run_request(updated["id"]) or updated
         self._track_active_command(node_id, command)
         return updated
 
@@ -2348,14 +2739,14 @@ class DaemonNodeRegistry:
         controller = self._controller_for_sandbox(sandbox, run_request.get("taskId"))
         # The command already carries the role the agent was told to play; the
         # thread must record that one, not a second resolution of it.
-        role = command.get("role") or effective_role_for_assignment(
-            sandbox, assignment
-        )
+        role = command.get("role") or effective_role_for_assignment(sandbox, assignment)
         controller.record_agent_started(
             run_request["sessionId"],
             {
                 "runId": command["runId"],
                 "assignmentId": assignment["assignmentId"],
+                "workItemId": assignment.get("workItemId")
+                or assignment["assignmentId"],
                 "agent": command["agent"],
                 **({"role": role} if role else {}),
                 "teamPhase": command["phase"],
@@ -2387,8 +2778,28 @@ class DaemonNodeRegistry:
                 ),
                 **({"brief": assignment["brief"]} if assignment.get("brief") else {}),
                 **(
+                    {"delegationAuthority": assignment["delegationAuthority"]}
+                    if assignment.get("delegationAuthority")
+                    else {}
+                ),
+                **(
+                    {"dependsOnWorkItemIds": assignment["dependsOnWorkItemIds"]}
+                    if "dependsOnWorkItemIds" in assignment
+                    else {}
+                ),
+                **(
+                    {"workKind": assignment["workKind"]}
+                    if assignment.get("workKind")
+                    else {}
+                ),
+                **(
                     {"coordinator": True}
                     if assignment.get("coordinator") is True
+                    else {}
+                ),
+                **(
+                    {"synthesizer": True}
+                    if assignment.get("synthesizer") is True
                     else {}
                 ),
                 **(
@@ -2653,27 +3064,7 @@ class DaemonNodeRegistry:
 
     @staticmethod
     def _round_result(event: dict[str, Any]) -> dict[str, Any] | None:
-        """Validate the verdict a daemon reported for the round that just ended.
-
-        The daemon relays a file an agent wrote, so nothing about it is
-        trusted: an unknown status or an oversized note is dropped rather than
-        allowed to steer the task.
-        """
-        reported = event.get("roundResult")
-        if not isinstance(reported, dict):
-            return None
-        status = reported.get("status")
-        if status not in ROUND_RESULT_STATUSES:
-            return None
-        note = reported.get("note")
-        return {
-            "status": status,
-            **(
-                {"note": note.strip()[:ROUND_RESULT_NOTE_MAX_CHARS]}
-                if isinstance(note, str) and note.strip()
-                else {}
-            ),
-        }
+        return validate_round_result(event)
 
     def _send_back_for_repair(
         self,
@@ -2690,37 +3081,29 @@ class DaemonNodeRegistry:
         the task, so it gets a bounded chance to repair and let the pipeline
         resume at the member that failed.
         """
-        assignments = run_request["assignments"]
-        index = run_request.get("currentIndex", 0)
-        state = dict(next_state)
-        repairs = int(state.get(REPAIR_COUNT_STATE_KEY) or 0)
-        # A repair turn instructs the lead to fix the task the failing member
-        # was working on; without a task that instruction is false, so a
-        # task-less room fails the round instead of inventing a lead's duty.
-        # There is also nothing above index 0 to appeal to, and a lead that
-        # fails its own repair has already had its turn.
-        if (
-            not run_request.get("taskId")
-            or index == 0
-            or len(assignments) < 2
-            or repairs >= DAEMON_RUN_MAX_REPAIRS
-            or assignments[0].get("coordinator") is not True
-        ):
-            return False
-        state[REPAIR_COUNT_STATE_KEY] = repairs + 1
-        state[REPAIR_RESUME_INDEX_STATE_KEY] = index
-        state[REPAIR_NOTE_STATE_KEY] = (
-            f"{outcome} You are the lead on this task: fix the cause so "
-            f"{agent_label} can run again. Do not repeat its work yourself."
+        decision = decide_failure(
+            run_request,
+            next_state,
+            outcome=outcome,
+            agent_label=agent_label,
+            mode=(
+                run_request["assignments"][run_request.get("currentIndex", 0)].get(
+                    "mode"
+                )
+                or "action"
+            ),
+            max_repairs=DAEMON_RUN_MAX_REPAIRS,
         )
+        if decision.kind != "repair" or decision.next_index is None:
+            return False
         updated = self.daemon_store.update_run_request_if_claimed(
             run_request["id"],
             TERMINAL_CLAIM_ID_STATE_KEY,
             terminal_claim_id,
             {
                 "status": "running",
-                "currentIndex": 0,
-                "state": state,
+                "currentIndex": decision.next_index,
+                "state": decision.state,
                 "currentCommandId": None,
                 "currentRunId": None,
                 "currentAgent": None,
@@ -2734,8 +3117,8 @@ class DaemonNodeRegistry:
             "Sending the lead back to repair a failed teammate",
             request_id=run_request["id"],
             session_id=run_request["sessionId"],
-            failed_index=index,
-            repair=repairs + 1,
+            failed_index=run_request.get("currentIndex", 0),
+            repair=decision.state[REPAIR_COUNT_STATE_KEY],
         )
         self._enqueue_current_assignment(updated)
         return True
@@ -2744,23 +3127,62 @@ class DaemonNodeRegistry:
         self, run_request: dict[str, Any], next_state: dict[str, Any]
     ) -> tuple[int, dict[str, Any]]:
         """Advance one step, or resume at the member whose failure was repaired."""
-        index = run_request.get("currentIndex", 0)
-        state = dict(next_state)
-        resume_index = state.get(REPAIR_RESUME_INDEX_STATE_KEY)
-        if index != 0 or not isinstance(resume_index, int):
-            return index + 1, state
-        state.pop(REPAIR_RESUME_INDEX_STATE_KEY, None)
-        state.pop(REPAIR_NOTE_STATE_KEY, None)
-        return resume_index, state
+        return advance_after_success(run_request, next_state)
+
+    def _continue_after_non_action_failure(
+        self,
+        run_request: dict[str, Any],
+        terminal_claim_id: str,
+        next_state: dict[str, Any],
+        outcome: str,
+        agent_label: str,
+        mode: str,
+    ) -> bool:
+        """Keep collecting discussion/review results after one member fails."""
+        assignments = run_request["assignments"]
+        decision = decide_failure(
+            run_request,
+            next_state,
+            outcome=outcome,
+            agent_label=agent_label,
+            mode=mode,
+            max_repairs=DAEMON_RUN_MAX_REPAIRS,
+        )
+        if decision.kind != "continue" or decision.next_index is None:
+            return False
+        updated = self.daemon_store.update_run_request_if_claimed(
+            run_request["id"],
+            TERMINAL_CLAIM_ID_STATE_KEY,
+            terminal_claim_id,
+            {
+                "status": "running",
+                "currentIndex": decision.next_index,
+                "state": decision.state,
+                "currentCommandId": None,
+                "currentRunId": None,
+                "currentAgent": None,
+                "currentMode": None,
+                "currentStartedAt": None,
+                "currentProgressAt": None,
+            },
+        )
+        if not updated:
+            return False
+        if decision.next_index < len(assignments):
+            self._enqueue_current_assignment(updated)
+        else:
+            self._complete_run_request(
+                updated,
+                "The round completed with one or more participant failures.",
+            )
+        return True
 
     @staticmethod
     def _assignment_reports_round_result(
         assignments: list[dict[str, Any]], index: int
     ) -> bool:
-        """Only the last member may publish the aggregate verdict."""
-        if index < 0 or index >= len(assignments):
-            return False
-        return index == len(assignments) - 1
+        """Only the last writable member may publish the aggregate verdict."""
+        return assignment_reports_round_result(assignments, index)
 
     def _node_reports_generated_files(self, sandbox: dict[str, Any]) -> bool:
         return DAEMON_CAPABILITY_GENERATED_FILES in (sandbox.get("capabilities") or [])
@@ -3020,10 +3442,7 @@ class DaemonNodeRegistry:
                 task_id=run_request.get("taskId"),
             )
         )
-        if (
-            run_id
-            and run_request.get("currentAgent")
-        ):
+        if run_id and run_request.get("currentAgent"):
             controller.record_agent_completed(
                 run_request["sessionId"],
                 run_request.get("state", initial_agent_state(run_request["taskGoal"])),
@@ -3114,10 +3533,15 @@ class DaemonNodeRegistry:
             return {}
         seen: dict[str, int] = {}
         for event in session.get("events", []):
-            if event.get("type") == "agent.output.batch" and event.get("runId") == run_id:
+            if (
+                event.get("type") == "agent.output.batch"
+                and event.get("runId") == run_id
+            ):
                 for entry in event.get("entries", []):
                     stream = entry.get("stream") if isinstance(entry, dict) else None
-                    sequence = entry.get("sequence") if isinstance(entry, dict) else None
+                    sequence = (
+                        entry.get("sequence") if isinstance(entry, dict) else None
+                    )
                     if isinstance(stream, str) and isinstance(sequence, int):
                         seen[stream] = max(seen.get(stream, -1), sequence)
                 continue

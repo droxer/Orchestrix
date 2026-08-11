@@ -85,6 +85,16 @@ function runCommand(id = "cmd_1"): DaemonNodeRunCommand {
     runId: "run_1",
     taskGoal: "do work",
     agent: "codex",
+    assignmentId: "assignment_1",
+    phase: "execution",
+    delivery: {
+      type: "assignment-attempt",
+      attemptId: "run_1",
+      collaborationId: "col_1",
+      roundId: "round_1",
+      assignmentId: "assignment_1",
+      workItemId: "assignment_1",
+    },
     workspacePath: process.cwd(),
     workspaceLayout: "thread",
   };

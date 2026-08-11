@@ -42,6 +42,21 @@ function applySessionEventProjection(session: RelaySession, event: RelayEvent): 
   };
 
   switch (event.type) {
+    case "collaboration.round.started": {
+      const existingRounds = next.collaborationRounds ?? [];
+      const collaborationRounds = existingRounds.some(
+        (round) => round.roundId === event.manifest.roundId,
+      )
+        ? existingRounds
+        : [...existingRounds, event.manifest];
+      return {
+        ...next,
+        collaborationRounds,
+        collaborationRevision: collaborationRounds.length,
+        activeCollaborationId: event.manifest.collaborationId,
+        activeRoundId: event.manifest.roundId,
+      };
+    }
     case "session.status":
       {
         const updated: RelaySession = {
@@ -73,6 +88,10 @@ function applySessionEventProjection(session: RelaySession, event: RelayEvent): 
           {
             id: event.runId,
             ...(event.assignmentId ? { assignmentId: event.assignmentId } : {}),
+            ...(event.workItemId ? { workItemId: event.workItemId } : {}),
+            ...(event.delegationAuthority ? { delegationAuthority: event.delegationAuthority } : {}),
+            ...(event.dependsOnWorkItemIds ? { dependsOnWorkItemIds: event.dependsOnWorkItemIds } : {}),
+            ...(event.workKind ? { workKind: event.workKind } : {}),
             agent: event.agent,
             ...(event.logicalAgentId ? { logicalAgentId: event.logicalAgentId } : {}),
             ...(event.placementId ? { placementId: event.placementId } : {}),
@@ -82,6 +101,7 @@ function applySessionEventProjection(session: RelaySession, event: RelayEvent): 
             ...(event.role ? { role: event.role } : {}),
             ...(event.brief ? { brief: event.brief } : {}),
             ...(event.coordinator ? { coordinator: true } : {}),
+            ...(event.synthesizer ? { synthesizer: true } : {}),
             ...(event.teamSnapshot ? { teamSnapshot: event.teamSnapshot } : {}),
             ...(event.teamPhase ? { teamPhase: event.teamPhase } : {}),
             status: "running",

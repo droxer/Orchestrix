@@ -89,6 +89,13 @@ export interface RelayChatBackend {
     idempotencyKey?: string;
     signal?: AbortSignal;
   }): Promise<RelaySession>;
+  continueThread?(input: {
+    sessionId: string;
+    taskGoal: string;
+    employeeId?: string;
+    idempotencyKey?: string;
+    signal?: AbortSignal;
+  }): Promise<RelaySession>;
   cancelSessionRun?(input: {
     sessionId: string;
     reason?: string;

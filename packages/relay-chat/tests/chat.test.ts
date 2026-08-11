@@ -128,6 +128,29 @@ describe("RelayChatClient", () => {
     });
   });
 
+  it("continues a thread through semantic collaboration intent", async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchFn = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return jsonResponse(makeSession("running"));
+    };
+    const client = new RelayChatClient({ baseUrl: "http://relay.local/", token: "svc", fetchFn });
+
+    await client.continueThread({
+      sessionId: "sess_1",
+      employeeId: "alice",
+      taskGoal: "follow up",
+      idempotencyKey: "discord_message_1",
+    });
+
+    assert.equal(calls[0].url, "http://relay.local/api/v1/threads/sess_1/messages");
+    assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
+      text: "follow up",
+      intent: "accomplish",
+      idempotencyKey: "discord_message_1",
+    });
+  });
+
   it("passes chat employee identity on session reads and streams", async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const fetchFn = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
@@ -320,15 +343,15 @@ describe("RelayChatGateway", () => {
   });
 
   it("continues the thread's bound session and re-binds after the run", async () => {
-    const calls: { resolved: number; boundTo: string[]; ranWith: (string | undefined)[] } = {
+    const calls: { resolved: number; boundTo: string[]; continued: string[] } = {
       resolved: 0,
       boundTo: [],
-      ranWith: [],
+      continued: [],
     };
     const backend: RelayChatBackend = {
       async listEmployeeAgents() { return [{ id: "agent_builder", executorKind: "codex", availability: "ready" }]; },
-      async startAgentRun(input) {
-        calls.ranWith.push(input.sessionId);
+      async continueThread(input) {
+        calls.continued.push(input.sessionId);
         return makeSession("running");
       },
       async getSession() {
@@ -356,7 +379,7 @@ describe("RelayChatGateway", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     // Resolved the existing binding, ran against it, and re-bound the result.
     assert.equal(calls.resolved, 1);
-    assert.deepEqual(calls.ranWith, ["sess_1"]);
+    assert.deepEqual(calls.continued, ["sess_1"]);
     assert.deepEqual(calls.boundTo, ["sess_1"]);
   });
 
@@ -468,6 +491,7 @@ function makeSession(status: RelaySession["status"]): RelaySession {
     agentRuns: [],
     artifacts: [],
     decisions: [],
+    collaborationRounds: [],
     events: [],
   };
 }
