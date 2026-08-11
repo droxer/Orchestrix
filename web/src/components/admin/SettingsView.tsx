@@ -264,7 +264,7 @@ function NumberSettingCard({
               setSavedAt(null);
             }}
           />
-          <Button type="submit" variant="secondary" disabled={isBusy || !isDirty || !isValid}>
+          <Button type="submit" disabled={isBusy || !isDirty || !isValid}>
             {isBusy ? t("admin.v2.settings_saving") : t("admin.v2.settings_save")}
           </Button>
           {isDirty && !isBusy ? (

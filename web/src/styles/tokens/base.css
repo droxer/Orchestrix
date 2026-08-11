@@ -87,8 +87,18 @@ select:not([data-slot]) {
   color: inherit;
 }
 
+/* FAMILY ONLY — never the `font` shorthand. This sheet is in @layer relay,
+   after Tailwind's utilities, so `font: inherit` here reset size, weight, and
+   line-height on every shadcn Button and silently beat the utilities that
+   buttonVariants sets: `font-medium`, `font-semibold`, and the entire
+   text-micro → text-xs → text-sm size ladder were dead on arrival. The ladder
+   coincidentally matched on size (--fs-3 is 14px, same as text-sm), so only
+   the weight gave it away — a real login button computed 400 while its class
+   list said font-medium. The exclusion above at :not([data-slot]) exists for
+   exactly this reason; this rule re-introduced the problem it was written to
+   avoid. Buttons still need the family, because the UA sets its own. */
 button[data-slot="button"] {
-  font: inherit;
+  font-family: inherit;
 }
 
 button,

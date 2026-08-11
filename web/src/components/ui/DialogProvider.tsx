@@ -276,10 +276,15 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                   </form>
                 ) : null}
 
+                {/* Ghost cancel + primary confirm at `cta` — the same footer
+                    recipe every drawer uses (adm-form-actions). A dialog and a
+                    drawer ask the identical question, so the dismiss action
+                    must not sit in a different tier in each. */}
                 <div className="dialog-actions">
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant="ghost"
+                    size="cta"
                     data-modal-initial-focus={request.kind === "confirm" && request.opts.tone === "danger" ? "" : undefined}
                     disabled={dialogClosing}
                     onClick={() => settle(cancelValue(request))}
@@ -289,6 +294,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                   {request.kind === "confirm" ? (
                     <Button
                       type="button"
+                      size="cta"
                       variant={request.opts.tone === "danger" ? "destructive" : "default"}
                       data-modal-initial-focus={request.opts.tone === "danger" ? undefined : ""}
                       disabled={dialogClosing}
@@ -297,7 +303,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                       {request.opts.confirmLabel ?? t("dialog.confirm")}
                     </Button>
                   ) : (
-                    <Button type="button" disabled={dialogClosing} onClick={() => settle(inputValue.trim())}>
+                    <Button type="button" size="cta" disabled={dialogClosing} onClick={() => settle(inputValue.trim())}>
                       {request.opts.confirmLabel ?? t("dialog.confirm")}
                     </Button>
                   )}
