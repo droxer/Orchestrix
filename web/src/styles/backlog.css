@@ -704,26 +704,21 @@
 }
 
 .backlog-task-actions button:not([data-variant="icon"]):hover:not(:disabled) {
-  background: var(--surface-1);
+  background: var(--control-fill-hover);
   border-color: var(--line-strong);
 }
 
-.backlog-task-actions button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
+/* Disabled comes from the button base (opacity-50 + pointer-events-none).
+   A local 0.45 + cursor:not-allowed made these rows fade one step harder than
+   every other disabled button, and the cursor never rendered anyway —
+   pointer-events-none means the element receives no hover to style. */
 
 /* Filled only while actionable; a disabled start recedes to a ghost icon so
-   Done/running rows don't scatter faded action blocks. */
-.backlog-task-actions .backlog-action-primary:not(:disabled) {
-  background: var(--action);
-  border-color: var(--action);
-  color: var(--on-action);
-}
-
-.backlog-task-actions .backlog-action-primary:hover:not(:disabled) {
-  background: var(--action-hover);
-}
+   Done/running rows don't scatter faded action blocks. The fill itself comes
+   from the `default` button variant the call site already selects — see
+   BacklogPage's variant={startDisabled ? "ghost" : "default"}. It used to be
+   restated here too, which meant this block silently outranked the variant and
+   any future change to primary would not have reached the backlog. */
 
 /* Icon-only action — square button, glyph centered, label in the tooltip. */
 .backlog-task-actions .backlog-action-icon,
@@ -1609,14 +1604,11 @@
 }
 
 .backlog-row-actions button:not([data-variant="icon"]):hover:not(:disabled) {
-  background: var(--surface-1);
+  background: var(--control-fill-hover);
   border-color: var(--line-strong);
 }
 
-.backlog-row-actions button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
+/* Disabled comes from the button base — see .backlog-task-actions above. */
 
 .backlog-row-actions .backlog-action-primary {
   display: inline-flex;
@@ -1624,16 +1616,9 @@
   gap: var(--sp-1);
 }
 
-/* Filled only while actionable; a disabled start recedes to a ghost icon. */
-.backlog-row-actions .backlog-action-primary:not(:disabled) {
-  background: var(--action);
-  border-color: var(--action);
-  color: var(--on-action);
-}
-
-.backlog-row-actions .backlog-action-primary:hover:not(:disabled) {
-  background: var(--action-hover);
-}
+/* Filled only while actionable; a disabled start recedes to a ghost icon. The
+   fill comes from the `default` variant the call site selects — see the note
+   on .backlog-task-actions .backlog-action-primary above. */
 
 @media (max-width: 1100px) {
   .backlog-row-status,

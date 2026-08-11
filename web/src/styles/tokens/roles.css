@@ -40,6 +40,39 @@
      unfocused field or switch state is still perceivable (WCAG 1.4.11). */
   --control-border: var(--ink-4);
 
+  /* Neutral control fill — the rest/hover wash for the secondary, ghost,
+     outline, and icon button tiers.
+
+     TRANSLUCENT INK, NOT A SURFACE STEP. These tiers previously resolved to
+     --surface-2, which palette.css defines as the RECESSED fill: a plane sized
+     against a --surface-1 card. That works on a card and inverts everywhere
+     else. Dialogs, admin drawers, and --popover all sit on --surface-3, which
+     is ABOVE --surface-2, so a hover moved the control down toward the page
+     instead of lifting it — and for `secondary`, whose hover resolved to
+     --surface-3 exactly, the fill landed at 1.00:1 against the modal behind
+     it. With `border-transparent` from the button base and no shadow in a flat
+     system, the hovered Cancel button in every confirm dialog had nothing left
+     to see but its label.
+
+     Mixing --ink-1 into transparent removes the dependency on which plane the
+     control happens to land on: the wash always moves toward the ink and away
+     from the surface, so it lifts on a card, a drawer, and a modal alike. It
+     is also register-correct without a second declaration — --ink-1 is near
+     white in dark and near black in light, so "toward the ink" means lighten
+     in one register and darken in the other, which is the direction a raised
+     control wants in each.
+
+     8% rest / 16% hover. The rest step started at 5%, which reproduced the
+     magnitude of the old --surface-1 → --surface-2 step it replaced; that step
+     was inherited, not chosen, and it left a secondary button sitting at
+     1.10:1 against its plane — present, but reading as a tint rather than as
+     something you can press. Measured across both registers on all three
+     planes, 8%/16% puts the resting fill at 1.17–1.26:1 against its plane and
+     the hover step at 1.19–1.29:1 against that rest — perceptible everywhere,
+     while still reading as a flat, low-chrome control. */
+  --control-fill: color-mix(in srgb, var(--ink-1) 8%, transparent);
+  --control-fill-hover: color-mix(in srgb, var(--ink-1) 16%, transparent);
+
   /* Focus — 2px ring at a 2px offset (WCAG 1.4.11), drawn with `outline`.
 
      OUTLINE, NOT BOX-SHADOW. A box-shadow ring is painted inside the nearest

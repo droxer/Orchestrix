@@ -11,12 +11,22 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary-active",
+        /* The neutral tiers wash with --control-fill rather than --surface-2.
+           See the role's note in roles.css: a fixed surface step only lifts on
+           the one plane it was sized against, and inverted on the --surface-3
+           planes (dialog, drawer, popover) these buttons most often sit on. */
+        /* `border-input` (--control-border) in BOTH registers, matching Input,
+           Textarea, SelectTrigger, and Checkbox. This variant used to take
+           --line-1 in light and --control-border in dark, which made it a
+           visibly different control per register — and --line-1 is the
+           STRUCTURAL hairline, too faint to carry a control boundary under
+           WCAG 1.4.11. The border is an outline button's whole affordance. */
         outline:
-          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+          "border-input bg-(--control-fill) hover:bg-(--control-fill-hover) hover:text-foreground aria-expanded:bg-(--control-fill-hover) aria-expanded:text-foreground",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-surface-raised aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+          "bg-(--control-fill) text-secondary-foreground hover:bg-(--control-fill-hover) aria-expanded:bg-(--control-fill-hover) aria-expanded:text-secondary-foreground",
         ghost:
-          "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
+          "hover:bg-(--control-fill-hover) hover:text-foreground aria-expanded:bg-(--control-fill-hover) aria-expanded:text-foreground",
         /* Destructive is encoded by SHAPE, not hue. Phosphor allows exactly one
            colour (--live), and --destructive/--err resolves to the same value as
            --action, so a tinted wash would be indistinguishable from `ghost`.
@@ -29,13 +39,12 @@ const buttonVariants = cva(
            partner. */
         destructive:
           "border-destructive/45 text-destructive hover:border-destructive hover:bg-destructive hover:text-on-primary focus-visible:border-destructive focus-visible:[outline:var(--focus-outline-danger)] focus-visible:[outline-offset:var(--focus-offset)]",
-        link: "text-primary underline-offset-4 hover:underline",
-        /* Circular icon-only action — the retired thread.css icon recipe,
-           ported 1:1: ink-3 idle; surface-2 + line-2 + ink-1 on hover.
-           Always paired with the round `icon-r` (40px) / `icon-r-sm`
-           (28px) sizes. `tinted` swaps the hover to an --action wash;
-           a `danger` className re-tints it to --err. */
-        icon: "text-(--ink-3) hover:border-(--line-2) hover:bg-(--surface-2) hover:text-(--ink-1)",
+        /* Circular icon-only action — the retired thread.css icon recipe:
+           ink-3 idle; a control wash + line-2 + ink-1 on hover. Always paired
+           with the round `icon-r` (40px) / `icon-r-sm` (28px) sizes. `tinted`
+           swaps the hover to an --action wash; a `danger` className re-tints
+           it to --err. */
+        icon: "text-(--ink-3) hover:border-(--line-2) hover:bg-(--control-fill-hover) hover:text-(--ink-1)",
       },
       size: {
         default:
@@ -51,8 +60,16 @@ const buttonVariants = cva(
         lg: "h-11 gap-1.5 px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
         /* Drawer/footer call-to-action: full control height with stronger
            label typography. Replaces the old `.adm-form-actions` descendant
-           override so footer buttons are styled explicitly. */
-        cta: "h-(--control-h) gap-1.5 px-4 text-2xs font-semibold",
+           override so footer buttons are styled explicitly.
+
+           Shares `default`'s 14px text tier, and differs from it by WEIGHT
+           (600 vs 500) and padding, not by size. It used to carry text-2xs
+           (13px), which put the drawer's commit action one step BELOW an
+           ordinary button at the same 40px height — the ladder inversion the
+           note above `xs` warns about, in the one slot where the label matters
+           most. Weight is the right channel for emphasis here; shrinking the
+           type is not. */
+        cta: "h-(--control-h) gap-1.5 px-4 font-semibold",
         /* Square counterpart of `default`: the toolbar refresh buttons sit
            directly beside default-size buttons, so the icon tier tracks
            --control-h instead of a fixed 32px that rendered 8px short.
