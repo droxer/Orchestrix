@@ -559,7 +559,7 @@ describe("agent command invocation", () => {
       assert.ok(args.includes("--skip-git-repo-check"));
       assert.ok(args.includes("--dangerously-bypass-approvals-and-sandbox"));
       assert.ok(args.includes("features.multi_agent=true"));
-      assert.ok(args.includes("features.multi_agent_v2=true"));
+      assert.ok(!args.some((arg) => arg.startsWith("features.multi_agent_v2=")));
       assert.equal(args[args.indexOf("-C") + 1], workspace);
       assert.ok(args.indexOf("exec") > args.indexOf(workspace));
       assert.ok(args.indexOf("--json") > args.indexOf("exec"));
@@ -899,6 +899,14 @@ describe("agent stream rendering", () => {
     ].map((line) => renderer.feed(line)).join("");
 
     assert.equal(output, "");
+  });
+
+  it("filters an incompatible Codex models-cache warning", () => {
+    const renderer = new StderrLineRenderer();
+    assert.equal(
+      renderer.feed("2026-08-11T17:33:20.820404Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 94 column 5\n"),
+      "",
+    );
   });
 
   it("filters the harmless Codex v1 router fallback when v2 handles collaboration", () => {
@@ -1396,7 +1404,8 @@ describe("Pi provider config", () => {
         assert.match(codexConfig, /https:\/\/llm\.example\.com\/v1/);
         assert.match(codexConfig, /llm-model/);
         assert.match(codexConfig, /\[features\][\s\S]*multi_agent = true/);
-        assert.match(codexConfig, /\[features\][\s\S]*multi_agent_v2 = true/);
+        assert.doesNotMatch(codexConfig, /multi_agent_v2/);
+        assert.doesNotMatch(codexCommand, /features\.multi_agent_v2=/);
         assert.match(codexCommand, /-m llm-model/);
         assert.match(claudeCommand, /--model claude-model/);
       },

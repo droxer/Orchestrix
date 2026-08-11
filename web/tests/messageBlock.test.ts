@@ -596,7 +596,7 @@ describe("projectMessages artifact projection", () => {
 });
 
 describe("phaseDividerLabel", () => {
-  it("labels the first agent chapter after a user turn", () => {
+  it("does not add an agent divider after each user turn", () => {
     const messages = projectMessages(session([
       {
         id: "ev_run",
@@ -610,7 +610,7 @@ describe("phaseDividerLabel", () => {
     ]), t);
 
     const agentIndex = messages.findIndex((message) => message.kind === "agent");
-    assert.equal(phaseDividerLabel(messages, agentIndex, t), "Agent");
+    assert.equal(phaseDividerLabel(messages, agentIndex, t), null);
   });
 
   it("labels agent handoffs across different agents", () => {

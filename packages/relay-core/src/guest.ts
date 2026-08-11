@@ -154,7 +154,6 @@ export function guestCodexConfigToml(): string {
     "",
     "[features]",
     `multi_agent = ${multiAgent}`,
-    `multi_agent_v2 = ${multiAgent}`,
   );
   return `${lines.join("\n")}\n`;
 }
@@ -215,8 +214,6 @@ export function codexCliConfigOverrides(): string[] {
     'model_provider="dashscope"',
     "-c",
     `features.multi_agent=${multiAgent}`,
-    "-c",
-    `features.multi_agent_v2=${multiAgent}`,
   ];
   const model = openaiModel();
   const baseUrl = openaiBaseUrl();

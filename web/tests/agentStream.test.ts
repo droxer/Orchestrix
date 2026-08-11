@@ -18,6 +18,17 @@ describe("agent stream parsing", () => {
     ]);
   });
 
+  it("filters an incompatible Codex models-cache warning", () => {
+    const raw = [
+      "2026-08-11T17:33:20.820404Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 94 column 5",
+      "real warning",
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStderr(raw), [
+      { kind: "status", tone: "warn", text: "real warning" },
+    ]);
+  });
+
   it("filters the Claude claude.ai connectors notice from stderr", () => {
     const raw = [
       "⚠ claude.ai connectors are disabled because ANTHROPIC_API_KEY or another auth source is set and takes precedence over your claude.ai login · Unset it to load your organization's connectors",

@@ -69,7 +69,7 @@ function previousTranscriptTurn(messages: DerivedMessage[], index: number): Deri
   return undefined;
 }
 
-/** Label for a phase divider before a new agent chapter (handoff or fresh run). */
+/** Label for a phase divider when the transcript hands work to another agent. */
 export function phaseDividerLabel(
   messages: DerivedMessage[],
   index: number,
@@ -83,9 +83,6 @@ export function phaseDividerLabel(
 
   if (prev.kind === "agent" && !isSameAgentTurn(prev, message)) {
     return t("transcript.phase_handoff");
-  }
-  if (prev.kind === "user") {
-    return t("transcript.phase_agent");
   }
   return null;
 }

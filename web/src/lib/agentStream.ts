@@ -285,7 +285,10 @@ export function parseAgentStderr(raw: string): AgentSegment[] {
   if (!raw) return [];
   const lines = stripAnsi(raw).split(/\r?\n/)
     .map((line) => line.trim())
-    .filter((line) => line && !isCodexStdinNotice(line) && !isClaudeConnectorNotice(line))
+    .filter((line) => line
+      && !isCodexStdinNotice(line)
+      && !isCodexModelsCacheWarning(line)
+      && !isClaudeConnectorNotice(line))
     .filter((line, index, all) => line !== all[index - 1]);
   const tail = lines.slice(-STDERR_TAIL_LINES);
   const omitted = lines.length - tail.length;
@@ -297,6 +300,10 @@ export function parseAgentStderr(raw: string): AgentSegment[] {
 
 function isCodexStdinNotice(line: string): boolean {
   return /^Reading additional input from stdin(?:\.{1,3}|…)?$/.test(line);
+}
+
+function isCodexModelsCacheWarning(line: string): boolean {
+  return /codex_models_manager::cache: failed to load models cache: missing field [`']base_instructions[`']/.test(line);
 }
 
 // Claude prints a claude.ai connectors notice when ANTHROPIC_API_KEY or another

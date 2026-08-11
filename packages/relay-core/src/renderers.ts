@@ -163,6 +163,7 @@ export class StderrLineRenderer {
     if (!line) return "";
     if (line.includes("seccomp not available")) return "";
     if (isCodexStdinNotice(line)) return "";
+    if (isCodexModelsCacheWarning(line)) return "";
     if (isCodexLegacyMultiAgentFallback(line)) return "";
     if (isKimiResumeNotice(line)) return "";
     if (isClaudeConnectorNotice(line)) return "";
@@ -172,6 +173,13 @@ export class StderrLineRenderer {
 
 function isCodexStdinNotice(line: string): boolean {
   return /^Reading additional input from stdin(?:\.{1,3}|…)?$/.test(line);
+}
+
+// Codex ignores an incompatible cache and refreshes model metadata. Different
+// installed Codex surfaces can briefly write different cache schemas, so keep
+// this recoverable local-cache detail out of the agent transcript.
+function isCodexModelsCacheWarning(line: string): boolean {
+  return /codex_models_manager::cache: failed to load models cache: missing field [`']base_instructions[`']/.test(line);
 }
 
 // Codex 0.138 can log a failed v1 lookup before its enabled v2 collaboration
