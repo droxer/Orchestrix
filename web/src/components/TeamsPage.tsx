@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useTeams } from "../hooks/useTeams";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
@@ -51,6 +51,14 @@ export function TeamsPage({
   );
   const loading = isFetching && teams.length === 0;
   const selectedTeam = selectedTeamForWorkspace(sortedTeams, teamId);
+  const selectedRowRef = useRef<HTMLLIElement>(null);
+
+  /* The roster is a bounded scroll region (46vh once it stacks above the
+     detail). Deep-linking to a team otherwise lands with its row clipped to a
+     sliver at the bottom edge. */
+  useEffect(() => {
+    selectedRowRef.current?.scrollIntoView({ block: "nearest" });
+  }, [selectedTeam?.id]);
 
   return (
     <section id="teams-panel" className="teams-page" aria-label={t("teams.title")} tabIndex={-1}>
@@ -86,9 +94,22 @@ export function TeamsPage({
               </TableHeader>
               <TableBody render={<ul className="teams-list" />}>
                 {sortedTeams.map((team) => {
-                  const memberNames = team.members.map((member) => member.displayName).join(", ");
+                  // Lead first, then the rest of the crew. Listing every member
+                  // after the lead printed the lead's name twice on every row.
+                  const supportNames = team.members
+                    .filter((member) => member.id !== team.leadAgentId)
+                    .map((member) => member.displayName)
+                    .join(", ");
+                  const roster = team.lead?.displayName
+                    ? [team.lead.displayName, supportNames].filter(Boolean).join(" · ")
+                    : supportNames || t("teams.no_members");
                   return (
-                    <TableRow key={team.id} render={<li />} className="teams-list-row" data-selected={team.id === selectedTeam?.id ? "true" : "false"}>
+                    <TableRow
+                      key={team.id}
+                      render={<li ref={team.id === selectedTeam?.id ? selectedRowRef : undefined} />}
+                      className="teams-list-row"
+                      data-selected={team.id === selectedTeam?.id ? "true" : "false"}
+                    >
                       <Button
                         variant="ghost"
                         type="button"
@@ -105,7 +126,7 @@ export function TeamsPage({
                         </span>
                         <TableCell render={<span />} className="teams-list-identity">
                           <span className="teams-list-title">{team.name}</span>
-                          <small className="teams-list-sub">{team.lead?.displayName ?? t("teams.unavailable")} · {memberNames || t("teams.no_members")}</small>
+                          <small className="teams-list-sub">{roster}</small>
                         </TableCell>
                         <TableCell render={<span />} className="teams-list-status">
                           {/* "ready" is the default healthy state and stays
