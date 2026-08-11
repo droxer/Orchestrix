@@ -166,6 +166,7 @@ export interface DaemonNodeRunCommand {
     collaborationId: string;
     roundId: string;
     assignmentId: string;
+    workItemId?: string;
   };
   workspacePath?: string;
   /** Missing means node-root for compatibility with commands from older backends. */

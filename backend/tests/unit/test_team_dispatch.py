@@ -165,3 +165,40 @@ def test_review_runs_the_facilitator_last_as_the_result_synthesizer() -> None:
     assert [item["agentId"] for item in assignments] == ["support", "lead"]
     assert assignments[-1]["synthesizer"] is True
     assert assignments[-1]["brief"].startswith("Synthesize")
+
+
+def test_accomplish_orders_delegated_execution_before_test_and_review() -> None:
+    team = _team(
+        memberAgentIds=["lead", "reviewer", "tester", "builder"],
+        updatedAt="2026-08-08T00:00:00Z",
+    )
+    agents = [
+        _agent("lead", "codex", defaultRole="planner"),
+        _agent("reviewer", "claude", defaultRole="reviewer"),
+        _agent("tester", "pi", defaultRole="tester"),
+        _agent("builder", "kimi", defaultRole="implementer"),
+    ]
+
+    assignments = team_member_assignments(agents, mode="action", team=team)
+
+    assert [item["agentId"] for item in assignments] == [
+        "lead",
+        "builder",
+        "tester",
+        "reviewer",
+    ]
+
+
+def test_accomplish_keeps_a_reviewer_lead_in_writable_coordination_mode() -> None:
+    team = _team(updatedAt="2026-08-08T00:00:00Z")
+    agents = [
+        _agent("lead", "codex", defaultRole="reviewer"),
+        _agent("support", "claude", defaultRole="implementer"),
+    ]
+
+    assignments = team_member_assignments(agents, mode="action", team=team)
+
+    assert assignments[0]["agentId"] == "lead"
+    assert assignments[0]["mode"] == "action"
+    assert assignments[0]["phase"] == "execution"
+    assert assignments[0]["brief"].startswith("Coordinate the round")

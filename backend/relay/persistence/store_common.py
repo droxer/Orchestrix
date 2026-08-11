@@ -389,6 +389,10 @@ def _apply_agent_started(session: dict[str, Any], event: dict[str, Any]) -> None
         "synthesizer",
         "teamSnapshot",
         "assignmentId",
+        "workItemId",
+        "delegationAuthority",
+        "dependsOnWorkItemIds",
+        "workKind",
         "teamPhase",
     ):
         if event.get(key) is not None:

@@ -94,6 +94,7 @@ function runCommand(id = "cmd_1"): DaemonNodeRunCommand {
       collaborationId: "col_1",
       roundId: "round_1",
       assignmentId: "assignment_1",
+      workItemId: "assignment_1",
     },
     workspacePath: process.cwd(),
     workspaceLayout: "thread",

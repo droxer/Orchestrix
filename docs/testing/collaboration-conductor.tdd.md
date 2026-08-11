@@ -9,7 +9,8 @@ Base: `3749ce8`
 Intent-first thread messages and recovery, versioned immutable round manifests,
 task parity, authoritative round projections, extracted advancement policy,
 lead-last discussion/review synthesis, single-assignment daemon attempt delivery,
-and crash-safe durable admission with terminal-state fencing.
+crash-safe durable admission with terminal-state fencing, and versioned
+delegated-subtask work graphs with role-topological execution.
 
 ## RED / GREEN checkpoints
 
@@ -29,6 +30,20 @@ and crash-safe durable admission with terminal-state fencing.
 | Terminal activation fencing | `5c2e855` | `a2202e1` |
 | Cross-crash delivery fencing | `074c89d` | `2b1d787` |
 | Terminal command-claim fencing | `b267a2e` | `0238ebe` |
+| Delegated work graph and projection parity | observed locally before implementation | this change |
+
+The delegated-work RED pass proved four missing seams independently: manifests
+had no work graph, accomplish rounds followed roster order instead of role
+dependencies, daemon prompts had no durable work-item context, and the browser
+SSE reducer discarded work-item fields from `agent.started`. Each failed before
+its implementation and passed afterward.
+
+The two-axis review then exposed three RED follow-ups: false lead attribution,
+loss of an authoritative empty dependency list, and reviewer-role precedence
+over a lead's coordinator phase on continuation. The final model records the
+conductor as delegation authority, gives each role item a distinct ordinal
+scope, preserves `[]` dependencies through Python and browser projections, and
+keeps coordinator action/execution precedence through the public message route.
 
 Each RED checkpoint was observed failing for the missing endpoint, event type,
 projection field, policy behavior, protocol metadata, or delivery envelope
@@ -69,3 +84,26 @@ were expanded afterward and pass in both focused and repository-wide backend
 runs. The isolated `relay-daemon/tests/daemon.test.js` shard could not complete
 in this environment because its BoxLite setup invokes Docker and access to the
 OrbStack Docker socket is denied. All other built TypeScript/web tests passed.
+
+## Final delegated-work graph gate
+
+After the version 2 work graph and both review passes were complete:
+
+```text
+npm run build
+passed (all packages, TypeScript, and production web build)
+
+node --test <all built package/web tests except relay-daemon daemon.test.js>
+801 passed
+
+uv run --project backend --extra dev pytest backend/tests -q
+803 passed, 1 skipped
+
+focused pytest-cov gate
+62 passed; collaboration package coverage: 91%
+```
+
+The daemon shard was attempted again and reached the same environment boundary:
+Docker denied access to the OrbStack socket while preparing the BoxLite devbox.
+Its shared protocol compiled, its delivery fixture includes `workItemId`, and
+all daemon-independent TypeScript tests passed.

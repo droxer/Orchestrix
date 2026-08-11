@@ -30,6 +30,7 @@ describe("applySessionEvent", () => {
       sessionId: "ses_1",
       timestamp: "2026-06-20T00:00:00.500Z",
       manifest: {
+        contract: { name: "relay.collaboration.round", version: 2 },
         collaborationId: "col_1",
         roundId: "round_1",
         source: "message",
@@ -43,6 +44,21 @@ describe("applySessionEvent", () => {
           phase: "review",
         }],
         completionPolicy: "synthesize",
+        workGraph: {
+          contract: { name: "relay.collaboration.work-graph", version: 1 },
+          items: [{
+            workItemId: "assignment_1",
+            assignmentId: "assignment_1",
+            ownerAgentId: "agent_1",
+            delegationAuthority: "conductor",
+            kind: "review",
+            objective: "Review the result.",
+            dependsOnWorkItemIds: [],
+            required: true,
+          }],
+          completion: { kind: "synthesize", resultOwnerWorkItemId: "assignment_1" },
+          delegationPolicy: { authority: "conductor", policy: "sequential-role-delegation-v1" },
+        },
       },
     });
 
@@ -50,6 +66,7 @@ describe("applySessionEvent", () => {
     assert.equal(updated.activeRoundId, "round_1");
     assert.equal(updated.collaborationRevision, 1);
     assert.equal(updated.collaborationRounds[0]?.strategy, "review");
+    assert.equal(updated.collaborationRounds[0]?.workGraph?.items[0]?.kind, "review");
   });
 
   it("preserves runtime affinity from streamed run starts", () => {
@@ -61,6 +78,10 @@ describe("applySessionEvent", () => {
       timestamp: "2026-06-20T00:00:01.000Z",
       runId: "run_1",
       assignmentId: "assignment_1",
+      workItemId: "assignment_1",
+      delegationAuthority: "conductor",
+      dependsOnWorkItemIds: ["work_plan"],
+      workKind: "implementation",
       agent: "codex",
       mode: "action",
       logicalAgentId: "agent_1",
@@ -71,6 +92,7 @@ describe("applySessionEvent", () => {
       role: "implementer",
       brief: "Implement only the migration.",
       coordinator: true,
+      synthesizer: true,
       teamSnapshot: {
         teamId: "team_1",
         teamRevision: "2026-06-20T00:00:00.000Z",
@@ -81,12 +103,17 @@ describe("applySessionEvent", () => {
     });
 
     assert.equal(updated.agentRuns[0]?.assignmentId, "assignment_1");
+    assert.equal(updated.agentRuns[0]?.workItemId, "assignment_1");
+    assert.equal(updated.agentRuns[0]?.delegationAuthority, "conductor");
+    assert.deepEqual(updated.agentRuns[0]?.dependsOnWorkItemIds, ["work_plan"]);
+    assert.equal(updated.agentRuns[0]?.workKind, "implementation");
     assert.equal(updated.agentRuns[0]?.daemonNodeId, "node_1");
     assert.equal(updated.agentRuns[0]?.placementId, "placement_1");
     assert.equal(updated.agentRuns[0]?.agentVersion, 3);
     assert.deepEqual(updated.agentRuns[0]?.workspaceIdentity, workspaceIdentity);
     assert.equal(updated.agentRuns[0]?.brief, "Implement only the migration.");
     assert.equal(updated.agentRuns[0]?.coordinator, true);
+    assert.equal(updated.agentRuns[0]?.synthesizer, true);
     assert.equal(updated.agentRuns[0]?.teamPhase, "execution");
     assert.deepEqual(updated.agentRuns[0]?.teamSnapshot?.memberAgentIds, [
       "agent_1",

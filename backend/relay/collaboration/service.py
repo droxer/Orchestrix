@@ -307,6 +307,11 @@ class CollaborationConductor:
             required_node_id=required_node_id,
             daemon_store=self.ctx.registry.daemon_store,
         )
+        resolved = compile_assignment_work_graph(
+            resolved,
+            purpose=intent.purpose,
+            team_snapshot=team_snapshot,
+        )
         collaboration_id = new_relay_id("col")
         round_id = new_relay_id("round")
         manifest = create_round_manifest(
@@ -417,11 +422,14 @@ class CollaborationConductor:
                 )
             mode = _mode(item.get("mode"))
             role = _role(item.get("role"))
+            coordinator = bool(
+                team_snapshot and item["agentId"] == team_snapshot.get("leadAgentId")
+            )
             phase = (
                 "discussion"
                 if mode == "ask"
                 else "review"
-                if mode == "review" or role == "reviewer"
+                if mode == "review" or (role == "reviewer" and not coordinator)
                 else "execution"
             )
             assignments.append(
@@ -442,12 +450,7 @@ class CollaborationConductor:
                         if isinstance(item.get("brief"), str) and item["brief"].strip()
                         else {}
                     ),
-                    **(
-                        {"coordinator": True}
-                        if team_snapshot
-                        and item["agentId"] == team_snapshot.get("leadAgentId")
-                        else {}
-                    ),
+                    **({"coordinator": True} if coordinator else {}),
                     **(
                         {"synthesizer": True} if item.get("synthesizer") is True else {}
                     ),
@@ -525,10 +528,34 @@ def create_round_manifest(
         if purpose == "review"
         else "coordinate"
     )
+    compiled_assignments = compile_assignment_work_graph(
+        assignments,
+        purpose=purpose,
+        team_snapshot=team_snapshot,
+    )
+    work_items = [
+        {
+            "workItemId": assignment["workItemId"],
+            "assignmentId": assignment["assignmentId"],
+            "ownerAgentId": assignment["workOwnerAgentId"],
+            **(
+                {"delegationAuthority": assignment["delegationAuthority"]}
+                if assignment.get("delegationAuthority")
+                else {}
+            ),
+            "kind": assignment["workKind"],
+            "objective": assignment["workObjective"],
+            "dependsOnWorkItemIds": assignment["dependsOnWorkItemIds"],
+            "required": True,
+        }
+        for assignment in compiled_assignments
+    ]
+    completion_kind = "synthesize" if strategy in ("room", "review") else "all_required"
+    result_owner = _result_owner_work_item(compiled_assignments)
     return {
         "contract": {
             "name": "relay.collaboration.round",
-            "version": 1,
+            "version": 2,
         },
         "collaborationId": collaboration_id or new_relay_id("col"),
         "roundId": round_id or new_relay_id("round"),
@@ -552,12 +579,155 @@ def create_round_manifest(
                 )
                 if assignment.get(key) is not None
             }
-            for assignment in assignments
+            for assignment in compiled_assignments
         ],
         "completionPolicy": (
             "synthesize" if strategy in ("room", "review") else "assigned_work"
         ),
+        "workGraph": {
+            "contract": {
+                "name": "relay.collaboration.work-graph",
+                "version": 1,
+            },
+            "items": work_items,
+            "completion": {
+                "kind": completion_kind,
+                **({"resultOwnerWorkItemId": result_owner} if result_owner else {}),
+            },
+            "delegationPolicy": {
+                "authority": "conductor",
+                "policy": "sequential-role-delegation-v1",
+            },
+        },
     }
+
+
+def compile_assignment_work_graph(
+    assignments: list[dict[str, Any]],
+    *,
+    purpose: str,
+    team_snapshot: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Attach the conductor-owned delegated-subtask contract to assignments.
+
+    Delivery may remain sequential, but the immutable graph records the actual
+    ownership and prerequisites independently of that transport choice.
+    """
+    work_item_ids = [assignment["assignmentId"] for assignment in assignments]
+    compiled: list[dict[str, Any]] = []
+    for index, assignment in enumerate(assignments):
+        work_item_id = assignment["assignmentId"]
+        synthesizer = assignment.get("synthesizer") is True
+        if synthesizer:
+            dependencies = work_item_ids[:index]
+        elif purpose in ("discuss", "review"):
+            dependencies = []
+        else:
+            # The current delivery adapter is sequential. Recording that chain
+            # makes the graph truthful today while leaving the public contract
+            # ready for a later dependency-aware parallel reconciler.
+            dependencies = work_item_ids[:index]
+        owner_agent_id = _work_owner_agent_id(assignment)
+        objective = assignment.get("workObjective") or _work_objective(
+            assignment,
+            index=index,
+            total=len(assignments),
+            dependencies=dependencies,
+        )
+        compiled.append(
+            {
+                **assignment,
+                "brief": objective,
+                "workItemId": work_item_id,
+                "workOwnerAgentId": owner_agent_id,
+                "workKind": _work_kind(assignment),
+                "workObjective": objective,
+                "dependsOnWorkItemIds": dependencies,
+                "delegationAuthority": "conductor",
+            }
+        )
+    return compiled
+
+
+def _work_owner_agent_id(assignment: dict[str, Any]) -> str:
+    agent_id = assignment.get("agentId")
+    if isinstance(agent_id, str) and agent_id:
+        return agent_id
+    executor = assignment.get("executorKind") or assignment.get("agent") or "unknown"
+    return f"legacy-executor:{executor}"
+
+
+def _work_kind(assignment: dict[str, Any]) -> str:
+    if assignment.get("synthesizer") is True:
+        return "synthesis"
+    mode = assignment.get("mode") or "action"
+    role = assignment.get("role")
+    if mode == "ask":
+        return "discussion"
+    if mode == "review":
+        return "review"
+    if assignment.get("coordinator") is True:
+        return "coordination"
+    if role == "reviewer":
+        return "review"
+    if role == "tester":
+        return "verification"
+    if role == "planner":
+        return "planning"
+    if role == "fixer":
+        return "repair"
+    return "implementation"
+
+
+def _work_objective(
+    assignment: dict[str, Any],
+    *,
+    index: int,
+    total: int,
+    dependencies: list[str],
+) -> str:
+    brief = assignment.get("brief")
+    if isinstance(brief, str) and brief.strip():
+        objective = brief.strip()
+    else:
+        objective = {
+            "discussion": "Contribute to the team's discussion.",
+            "review": "Review the accumulated team result.",
+            "verification": "Verify the accumulated implementation.",
+            "planning": "Plan the delegated team work.",
+            "repair": "Repair confirmed defects in the accumulated work.",
+            "coordination": "Coordinate the delegated team work.",
+            "synthesis": "Synthesize the team's contributions into one result.",
+            "implementation": "Implement a distinct part of the shared goal.",
+        }[_work_kind(assignment)]
+    if total <= 1 or assignment.get("coordinator") or assignment.get("synthesizer"):
+        return objective
+    if not dependencies:
+        return (
+            f"{objective} Own delegated work item {index + 1} of {total} as an "
+            "independently eligible contribution; do not duplicate another item."
+        )
+    return (
+        f"{objective} Own delegated work item {index + 1} of {total}; "
+        "use predecessor results and do not duplicate another item."
+    )
+
+
+def _result_owner_work_item(assignments: list[dict[str, Any]]) -> str | None:
+    synthesizers = [
+        assignment
+        for assignment in assignments
+        if assignment.get("synthesizer") is True
+    ]
+    if synthesizers:
+        return synthesizers[-1]["workItemId"]
+    writable = [
+        assignment
+        for assignment in assignments
+        if (assignment.get("mode") or "action") != "ask"
+    ]
+    owner = writable[-1] if writable else assignments[-1] if assignments else None
+    return owner["workItemId"] if owner else None
 
 
 def _validated_decision(

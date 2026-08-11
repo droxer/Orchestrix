@@ -59,6 +59,21 @@ function promptPreludes(state: AgentState, options: PreludeOptions = {}): string
       ].join("\n"),
     );
   }
+  if (state.work_item_id) {
+    preludes.push(
+      [
+        "[Delegated work item]",
+        `Work item: ${state.work_item_id}.`,
+        ...(state.delegation_authority === "conductor"
+          ? ["Assigned by the collaboration conductor from the immutable round policy."]
+          : []),
+        ...(state.depends_on_work_item_ids?.length
+          ? [`Prerequisite work items: ${state.depends_on_work_item_ids.join(", ")}.`]
+          : ["This work item has no prerequisites."]),
+        "Own this work item only; treat prerequisite results as completed team context.",
+      ].join("\n"),
+    );
+  }
   if (state.team_phase) {
     preludes.push(["[Team phase]", `This assignment is in the ${state.team_phase} phase.`].join("\n"));
   }

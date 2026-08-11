@@ -11,6 +11,10 @@ export type WorkspaceLayout = "node-root" | "thread";
 export interface AgentRun {
   id: string;
   assignmentId?: string;
+  workItemId?: string;
+  delegationAuthority?: "conductor";
+  dependsOnWorkItemIds?: string[];
+  workKind?: CollaborationWorkKind;
   agent: AgentName;
   /** Logical (employee) agent that ran this step. `agent` is only its executor
    * kind, which several named agents can share — this is the identity. */
@@ -69,6 +73,18 @@ export interface HumanDecision {
 
 export type CollaborationPurpose = "accomplish" | "discuss" | "review";
 export type CollaborationStrategy = "direct" | "room" | "review" | "coordinate";
+export type CollaborationWorkKind = "coordination" | "discussion" | "planning" | "implementation" | "verification" | "review" | "repair" | "synthesis";
+
+export interface CollaborationWorkItem {
+  workItemId: string;
+  assignmentId: string;
+  ownerAgentId: string;
+  delegationAuthority: "conductor";
+  kind: CollaborationWorkKind;
+  objective: string;
+  dependsOnWorkItemIds: string[];
+  required: boolean;
+}
 
 export interface CollaborationRoundManifest {
   /** Absent only on rounds persisted before the conductor contract shipped. */
@@ -96,6 +112,21 @@ export interface CollaborationRoundManifest {
     synthesizer?: boolean;
   }>;
   completionPolicy: string;
+  workGraph?: {
+    contract: {
+      name: "relay.collaboration.work-graph";
+      version: number;
+    };
+    items: CollaborationWorkItem[];
+    completion: {
+      kind: "all_required" | "synthesize";
+      resultOwnerWorkItemId?: string;
+    };
+    delegationPolicy: {
+      authority: "conductor";
+      policy: "sequential-role-delegation-v1";
+    };
+  };
 }
 
 export interface RelaySession {
@@ -181,6 +212,10 @@ export type RelayEvent =
       timestamp: string;
       runId: string;
       assignmentId?: string;
+      workItemId?: string;
+      delegationAuthority?: "conductor";
+      dependsOnWorkItemIds?: string[];
+      workKind?: CollaborationWorkKind;
       agent: AgentName;
       /** Logical (employee) agent dispatched for this run; absent on legacy
        * runs and workflow dispatches that name only an executor kind. */
@@ -374,6 +409,10 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
       session.agentRuns.push({
         id: event.runId,
         ...(event.assignmentId ? { assignmentId: event.assignmentId } : {}),
+        ...(event.workItemId ? { workItemId: event.workItemId } : {}),
+        ...(event.delegationAuthority ? { delegationAuthority: event.delegationAuthority } : {}),
+        ...(event.dependsOnWorkItemIds ? { dependsOnWorkItemIds: event.dependsOnWorkItemIds } : {}),
+        ...(event.workKind ? { workKind: event.workKind } : {}),
         agent: event.agent,
         ...(event.logicalAgentId ? { logicalAgentId: event.logicalAgentId } : {}),
         ...(event.role ? { role: event.role } : {}),
@@ -383,6 +422,7 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
         ...(event.workspaceIdentity ? { workspaceIdentity: event.workspaceIdentity } : {}),
         ...(event.brief ? { brief: event.brief } : {}),
         ...(event.coordinator ? { coordinator: true } : {}),
+        ...(event.synthesizer ? { synthesizer: true } : {}),
         ...(event.teamSnapshot ? { teamSnapshot: event.teamSnapshot } : {}),
         ...(event.teamPhase ? { teamPhase: event.teamPhase } : {}),
         mode: event.mode,

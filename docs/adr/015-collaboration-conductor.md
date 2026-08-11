@@ -36,6 +36,26 @@ manifest using the versioned `relay.collaboration.round` contract. A manifest
 contains stable collaboration, round, and assignment identities; addressing;
 the roster revision used for the round; strategy; and completion policy.
 
+Version 2 of that manifest adds a versioned
+`relay.collaboration.work-graph`. Each graph item is a durable delegated
+subtask with the assignment identity it compiles to, one owning logical agent,
+an objective, a semantic work kind, and explicit predecessor work-item IDs.
+The graph also identifies the aggregate-result owner. Historical version 1
+manifests remain readable; the work graph is optional in shared projections for
+that reason. New clients consume the graph as workflow state and still never
+submit daemon assignments.
+
+Delegation authority belongs to the conductor, not to the team lead or a
+daemon prompt. The graph records `sequential-role-delegation-v1`: stable role
+ordering plus a distinct ordinal scope for every item. Dependent later items
+are told to consume predecessor results and take an unclaimed slice, so
+repeated specialist roles do not receive indistinguishable work. Independently
+eligible discussion and review items are labeled as such and do not claim
+predecessors. The lead coordinates the round but is never falsely recorded as
+having authored an immutable plan before its turn ran. Empty predecessor lists
+are retained in agent-run events and projections, distinguishing an
+authoritative root item from legacy data with no graph.
+
 `collaboration.round.started` is the authoritative event. Python, shared
 TypeScript, and browser SSE projections expose the same ordered manifest list,
 active IDs, and monotonic `collaborationRevision`. Membership is fixed inside a
@@ -86,8 +106,13 @@ policies can change the reconciler and manifests without changing message or
 recovery callers.
 
 Discussion rounds run non-facilitators first and the team lead last, allowing
-the facilitator to synthesize the room. Accomplish rounds retain explicit
-coordinator semantics, and review rounds use the manifest's synthesis policy.
+the facilitator to synthesize the room. Accomplish rounds run the writable lead
+as coordinator first, then stable role phases: planning, implementation/repair,
+verification, and review. A lead's specialist default never turns that initial
+coordination step read-only. Review rounds run the lead last and use the
+manifest's synthesis policy. These orders are a conservative sequential
+execution of the work graph; a future reconciler may schedule independent
+ready items in parallel without changing clients or the manifest vocabulary.
 
 ## HTTP Interface
 
@@ -113,6 +138,10 @@ assignment arrays.
   assignment identity.
 - A collaboration round cannot become daemon-claimable before its
   authoritative session events are durable.
+- Delegation and subtask ownership are reconstructible from session history;
+  they are not inferred from prompts or daemon telemetry.
+- Assignment prompts and run projections carry the same work-item identity and
+  dependency context as the authoritative graph.
 - The legacy `/agent-runs` route remains a compatibility adapter for new-thread
   creation and older callers; continued-thread web traffic uses the conductor.
 

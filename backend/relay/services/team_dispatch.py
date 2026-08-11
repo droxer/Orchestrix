@@ -150,21 +150,46 @@ def team_member_assignments(
             *(agent for agent in agents if agent["id"] == lead_agent_id),
         ]
         if synthesis_round and lead_agent_id
-        else agents
+        else _ordered_accomplish_agents(agents, lead_agent_id)
     )
     return [
         _team_member_assignment(
             agent,
             mode=mode,
-            coordinator=(
-                agent["id"] == lead_agent_id if lead_agent_id else index == 0
-            ),
+            coordinator=(agent["id"] == lead_agent_id if lead_agent_id else index == 0),
             synthesizer=bool(
                 synthesis_round and lead_agent_id and agent["id"] == lead_agent_id
             ),
             team_snapshot=snapshot,
         )
         for index, agent in enumerate(ordered_agents)
+    ]
+
+
+def _ordered_accomplish_agents(
+    agents: list[dict[str, Any]], lead_agent_id: str | None
+) -> list[dict[str, Any]]:
+    """Produce a stable topological order for delegated team work.
+
+    The lead establishes the boundary first. Implementers then create the
+    change, testers validate that accumulated work, and reviewers inspect the
+    completed result. Stable sorting preserves the team's chosen order inside
+    each phase.
+    """
+    if not lead_agent_id:
+        return agents
+    lead = [agent for agent in agents if agent["id"] == lead_agent_id]
+    members = [agent for agent in agents if agent["id"] != lead_agent_id]
+    stage = {
+        "planner": 0,
+        "implementer": 1,
+        "fixer": 1,
+        "tester": 2,
+        "reviewer": 3,
+    }
+    return [
+        *lead,
+        *sorted(members, key=lambda agent: stage.get(agent.get("defaultRole"), 1)),
     ]
 
 
@@ -194,8 +219,8 @@ def _team_member_assignment(
     return {
         "agentId": agent["id"],
         "agent": agent["executorKind"],
-        "mode": _member_mode(role, mode),
-        "phase": _member_phase(role, mode),
+        "mode": _member_mode(role, mode, coordinator),
+        "phase": _member_phase(role, mode, coordinator),
         **({"role": role} if role else {}),
         **({"coordinator": True} if coordinator else {}),
         **({"synthesizer": True} if synthesizer else {}),
@@ -212,6 +237,8 @@ def _member_brief(
             "Synthesize the room's evidence into one coherent final response, "
             "including disagreements, risks, and the recommended next step."
         )
+    if coordinator:
+        return "Coordinate the round, establish clear boundaries, and keep the shared work coherent."
     if role == "planner":
         return "Develop the plan, dependencies, risks, and open questions for the shared goal."
     if role == "reviewer":
@@ -222,26 +249,28 @@ def _member_brief(
         return "Fix confirmed defects in the accumulated implementation without duplicating completed work."
     if role == "implementer":
         return "Implement the part of the shared goal that fits your role and preserve earlier teammates' work."
-    if coordinator:
-        return "Coordinate the round, establish clear boundaries, and keep the shared work coherent."
     return "Contribute a distinct part of the shared goal and avoid duplicating completed teammate work."
 
 
-def _member_phase(role: str | None, requested_mode: str) -> str:
+def _member_phase(
+    role: str | None, requested_mode: str, coordinator: bool = False
+) -> str:
     if requested_mode == "ask":
         return "discussion"
-    if requested_mode == "review" or role == "reviewer":
+    if requested_mode == "review" or (role == "reviewer" and not coordinator):
         return "review"
     return "execution"
 
 
-def _member_mode(role: str | None, requested_mode: str) -> str:
+def _member_mode(
+    role: str | None, requested_mode: str, coordinator: bool = False
+) -> str:
     """Pick the mode a member runs in, given its role and what was asked for.
 
     Only a plain "do the work" request is specialized: a reviewer asked to act
     reviews instead. An explicit review or ask request already describes the
     whole round, so every member honors it as given.
     """
-    if requested_mode == "action" and role == "reviewer":
+    if requested_mode == "action" and role == "reviewer" and not coordinator:
         return "review"
     return requested_mode

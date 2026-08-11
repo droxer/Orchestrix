@@ -1452,6 +1452,13 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
         )
         lead = _agent(client, "alice", "Lead", "codex")
         support = _agent(client, "alice", "Support", "claude")
+        assert (
+            client.patch(
+                f"/api/v1/admin/agents/{lead['id']}",
+                json={"defaultRole": "reviewer"},
+            ).status_code
+            == 200
+        )
         for agent in (lead, support):
             assert (
                 client.post(
@@ -1544,6 +1551,7 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
             support["id"],
         ]
         assert request["assignments"][0]["coordinator"] is True
+        assert request["assignments"][0]["mode"] == "action"
         assert request["assignments"][0]["phase"] == "execution"
         assert request["assignments"][0]["brief"]
         assert request["assignments"][0]["teamSnapshot"] == {
@@ -1566,6 +1574,7 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
             "collaborationId": manifest["collaborationId"],
             "roundId": manifest["roundId"],
             "assignmentId": manifest["assignments"][0]["assignmentId"],
+            "workItemId": manifest["assignments"][0]["assignmentId"],
         }
         assert manifest["strategy"] == "coordinate"
         assert manifest["source"] == "message"
@@ -1579,6 +1588,23 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
             == (request["assignments"][0]["brief"])
         )
         assert room_command["state"]["team_phase"] == "execution"
+        work_graph = manifest["workGraph"]
+        assert [item["ownerAgentId"] for item in work_graph["items"]] == [
+            lead["id"],
+            support["id"],
+        ]
+        assert work_graph["items"][1]["delegationAuthority"] == "conductor"
+        assert work_graph["items"][1]["dependsOnWorkItemIds"] == [
+            work_graph["items"][0]["workItemId"]
+        ]
+        assert (
+            room_command["state"]["work_item_id"]
+            == work_graph["items"][0]["workItemId"]
+        )
+        assert room_command["state"]["depends_on_work_item_ids"] == []
+        first_run = app.state.session_store.get_session(session_id)["agentRuns"][-1]
+        assert first_run["dependsOnWorkItemIds"] == []
+        assert first_run["teamPhase"] == "execution"
 
 
 def test_message_to_a_team_thread_reports_a_disabled_team(monkeypatch) -> None:

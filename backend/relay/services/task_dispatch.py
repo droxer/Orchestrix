@@ -5,7 +5,10 @@ from typing import Any, Protocol, TypedDict
 
 from loguru import logger
 
-from ..collaboration.service import create_round_manifest
+from ..collaboration.service import (
+    compile_assignment_work_graph,
+    create_round_manifest,
+)
 from ..core.ids import new_database_id
 from ..daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
 from ..persistence.protocols import (
@@ -302,6 +305,26 @@ class TaskDispatcher:
             }
             for assignment in self.run_assignments
         ]
+        team_snapshot = next(
+            (
+                assignment.get("teamSnapshot")
+                for assignment in self.run_assignments
+                if isinstance(assignment.get("teamSnapshot"), dict)
+            ),
+            None,
+        )
+        mode = _task_mode(self.mode)
+        self.run_assignments = compile_assignment_work_graph(
+            self.run_assignments,
+            purpose=(
+                "discuss"
+                if mode == "ask"
+                else "review"
+                if mode == "review"
+                else "accomplish"
+            ),
+            team_snapshot=team_snapshot,
+        )
         if (
             self.task.get("assignedAgentId") or self.task.get("assignedTeamId")
         ) and self.task.get("status") == "backlog":
@@ -458,7 +481,13 @@ class TaskDispatcher:
 
     def _run_request(self) -> dict[str, Any]:
         mode = _task_mode(self.mode)
-        purpose = "discuss" if mode == "ask" else "review" if mode == "review" else "accomplish"
+        purpose = (
+            "discuss"
+            if mode == "ask"
+            else "review"
+            if mode == "review"
+            else "accomplish"
+        )
         team_snapshot = next(
             (
                 assignment.get("teamSnapshot")

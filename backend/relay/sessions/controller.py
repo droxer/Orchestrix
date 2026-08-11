@@ -534,6 +534,11 @@ class SessionController:
                         if step.get("assignmentId")
                         else {}
                     ),
+                    **(
+                        {"workItemId": step["workItemId"]}
+                        if step.get("workItemId")
+                        else {}
+                    ),
                     "agent": step["agent"],
                     **({"role": role} if role else {}),
                     "mode": step["mode"],
@@ -573,6 +578,17 @@ class SessionController:
                         else {}
                     ),
                     **({"brief": step["brief"]} if step.get("brief") else {}),
+                    **(
+                        {"delegationAuthority": step["delegationAuthority"]}
+                        if step.get("delegationAuthority")
+                        else {}
+                    ),
+                    **(
+                        {"dependsOnWorkItemIds": step["dependsOnWorkItemIds"]}
+                        if "dependsOnWorkItemIds" in step
+                        else {}
+                    ),
+                    **({"workKind": step["workKind"]} if step.get("workKind") else {}),
                     **(
                         {"coordinator": True} if step.get("coordinator") is True else {}
                     ),

@@ -2569,6 +2569,15 @@ class DaemonNodeRegistry:
         if assignment.get("brief"):
             state["assignment_brief"] = assignment["brief"]
         state["assignment_id"] = assignment["assignmentId"]
+        state["work_item_id"] = (
+            assignment.get("workItemId") or assignment["assignmentId"]
+        )
+        if assignment.get("delegationAuthority"):
+            state["delegation_authority"] = assignment["delegationAuthority"]
+        if "dependsOnWorkItemIds" in assignment:
+            state["depends_on_work_item_ids"] = assignment["dependsOnWorkItemIds"]
+        if assignment.get("workKind"):
+            state["work_kind"] = assignment["workKind"]
         state["team_phase"] = assignment.get("phase") or self._assignment_phase(mode)
         request_state = run_request["state"] or {}
         if request_state.get(REPAIR_NOTE_STATE_KEY) and index == 0:
@@ -2637,6 +2646,8 @@ class DaemonNodeRegistry:
                 "collaborationId": collaboration_manifest.get("collaborationId"),
                 "roundId": collaboration_manifest.get("roundId"),
                 "assignmentId": assignment["assignmentId"],
+                "workItemId": assignment.get("workItemId")
+                or assignment["assignmentId"],
             }
         # Daemons that report generated files themselves make the backend-side
         # workspace walk unnecessary (and it only works on a shared filesystem).
@@ -2710,6 +2721,8 @@ class DaemonNodeRegistry:
             {
                 "runId": command["runId"],
                 "assignmentId": assignment["assignmentId"],
+                "workItemId": assignment.get("workItemId")
+                or assignment["assignmentId"],
                 "agent": command["agent"],
                 **({"role": role} if role else {}),
                 "mode": command["mode"],
@@ -2741,6 +2754,21 @@ class DaemonNodeRegistry:
                     else {}
                 ),
                 **({"brief": assignment["brief"]} if assignment.get("brief") else {}),
+                **(
+                    {"delegationAuthority": assignment["delegationAuthority"]}
+                    if assignment.get("delegationAuthority")
+                    else {}
+                ),
+                **(
+                    {"dependsOnWorkItemIds": assignment["dependsOnWorkItemIds"]}
+                    if "dependsOnWorkItemIds" in assignment
+                    else {}
+                ),
+                **(
+                    {"workKind": assignment["workKind"]}
+                    if assignment.get("workKind")
+                    else {}
+                ),
                 **(
                     {"coordinator": True}
                     if assignment.get("coordinator") is True

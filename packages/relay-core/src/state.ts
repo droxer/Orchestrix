@@ -39,6 +39,14 @@ export interface AgentState {
   assignment_brief?: string;
   /** Stable identity for this assignment across at-least-once delivery. */
   assignment_id?: string;
+  /** Stable conductor-owned delegated-subtask identity. */
+  work_item_id?: string;
+  /** Authority that assigned this work item. */
+  delegation_authority?: "conductor";
+  /** Work items that must be complete before this one is eligible. */
+  depends_on_work_item_ids?: string[];
+  /** Semantic kind used by the conductor's work graph. */
+  work_kind?: "coordination" | "discussion" | "planning" | "implementation" | "verification" | "review" | "repair" | "synthesis";
   /** Explicit collaboration phase for this assignment. */
   team_phase?: "discussion" | "execution" | "review";
   /**
