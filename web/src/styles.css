@@ -41,6 +41,11 @@
 @import "./styles/thread.css" layer(relay);
 @import "./styles/chat.css" layer(relay);
 @import "./styles/agent-stream.css" layer(relay);
+/* KaTeX's own stylesheet, pulled into `relay` so markdown.css can override its
+   display-equation spacing by source order. Unlayered it would outrank every
+   app rule and the adjustments below it would silently do nothing. */
+@import "katex/dist/katex.min.css" layer(relay);
+@import "./styles/markdown.css" layer(relay);
 @import "./styles/syntax.css" layer(relay);
 @import "./styles/artifact.css" layer(relay);
 @import "./styles/thread-space.css" layer(relay);

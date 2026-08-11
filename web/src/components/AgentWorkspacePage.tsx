@@ -736,7 +736,7 @@ function FilePreview({
       ) : null}
       <div className={`artifact-viewer-body${bleed ? " is-bleed" : ""}`}>
         {showRendered && isMarkdownFile(name) ? (
-          <Markdown text={data.content} />
+          <Markdown text={data.content} variant="document" />
         ) : showRendered && isHtmlFile(name) ? (
           <HtmlPreview html={data.content} title={name} />
         ) : (

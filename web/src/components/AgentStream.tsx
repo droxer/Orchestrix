@@ -214,7 +214,7 @@ function TextSegment({ text, live }: { text: string; live: boolean }) {
   return (
     <div className={`agent-text ${live ? "is-live" : ""}`}>
       <div className="agent-prose" aria-hidden={live || undefined}>
-        <MarkdownContent text={visibleText} />
+        <MarkdownContent text={visibleText} live={live} />
       </div>
       {live ? (
         <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
