@@ -9,6 +9,7 @@ import remarkMath from "remark-math";
 import { fenceLanguage, type MarkdownVariant } from "../lib/markdown";
 import { MarkdownModeProvider } from "./markdown/context";
 import { MarkdownFence } from "./markdown/MarkdownFence";
+import { MarkdownTable } from "./markdown/MarkdownTable";
 
 type CodeProps = { className?: string; children?: ReactNode };
 
@@ -55,11 +56,7 @@ const MARKDOWN_COMPONENTS: Components = {
   // A GFM table is the one block that cannot be made to fit a narrow column by
   // wrapping: past a few columns it either overflows the transcript or crushes
   // its cells. Give it its own scroll region so the page never scrolls sideways.
-  table: ({ children, ...rest }) => (
-    <div className="md-table">
-      <table {...rest}>{children}</table>
-    </div>
-  ),
+  table: MarkdownTable,
   a: ({ href, children, ...rest }) => (
     <a href={href} target="_blank" rel="noreferrer noopener" {...rest}>
       {children}

@@ -1121,7 +1121,8 @@
     "retry": "重试",
     "copy_code": "复制代码",
     "copy_code_failed": "复制失败",
-    "diagram": "图表"
+    "diagram": "图表",
+    "table": "表格"
   },
   "nodes": {
     "agent_presence_title": "{{agent}}：{{presence}}",

@@ -1123,7 +1123,8 @@
     "retry": "Retry",
     "copy_code": "Copy code",
     "copy_code_failed": "Copy failed",
-    "diagram": "Diagram"
+    "diagram": "Diagram",
+    "table": "Table"
   },
   "nodes": {
     "agent_presence_title": "{{agent}}: {{presence}}",

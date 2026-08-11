@@ -13,6 +13,23 @@ function prefersDark(): boolean {
   return document.documentElement.getAttribute("data-theme") !== "light";
 }
 
+/** Tracks the app theme so a diagram re-renders when the user switches.
+ *
+ *  A diagram is baked into an SVG at render time, so unlike everything else on
+ *  the page it cannot follow a theme change through CSS variables — a diagram
+ *  drawn in dark and left alone becomes dark boxes on a light page. */
+function useIsDark(): boolean {
+  const [dark, setDark] = useState(prefersDark);
+  useEffect(() => {
+    const root = document.documentElement;
+    const observer = new MutationObserver(() => setDark(prefersDark()));
+    observer.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    setDark(prefersDark());
+    return () => observer.disconnect();
+  }, []);
+  return dark;
+}
+
 /**
  * A ```mermaid fence drawn as an SVG.
  *
@@ -26,6 +43,7 @@ function prefersDark(): boolean {
 export function MermaidDiagram({ code, fallback }: { code: string; fallback: ReactNode }) {
   const { t } = useTranslation();
   const [svg, setSvg] = useState<string | null>(null);
+  const dark = useIsDark();
 
   useEffect(() => {
     let cancelled = false;
@@ -35,7 +53,7 @@ export function MermaidDiagram({ code, fallback }: { code: string; fallback: Rea
     void (async () => {
       try {
         const mermaid = (await import("mermaid")).default;
-        mermaid.initialize(mermaidConfig(prefersDark()));
+        mermaid.initialize(mermaidConfig(dark));
         const { svg: rendered } = await mermaid.render(id, code);
         if (!cancelled) setSvg(rendered);
       } catch {
@@ -51,7 +69,7 @@ export function MermaidDiagram({ code, fallback }: { code: string; fallback: Rea
       // orphaned SVG in the body.
       document.getElementById(id)?.remove();
     };
-  }, [code]);
+  }, [code, dark]);
 
   if (svg === null) return <>{fallback}</>;
 

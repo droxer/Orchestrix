@@ -244,8 +244,37 @@
   max-width: 100%;
   margin: 0 0 var(--sp-2);
   overflow-x: auto;
-  border: 1px solid var(--line-2);
+  /* --line-1, not --line-2: this edge is where content gets clipped, so the
+     frame has to be legible enough to read as a boundary rather than as the
+     table simply stopping mid-word. */
+  border: 1px solid var(--line-1);
   border-radius: var(--r-2);
+
+  /* Scroll affordance. Four background layers: two opaque covers pinned to the
+     content (`local`, so they travel with the scroll) and two shadows pinned to
+     the box (`scroll`, so they stay at the edges). At the left end the cover
+     sits over the left shadow and hides it; scroll right and the cover moves
+     away, revealing it. The result is a shadow on precisely the sides that have
+     more content — no JS, no scroll listener. */
+  background:
+    linear-gradient(to right, var(--surface-0) 40%, transparent) 0 0 / var(--sp-6) 100% no-repeat local,
+    linear-gradient(to left, var(--surface-0) 40%, transparent) 100% 0 / var(--sp-6) 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--ink-1) 22%, transparent), transparent)
+      0 0 / var(--sp-4) 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--ink-1) 22%, transparent), transparent)
+      100% 0 / var(--sp-4) 100% no-repeat scroll;
+}
+
+/* The covers are painted in --surface-0; a table sitting on a raised surface
+   needs them repainted to match or they read as pale strips. */
+.artifact-viewer-body .md-table,
+.thread-space-preview .md-table {
+  background-color: var(--surface-1);
+  background-image:
+    linear-gradient(to right, var(--surface-1) 40%, transparent),
+    linear-gradient(to left, var(--surface-1) 40%, transparent),
+    radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--ink-1) 22%, transparent), transparent),
+    radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--ink-1) 22%, transparent), transparent);
 }
 
 .md-table:focus-visible {

@@ -55,6 +55,15 @@ describe("markdown fence decisions", () => {
     assert.equal(shouldRenderDiagram("ts", false), false);
   });
 
+  it("redraws a diagram when the theme changes", () => {
+    // A diagram is baked into an SVG, so unlike the rest of the page it cannot
+    // follow a theme switch through CSS variables — without this it stays dark
+    // boxes on a light page.
+    const diagram = readWeb("src/components/markdown/MermaidDiagram.tsx");
+    assert.match(diagram, /attributeFilter: \["data-theme"\]/);
+    assert.match(diagram, /\}, \[code, dark\]\);/);
+  });
+
   it("pins mermaid to its strict security level", () => {
     // Diagram source is agent-authored. Strict is what disables click bindings
     // and raw HTML labels inside the SVG; nothing else in this renderer parses
@@ -129,8 +138,18 @@ describe("markdown component wiring", () => {
   it("wraps tables and fences unconditionally", () => {
     // Conditional wrapping would reshuffle the DOM at the moment a run settles,
     // and the streaming caret matches through this structure.
-    assert.match(source, /className="md-table"/);
+    assert.match(source, /table: MarkdownTable/);
+    assert.match(readWeb("src/components/markdown/MarkdownTable.tsx"), /className="md-table"/);
     assert.match(readWeb("src/components/markdown/MarkdownFence.tsx"), /className="md-fence"/);
+  });
+
+  it("makes the table scroll region reachable by keyboard", () => {
+    // A clipped table is mouse-only without this: the columns past the fold
+    // cannot be scrolled to, and the region has no name to announce.
+    const table = readWeb("src/components/markdown/MarkdownTable.tsx");
+    assert.match(table, /tabIndex=\{0\}/);
+    assert.match(table, /role="region"/);
+    assert.match(table, /aria-label=\{t\("message\.table"\)\}/);
   });
 
   it("passes the live flag from the stream into the renderer", () => {
@@ -158,6 +177,17 @@ describe("markdown stylesheet", () => {
 
   it("gives tables their own scroll region", () => {
     assert.match(markdownCss, /\.md-table \{[^}]*overflow-x: auto/s);
+  });
+
+  it("signals that a clipped table has more to the side", () => {
+    // Without this the table just stops mid-word and reads as truncated. The
+    // `local` covers ride the content and unmask the fixed `scroll` shadows
+    // only on the sides that still have content.
+    const block = /\.md-table \{(.*?)\n\}/s.exec(markdownCss)?.[1] ?? "";
+    assert.equal((block.match(/no-repeat local/g) ?? []).length, 2);
+    assert.equal((block.match(/no-repeat scroll/g) ?? []).length, 2);
+    // The clipped edge needs a legible frame, not the soft hairline.
+    assert.match(block, /border: 1px solid var\(--line-1\)/);
   });
 
   it("keeps the streaming caret matching through the new wrappers", () => {
