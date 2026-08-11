@@ -80,15 +80,6 @@ export function ArtifactPreviewHeader({
         >
           {t("artifact.action_download")}
         </a>
-        <a
-          className="artifact-preview-action-btn"
-          href={rawHref}
-          target="_blank"
-          rel="noreferrer"
-          aria-label={t("artifact.action_raw")}
-        >
-          {t("artifact.action_raw")}
-        </a>
       </div>
     </header>
   );

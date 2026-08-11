@@ -1017,7 +1017,6 @@
   "artifact": {
     "action_copy": "复制",
     "action_download": "下载",
-    "action_raw": "原始",
     "copied": "已复制",
     "kind": {
       "default": "{{kind}}",

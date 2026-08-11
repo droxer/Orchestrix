@@ -1018,7 +1018,6 @@
   "artifact": {
     "action_copy": "Copy",
     "action_download": "Download",
-    "action_raw": "Raw",
     "copied": "Copied",
     "kind": {
       "default": "{{kind}}",
