@@ -140,7 +140,6 @@
     "mention_list": "Agents you can mention",
     "mention_blocked": "Fix the mentioned agents before sending",
     "mention_reason": {
-      "off-node": "not on this computer",
       "unavailable": "unavailable",
       "unknown": "unknown agent"
     }

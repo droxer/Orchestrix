@@ -18,7 +18,7 @@ import { mergeThreadRuntimeNodes, mergeVisibleDaemonNodes } from "./lib/daemonNo
 import { formatDispatchError } from "./lib/agentReadiness";
 import { isEmployeeAgentRoutable, preferredRoutableAgent } from "./lib/agentDisplayNames";
 import { routeComposerMessage, threadMessageInput } from "./lib/messageRouting";
-import { mentionCandidates } from "./lib/mentions";
+import { mentionCandidates, parseMentions } from "./lib/mentions";
 import { applyTheme, readLanguage, readSidenavExpanded, readTheme, readThreadSpaceWidth, readTokens, selectedEmployeeKey, writeLanguage, writeSidenavExpanded, writeTheme, writeThreadSpaceWidth } from "./lib/appStorage";
 import { canUseLocalControlPanel } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
@@ -281,14 +281,12 @@ export function App() {
     },
     [teams, logicalAgents, selectedThreadNodeId, startedThreadTeamId],
   );
-  // `@` names agents in a started thread, and a thread never leaves its
-  // computer — so the candidates come from the whole roster filtered to that
-  // computer, not from the narrower set a new thread may be staged with.
+  // `@` names exactly the agents the footer picker offers: the ones placed on
+  // the thread's computer. One list keeps the two selections in sync — the
+  // agent a mention addresses is always one the composer could have picked.
   const threadMentionCandidates = useMemo(
-    () => (initializingThread || !activeSession
-      ? []
-      : mentionCandidates(logicalAgents, activeThreadNodeId ?? null)),
-    [activeSession, activeThreadNodeId, initializingThread, logicalAgents],
+    () => mentionCandidates(selectableLogicalAgents),
+    [selectableLogicalAgents],
   );
   // The room, in join order. Ids the roster names but the agent list does not
   // know (deleted, or another employee's) are dropped rather than rendered as
@@ -806,37 +804,48 @@ export function App() {
       ? composerTeams.find((team) => team.id === pendingThreadTeamId)
       : undefined;
     let goal = raw;
-    let newThreadAgentId: string | undefined;
+    let newThreadAgentIds: string[] | undefined;
+    // A mention names who answers, in a new thread as much as a started one —
+    // otherwise the draft says one agent and the dispatch picks another.
+    const addressed = parseMentions(raw, threadMentionCandidates);
+    if (addressed.blocked) {
+      reportMutationError("Mention unresolved", null, t("composer.mention_blocked"));
+      return;
+    }
     // Participant availability is a creation concern. Continued threads send
     // semantic intent to the conductor, which resolves the room against live
     // membership and placement state on the server.
     if (!sessionId && !pendingTeam) {
-      const defaultLogicalAgent = activeLogicalAgent
-        && selectableLogicalAgents.some((agent) => agent.id === activeLogicalAgent.id)
-        && isEmployeeAgentRoutable(activeLogicalAgent)
-        ? activeLogicalAgent
-        : selectableLogicalAgents.find(isEmployeeAgentRoutable);
-      if (!defaultLogicalAgent) {
-        reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: activeAgent }));
-        return;
+      if (addressed.addressAgentIds.length > 0) {
+        newThreadAgentIds = addressed.addressAgentIds;
+      } else {
+        const defaultLogicalAgent = activeLogicalAgent
+          && selectableLogicalAgents.some((agent) => agent.id === activeLogicalAgent.id)
+          && isEmployeeAgentRoutable(activeLogicalAgent)
+          ? activeLogicalAgent
+          : selectableLogicalAgents.find(isEmployeeAgentRoutable);
+        if (!defaultLogicalAgent) {
+          reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: activeAgent }));
+          return;
+        }
+        const routed = routeComposerMessage(
+          raw,
+          {
+            id: defaultLogicalAgent.id,
+            executorKind: defaultLogicalAgent.executorKind,
+          },
+        );
+        goal = routed.goal;
+        if (!goal) return;
+        const routedLogicalAgent = selectableLogicalAgents.find(
+          (agent) => agent.id === routed.agentId && isEmployeeAgentRoutable(agent),
+        );
+        if (!routedLogicalAgent) {
+          reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: routed.agent }));
+          return;
+        }
+        newThreadAgentIds = [routedLogicalAgent.id];
       }
-      const routed = routeComposerMessage(
-        raw,
-        {
-          id: defaultLogicalAgent.id,
-          executorKind: defaultLogicalAgent.executorKind,
-        },
-      );
-      goal = routed.goal;
-      if (!goal) return;
-      const routedLogicalAgent = selectableLogicalAgents.find(
-        (agent) => agent.id === routed.agentId && isEmployeeAgentRoutable(agent),
-      );
-      if (!routedLogicalAgent) {
-        reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: routed.agent }));
-        return;
-      }
-      newThreadAgentId = routedLogicalAgent.id;
     }
     // Echo the turn immediately. For a continued session we mint the message id
     // here and hand it to the backend so the persisted event reconciles by id.
@@ -881,7 +890,9 @@ export function App() {
             ...(selectedThreadNodeId ? { daemonNodeId: selectedThreadNodeId } : {}),
             ...(pendingTeam
               ? { teamId: pendingTeam.id }
-              : { assignments: [{ agentId: newThreadAgentId! }] }),
+              : {
+                  assignments: newThreadAgentIds!.map((agentId) => ({ agentId })),
+                }),
           });
       setPendingThreadTeamId(null);
       setActiveSessionId(done.id);

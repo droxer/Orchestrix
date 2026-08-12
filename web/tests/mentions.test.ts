@@ -13,7 +13,7 @@ import type { EmployeeAgent } from "../src/types.js";
 const candidates: MentionCandidate[] = [
   { id: "agent_lead", displayName: "Lead", eligible: true },
   { id: "agent_support", displayName: "Support Bot", eligible: true },
-  { id: "agent_far", displayName: "Remote", eligible: false, reason: "off-node" },
+  { id: "agent_far", displayName: "Remote", eligible: false, reason: "unavailable" },
 ];
 
 function agent(overrides: Partial<EmployeeAgent>): EmployeeAgent {
@@ -47,6 +47,35 @@ function placement(daemonNodeId: string): EmployeeAgent["placements"][number] {
     priority: 100,
   } as EmployeeAgent["placements"][number];
 }
+
+describe("mentionCandidates", () => {
+  it("offers exactly the agents it was given, so `@` matches the picker", () => {
+    const offered = mentionCandidates([
+      agent({ id: "agent_here", displayName: "Here", placements: [placement("node_1")] }),
+      agent({ id: "agent_also", displayName: "Also", placements: [placement("node_1")] }),
+    ]);
+    assert.deepEqual(offered.map((candidate) => candidate.id), [
+      "agent_here",
+      "agent_also",
+    ]);
+    assert.ok(offered.every((candidate) => candidate.eligible));
+  });
+
+  it("keeps an agent that cannot run listed, with the reason", () => {
+    const [offered] = mentionCandidates([
+      agent({ id: "agent_off", displayName: "Off", availability: "offline" }),
+    ]);
+    assert.equal(offered.eligible, false);
+    assert.equal(offered.reason, "unavailable");
+  });
+
+  it("drops a deleted agent entirely", () => {
+    assert.deepEqual(
+      mentionCandidates([agent({ deletedAt: "2026-02-01T00:00:00.000Z" })]),
+      [],
+    );
+  });
+});
 
 describe("parseMentions", () => {
   it("addresses one agent named at the head of the message", () => {
@@ -84,11 +113,11 @@ describe("parseMentions", () => {
     assert.equal(parsed.blocked, true);
   });
 
-  it("blocks an agent that does not run on this computer", () => {
+  it("blocks an agent that cannot take a turn right now", () => {
     const parsed = parseMentions("@Remote hello", candidates);
     assert.deepEqual(parsed.addressAgentIds, []);
     assert.equal(parsed.blocked, true);
-    assert.equal(parsed.mentions[0].reason, "off-node");
+    assert.equal(parsed.mentions[0].reason, "unavailable");
   });
 
   it("resolves an ambiguous name to nobody", () => {

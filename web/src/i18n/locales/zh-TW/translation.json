@@ -140,7 +140,6 @@
     "mention_list": "可提及的智慧體",
     "mention_blocked": "傳送前請修正提及的智慧體",
     "mention_reason": {
-      "off-node": "不在此電腦上",
       "unavailable": "無法使用",
       "unknown": "未知智慧體"
     }

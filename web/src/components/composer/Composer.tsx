@@ -63,6 +63,14 @@ const ComposerView = forwardRef<ComposerHandle, {
     () => parseMentions(composerText, mentionCandidates),
     [composerText, mentionCandidates],
   );
+  // A mention is a selection: while the draft addresses someone, the footer
+  // names that agent rather than the picker's standing choice, so the composer
+  // gives one answer to "who runs this?" instead of two. A team thread is the
+  // exception — the round still runs the whole roster, so it keeps naming the
+  // team.
+  const addressedLogicalAgentId = activeTeamId
+    ? null
+    : parsed.addressAgentIds[0] ?? null;
   const highlightRef = useRef<HTMLDivElement | null>(null);
   const mentions = useMentionAutocomplete({
     text: composerText,
@@ -80,6 +88,10 @@ const ComposerView = forwardRef<ComposerHandle, {
   const [sendPending, setSendPending] = useState(false);
   const triggerSend = () => {
     if (running || sendPending) return;
+    // The send button is disabled on a mention that resolves to nobody, but the
+    // keyboard shortcut bypasses the button — and a blocked draft sent anyway
+    // would address the whole room instead of the agent the author named.
+    if (parsed.blocked || !composerText.trim()) return;
     setSendPending(true);
     onSend();
   };
@@ -167,7 +179,7 @@ const ComposerView = forwardRef<ComposerHandle, {
               ) : null}
               <AgentSelect
                 logicalAgents={logicalAgents}
-                activeLogicalAgentId={activeLogicalAgentId}
+                activeLogicalAgentId={addressedLogicalAgentId ?? activeLogicalAgentId}
                 onLogicalAgentPicked={onLogicalAgentPicked}
                 teams={teams}
                 activeTeamId={activeTeamId}

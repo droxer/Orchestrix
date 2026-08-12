@@ -1,4 +1,4 @@
-import type { AgentPlacement, EmployeeAgent } from "../types.js";
+import type { EmployeeAgent } from "../types.js";
 import { isEmployeeAgentRoutable } from "./agentDisplayNames.ts";
 
 /** An agent that may be addressed from this thread's composer. */
@@ -6,10 +6,10 @@ export type MentionCandidate = {
   id: string;
   displayName: string;
   profileImageUrl?: string | null;
-  /** False when the agent does not run on this thread's computer. It stays in
-   *  the list so the popup can say why, rather than silently hiding it. */
+  /** False when the agent cannot take a turn right now (offline, disabled).
+   *  It stays in the list so the popup can say why. */
   eligible: boolean;
-  reason?: "off-node" | "unavailable";
+  reason?: "unavailable";
 };
 
 /** One `@…` token found in the addressing run at the head of the message. */
@@ -35,38 +35,29 @@ export type ParsedMentions = {
 const MENTION_PREFIX = "@";
 
 /**
- * The agents `@` can name in a thread pinned to `daemonNodeId`.
+ * The agents `@` can name in this thread.
  *
- * An agent lives on the computers it has placements on, and a thread never
- * leaves its computer, so an agent placed elsewhere can never answer here.
- * Those agents are still returned, marked ineligible, because an empty list
- * with no explanation is worse than a disabled row.
+ * `agents` must already be scoped to the thread's computer — the same list the
+ * composer's agent picker offers. A thread never leaves its computer, so an
+ * agent placed elsewhere can never answer here; naming it in the popup only
+ * invites a mention the dispatch would refuse. Keeping both surfaces on one
+ * list is what makes the picker and `@` a single selection.
  */
 export function mentionCandidates(
   agents: readonly EmployeeAgent[],
-  daemonNodeId: string | null,
 ): MentionCandidate[] {
   return agents
     .filter((agent) => !agent.deletedAt)
     .map((agent) => {
       const routable = isEmployeeAgentRoutable(agent);
-      const onNode = !daemonNodeId || agentRunsOnNode(agent, daemonNodeId);
       return {
         id: agent.id,
         displayName: agent.displayName,
         profileImageUrl: agent.profileImageUrl,
-        eligible: routable && onNode,
-        ...(onNode ? {} : { reason: "off-node" as const }),
-        ...(onNode && !routable ? { reason: "unavailable" as const } : {}),
+        eligible: routable,
+        ...(routable ? {} : { reason: "unavailable" as const }),
       };
     });
-}
-
-function agentRunsOnNode(agent: EmployeeAgent, daemonNodeId: string): boolean {
-  return (agent.placements ?? []).some(
-    (placement: AgentPlacement) =>
-      placement.daemonNodeId === daemonNodeId && placement.desiredState !== "removed",
-  );
 }
 
 /**

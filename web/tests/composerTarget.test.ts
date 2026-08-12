@@ -36,3 +36,38 @@ describe("composer team targeting", () => {
     assert.match(app, /teamId: pendingTeam\.id/);
   });
 });
+
+describe("composer agent selection", () => {
+  it("names the same agents in `@` as in the footer picker", async () => {
+    const app = await readFile(resolve("web/src/App.tsx"), "utf8");
+    // Both surfaces read one list — the agents placed on the thread's
+    // computer — so `@` can never offer an agent the thread cannot run.
+    assert.match(app, /mentionCandidates\(selectableLogicalAgents\)/);
+    assert.match(app, /logicalAgents,\s*selectedThreadNodeId/);
+  });
+
+  it("dispatches a new thread to the agents the draft addresses", async () => {
+    const app = await readFile(resolve("web/src/App.tsx"), "utf8");
+    assert.match(app, /newThreadAgentIds = addressed\.addressAgentIds/);
+    assert.match(app, /assignments: newThreadAgentIds!\.map/);
+  });
+
+  it("refuses a draft whose mention resolves to nobody, shortcut included", async () => {
+    const composer = await readFile(
+      resolve("web/src/components/composer/Composer.tsx"),
+      "utf8",
+    );
+    // The disabled send button is not enough: Cmd+Enter calls triggerSend
+    // directly, and a blocked draft sent that way addresses the whole room
+    // instead of the agent the author named.
+    assert.match(composer, /const triggerSend = \(\) => \{[\s\S]*?parsed\.blocked/);
+  });
+
+  it("shows the addressed agent in the footer while the draft names one", async () => {
+    const composer = await readFile(
+      resolve("web/src/components/composer/Composer.tsx"),
+      "utf8",
+    );
+    assert.match(composer, /addressedLogicalAgentId \?\? activeLogicalAgentId/);
+  });
+});
