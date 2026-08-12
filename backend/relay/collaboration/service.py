@@ -119,19 +119,18 @@ class CollaborationConductor:
                 "discuss": "ask",
                 "review": "review",
             }
+            addressed_ids = list(dict.fromkeys(intent.address_agent_ids))
             raw_assignments = (
                 [
-                    {
-                        "agentId": intent.address_agent_id,
-                        "mode": purpose_modes[intent.purpose],
-                    }
+                    {"agentId": agent_id, "mode": purpose_modes[intent.purpose]}
+                    for agent_id in addressed_ids
                 ]
-                if intent.address_agent_id
+                if addressed_ids
                 else None
             )
             address = (
-                {"kind": "members", "agentIds": [intent.address_agent_id]}
-                if intent.address_agent_id
+                {"kind": "members", "agentIds": addressed_ids}
+                if addressed_ids
                 else {"kind": "room"}
             )
             return _PreparedRound(
@@ -256,28 +255,18 @@ class CollaborationConductor:
                 team_member_ids = {agent["id"] for agent in members}
             team_snapshot = _team_snapshot(team, members)
         elif session and not raw_assignments:
-            owner_agent_id = session.get("ownerAgentId")
-            if not isinstance(owner_agent_id, str) or not owner_agent_id:
+            # A bare message goes to the whole room: every agent the thread has
+            # accumulated, not just the one it started with.
+            room = _room_agent_ids(session)
+            if not room:
                 raise CollaborationError(
                     "participants_required",
                     "The thread has no addressable room participant.",
                     status=400,
                 )
-            raw_assignments = [{"agentId": owner_agent_id, "mode": intent.mode}]
-        elif (
-            session
-            and not team_id
-            and intent.source == "message"
-            and raw_assignments
-            and any(
-                item.get("agentId") != session.get("ownerAgentId")
-                for item in raw_assignments
-            )
-        ):
-            raise CollaborationError(
-                "agent_forbidden",
-                "A normal message may only address the solo room's agent.",
-            )
+            raw_assignments = [
+                {"agentId": agent_id, "mode": intent.mode} for agent_id in room
+            ]
         if not raw_assignments:
             raise CollaborationError(
                 "participants_required",
@@ -308,6 +297,13 @@ class CollaborationConductor:
                 "This thread already runs on another computer.",
             )
         required_node_id = session_node_id or intent.requested_node_id
+        if intent.source == "message" and session and required_node_id:
+            self._assert_addressed_agents_on_node(
+                raw_assignments,
+                _room_agent_ids(session),
+                required_node_id,
+                daemon_nodes,
+            )
         assignments = self._compile_assignments(
             raw_assignments, team_id, team_member_ids, team_snapshot
         )
@@ -358,7 +354,84 @@ class CollaborationConductor:
             parsed["teamId"] = team_id
         if intent.decision:
             parsed["decision"] = _validated_decision(intent.decision, resolved[0])
-        return await self.ctx.backend.run(resolved[0]["daemonNodeId"], parsed)
+        dispatched = await self.ctx.backend.run(resolved[0]["daemonNodeId"], parsed)
+        return self._admit_addressed_agents(dispatched, resolved, actor)
+
+    def _assert_addressed_agents_on_node(
+        self,
+        raw_assignments: list[dict[str, Any]],
+        room: list[str],
+        required_node_id: str,
+        daemon_nodes: list[dict[str, Any]],
+    ) -> None:
+        """An agent may only be mentioned into a thread from its own computer.
+
+        Generic placement resolution reports this as `workspace_unavailable`,
+        which reads as a transient runtime problem. A mention that names an
+        agent living on another computer is a permanent, explainable mistake, so
+        it gets its own code for the composer to render.
+        """
+        newcomers = [
+            item["agentId"]
+            for item in raw_assignments
+            if isinstance(item, dict)
+            and isinstance(item.get("agentId"), str)
+            and item["agentId"] not in set(room)
+        ]
+        if not newcomers:
+            return
+        nodes_by_id = {node["id"]: node for node in daemon_nodes}
+        required_node = nodes_by_id.get(required_node_id) or {}
+        managed_node_id = required_node.get("managedNodeId")
+        allowed_node_ids = {required_node_id} | {
+            node["id"]
+            for node in daemon_nodes
+            if managed_node_id and node.get("managedNodeId") == managed_node_id
+        }
+        for agent_id in newcomers:
+            placements = self.ctx.agent_placement_store.list_placements(
+                agent_id=agent_id
+            )
+            if any(
+                placement.get("daemonNodeId") in allowed_node_ids
+                and placement.get("desiredState") != "removed"
+                for placement in placements
+            ):
+                continue
+            agent = self.ctx.agent_store.get_agent(agent_id)
+            name = (agent or {}).get("displayName") or agent_id
+            raise CollaborationError(
+                "agent_not_on_thread_node",
+                f"{name} does not run on this thread's computer.",
+                status=400,
+            )
+
+    def _admit_addressed_agents(
+        self,
+        session: dict[str, Any],
+        assignments: list[dict[str, Any]],
+        actor: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Grow the room to include agents this round addressed into it.
+
+        Admission happens after dispatch resolves, so an agent that could not
+        actually take the round never becomes a participant.
+        """
+        session_id = session.get("id")
+        if not isinstance(session_id, str) or not session_id:
+            return session
+        room = set(_room_agent_ids(session))
+        newcomers = [
+            assignment["agentId"]
+            for assignment in assignments
+            if isinstance(assignment.get("agentId"), str)
+            and assignment["agentId"] not in room
+        ]
+        if not newcomers:
+            return session
+        return SessionController(self.ctx.session_store).record_participants_joined(
+            session_id, newcomers, actor["employeeId"]
+        )
 
     def _session_for_actor(
         self, session_id: str | None, actor: dict[str, Any]
@@ -490,6 +563,19 @@ def _scoped_idempotency_key(
 def _request_fingerprint(intent: _PreparedRound) -> str:
     payload = asdict(intent)
     payload.pop("idempotency_key", None)
+    # Addressing the same text to a different set of agents is a different
+    # request; addressing the same set in a different order is not.
+    address = payload.get("address")
+    if isinstance(address, dict) and isinstance(address.get("agentIds"), list):
+        payload["address"] = {**address, "agentIds": sorted(address["agentIds"])}
+    assignments = payload.get("raw_assignments")
+    if isinstance(assignments, list):
+        payload["raw_assignments"] = sorted(
+            assignments,
+            key=lambda item: str(item.get("agentId"))
+            if isinstance(item, dict)
+            else "",
+        )
     encoded = json.dumps(
         payload,
         sort_keys=True,
@@ -497,6 +583,24 @@ def _request_fingerprint(intent: _PreparedRound) -> str:
         ensure_ascii=True,
     ).encode()
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _room_agent_ids(session: dict[str, Any]) -> list[str]:
+    """Every agent currently in the thread's room.
+
+    The roster is authoritative once a thread has one. Threads created before
+    the roster existed replay with only their owner agent, which is exactly the
+    room they had.
+    """
+    roster = [
+        agent_id
+        for agent_id in session.get("participantAgentIds") or []
+        if isinstance(agent_id, str) and agent_id
+    ]
+    if roster:
+        return roster
+    owner_agent_id = session.get("ownerAgentId")
+    return [owner_agent_id] if isinstance(owner_agent_id, str) and owner_agent_id else []
 
 
 def _mode(value: Any) -> str:

@@ -12,6 +12,7 @@ import {
   displayNameForExecutor,
 } from "../lib/agentDisplayNames";
 import type { ThreadItem } from "./ThreadRow";
+import type { MentionCandidate } from "../lib/mentions";
 import { ThreadListPanel } from "./ThreadListPanel";
 import { ThreadHeader } from "./ThreadHeader";
 import { TranscriptEmpty } from "./TranscriptEmpty";
@@ -66,6 +67,10 @@ export type ThreadsViewProps = {
   runtimeNodeId: string | null;
   selectedRuntimeNode: DaemonNodeMonitorRecord | null;
   activeRuntimeNode: DaemonNodeMonitorRecord | null;
+  /** Agents `@` may name in this thread. */
+  mentionCandidates: MentionCandidate[];
+  /** Agents in the thread's room, resolved for the header strip. */
+  threadParticipants: EmployeeAgent[];
   onRuntimeNodeChange: (nodeId: string) => void;
   agentDescriptors: Record<AgentName, { blurb: string }>;
   handoffOpen: boolean;
@@ -126,6 +131,8 @@ export function ThreadsView({
   runtimeNodeId,
   selectedRuntimeNode,
   activeRuntimeNode,
+  mentionCandidates,
+  threadParticipants,
   onRuntimeNodeChange,
   agentDescriptors,
   handoffOpen,
@@ -178,6 +185,7 @@ export function ThreadsView({
       <section id="chat-panel" className="chat-panel" aria-label={t("nav.threads")} tabIndex={-1}>
         <ThreadHeader
           activeSession={activeSession}
+          participants={threadParticipants}
           artifactCount={artifactCount}
           spaceOpen={spaceOpen}
           threadListHidden={threadListHidden}
@@ -267,6 +275,7 @@ export function ThreadsView({
           runtimeNodeId={runtimeNodeId}
           selectedRuntimeNode={selectedRuntimeNode}
           activeRuntimeNode={activeRuntimeNode}
+          mentionCandidates={mentionCandidates}
           onRuntimeNodeChange={onRuntimeNodeChange}
           running={running}
           onSend={onSend}

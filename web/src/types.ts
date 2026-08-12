@@ -545,7 +545,8 @@ export interface AgentRunInput {
 export interface ThreadMessageInput {
   text: string;
   intent: "accomplish" | "discuss" | "review";
-  addressAgentId?: string;
+  /** Agents this message addresses. Empty or absent means the whole room. */
+  addressAgentIds?: string[];
   userMessageId?: string;
   idempotencyKey?: string;
 }

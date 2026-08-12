@@ -24,7 +24,10 @@ class MessageIntent:
     thread_id: str
     text: str
     purpose: CollaborationPurpose = "accomplish"
-    address_agent_id: str | None = None
+    # Empty addresses the whole room. Several ids address several agents in one
+    # round; agents that are not yet participants join the thread by being
+    # addressed.
+    address_agent_ids: tuple[str, ...] = ()
     idempotency_key: str | None = None
     user_message_id: str | None = None
 

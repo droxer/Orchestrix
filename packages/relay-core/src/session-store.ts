@@ -145,6 +145,9 @@ export interface RelaySession {
   title?: string;
   taskGoal: string;
   participants: string[];
+  /** Agents in this thread's room. Seeded from the thread's first agent and
+   *  grown by `@` mentions; membership only ever grows. */
+  participantAgentIds?: string[];
   status: SessionStatus;
   phase: string;
   createdAt: string;

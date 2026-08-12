@@ -17,7 +17,8 @@ import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeThreadRuntimeNodes, mergeVisibleDaemonNodes } from "./lib/daemonNodes";
 import { formatDispatchError } from "./lib/agentReadiness";
 import { isEmployeeAgentRoutable, preferredRoutableAgent } from "./lib/agentDisplayNames";
-import { routeComposerMessage, teamMembersForMention, teamMessageInput, threadMessageInput } from "./lib/messageRouting";
+import { routeComposerMessage, threadMessageInput } from "./lib/messageRouting";
+import { mentionCandidates } from "./lib/mentions";
 import { applyTheme, readLanguage, readSidenavExpanded, readTheme, readThreadSpaceWidth, readTokens, selectedEmployeeKey, writeLanguage, writeSidenavExpanded, writeTheme, writeThreadSpaceWidth } from "./lib/appStorage";
 import { canUseLocalControlPanel } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
@@ -279,6 +280,24 @@ export function App() {
       return nodeTeams;
     },
     [teams, logicalAgents, selectedThreadNodeId, startedThreadTeamId],
+  );
+  // `@` names agents in a started thread, and a thread never leaves its
+  // computer — so the candidates come from the whole roster filtered to that
+  // computer, not from the narrower set a new thread may be staged with.
+  const threadMentionCandidates = useMemo(
+    () => (initializingThread || !activeSession
+      ? []
+      : mentionCandidates(logicalAgents, activeThreadNodeId ?? null)),
+    [activeSession, activeThreadNodeId, initializingThread, logicalAgents],
+  );
+  // The room, in join order. Ids the roster names but the agent list does not
+  // know (deleted, or another employee's) are dropped rather than rendered as
+  // a nameless chip.
+  const threadParticipants = useMemo(
+    () => (activeSession?.participantAgentIds ?? [])
+      .map((agentId) => logicalAgents.find((agent) => agent.id === agentId))
+      .filter((agent): agent is EmployeeAgent => Boolean(agent)),
+    [activeSession?.participantAgentIds, logicalAgents],
   );
   const visibleArtifacts = useMemo(() => visibleThreadArtifacts(activeSession), [activeSession]);
 
@@ -848,22 +867,14 @@ export function App() {
     composerRef.current?.clear();
     atBottomRef.current = true;
     try {
-      const teamMembers = sessionId && activeSession?.teamId
-        ? teamMembersForMention(
-            teams.find((team) => team.id === activeSession.teamId)?.memberAgentIds,
-            logicalAgents.map((agent) => ({ id: agent.id, displayName: agent.displayName })),
-          )
-        : [];
       const done = sessionId
         ? await submitThreadMessageMutation.mutateAsync({
             sessionId,
-            input: activeSession?.teamId
-              ? teamMessageInput({
-                  text: goal,
-                  teamMembers,
-                  userMessageId,
-                })
-              : threadMessageInput({ text: goal, userMessageId }),
+            input: threadMessageInput({
+              text: goal,
+              candidates: threadMentionCandidates,
+              userMessageId,
+            }),
           })
         : await runLogicalAgentsMutation.mutateAsync({
             taskGoal: goal,
@@ -1229,6 +1240,8 @@ export function App() {
             runtimeNodeId={selectedThreadNodeId}
             selectedRuntimeNode={stableSelectedThreadComputer}
             activeRuntimeNode={activeRuntimeNode}
+            mentionCandidates={threadMentionCandidates}
+            threadParticipants={threadParticipants}
             onRuntimeNodeChange={setNewThreadNodeId}
             agentDescriptors={agentDescriptors}
             handoffOpen={handoffOpen}

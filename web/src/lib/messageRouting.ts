@@ -1,4 +1,5 @@
 import type { AgentName, ThreadMessageInput } from "../types.js";
+import { parseMentions, type MentionCandidate } from "./mentions.ts";
 
 export type RoutedComposerMessage = {
   agentId: string;
@@ -19,84 +20,24 @@ export function routeComposerMessage(
 }
 
 /**
- * Resolve a leading `@Name` to one room member.
+ * Build semantic intent for a message typed into a thread.
  *
- * Only a leading mention addresses the turn: "tell @Alice I said hi" is a
- * message to the room that happens to name her. The mention is never stripped
- * from the message — being addressed by name is context the agent should see.
+ * Mentions at the head of the message address specific agents; anything else
+ * addresses the whole room. Mentions are left in the text — being addressed by
+ * name is context the agent should see.
  */
-export function resolveLeadingMention(
-  raw: string,
-  members: Array<{ id: string; displayName: string }>,
-): { agentId: string } | null {
-  const text = raw.trimStart();
-  if (!text.startsWith("@")) return null;
-  const candidate = text.slice(1).toLowerCase();
-  // Longest name first, so "Support Bot" wins over a hypothetical "Support".
-  const byLength = [...members].sort(
-    (left, right) => right.displayName.length - left.displayName.length,
-  );
-  const named = byLength.filter((member) => {
-    const name = member.displayName.toLowerCase();
-    return candidate === name || candidate.startsWith(`${name} `);
-  });
-  if (named.length === 0) return null;
-  const best = named[0];
-  const ambiguous = named.some(
-    (member) =>
-      member.id !== best.id
-      && member.displayName.length === best.displayName.length,
-  );
-  return ambiguous ? null : { agentId: best.id };
-}
-
-/**
- * Resolve the mention candidates for a team thread from the team's roster,
- * not from every agent the employee happens to own.
- *
- * A name that resolves to an agent the employee owns but that is NOT on this
- * team's roster must be treated as unknown, so the message falls back to the
- * whole room instead of narrowing to (and being rejected for) an outsider.
- * When the roster is missing (team not loaded/found), this returns an empty
- * list, which makes `resolveLeadingMention` return null and every mention
- * fall back to the room — the safe default.
- */
-export function teamMembersForMention(
-  memberAgentIds: string[] | undefined,
-  employeeAgents: Array<{ id: string; displayName: string }>,
-): Array<{ id: string; displayName: string }> {
-  if (!memberAgentIds || memberAgentIds.length === 0) return [];
-  const agentsById = new Map(employeeAgents.map((agent) => [agent.id, agent]));
-  return memberAgentIds
-    .map((id) => agentsById.get(id))
-    .filter((agent): agent is { id: string; displayName: string } => Boolean(agent));
-}
-
-/** Build semantic intent for a message typed into a team thread. */
-export function teamMessageInput({ text, teamMembers, userMessageId }: {
+export function threadMessageInput({ text, candidates, userMessageId }: {
   text: string;
-  teamMembers: Array<{ id: string; displayName: string }>;
+  /** Agents `@` may name here; empty makes every message a room message. */
+  candidates: readonly MentionCandidate[];
   userMessageId: string;
 }): ThreadMessageInput {
-  const mentioned = resolveLeadingMention(text, teamMembers);
+  const { addressAgentIds } = parseMentions(text, candidates);
   return {
     text,
     intent: "accomplish",
     userMessageId,
     idempotencyKey: userMessageId,
-    ...(mentioned ? { addressAgentId: mentioned.agentId } : {}),
-  };
-}
-
-/** Build semantic intent for a solo thread, whose room identity is server-owned. */
-export function threadMessageInput({ text, userMessageId }: {
-  text: string;
-  userMessageId: string;
-}): ThreadMessageInput {
-  return {
-    text,
-    intent: "accomplish",
-    userMessageId,
-    idempotencyKey: userMessageId,
+    ...(addressAgentIds.length ? { addressAgentIds } : {}),
   };
 }

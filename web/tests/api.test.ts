@@ -574,7 +574,7 @@ describe("thread collaboration messages", () => {
       await submitThreadMessage("ses_1", {
         text: "@Support check this",
         intent: "review",
-        addressAgentId: "agent_support",
+        addressAgentIds: ["agent_support"],
         userMessageId: "evt_1",
       });
     } finally {
@@ -586,7 +586,7 @@ describe("thread collaboration messages", () => {
       body: {
         text: "@Support check this",
         intent: "review",
-        addressAgentId: "agent_support",
+        addressAgentIds: ["agent_support"],
         userMessageId: "evt_1",
       },
     }]);
