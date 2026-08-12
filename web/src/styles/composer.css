@@ -343,3 +343,114 @@
 
   .send-button-icon { animation: none; }
 }
+
+/* ============================ mentions ============================ */
+/* `@` addressing: a popup over the input and a chip row above it. Both sit
+   inside .composer-input so they inherit the card's inline padding and move
+   with it; the popup is absolutely placed so opening it never reflows the
+   transcript. */
+
+.mention-popup {
+  position: absolute;
+  bottom: calc(100% + var(--sp-2));
+  left: 0;
+  z-index: var(--z-float);
+  display: flex;
+  max-height: 240px;
+  min-width: min(280px, 100%);
+  flex-direction: column;
+  overflow-y: auto;
+  padding: var(--sp-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-3);
+  background: var(--surface-3);
+  box-shadow: var(--shadow-2);
+}
+
+.mention-option {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1-5) var(--sp-2);
+  border: 0;
+  border-radius: var(--r-2);
+  background: transparent;
+  color: var(--ink-1);
+  font: var(--type-label-strong);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mention-option[data-active] {
+  background: var(--action-soft);
+}
+
+.mention-option:disabled {
+  color: var(--ink-4);
+  cursor: not-allowed;
+}
+
+.mention-option-mark {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: var(--r-full);
+}
+
+.mention-option-reason {
+  margin-left: auto;
+  color: var(--ink-4);
+  font: var(--type-label);
+}
+
+/* Recipients row: what this message will actually reach. Absent entirely
+   when nothing is mentioned — an unaddressed message goes to the room. */
+.mention-recipients {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1-5);
+  padding-bottom: var(--sp-2);
+}
+
+.mention-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-0-5) var(--sp-1-5);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font: var(--type-label);
+}
+
+/* An unresolved or off-computer mention is the one thing here that must
+   read as wrong, since it blocks the send. */
+.mention-chip:not([data-eligible]) {
+  border-style: dashed;
+  color: var(--ink-4);
+}
+
+.mention-chip-mark {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: var(--r-full);
+}
+
+.mention-chip-reason {
+  color: var(--ink-4);
+}
+
+.mention-chip-remove {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-4);
+  cursor: pointer;
+}
+
+.mention-chip-remove:hover {
+  color: var(--ink-1);
+}

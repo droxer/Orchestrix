@@ -136,7 +136,16 @@
     "choose_agent": "選擇 Agent",
     "agents_group": "智能體",
     "teams_group": "團隊",
-    "send_shortcut": "{{shortcut}} 傳送"
+    "send_shortcut": "{{shortcut}} 傳送",
+    "mention_list": "可提及的智慧體",
+    "mention_recipients": "此訊息將傳送給",
+    "mention_remove": "移除 {{name}}",
+    "mention_blocked": "傳送前請修正提及的智慧體",
+    "mention_reason": {
+      "off-node": "不在此電腦上",
+      "unavailable": "無法使用",
+      "unknown": "未知智慧體"
+    }
   },
   "decision": {
     "approve": "核准",

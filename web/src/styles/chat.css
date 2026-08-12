@@ -59,6 +59,35 @@
   white-space: nowrap;
 }
 
+/* Room roster: who is in this thread, shown only once it has more than one
+   agent. Sits between the title and the tools so a thread that grew reads
+   differently at a glance from one that never did. */
+.chat-participants {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  margin-inline-start: auto;
+  overflow: hidden;
+}
+
+.chat-participant {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  color: var(--ink-3);
+  font: var(--type-label);
+  white-space: nowrap;
+}
+
+.chat-participant-mark {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: var(--r-full);
+}
+
 .chat-tools {
   display: flex;
   align-items: center;

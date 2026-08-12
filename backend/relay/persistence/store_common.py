@@ -310,6 +310,12 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         session["ownerEmployeeId"] = created["ownerEmployeeId"]
     if created.get("ownerAgentId"):
         session["ownerAgentId"] = created["ownerAgentId"]
+        # The room starts as whoever the thread started with; `@` mentions grow
+        # it from there. A team thread seeds the rest of its roster from the
+        # team snapshot at dispatch time, so legacy threads replay correctly.
+        session["participantAgentIds"] = [created["ownerAgentId"]]
+    else:
+        session["participantAgentIds"] = []
     if created.get("teamId"):
         session["teamId"] = created["teamId"]
     if created.get("daemonNodeId"):
@@ -474,6 +480,14 @@ def _apply_session_renamed(session: dict[str, Any], event: dict[str, Any]) -> No
     session["title"] = event["title"]
 
 
+def _apply_participants_joined(session: dict[str, Any], event: dict[str, Any]) -> None:
+    """Grow the thread's room. Membership only ever grows, never shrinks."""
+    roster = session.setdefault("participantAgentIds", [])
+    for agent_id in event.get("agentIds") or []:
+        if isinstance(agent_id, str) and agent_id and agent_id not in roster:
+            roster.append(agent_id)
+
+
 SessionEventHandler = Callable[[dict[str, Any], dict[str, Any]], None]
 SESSION_EVENT_HANDLERS: dict[str, SessionEventHandler] = {
     "session.status": _apply_session_status,
@@ -487,6 +501,7 @@ SESSION_EVENT_HANDLERS: dict[str, SessionEventHandler] = {
     "session.archived": _apply_session_archived,
     "session.runtime_affinity": _apply_session_runtime_affinity,
     "session.renamed": _apply_session_renamed,
+    "thread.participants_joined": _apply_participants_joined,
 }
 
 

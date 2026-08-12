@@ -875,7 +875,9 @@ export function submitThreadMessage(
     body: {
       text: input.text,
       intent: input.intent,
-      ...(input.addressAgentId ? { addressAgentId: input.addressAgentId } : {}),
+      ...(input.addressAgentIds?.length
+        ? { addressAgentIds: input.addressAgentIds }
+        : {}),
       ...(input.userMessageId ? { userMessageId: input.userMessageId } : {}),
       ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
     },

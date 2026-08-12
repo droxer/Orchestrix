@@ -16,6 +16,24 @@ RECOVERY_KINDS = frozenset({"rerun", "handoff"})
 MODES = frozenset({"action", "ask", "review"})
 
 
+def _address_agent_ids(body: dict[str, Any]) -> tuple[str, ...]:
+    """Read the addressed agents, accepting the singular legacy field.
+
+    `addressAgentId` is what the chat gateway still sends; it means the same
+    thing as a one-element `addressAgentIds`.
+    """
+    raw = body.get("addressAgentIds")
+    if isinstance(raw, list):
+        ids = [item for item in raw if isinstance(item, str) and item]
+        if len(ids) != len(raw):
+            raise HTTPException(400, "addressAgentIds must be a list of agent ids.")
+        return tuple(dict.fromkeys(ids))
+    if raw is not None:
+        raise HTTPException(400, "addressAgentIds must be a list of agent ids.")
+    single = string_field(body, "addressAgentId") or None
+    return (single,) if single else ()
+
+
 @router.post("/threads/{thread_id}/messages", status_code=202)
 async def submit_thread_message(
     thread_id: str, request: Request, ctx: AppContextDep
@@ -28,14 +46,14 @@ async def submit_thread_message(
     purpose = string_field(body, "intent") or "accomplish"
     if purpose not in PURPOSES:
         raise HTTPException(400, "intent must be accomplish, discuss, or review.")
-    address_agent_id = string_field(body, "addressAgentId") or None
+    address_agent_ids = _address_agent_ids(body)
     try:
         return await CollaborationConductor(ctx).submit(
             MessageIntent(
                 thread_id=thread_id,
                 text=text,
                 purpose=purpose,  # type: ignore[arg-type]
-                address_agent_id=address_agent_id,
+                address_agent_ids=address_agent_ids,
                 idempotency_key=string_field(body, "idempotencyKey") or None,
                 user_message_id=string_field(body, "userMessageId") or None,
             ),

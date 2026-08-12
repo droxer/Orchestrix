@@ -712,7 +712,7 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
         assert not app.state.agent_store.get_agent(agent["id"]).get("deletedAt")
 
 
-def test_normal_solo_message_cannot_address_an_agent_outside_the_room(
+def test_mentioning_an_agent_grows_the_room_and_later_messages_reach_it(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
@@ -749,14 +749,194 @@ def test_normal_solo_message_cannot_address_an_agent_outside_the_room(
         response = client.post(
             f"/api/v1/threads/{session['id']}/messages",
             json={
-                "text": "bring in somebody else",
+                "text": f"@{outsider['displayName']} take a look",
                 "intent": "accomplish",
-                "addressAgentId": outsider["id"],
+                "addressAgentIds": [outsider["id"]],
             },
         )
 
-        assert response.status_code == 409
-        assert response.json()["detail"]["code"] == "agent_forbidden"
+        assert response.status_code == 202
+        assert app.state.session_store.get_session(session["id"])[
+            "participantAgentIds"
+        ] == [owner["id"], outsider["id"]]
+
+
+def test_mentioning_two_agents_dispatches_one_round_with_both(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        node = app.state.registry.register(
+            {
+                "sandboxId": "node_admin",
+                "employeeId": "admin",
+                "token": "node_token",
+                "workspacePath": "/workspace/admin",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex", "claude"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        sync_node_agents(app.state, node)
+        agents = app.state.agent_store.list_agents(supervisor_employee_id="admin")
+        owner = next(agent for agent in agents if agent["executorKind"] == "codex")
+        other = next(agent for agent in agents if agent["executorKind"] == "claude")
+        session = app.state.session_store.create_session(
+            {
+                "daemonNodeId": node["id"],
+                "workspacePath": "/workspace/admin",
+                "ownerEmployeeId": "admin",
+                "ownerAgentId": owner["id"],
+                "taskGoal": "Keep one room",
+            }
+        )
+
+        response = client.post(
+            f"/api/v1/threads/{session['id']}/messages",
+            json={
+                "text": "both of you look at this",
+                "intent": "accomplish",
+                "addressAgentIds": [owner["id"], other["id"]],
+            },
+        )
+
+        assert response.status_code == 202, response.text
+        persisted = app.state.session_store.get_session(session["id"])
+        manifest = persisted["collaborationRounds"][-1]
+        assert {assignment["agentId"] for assignment in manifest["assignments"]} == {
+            owner["id"],
+            other["id"],
+        }
+        assert manifest["address"] == {
+            "kind": "members",
+            "agentIds": [owner["id"], other["id"]],
+        }
+        assert persisted["participantAgentIds"] == [owner["id"], other["id"]]
+
+
+def test_room_message_fans_out_to_every_participant(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        node = app.state.registry.register(
+            {
+                "sandboxId": "node_admin",
+                "employeeId": "admin",
+                "token": "node_token",
+                "workspacePath": "/workspace/admin",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex", "claude"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        sync_node_agents(app.state, node)
+        agents = app.state.agent_store.list_agents(supervisor_employee_id="admin")
+        owner = next(agent for agent in agents if agent["executorKind"] == "codex")
+        joiner = next(agent for agent in agents if agent["executorKind"] == "claude")
+        session = app.state.session_store.create_session(
+            {
+                "daemonNodeId": node["id"],
+                "workspacePath": "/workspace/admin",
+                "ownerEmployeeId": "admin",
+                "ownerAgentId": owner["id"],
+                "taskGoal": "Keep one room",
+            }
+        )
+        SessionController(app.state.session_store).record_participants_joined(
+            session["id"], [joiner["id"]], "admin"
+        )
+
+        response = client.post(
+            f"/api/v1/threads/{session['id']}/messages",
+            json={"text": "status please", "intent": "accomplish"},
+        )
+
+        assert response.status_code == 202, response.text
+        manifest = app.state.session_store.get_session(session["id"])[
+            "collaborationRounds"
+        ][-1]
+        assert {assignment["agentId"] for assignment in manifest["assignments"]} == {
+            owner["id"],
+            joiner["id"],
+        }
+
+
+def test_mentioning_an_agent_from_another_computer_is_rejected(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        node = app.state.registry.register(
+            {
+                "sandboxId": "node_admin",
+                "employeeId": "admin",
+                "token": "node_token",
+                "workspacePath": "/workspace/admin",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex", "claude"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        other_node = app.state.registry.register(
+            {
+                "sandboxId": "node_admin_2",
+                "employeeId": "admin",
+                "token": "node_token_2",
+                "workspacePath": "/workspace/admin-2",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex", "claude"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        sync_node_agents(app.state, node)
+        sync_node_agents(app.state, other_node)
+        agents = app.state.agent_store.list_agents(supervisor_employee_id="admin")
+        placements = app.state.agent_placement_store
+        owner = next(
+            agent
+            for agent in agents
+            if any(
+                placement["daemonNodeId"] == node["id"]
+                for placement in placements.list_placements(agent_id=agent["id"])
+            )
+        )
+        elsewhere = next(
+            agent
+            for agent in agents
+            if all(
+                placement["daemonNodeId"] != node["id"]
+                for placement in placements.list_placements(agent_id=agent["id"])
+            )
+        )
+        session = app.state.session_store.create_session(
+            {
+                "daemonNodeId": node["id"],
+                "workspacePath": "/workspace/admin",
+                "ownerEmployeeId": "admin",
+                "ownerAgentId": owner["id"],
+                "taskGoal": "Keep one room",
+            }
+        )
+
+        response = client.post(
+            f"/api/v1/threads/{session['id']}/messages",
+            json={
+                "text": "come help",
+                "intent": "accomplish",
+                "addressAgentIds": [elsewhere["id"]],
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"]["code"] == "agent_not_on_thread_node"
 
 
 @pytest.mark.parametrize(

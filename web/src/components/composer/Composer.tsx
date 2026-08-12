@@ -5,6 +5,10 @@ import { sendShortcutLabel } from "../../lib/sendShortcut";
 import { ActionSend, ComposerStop } from "../icons";
 import { AgentSelect } from "./AgentSelect";
 import { useComposer } from "../../hooks/useComposer";
+import { useMentionAutocomplete } from "../../hooks/useMentionAutocomplete";
+import { parseMentions, removeMention, type MentionCandidate } from "../../lib/mentions";
+import { MentionPopup } from "./MentionPopup";
+import { MentionRecipients } from "./MentionRecipients";
 import { ThreadRuntimeReadout, ThreadRuntimeSelect } from "./ThreadRuntimeSelect";
 
 
@@ -42,14 +46,29 @@ const ComposerView = forwardRef<ComposerHandle, {
   activeRuntimeNode: DaemonNodeMonitorRecord | null;
   onRuntimeNodeChange: (nodeId: string) => void;
   running: boolean;
+  /** Agents `@` may name in this thread — the ones on its computer. Empty
+   *  while staging a new thread, where the footer picker chooses the target. */
+  mentionCandidates?: MentionCandidate[];
   onSend: () => void;
   onCancelRun: () => void;
-}>(function Composer({ logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, teams, activeTeamId, onTeamPicked, teamLocked, activeAgentDisplayName, selectedEmployee, initializingThread, runtimeNodes, runtimeNodeId, selectedRuntimeNode, activeRuntimeNode, onRuntimeNodeChange, running, onSend, onCancelRun }, ref) {
+}>(function Composer({ logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, teams, activeTeamId, onTeamPicked, teamLocked, activeAgentDisplayName, selectedEmployee, initializingThread, runtimeNodes, runtimeNodeId, selectedRuntimeNode, activeRuntimeNode, onRuntimeNodeChange, running, mentionCandidates = [], onSend, onCancelRun }, ref) {
   const { t } = useTranslation();
   const composer = useComposer();
   const {
     composerText, setComposerText, textareaRef,
   } = composer;
+  // Derived every render rather than stored: the draft text is the only
+  // source of truth for who this message addresses.
+  const parsed = useMemo(
+    () => parseMentions(composerText, mentionCandidates),
+    [composerText, mentionCandidates],
+  );
+  const mentions = useMentionAutocomplete({
+    text: composerText,
+    candidates: mentionCandidates,
+    setText: setComposerText,
+    textareaRef,
+  });
   const sendShortcutTitle = useMemo(
     () => t("composer.send_shortcut", { shortcut: sendShortcutLabel() }),
     [t],
@@ -87,6 +106,17 @@ const ComposerView = forwardRef<ComposerHandle, {
     <form className="composer" onSubmit={(e) => { e.preventDefault(); triggerSend(); }}>
       <div className="composer-input-wrap" data-running={running || undefined}>
         <div className="composer-input">
+          <MentionRecipients
+            mentions={parsed.mentions}
+            candidates={mentionCandidates}
+            onRemove={(mention) => setComposerText(removeMention(composerText, mention))}
+          />
+          <MentionPopup
+            matches={mentions.matches}
+            activeIndex={mentions.activeIndex}
+            onHover={mentions.setActiveIndex}
+            onPick={mentions.pick}
+          />
           <textarea
             ref={textareaRef}
             aria-label={selectedEmployee
@@ -98,8 +128,19 @@ const ComposerView = forwardRef<ComposerHandle, {
               ? t("composer.placeholder")
               : t("composer.placeholder_no_employee")}
             value={composerText}
-            onChange={(e) => setComposerText(e.target.value)}
+            onChange={(e) => {
+              setComposerText(e.target.value);
+              mentions.onCaretChange(e.target.selectionStart ?? e.target.value.length);
+            }}
+            onSelect={(e) => mentions.onCaretChange(e.currentTarget.selectionStart ?? 0)}
+            onBlur={mentions.close}
             onKeyDown={(e) => {
+              // The popup gets first refusal on navigation keys; the send
+              // shortcut is untouched because the popup never claims it.
+              if (!(e.metaKey || e.ctrlKey) && mentions.handleKey(e.key)) {
+                e.preventDefault();
+                return;
+              }
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); triggerSend(); }
             }}
             rows={1}
@@ -138,12 +179,17 @@ const ComposerView = forwardRef<ComposerHandle, {
                 disabled={!running && (
                   sendPending
                   || !composerText.trim()
+                  || parsed.blocked
                   || (initializingThread && !runtimeNodeId)
                 )}
                 onClick={running ? onCancelRun : undefined}
                 aria-busy={sendPending || undefined}
                 aria-label={running ? t("composer.cancel_run") : sendPending ? t("composer.sending", { defaultValue: "Sending…" }) : t("composer.send")}
-                title={running ? t("composer.cancel_run") : sendShortcutTitle}
+                title={running
+                  ? t("composer.cancel_run")
+                  : parsed.blocked
+                    ? t("composer.mention_blocked")
+                    : sendShortcutTitle}
               >
                 <span className="send-button-icon" key={running ? "stop" : "send"}>
                   {running ? <ComposerStop size={13} /> : <ActionSend size={16} />}
