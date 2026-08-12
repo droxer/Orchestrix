@@ -136,10 +136,40 @@ export function parseMentions(
   };
 }
 
-/** Remove one mention's text from the message, leaving the rest untouched. */
-export function removeMention(text: string, mention: ParsedMention): string {
-  const trailing = leadingSpace(text.slice(mention.end));
-  return `${text.slice(0, mention.start)}${text.slice(mention.end + trailing)}`;
+/** One run of the draft, either a mention or the plain text between two. */
+export type MentionSegment = {
+  text: string;
+  mention: boolean;
+  /** Present only on mention runs; false is what makes one read as blocking. */
+  eligible?: boolean;
+};
+
+/**
+ * Cut `text` into the runs a highlight layer paints: mentions become pills,
+ * everything else stays plain. Empty runs are dropped so the layer never
+ * renders a zero-width span between two adjacent mentions.
+ */
+export function mentionSegments(
+  text: string,
+  mentions: readonly ParsedMention[],
+): MentionSegment[] {
+  const segments: MentionSegment[] = [];
+  let cursor = 0;
+  for (const mention of mentions) {
+    if (mention.start > cursor) {
+      segments.push({ text: text.slice(cursor, mention.start), mention: false });
+    }
+    segments.push({
+      text: text.slice(mention.start, mention.end),
+      mention: true,
+      eligible: mention.eligible,
+    });
+    cursor = mention.end;
+  }
+  if (cursor < text.length || segments.length === 0) {
+    segments.push({ text: text.slice(cursor), mention: false });
+  }
+  return segments;
 }
 
 /** The `@…` fragment being typed at `caret`, or null when none is open. */

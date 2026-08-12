@@ -496,6 +496,20 @@
   position: relative;
 }
 
+/* Speaker line: the agent's name on the first row of its turn, level with the
+   mark in the rail. It sits tight above the body (the turn-body gap is meant
+   for blocks, not for a caption) and stays selectable text, since who said a
+   thing is part of what you copy out of a transcript. */
+.msg-speaker {
+  margin-bottom: calc(var(--sp-2) * -1 + 1px);
+  color: var(--ink-1);
+  font: var(--type-label-strong);
+  letter-spacing: var(--track-0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .msg-turn-foot {
   display: flex;
   align-items: center;
