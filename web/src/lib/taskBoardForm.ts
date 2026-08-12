@@ -129,6 +129,30 @@ export function taskAssignmentMutationFields(
   };
 }
 
+type TaskStartSelection = {
+  id: string;
+  assignedAgentId?: string;
+  assignedTeamId?: string;
+};
+
+function taskStartAssignments(task: TaskStartSelection): Array<{ agentId: string }> | undefined {
+  if (task.assignedTeamId || !task.assignedAgentId) return undefined;
+  return [{ agentId: task.assignedAgentId }];
+}
+
+export function taskStartMutationInput(
+  task: TaskStartSelection,
+  fallbackAssignments?: Array<{ agentId?: string; agent: AgentName }>,
+): { taskId: string; assignments?: Array<{ agentId?: string; agent?: AgentName }> } {
+  const selectedAssignments = taskStartAssignments(task);
+  const assignments = selectedAssignments
+    ?? (!task.assignedAgentId && !task.assignedTeamId ? fallbackAssignments : undefined);
+  return {
+    taskId: task.id,
+    ...(assignments ? { assignments } : {}),
+  };
+}
+
 export function clearTaskAssignment(form: TaskBoardFormState): TaskBoardFormState {
   const cleared = {
     ...form,

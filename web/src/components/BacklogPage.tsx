@@ -13,7 +13,7 @@ import { type CurrentUser, type DaemonNodeMonitorRecord, type EmployeeAgent, typ
 import { ActionApprove, ActionAdd, ActionCalendar, ActionStart, ActionStop, NavAgents, NavRefresh, ViewBoard, ViewList } from "./icons";
 import { agentReadyForTask, canDiscussTask, discussionAgentsForTask, dueTone, filterTasks, isTaskStatus, TASK_PRIORITIES, TASK_STATUSES, tasksByStatus, type BacklogFilters } from "../lib/backlog";
 import { readDraggedTaskId, TASK_DRAG_MEDIA_TYPE, taskDropRejection } from "../lib/taskDrag";
-import { emptyBacklogForm, taskAssignmentMutationFields, taskBoardFormsEqual, type BacklogTaskFormState } from "../lib/taskBoardForm";
+import { emptyBacklogForm, taskAssignmentMutationFields, taskBoardFormsEqual, taskStartMutationInput, type BacklogTaskFormState } from "../lib/taskBoardForm";
 import { TaskDrawer } from "./task-board/TaskDrawer";
 import { InlineTaskCreate } from "./task-board/InlineTaskCreate";
 import { taskCreateIntent } from "../lib/taskCreateIntent";
@@ -757,9 +757,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
       onEdit: () => editTask(task),
       onAssign: () => assignTask(task),
       onStart: () => void startTaskMutation.mutate(
-        (task.assignedAgentId || task.assignedTeamId)
-          ? { taskId: task.id }
-          : { taskId: task.id, assignments: discussionAssignments },
+        taskStartMutationInput(task, discussionAssignments),
         {
           onSuccess: (result) => {
             if (!task.assignedAgentId && !task.assignedTeamId && result.session) onOpenThread(result.session.id);

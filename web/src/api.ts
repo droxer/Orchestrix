@@ -48,6 +48,7 @@ import type {
   TaskArtifactsResponse,
   TaskDeletionResponse,
   TaskMutationInput,
+  TaskRunAssignment,
   ThreadMessageInput,
   ThreadRecoveryInput,
   TasksResponse,
@@ -664,7 +665,10 @@ export function assignTaskToTeam(taskId: string, teamId: string): Promise<RelayT
   });
 }
 
-export function startTask(taskId: string, input: { assignments?: RunInput["assignments"] } = {}): Promise<StartTaskResponse> {
+export function startTask(
+  taskId: string,
+  input: { assignments?: TaskRunAssignment[] } = {},
+): Promise<StartTaskResponse> {
   return apiJson<StartTaskResponse>(`/tasks/${encodeURIComponent(taskId)}/runs`, {
     method: "POST",
     body: input,

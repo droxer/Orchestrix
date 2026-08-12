@@ -6,6 +6,7 @@ import {
   emptyRoutineForm,
   nextRoutineRunDate,
   parseTaskAssignmentValue,
+  taskStartMutationInput,
   teamAssignmentPatch,
   taskAssignmentMutationFields,
   taskAssignmentValue,
@@ -81,6 +82,26 @@ describe("taskBoardForm", () => {
       assignedAgentId: null,
       assignedTeamId: "team_ops",
     });
+  });
+
+  it("pins a task start request to its selected logical agent", () => {
+    assert.deepEqual(
+      taskStartMutationInput({
+        id: "task_1",
+        assignedAgentId: "agent_selected",
+      }),
+      {
+        taskId: "task_1",
+        assignments: [{ agentId: "agent_selected" }],
+      },
+    );
+    assert.deepEqual(
+      taskStartMutationInput({
+        id: "task_2",
+        assignedTeamId: "team_delivery",
+      }),
+      { taskId: "task_2" },
+    );
   });
 
   it("hides ownerless assignment options unless they are already selected", () => {
