@@ -114,3 +114,122 @@ html[data-theme="dark"] .relay-bleed-mark {
   gap: var(--sp-2);
   margin-top: var(--sp-3);
 }
+
+/* ── Transcript landing hero ──────────────────────────────────────────
+   The new-thread landing is a starting point, not a zero-data notice: it
+   is the one empty state allowed the display tier, a staged entrance, and
+   starter prompts. Everything below is scoped under .transcript-empty so
+   the board/setup/monitoring empties above stay settled. */
+
+/* Two classes: atelier.css re-states the shared .relay-empty measure later in
+   the layer, so the hero measure must out-specify it. */
+.relay-empty.transcript-empty {
+  gap: var(--sp-4);
+  max-width: 560px;
+}
+
+/* Kicker above the avatar; suggestion chips between the blurb and the kbd
+   hints (the shared markup renders actions last). */
+.transcript-empty .relay-empty-kicker { order: -2; }
+.transcript-empty .relay-empty-actions { order: 5; margin-top: var(--sp-2); }
+.transcript-empty .relay-empty-hint { order: 6; }
+
+.transcript-empty-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--ink-3);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+}
+
+.transcript-empty .relay-empty-illustration {
+  margin-bottom: var(--sp-2);
+}
+
+.transcript-empty .relay-empty-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--r-3);
+  /* Flat system, one decorative exception: a wide action-tinted halo stands
+     in for a drop shadow so the hero tile reads as the room's focal point. */
+  box-shadow:
+    inset 0 0 0 1px var(--line-2),
+    0 0 0 10px color-mix(in srgb, var(--action) 6%, transparent);
+}
+
+.transcript-empty .relay-empty-title {
+  font: var(--type-display);
+  letter-spacing: var(--type-display-track);
+}
+
+.transcript-empty .relay-empty-body {
+  font: var(--type-body);
+  letter-spacing: var(--type-body-track);
+}
+
+/* Starter prompts — quiet outlined chips that strengthen their edge under
+   the pointer (--line-strong is the hover tier; fills stay flat). */
+.transcript-empty-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-2);
+}
+
+.transcript-empty-suggestion {
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-full);
+  background: var(--surface-1);
+  color: var(--ink-2);
+  font: var(--type-label-strong);
+  letter-spacing: var(--type-label-strong-track);
+  cursor: pointer;
+  transition:
+    border-color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease);
+}
+
+.transcript-empty-suggestion:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+  color: var(--ink-1);
+}
+
+.transcript-empty-suggestion:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
+}
+
+.transcript-empty-hints {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-4);
+}
+
+.transcript-empty-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* The hero earns a staged entrance; every other empty state renders settled. */
+@media (prefers-reduced-motion: no-preference) {
+  .transcript-empty > * {
+    --rise-from: var(--rise-sm);
+    animation: rise var(--t-slow) var(--ease) both;
+  }
+
+  /* Delays follow the VISUAL order (kicker → avatar → title → blurb →
+     chips → hints), which the order overrides above decouple from the DOM.
+     Every step runs off the shared --t-stagger base. */
+  .transcript-empty > .relay-empty-kicker { animation-delay: calc(var(--t-stagger) * 0); }
+  .transcript-empty > .relay-empty-illustration { animation-delay: calc(var(--t-stagger) * 1); }
+  .transcript-empty > .relay-empty-title { animation-delay: calc(var(--t-stagger) * 2); }
+  .transcript-empty > .relay-empty-body { animation-delay: calc(var(--t-stagger) * 3); }
+  .transcript-empty > .relay-empty-actions { animation-delay: calc(var(--t-stagger) * 4); }
+  .transcript-empty > .relay-empty-hint { animation-delay: calc(var(--t-stagger) * 5); }
+}

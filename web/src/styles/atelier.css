@@ -111,7 +111,27 @@ body {
   min-height: 100%;
   border: 0;
   border-radius: 0;
-  background: transparent;
+  /* The landing gets the app's one ambient wash: a soft action-tinted glow
+     pooled behind the hero, a second neutral bloom off-axis so the field
+     reads lit rather than flat. Sizes past 100% let the drift keyframe
+     travel the pools without ever exposing an edge. */
+  background:
+    radial-gradient(52% 42% at 50% 40%, color-mix(in srgb, var(--action) 7%, transparent), transparent 72%),
+    radial-gradient(38% 30% at 68% 30%, color-mix(in srgb, var(--ink-1) 4%, transparent), transparent 70%);
+  background-size: 150% 150%, 130% 130%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .transcript-inner:has(.transcript-empty) {
+    animation: transcript-landing-drift 16s var(--ease) infinite alternate;
+  }
+}
+
+/* A barely-there drift — the light breathes around the hero; it never
+   travels far enough to read as motion you could track. */
+@keyframes transcript-landing-drift {
+  from { background-position: 50% 40%, 68% 30%; }
+  to   { background-position: 44% 46%, 74% 24%; }
 }
 .rail-node { border-color: var(--ink-4); border-radius: var(--r-full); background: var(--surface-3); }
 .msg-time { color: var(--ink-4); }
@@ -125,6 +145,12 @@ body {
 html[data-theme="dark"] .chat-header,
 html[data-theme="dark"] .page-header {
   --surface-header-bg: var(--surface-0);
+}
+html[data-theme="dark"] .transcript-inner:has(.transcript-empty) {
+  background:
+    radial-gradient(52% 42% at 50% 40%, color-mix(in srgb, var(--action) 5%, transparent), transparent 72%),
+    radial-gradient(38% 30% at 68% 30%, color-mix(in srgb, var(--ink-1) 3%, transparent), transparent 70%);
+  background-size: 150% 150%, 130% 130%;
 }
 html[data-theme="dark"] .rail-node { background: var(--surface-3); }
 

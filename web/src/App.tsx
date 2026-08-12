@@ -198,12 +198,6 @@ export function App() {
     () => logicalAgents.find((agent) => agent.id === activeLogicalAgentId),
     [activeLogicalAgentId, logicalAgents],
   );
-  const agentDescriptors = useMemo<Record<AgentName, { blurb: string }>>(() => ({
-    claude: { blurb: t("agent.claude.blurb") },
-    pi: { blurb: t("agent.pi.blurb") },
-    codex: { blurb: t("agent.codex.blurb") },
-    kimi: { blurb: t("agent.kimi.blurb") },
-  }), [t]);
   // The logged-in user is themselves an employee; their threads are the
   // sessions they own. The backend already owner-scopes /api/v1/threads, so this is
   // just the non-archived sessions sorted most-recent first.
@@ -1247,7 +1241,6 @@ export function App() {
             mentionCandidates={threadMentionCandidates}
             threadParticipants={threadParticipants}
             onRuntimeNodeChange={setNewThreadNodeId}
-            agentDescriptors={agentDescriptors}
             handoffOpen={handoffOpen}
             setHandoffOpen={setHandoffOpen}
             handoffAgentId={handoffAgentId}

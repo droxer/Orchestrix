@@ -1,47 +1,72 @@
 import { useTranslation } from "react-i18next";
-import { IdentityMonogram } from "./IdentityMonogram";
-import { ProfileImage } from "./ProfileImagePicker";
 import { RelayEmptyState } from "./RelayEmptyState";
-import type { AgentName } from "../types";
-
-type AgentDescriptor = { blurb: string };
+import { RelayMark } from "./RelayMark";
+import { sendShortcutLabel } from "../lib/sendShortcut";
 
 type TranscriptEmptyProps = {
   selectedEmployee: string;
-  activeAgent: AgentName;
-  activeAgentDisplayName: string;
-  activeAgentImageUrl?: string | null;
-  agentDescriptors: Record<AgentName, AgentDescriptor>;
+  /** A starter chip drops its prompt into the composer and focuses it. */
+  onSuggestion?: (text: string) => void;
 };
+
+const SUGGESTION_KEYS = ["plan", "review", "orient"] as const;
 
 export function TranscriptEmpty({
   selectedEmployee,
-  activeAgent,
-  activeAgentDisplayName,
-  activeAgentImageUrl,
-  agentDescriptors,
+  onSuggestion,
 }: TranscriptEmptyProps) {
   const { t } = useTranslation();
-  const descriptor = agentDescriptors[activeAgent];
-  const headline = selectedEmployee
+  const ready = Boolean(selectedEmployee);
+  const headline = ready
     ? t("transcript.ready_for")
-    : t("transcript.ready_no_employee", { agent: activeAgentDisplayName });
+    : t("transcript.ready_no_employee");
 
   return (
     <RelayEmptyState
       className="transcript-empty"
       titleId="transcript-empty-headline"
-      title={headline}
-      body={descriptor.blurb}
-      illustration={(
-        <span className="relay-empty-avatar agent-avatar" data-agent={activeAgent} aria-hidden="true">
-          <ProfileImage
-            src={activeAgentImageUrl}
-            alt=""
-            fallback={<IdentityMonogram name={activeAgentDisplayName} size={20} />}
-          />
+      kicker={(
+        <span className="transcript-empty-kicker">
+          <RelayMark width={11} height={11} />
+          {t("thread.new_thread")}
         </span>
       )}
+      title={headline}
+      body={t("transcript.landing_body")}
+      illustration={(
+        <span className="relay-empty-avatar" aria-hidden="true">
+          <RelayMark width={30} height={30} />
+        </span>
+      )}
+      actions={ready && onSuggestion ? (
+        <div className="transcript-empty-suggestions">
+          {SUGGESTION_KEYS.map((key) => {
+            const text = t(`transcript.suggestion_${key}`);
+            return (
+              <button
+                key={key}
+                type="button"
+                className="transcript-empty-suggestion"
+                onClick={() => onSuggestion(text)}
+              >
+                {text}
+              </button>
+            );
+          })}
+        </div>
+      ) : undefined}
+      hint={ready ? (
+        <span className="transcript-empty-hints">
+          <span className="transcript-empty-hint">
+            <kbd className="command-kbd">@</kbd>
+            {t("transcript.hint_mention")}
+          </span>
+          <span className="transcript-empty-hint">
+            <kbd className="command-kbd">{sendShortcutLabel()}</kbd>
+            {t("transcript.hint_send")}
+          </span>
+        </span>
+      ) : undefined}
     />
   );
 }

@@ -979,11 +979,17 @@
   },
   "transcript": {
     "new_session": "新会话",
-    "ready_for": "发送消息。",
-    "ready_no_employee": "为 {{agent}} 选择员工工作区。",
-    "awaiting_first": "等待首条消息",
-    "phase_agent": "Agent",
-    "phase_handoff": "移交"
+    "ready_for": "想让 Relay 做点什么？",
+    "ready_no_employee": "选择一个员工工作区开始。",
+    "landing_body": "一个对话，汇聚团队中的每位代理。",
+    "hint_mention": "指定由谁回复",
+    "hint_send": "发送",
+    "suggestion_plan": "端到端规划一个小功能",
+    "suggestion_review": "审查最近的改动，找出风险",
+    "suggestion_orient": "讲讲这个项目是如何组织的",
+    "awaiting_first": "等待第一条消息",
+    "phase_agent": "代理",
+    "phase_handoff": "交接"
   },
   "login": {
     "lede": "管理节点、守护进程与智能体运行。",

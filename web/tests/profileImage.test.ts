@@ -59,12 +59,15 @@ describe("Profile images", () => {
     assert.match(messageBlock, /fallback=\{<IdentityMonogram name=\{agentName\}/);
     assert.doesNotMatch(messageBlock, /rail-node-agent[\s\S]{0,120}<AgentMark/);
 
-    // The composer picker and the empty state name one logical agent each, so
-    // both read profileImageUrl straight off it.
+    // The composer picker names one logical agent, so it reads profileImageUrl
+    // straight off it. The new-thread landing speaks for Relay itself, not
+    // whichever agent the picker happens to point at — the product mark, no
+    // agent face, no executor tint.
     assert.match(agentSelect, /src=\{activeLogicalAgent\.profileImageUrl\}/);
     assert.match(agentSelect, /src=\{logicalAgent\.profileImageUrl\}/);
     assert.doesNotMatch(agentSelect, /AgentMark/);
-    assert.match(transcriptEmpty, /src=\{activeAgentImageUrl\}/);
+    assert.match(transcriptEmpty, /RelayMark/);
+    assert.doesNotMatch(transcriptEmpty, /ProfileImage|AgentMark|agent-avatar/);
 
     // The image must fill the 20px speaker node, and a grouped continuation
     // has to dim it the same way it dimmed the old glyph.

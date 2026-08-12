@@ -4,7 +4,9 @@ import { cn } from "@/lib/utils";
 type RelayEmptyStateProps = {
   title: string;
   body?: string;
-  hint?: string;
+  hint?: ReactNode;
+  /** Small label above the title — the landing hero's "New thread" line. */
+  kicker?: ReactNode;
   illustration?: ReactNode;
   actions?: ReactNode;
   className?: string;
@@ -19,6 +21,7 @@ export function RelayEmptyState({
   title,
   body,
   hint,
+  kicker,
   illustration,
   actions,
   className,
@@ -48,6 +51,7 @@ export function RelayEmptyState({
           {illustration}
         </div>
       ) : null}
+      {kicker ? <div className="relay-empty-kicker">{kicker}</div> : null}
       <TitleTag
         id={resolvedTitleId}
         className="relay-empty-title"

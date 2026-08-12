@@ -980,8 +980,14 @@
   },
   "transcript": {
     "new_session": "New session",
-    "ready_for": "Send a message.",
-    "ready_no_employee": "Select an employee workspace for {{agent}}.",
+    "ready_for": "What should Relay make?",
+    "ready_no_employee": "Select an employee workspace to get started.",
+    "landing_body": "One thread, every agent on your team.",
+    "hint_mention": "to address an agent",
+    "hint_send": "to send",
+    "suggestion_plan": "Plan a small feature end to end",
+    "suggestion_review": "Review recent changes for risks",
+    "suggestion_orient": "Explain how this project fits together",
     "awaiting_first": "waiting for first message",
     "phase_agent": "Agent",
     "phase_handoff": "Handoff"

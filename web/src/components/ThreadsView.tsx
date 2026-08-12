@@ -72,7 +72,6 @@ export type ThreadsViewProps = {
   /** Agents in the thread's room, resolved for the header strip. */
   threadParticipants: EmployeeAgent[];
   onRuntimeNodeChange: (nodeId: string) => void;
-  agentDescriptors: Record<AgentName, { blurb: string }>;
   handoffOpen: boolean;
   setHandoffOpen: Dispatch<SetStateAction<boolean>>;
   handoffAgentId: string;
@@ -134,7 +133,6 @@ export function ThreadsView({
   mentionCandidates,
   threadParticipants,
   onRuntimeNodeChange,
-  agentDescriptors,
   handoffOpen,
   setHandoffOpen,
   handoffAgentId,
@@ -250,10 +248,10 @@ export function ThreadsView({
             ) : (
               <TranscriptEmpty
                 selectedEmployee={selectedEmployee}
-                activeAgent={activeAgent}
-                activeAgentDisplayName={activeAgentDisplayName}
-                activeAgentImageUrl={activeLogicalAgent?.profileImageUrl}
-                agentDescriptors={agentDescriptors}
+                onSuggestion={(text) => {
+                  composerRef.current?.setText(text);
+                  composerRef.current?.focus();
+                }}
               />
             )}
           </div>

@@ -46,6 +46,7 @@ export function newDaemonNodeToken(): string {
 export function ensureDaemonNodeToken(input: EnsureDaemonNodeTokenInput): DaemonNodeTokenResolution {
   const explicit = input.token?.trim();
   if (explicit) {
+    writeDaemonNodeToken(input.workspacePath, input.employeeId, explicit);
     return { token: explicit, source: "explicit" };
   }
 

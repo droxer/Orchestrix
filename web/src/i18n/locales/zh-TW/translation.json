@@ -979,8 +979,14 @@
   },
   "transcript": {
     "new_session": "新工作階段",
-    "ready_for": "傳送訊息。",
-    "ready_no_employee": "為 {{agent}} 選擇員工工作區。",
+    "ready_for": "想讓 Relay 做點什麼？",
+    "ready_no_employee": "選擇一個員工工作區開始。",
+    "landing_body": "一個對話，匯聚團隊中的每位代理。",
+    "hint_mention": "指定由誰回覆",
+    "hint_send": "傳送",
+    "suggestion_plan": "端到端規劃一個小功能",
+    "suggestion_review": "審查最近的改動，找出風險",
+    "suggestion_orient": "講講這個專案是如何組織的",
     "awaiting_first": "等待首則訊息",
     "phase_agent": "Agent",
     "phase_handoff": "移交"
