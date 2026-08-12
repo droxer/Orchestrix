@@ -33,16 +33,17 @@ export function useMentionAutocomplete({ text, candidates, setText, textareaRef 
 }): MentionAutocomplete {
   const [caret, setCaret] = useState(0);
   const [dismissedAt, setDismissedAt] = useState<number | null>(null);
+  const [acceptedText, setAcceptedText] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
   const open = useMemo(() => activeMentionQuery(text, caret), [text, caret]);
   const matches = useMemo(() => {
-    if (!open || dismissedAt === open.start) return [];
+    if (!open || dismissedAt === open.start || acceptedText === text) return [];
     const needle = open.query.trim().toLowerCase();
     return candidates.filter(
       (candidate) => !needle || candidate.displayName.toLowerCase().includes(needle),
     );
-  }, [candidates, dismissedAt, open]);
+  }, [acceptedText, candidates, dismissedAt, open, text]);
 
   useEffect(() => {
     setActiveIndex(0);
@@ -58,6 +59,11 @@ export function useMentionAutocomplete({ text, candidates, setText, textareaRef 
       const applied = applyMention(text, open.start, caret, candidate.displayName);
       setText(applied.text);
       setDismissedAt(null);
+      // A completed name still reads as an open `@…` fragment, so the popup
+      // would otherwise stay up listing the agent just accepted. Closing it
+      // against the exact accepted text — rather than the fragment's offset —
+      // means editing that name straight back down to `@Le` re-opens it.
+      setAcceptedText(applied.text);
       // The caret must land after the inserted name, which React would
       // otherwise push to the end of the value on the next render.
       requestAnimationFrame(() => {

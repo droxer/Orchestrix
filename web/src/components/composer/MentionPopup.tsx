@@ -1,7 +1,12 @@
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { MentionCandidate } from "../../lib/mentions";
 import { IdentityMonogram } from "../IdentityMonogram";
 import { ProfileImage } from "../ProfileImagePicker";
+
+/** Id of the row the textarea points `aria-activedescendant` at. */
+export const MENTION_LIST_ID = "composer-mention-list";
+export const mentionOptionId = (candidateId: string) => `mention-option-${candidateId}`;
 
 /**
  * Autocomplete list for `@` in the composer. Presentational: the highlight
@@ -18,12 +23,25 @@ export function MentionPopup({ matches, activeIndex, onHover, onPick }: {
   onPick: (candidate: MentionCandidate) => void;
 }) {
   const { t } = useTranslation();
+  const activeRef = useRef<HTMLButtonElement | null>(null);
+  // Arrow keys move the highlight without moving the scrollbar, so a roster
+  // taller than the popup would walk the selection out of sight.
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, matches.length]);
   if (matches.length === 0) return null;
   return (
-    <div className="mention-popup" role="listbox" aria-label={t("composer.mention_list")}>
+    <div
+      className="mention-popup"
+      id={MENTION_LIST_ID}
+      role="listbox"
+      aria-label={t("composer.mention_list")}
+    >
       {matches.map((candidate, index) => (
         <button
           key={candidate.id}
+          id={mentionOptionId(candidate.id)}
+          ref={index === activeIndex ? activeRef : undefined}
           type="button"
           role="option"
           aria-selected={index === activeIndex}

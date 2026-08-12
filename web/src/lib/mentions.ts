@@ -163,6 +163,29 @@ export function mentionSegments(
   return segments;
 }
 
+/**
+ * Rewrite the draft's leading address run to name `displayName` alone.
+ *
+ * The footer picker is single-select, so picking there means "this message goes
+ * to exactly this agent". A leading mention outranks the picker at dispatch, so
+ * without this the pick would look accepted in the footer and still route to
+ * the named agent. Rewriting the run keeps one answer to "who runs this?".
+ *
+ * A draft with no leading mention is left untouched — the picker is already the
+ * only selection there, and inserting text the author did not type would be a
+ * surprise.
+ */
+export function replaceAddressRun(
+  text: string,
+  mentions: readonly ParsedMention[],
+  displayName: string,
+): string {
+  if (mentions.length === 0) return text;
+  const start = mentions[0].start;
+  const end = mentions[mentions.length - 1].end;
+  return `${text.slice(0, start)}${MENTION_PREFIX}${displayName}${text.slice(end)}`;
+}
+
 /** The `@…` fragment being typed at `caret`, or null when none is open. */
 export function activeMentionQuery(
   text: string,

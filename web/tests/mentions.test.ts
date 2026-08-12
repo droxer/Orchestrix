@@ -6,6 +6,7 @@ import {
   mentionCandidates,
   mentionSegments,
   parseMentions,
+  replaceAddressRun,
   type MentionCandidate,
 } from "../src/lib/mentions.js";
 import type { EmployeeAgent } from "../src/types.js";
@@ -175,6 +176,27 @@ describe("applyMention", () => {
     const applied = applyMention("@Le rest", 0, 3, "Lead");
     assert.equal(applied.text, "@Lead  rest");
     assert.equal(applied.caret, 6);
+  });
+});
+
+describe("replaceAddressRun", () => {
+  const run = (text: string, displayName: string) =>
+    replaceAddressRun(text, parseMentions(text, candidates).mentions, displayName);
+
+  it("renames the addressed agent, keeping the message", () => {
+    assert.equal(run("@Lead ship it", "Support Bot"), "@Support Bot ship it");
+  });
+
+  it("collapses a multi-agent run to the single agent picked", () => {
+    assert.equal(run("@Lead @Support Bot go", "Lead"), "@Lead go");
+  });
+
+  it("replaces a name that resolves to nobody, unblocking the send", () => {
+    assert.equal(run("@Nobody hello", "Lead"), "@Lead hello");
+  });
+
+  it("leaves a draft that addresses the room untouched", () => {
+    assert.equal(run("hello everyone", "Lead"), "hello everyone");
   });
 });
 
