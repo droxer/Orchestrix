@@ -17,8 +17,12 @@ import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeThreadRuntimeNodes, mergeVisibleDaemonNodes } from "./lib/daemonNodes";
 import { formatDispatchError } from "./lib/agentReadiness";
 import { isEmployeeAgentRoutable, preferredRoutableAgent } from "./lib/agentDisplayNames";
-import { routeComposerMessage, threadMessageInput } from "./lib/messageRouting";
-import { mentionCandidates, parseMentions } from "./lib/mentions";
+import {
+  resolveThreadMessageAddress,
+  threadMessageInput,
+  threadMessageOperationKey,
+} from "./lib/messageRouting";
+import { mentionCandidates } from "./lib/mentions";
 import { applyTheme, readLanguage, readSidenavExpanded, readTheme, readThreadSpaceWidth, readTokens, selectedEmployeeKey, writeLanguage, writeSidenavExpanded, writeTheme, writeThreadSpaceWidth } from "./lib/appStorage";
 import { canUseLocalControlPanel } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
@@ -805,52 +809,41 @@ export function App() {
       : undefined;
     let goal = raw;
     let newThreadAgentIds: string[] | undefined;
-    // A mention names who answers, in a new thread as much as a started one —
-    // otherwise the draft says one agent and the dispatch picks another.
-    const addressed = parseMentions(raw, threadMentionCandidates);
-    if (addressed.blocked) {
-      reportMutationError("Mention unresolved", null, t("composer.mention_blocked"));
+    // A mention overrides the footer selection. Team messages intentionally
+    // default to the room; every single-agent message requires one valid
+    // footer selection and never fails open to the room.
+    const messageAddress = resolveThreadMessageAddress({
+      text: raw,
+      candidates: threadMentionCandidates,
+      defaultAgentId: pendingTeam || activeSession?.teamId
+        ? undefined
+        : activeLogicalAgentId,
+    });
+    if (messageAddress.blocked) {
+      reportMutationError(
+        messageAddress.reason === "mention" ? "Mention unresolved" : "Agent not ready for dispatch",
+        null,
+        messageAddress.reason === "mention"
+          ? t("composer.mention_blocked")
+          : t("errors.agent_not_ready", { agent: activeAgent }),
+      );
       return;
     }
     // Participant availability is a creation concern. Continued threads send
     // semantic intent to the conductor, which resolves the room against live
     // membership and placement state on the server.
     if (!sessionId && !pendingTeam) {
-      if (addressed.addressAgentIds.length > 0) {
-        newThreadAgentIds = addressed.addressAgentIds;
-      } else {
-        const defaultLogicalAgent = activeLogicalAgent
-          && selectableLogicalAgents.some((agent) => agent.id === activeLogicalAgent.id)
-          && isEmployeeAgentRoutable(activeLogicalAgent)
-          ? activeLogicalAgent
-          : selectableLogicalAgents.find(isEmployeeAgentRoutable);
-        if (!defaultLogicalAgent) {
-          reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: activeAgent }));
-          return;
-        }
-        const routed = routeComposerMessage(
-          raw,
-          {
-            id: defaultLogicalAgent.id,
-            executorKind: defaultLogicalAgent.executorKind,
-          },
-        );
-        goal = routed.goal;
-        if (!goal) return;
-        const routedLogicalAgent = selectableLogicalAgents.find(
-          (agent) => agent.id === routed.agentId && isEmployeeAgentRoutable(agent),
-        );
-        if (!routedLogicalAgent) {
-          reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: routed.agent }));
-          return;
-        }
-        newThreadAgentIds = [routedLogicalAgent.id];
-      }
+      newThreadAgentIds = messageAddress.addressAgentIds;
     }
     // Echo the turn immediately. For a continued session we mint the message id
     // here and hand it to the backend so the persisted event reconciles by id.
     const messageOperationKey = sessionId
-      ? `${sessionId}:${goal}`
+      ? threadMessageOperationKey({
+          sessionId,
+          text: goal,
+          intent: "accomplish",
+          addressAgentIds: messageAddress.addressAgentIds,
+        })
       : null;
     const retainedMessageId = messageOperationKey
       ? messageOperationIdsRef.current.get(messageOperationKey)
@@ -881,7 +874,7 @@ export function App() {
             sessionId,
             input: threadMessageInput({
               text: goal,
-              candidates: threadMentionCandidates,
+              addressAgentIds: messageAddress.addressAgentIds,
               userMessageId,
             }),
           })

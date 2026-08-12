@@ -48,8 +48,25 @@ describe("composer agent selection", () => {
 
   it("dispatches a new thread to the agents the draft addresses", async () => {
     const app = await readFile(resolve("web/src/App.tsx"), "utf8");
-    assert.match(app, /newThreadAgentIds = addressed\.addressAgentIds/);
+    assert.match(app, /newThreadAgentIds = messageAddress\.addressAgentIds/);
     assert.match(app, /assignments: newThreadAgentIds!\.map/);
+  });
+
+  it("addresses a continued thread to the footer's selected agent", async () => {
+    const app = await readFile(resolve("web/src/App.tsx"), "utf8");
+    assert.match(
+      app,
+      /resolveThreadMessageAddress\(\{[\s\S]*?defaultAgentId: pendingTeam \|\| activeSession\?\.teamId[\s\S]*?: activeLogicalAgentId/,
+    );
+    assert.match(app, /addressAgentIds: messageAddress\.addressAgentIds/);
+  });
+
+  it("includes the resolved responder in continued-thread retry identity", async () => {
+    const app = await readFile(resolve("web/src/App.tsx"), "utf8");
+    assert.match(
+      app,
+      /threadMessageOperationKey\(\{[\s\S]*?addressAgentIds: messageAddress\.addressAgentIds/,
+    );
   });
 
   it("refuses a draft whose mention resolves to nobody, shortcut included", async () => {

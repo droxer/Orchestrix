@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { routeComposerMessage, threadMessageInput } from "../src/lib/messageRouting.js";
+import {
+  resolveThreadMessageAddress,
+  routeComposerMessage,
+  threadMessageInput,
+  threadMessageOperationKey,
+} from "../src/lib/messageRouting.js";
 import type { MentionCandidate } from "../src/lib/mentions.js";
 
 const activeAgent = { id: "researcher", executorKind: "claude" as const };
@@ -26,10 +31,45 @@ const candidates: MentionCandidate[] = [
 ];
 
 describe("thread message input", () => {
+  it("resolves the agent selected in the composer footer", () => {
+    const resolved = resolveThreadMessageAddress({
+      text: "one more pass",
+      candidates,
+      defaultAgentId: "agent_support",
+    });
+
+    assert.deepEqual(resolved, {
+      blocked: false,
+      addressAgentIds: ["agent_support"],
+    });
+  });
+
+  it("blocks a stale or unavailable footer selection instead of widening to the room", () => {
+    assert.deepEqual(
+      resolveThreadMessageAddress({
+        text: "one more pass",
+        candidates,
+        defaultAgentId: "agent_missing",
+      }),
+      { blocked: true, reason: "selected-agent", addressAgentIds: [] },
+    );
+    assert.deepEqual(
+      resolveThreadMessageAddress({
+        text: "one more pass",
+        candidates: [
+          ...candidates,
+          { id: "agent_offline", displayName: "Offline", eligible: false },
+        ],
+        defaultAgentId: "agent_offline",
+      }),
+      { blocked: true, reason: "selected-agent", addressAgentIds: [] },
+    );
+  });
+
   it("addresses the room when nobody is mentioned", () => {
     const input = threadMessageInput({
       text: "one more pass",
-      candidates,
+      addressAgentIds: [],
       userMessageId: "evt_1",
     });
 
@@ -42,34 +82,78 @@ describe("thread message input", () => {
   });
 
   it("narrows to the agents named at the head of the message", () => {
-    const input = threadMessageInput({
+    const resolved = resolveThreadMessageAddress({
       text: "@Lead @Support Bot ship it",
       candidates,
-      userMessageId: "evt_1",
+      defaultAgentId: "agent_support",
     });
 
-    assert.deepEqual(input.addressAgentIds, ["agent_lead", "agent_support"]);
+    assert.deepEqual(resolved.addressAgentIds, ["agent_lead", "agent_support"]);
   });
 
   it("keeps the mention in the text the agent sees", () => {
     const input = threadMessageInput({
       text: "@Lead ship it",
-      candidates,
+      addressAgentIds: ["agent_lead"],
       userMessageId: "evt_1",
     });
 
     assert.equal(input.text, "@Lead ship it");
   });
 
-  it("falls back to the room when the name matches nobody here", () => {
-    // The composer blocks this before it can be sent; a non-UI caller still
-    // gets the safe outcome rather than a dispatch to an outsider.
-    const input = threadMessageInput({
+  it("blocks an unresolved mention instead of falling back to the room", () => {
+    const resolved = resolveThreadMessageAddress({
       text: "@Scout can you look at this?",
       candidates,
-      userMessageId: "evt_1",
     });
 
-    assert.equal(input.addressAgentIds, undefined);
+    assert.deepEqual(resolved, {
+      blocked: true,
+      reason: "mention",
+      addressAgentIds: [],
+    });
+  });
+
+  it("keeps intentional team and room messages unaddressed", () => {
+    assert.deepEqual(
+      resolveThreadMessageAddress({ text: "one more pass", candidates }),
+      { blocked: false, addressAgentIds: [] },
+    );
+  });
+});
+
+describe("thread message operation identity", () => {
+  it("changes when the selected responder changes for the same text", () => {
+    const lead = threadMessageOperationKey({
+      sessionId: "ses_1",
+      text: "one more pass",
+      intent: "accomplish",
+      addressAgentIds: ["agent_lead"],
+    });
+    const support = threadMessageOperationKey({
+      sessionId: "ses_1",
+      text: "one more pass",
+      intent: "accomplish",
+      addressAgentIds: ["agent_support"],
+    });
+
+    assert.notEqual(lead, support);
+  });
+
+  it("treats the same addressed set as one operation regardless of order", () => {
+    const first = threadMessageOperationKey({
+      sessionId: "ses_1",
+      text: "ship it",
+      intent: "accomplish",
+      addressAgentIds: ["agent_support", "agent_lead"],
+    });
+    const second = threadMessageOperationKey({
+      sessionId: "ses_1",
+      text: "ship it",
+      intent: "accomplish",
+      addressAgentIds: ["agent_lead", "agent_support"],
+    });
+
+    assert.equal(first, second);
   });
 });
