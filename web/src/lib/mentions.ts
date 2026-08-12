@@ -73,10 +73,25 @@ export function parseMentions(
   candidates: readonly MentionCandidate[],
 ): ParsedMentions {
   const mentions: ParsedMention[] = [];
-  // With nobody to name — the roster has not loaded, or a new thread is still
-  // being staged — every `@` is just text. Blocking the send here would punish
-  // the author for the app's loading state.
+  // With nobody to name, a leading `@Name` must stay blocked until the roster
+  // loads. Treating it as prose would let the footer default address the room or
+  // another agent — exactly the kind of fail-open routing mentions prevent.
   if (candidates.length === 0) {
+    const start = leadingSpace(text);
+    if (text.startsWith(MENTION_PREFIX, start)) {
+      const rest = text.slice(start + MENTION_PREFIX.length);
+      const end = start + MENTION_PREFIX.length + wordLength(rest);
+      if (end > start + MENTION_PREFIX.length) {
+        mentions.push({
+          agentId: null,
+          text: text.slice(start, end),
+          start,
+          end,
+          eligible: false,
+        });
+        return { mentions, addressAgentIds: [], blocked: true };
+      }
+    }
     return { mentions, addressAgentIds: [], blocked: false };
   }
   // Longest name first, so "Support Bot" wins over a hypothetical "Support".

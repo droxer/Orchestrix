@@ -690,15 +690,22 @@ async def start_task(
     actor = request_actor(request, ctx.auth_store)
     task = get_task_for_actor(ctx.task_store, task_id, actor)
     body = await json_body(request)
-    assignments = assignment_list(body.get("assignments"))
+    raw_assignments = body.get("assignments")
+    assignments = assignment_list(raw_assignments)
     if body.get("agent") is not None:
         raise HTTPException(400, "agent is read-only; start through assignedAgentId.")
     if assignments and task.get("assignedTeamId"):
         assignments = []
-    if assignments and task.get("assignedAgentId"):
-        if len(assignments) != 1 or assignments[0].get("agentId") != task.get(
-            "assignedAgentId"
-        ):
+    if (
+        task.get("assignedAgentId")
+        and isinstance(raw_assignments, list)
+        and raw_assignments
+    ):
+        requested_agent_ids = [
+            item.get("agentId") if isinstance(item, dict) else None
+            for item in raw_assignments
+        ]
+        if requested_agent_ids != [task.get("assignedAgentId")]:
             raise HTTPException(409, "task_assignment_override")
         if not task.get("assignedAgent"):
             raise HTTPException(409, "task_assignment_invalid")

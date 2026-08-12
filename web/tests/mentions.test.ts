@@ -131,11 +131,11 @@ describe("parseMentions", () => {
     assert.equal(parsed.blocked, true);
   });
 
-  it("treats every mention as prose when there is nobody to name yet", () => {
-    // The roster has not loaded, or a new thread is still being staged.
+  it("blocks a leading mention while the roster is empty", () => {
     const parsed = parseMentions("@Lead hello", []);
-    assert.deepEqual(parsed.mentions, []);
-    assert.equal(parsed.blocked, false);
+    assert.equal(parsed.mentions[0]?.text, "@Lead");
+    assert.equal(parsed.mentions[0]?.eligible, false);
+    assert.equal(parsed.blocked, true);
   });
 
   it("addresses the room when nothing is mentioned", () => {

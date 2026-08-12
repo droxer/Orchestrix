@@ -1212,15 +1212,17 @@ def test_assigned_task_rejects_run_assignment_override(monkeypatch) -> None:
 
         started = client.post(
             f"/api/v1/tasks/{task['id']}/runs",
-            json={
-                "assignments": [
-                    {"agentId": override["id"], "agent": "claude"}
-                ]
-            },
+            json={"assignments": [{"agentId": override["id"]}]},
         )
 
         assert started.status_code == 409
         assert started.json()["detail"] == "task_assignment_override"
+        commands = client.get(
+            "/api/v1/daemon-nodes/sbx_alice/commands",
+            headers={"Authorization": "Bearer node_token"},
+        )
+        assert commands.status_code == 200
+        assert commands.json()["commands"] == []
 
 
 def test_task_rejects_invalid_due_date(monkeypatch) -> None:
