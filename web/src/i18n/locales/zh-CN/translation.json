@@ -138,8 +138,6 @@
     "teams_group": "团队",
     "send_shortcut": "{{shortcut}} 发送",
     "mention_list": "可提及的智能体",
-    "mention_recipients": "此消息将发送给",
-    "mention_remove": "移除 {{name}}",
     "mention_blocked": "发送前请修正提及的智能体",
     "mention_reason": {
       "off-node": "不在此电脑上",

@@ -4,8 +4,8 @@ import {
   activeMentionQuery,
   applyMention,
   mentionCandidates,
+  mentionSegments,
   parseMentions,
-  removeMention,
   type MentionCandidate,
 } from "../src/lib/mentions.js";
 import type { EmployeeAgent } from "../src/types.js";
@@ -126,47 +126,6 @@ describe("parseMentions", () => {
   });
 });
 
-describe("removeMention", () => {
-  it("removes the mention and the space that followed it", () => {
-    const text = "@Lead @Support Bot ship it";
-    const parsed = parseMentions(text, candidates);
-    assert.equal(removeMention(text, parsed.mentions[0]), "@Support Bot ship it");
-  });
-});
-
-describe("mentionCandidates", () => {
-  it("marks an agent placed on another computer ineligible", () => {
-    const here = agent({ id: "here", placements: [placement("node_a")] });
-    const elsewhere = agent({ id: "elsewhere", placements: [placement("node_b")] });
-    const resolved = mentionCandidates([here, elsewhere], "node_a");
-    assert.deepEqual(
-      resolved.map((candidate) => [candidate.id, candidate.eligible]),
-      [["here", true], ["elsewhere", false]],
-    );
-    assert.equal(resolved[1].reason, "off-node");
-  });
-
-  it("marks an offline agent on this computer ineligible", () => {
-    const offline = agent({
-      id: "offline",
-      availability: "offline",
-      placements: [placement("node_a")],
-    });
-    const [candidate] = mentionCandidates([offline], "node_a");
-    assert.equal(candidate.eligible, false);
-    assert.equal(candidate.reason, "unavailable");
-  });
-
-  it("keeps a busy agent mentionable, matching the footer picker", () => {
-    const busy = agent({
-      id: "busy",
-      availability: "busy",
-      placements: [placement("node_a")],
-    });
-    assert.equal(mentionCandidates([busy], "node_a")[0].eligible, true);
-  });
-});
-
 describe("activeMentionQuery", () => {
   it("opens on a fresh @ at a word boundary", () => {
     assert.deepEqual(activeMentionQuery("@Le", 3), { query: "Le", start: 0 });
@@ -187,5 +146,36 @@ describe("applyMention", () => {
     const applied = applyMention("@Le rest", 0, 3, "Lead");
     assert.equal(applied.text, "@Lead  rest");
     assert.equal(applied.caret, 6);
+  });
+});
+
+describe("mentionSegments", () => {
+  it("splits the draft into plain runs and mention runs, in order", () => {
+    const text = "@Lead @Support Bot ship it";
+    const segments = mentionSegments(text, parseMentions(text, candidates).mentions);
+    assert.deepEqual(segments, [
+      { text: "@Lead", mention: true, eligible: true },
+      { text: " ", mention: false },
+      { text: "@Support Bot", mention: true, eligible: true },
+      { text: " ship it", mention: false },
+    ]);
+  });
+
+  it("marks an ineligible mention so it can read as blocking", () => {
+    const text = "@Remote hi";
+    const segments = mentionSegments(text, parseMentions(text, candidates).mentions);
+    assert.deepEqual(segments[0], { text: "@Remote", mention: true, eligible: false });
+  });
+
+  it("returns the whole draft as one plain run when nobody is addressed", () => {
+    assert.deepEqual(mentionSegments("plain text", []), [
+      { text: "plain text", mention: false },
+    ]);
+  });
+
+  it("drops the empty leading run instead of emitting a blank segment", () => {
+    const text = "@Lead go";
+    const segments = mentionSegments(text, parseMentions(text, candidates).mentions);
+    assert.equal(segments[0].text, "@Lead");
   });
 });

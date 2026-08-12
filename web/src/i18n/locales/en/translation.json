@@ -138,8 +138,6 @@
     "teams_group": "Teams",
     "send_shortcut": "{{shortcut}} to send",
     "mention_list": "Agents you can mention",
-    "mention_recipients": "This message goes to",
-    "mention_remove": "Remove {{name}}",
     "mention_blocked": "Fix the mentioned agents before sending",
     "mention_reason": {
       "off-node": "not on this computer",

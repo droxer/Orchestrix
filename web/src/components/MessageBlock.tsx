@@ -220,6 +220,10 @@ export const MessageBlock = memo(function MessageBlock({
           />
         </span>
         <div className="turn-body">
+          {/* Who is speaking, beside its mark. A continuation from the same
+              agent hides this (see .msg-agent.grouped in chat.css), so a run
+              of turns reads as one speaker rather than a repeated name. */}
+          <header className="msg-speaker" translate="no">{agentName}</header>
           <AgentStream
             agent={message.agent}
             stdout={message.stdout}

@@ -1,4 +1,4 @@
-import { forwardRef, memo, useEffect, useImperativeHandle, useMemo, useState } from "react";
+import { forwardRef, memo, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AgentTeam, DaemonNodeMonitorRecord, EmployeeAgent } from "../../types";
 import { sendShortcutLabel } from "../../lib/sendShortcut";
@@ -6,9 +6,9 @@ import { ActionSend, ComposerStop } from "../icons";
 import { AgentSelect } from "./AgentSelect";
 import { useComposer } from "../../hooks/useComposer";
 import { useMentionAutocomplete } from "../../hooks/useMentionAutocomplete";
-import { parseMentions, removeMention, type MentionCandidate } from "../../lib/mentions";
+import { parseMentions, type MentionCandidate } from "../../lib/mentions";
+import { MentionHighlight } from "./MentionHighlight";
 import { MentionPopup } from "./MentionPopup";
-import { MentionRecipients } from "./MentionRecipients";
 import { ThreadRuntimeReadout, ThreadRuntimeSelect } from "./ThreadRuntimeSelect";
 
 
@@ -63,6 +63,7 @@ const ComposerView = forwardRef<ComposerHandle, {
     () => parseMentions(composerText, mentionCandidates),
     [composerText, mentionCandidates],
   );
+  const highlightRef = useRef<HTMLDivElement | null>(null);
   const mentions = useMentionAutocomplete({
     text: composerText,
     candidates: mentionCandidates,
@@ -106,45 +107,50 @@ const ComposerView = forwardRef<ComposerHandle, {
     <form className="composer" onSubmit={(e) => { e.preventDefault(); triggerSend(); }}>
       <div className="composer-input-wrap" data-running={running || undefined}>
         <div className="composer-input">
-          <MentionRecipients
-            mentions={parsed.mentions}
-            candidates={mentionCandidates}
-            onRemove={(mention) => setComposerText(removeMention(composerText, mention))}
-          />
           <MentionPopup
             matches={mentions.matches}
             activeIndex={mentions.activeIndex}
             onHover={mentions.setActiveIndex}
             onPick={mentions.pick}
           />
-          <textarea
-            ref={textareaRef}
-            aria-label={selectedEmployee
-              ? t("composer.aria_label", { employee: selectedEmployee, agent: activeAgentDisplayName })
-              : t("composer.aria_label_no_employee", { agent: activeAgentDisplayName })}
-            autoComplete="off"
-            name="message"
-            placeholder={selectedEmployee
-              ? t("composer.placeholder")
-              : t("composer.placeholder_no_employee")}
-            value={composerText}
-            onChange={(e) => {
-              setComposerText(e.target.value);
-              mentions.onCaretChange(e.target.selectionStart ?? e.target.value.length);
-            }}
-            onSelect={(e) => mentions.onCaretChange(e.currentTarget.selectionStart ?? 0)}
-            onBlur={mentions.close}
-            onKeyDown={(e) => {
-              // The popup gets first refusal on navigation keys; the send
-              // shortcut is untouched because the popup never claims it.
-              if (!(e.metaKey || e.ctrlKey) && mentions.handleKey(e.key)) {
-                e.preventDefault();
-                return;
-              }
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); triggerSend(); }
-            }}
-            rows={1}
-          />
+          {/* The mirror sits under the textarea inside a positioned wrapper so
+              the pills track the text through resize and scroll. */}
+          <div className="composer-textarea-wrap">
+            <MentionHighlight ref={highlightRef} text={composerText} mentions={parsed.mentions} />
+            <textarea
+              ref={textareaRef}
+              aria-label={selectedEmployee
+                ? t("composer.aria_label", { employee: selectedEmployee, agent: activeAgentDisplayName })
+                : t("composer.aria_label_no_employee", { agent: activeAgentDisplayName })}
+              autoComplete="off"
+              name="message"
+              placeholder={selectedEmployee
+                ? t("composer.placeholder")
+                : t("composer.placeholder_no_employee")}
+              value={composerText}
+              onChange={(e) => {
+                setComposerText(e.target.value);
+                mentions.onCaretChange(e.target.selectionStart ?? e.target.value.length);
+              }}
+              onSelect={(e) => mentions.onCaretChange(e.currentTarget.selectionStart ?? 0)}
+              onBlur={mentions.close}
+              onKeyDown={(e) => {
+                // The popup gets first refusal on navigation keys; the send
+                // shortcut is untouched because the popup never claims it.
+                if (!(e.metaKey || e.ctrlKey) && mentions.handleKey(e.key)) {
+                  e.preventDefault();
+                  return;
+                }
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); triggerSend(); }
+              }}
+              onScroll={(e) => {
+                // A tall draft scrolls inside the textarea; the mirror has to
+                // follow or the pills detach from their names.
+                if (highlightRef.current) highlightRef.current.scrollTop = e.currentTarget.scrollTop;
+              }}
+              rows={1}
+            />
+          </div>
           <div className="composer-footer">
             <div className="composer-footer-left">
               {/* A new thread picks its computer; a started one keeps a
