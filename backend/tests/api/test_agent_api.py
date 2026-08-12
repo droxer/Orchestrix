@@ -761,6 +761,56 @@ def test_mentioning_an_agent_grows_the_room_and_later_messages_reach_it(
         ] == [owner["id"], outsider["id"]]
 
 
+def test_leading_named_mention_cannot_silently_dispatch_to_the_room(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        node = app.state.registry.register(
+            {
+                "sandboxId": "node_admin",
+                "employeeId": "admin",
+                "token": "node_token",
+                "workspacePath": "/workspace/admin",
+                "protocolVersion": 1,
+                "supportedAgents": ["claude", "kimi"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        sync_node_agents(app.state, node)
+        agents = app.state.agent_store.list_agents(supervisor_employee_id="admin")
+        owner = next(agent for agent in agents if agent["executorKind"] == "claude")
+        kimi = next(agent for agent in agents if agent["executorKind"] == "kimi")
+        session = app.state.session_store.create_session(
+            {
+                "daemonNodeId": node["id"],
+                "workspacePath": "/workspace/admin",
+                "ownerEmployeeId": "admin",
+                "ownerAgentId": owner["id"],
+                "taskGoal": "Keep one room",
+            }
+        )
+
+        response = client.post(
+            f"/api/v1/threads/{session['id']}/messages",
+            json={
+                "text": f"@{kimi['displayName']} what do you think?",
+                "intent": "accomplish",
+            },
+        )
+
+        assert response.status_code == 202
+        commands = client.get(
+            "/api/v1/daemon-nodes/node_admin/commands",
+            headers={"Authorization": "Bearer node_token"},
+        )
+        assert commands.status_code == 200
+        [command] = commands.json()["commands"]
+        assert command["logicalAgentId"] == kimi["id"]
+
+
 def test_mentioning_two_agents_dispatches_one_round_with_both(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
