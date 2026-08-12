@@ -6,9 +6,9 @@ import { ActionSend, ComposerStop } from "../icons";
 import { AgentSelect } from "./AgentSelect";
 import { useComposer } from "../../hooks/useComposer";
 import { useMentionAutocomplete } from "../../hooks/useMentionAutocomplete";
-import { parseMentions, type MentionCandidate } from "../../lib/mentions";
+import { parseMentions, replaceAddressRun, type MentionCandidate } from "../../lib/mentions";
 import { MentionHighlight } from "./MentionHighlight";
-import { MentionPopup } from "./MentionPopup";
+import { MENTION_LIST_ID, MentionPopup, mentionOptionId } from "./MentionPopup";
 import { ThreadRuntimeReadout, ThreadRuntimeSelect } from "./ThreadRuntimeSelect";
 
 
@@ -78,6 +78,26 @@ const ComposerView = forwardRef<ComposerHandle, {
     setText: setComposerText,
     textareaRef,
   });
+  // The footer picker and `@` are one selection, so picking in the footer
+  // rewrites the draft's address run instead of losing to it at dispatch — a
+  // leading mention outranks the picker when the message is sent.
+  const pickLogicalAgent = (agent: EmployeeAgent) => {
+    if (parsed.mentions.length > 0) {
+      setComposerText(replaceAddressRun(composerText, parsed.mentions, agent.displayName));
+      textareaRef.current?.focus();
+    }
+    onLogicalAgentPicked(agent);
+  };
+  // Picking a team addresses the whole roster, so a leftover mention naming one
+  // agent would quietly narrow the round back down to them.
+  const pickTeam = (team: AgentTeam) => {
+    if (parsed.mentions.length > 0) {
+      const start = parsed.mentions[0].start;
+      const end = parsed.mentions[parsed.mentions.length - 1].end;
+      setComposerText(`${composerText.slice(0, start)}${composerText.slice(end).trimStart()}`);
+    }
+    onTeamPicked?.(team);
+  };
   const sendShortcutTitle = useMemo(
     () => t("composer.send_shortcut", { shortcut: sendShortcutLabel() }),
     [t],
@@ -135,6 +155,15 @@ const ComposerView = forwardRef<ComposerHandle, {
                 ? t("composer.aria_label", { employee: selectedEmployee, agent: activeAgentDisplayName })
                 : t("composer.aria_label_no_employee", { agent: activeAgentDisplayName })}
               autoComplete="off"
+              // While `@` is open the textarea drives the list from the
+              // keyboard, so a screen reader has to hear the moving highlight.
+              role={mentions.matches.length > 0 ? "combobox" : undefined}
+              aria-expanded={mentions.matches.length > 0 || undefined}
+              aria-controls={mentions.matches.length > 0 ? MENTION_LIST_ID : undefined}
+              aria-autocomplete={mentions.matches.length > 0 ? "list" : undefined}
+              aria-activedescendant={mentions.matches.length > 0
+                ? mentionOptionId(mentions.matches[mentions.activeIndex].id)
+                : undefined}
               name="message"
               placeholder={selectedEmployee
                 ? t("composer.placeholder")
@@ -180,10 +209,10 @@ const ComposerView = forwardRef<ComposerHandle, {
               <AgentSelect
                 logicalAgents={logicalAgents}
                 activeLogicalAgentId={addressedLogicalAgentId ?? activeLogicalAgentId}
-                onLogicalAgentPicked={onLogicalAgentPicked}
+                onLogicalAgentPicked={pickLogicalAgent}
                 teams={teams}
                 activeTeamId={activeTeamId}
-                onTeamPicked={onTeamPicked}
+                onTeamPicked={pickTeam}
                 teamLocked={teamLocked}
                 teamOptionsEnabled={initializingThread}
               />

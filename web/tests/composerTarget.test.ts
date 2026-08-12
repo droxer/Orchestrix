@@ -87,4 +87,27 @@ describe("composer agent selection", () => {
     );
     assert.match(composer, /addressedLogicalAgentId \?\? activeLogicalAgentId/);
   });
+
+  it("rewrites the draft's address run when the footer picks another agent", async () => {
+    const composer = await readFile(
+      resolve("web/src/components/composer/Composer.tsx"),
+      "utf8",
+    );
+    // A leading mention outranks the picker at dispatch, so a pick that only
+    // moved the footer would route to the agent the draft still names.
+    assert.match(composer, /replaceAddressRun\(composerText, parsed\.mentions, agent\.displayName\)/);
+    assert.match(composer, /onLogicalAgentPicked=\{pickLogicalAgent\}/);
+    assert.match(composer, /onTeamPicked=\{pickTeam\}/);
+  });
+
+  it("closes the `@` list once a name is accepted", async () => {
+    const hook = await readFile(
+      resolve("web/src/hooks/useMentionAutocomplete.ts"),
+      "utf8",
+    );
+    // A completed name still parses as an open `@…` fragment; without this the
+    // popup stays up listing the agent just picked.
+    assert.match(hook, /acceptedText === text/);
+    assert.match(hook, /setAcceptedText\(applied\.text\)/);
+  });
 });
