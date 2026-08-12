@@ -239,7 +239,10 @@
   padding: var(--sp-7) var(--page-gutter) var(--sp-8);
   display: flex;
   flex-direction: column;
-  gap: var(--sp-5);
+  /* Has to stay clearly larger than the biggest gap *inside* a turn — a
+     Markdown heading opens on --sp-6 (markdown.css) — or a new speaker reads
+     as one more section of the previous answer. */
+  gap: var(--sp-7);
 }
 
 /* Empty transcript — flat soft surface behind the shared empty state. */
@@ -393,8 +396,10 @@
   opacity: 0.4;
 }
 
+/* Consecutive turns from the same agent are one continued answer, so they pull
+   back to a --sp-2 gap. Tracks the .transcript-inner gap above. */
 .msg-agent + .msg-agent.grouped {
-  margin-top: calc(var(--sp-2) - var(--sp-5));
+  margin-top: calc(var(--sp-2) - var(--sp-7));
 }
 
 .turn-body {
@@ -497,11 +502,13 @@
 }
 
 /* Speaker line: the agent's name on the first row of its turn, level with the
-   mark in the rail. It sits tight above the body (the turn-body gap is meant
-   for blocks, not for a caption) and stays selectable text, since who said a
-   thing is part of what you copy out of a transcript. */
+   mark in the rail. It stays selectable text, since who said a thing is part of
+   what you copy out of a transcript. It used to cancel the turn-body gap almost
+   entirely (a -7px pull) on the reasoning that the gap is meant for blocks, not
+   captions — but against the looser block rhythm the name then collided with
+   the first line of the answer. It now keeps the full --sp-2 turn-body gap. */
 .msg-speaker {
-  margin-bottom: calc(var(--sp-2) * -1 + 1px);
+  margin-bottom: 0;
   color: var(--ink-1);
   font: var(--type-label-strong);
   letter-spacing: var(--track-0);
