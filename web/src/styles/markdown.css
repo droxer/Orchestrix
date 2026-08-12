@@ -15,8 +15,15 @@
   overflow-wrap: anywhere;
 }
 
+/* Block rhythm. A paragraph gap has to read as bigger than the leading inside
+   the paragraph or the blocks fuse into one grey slab — at 14px/1.65 the line
+   box is ~23px, so an 8px gap is a third of a line and reads as no gap at all.
+   12px is the smallest step that separates. Headings then need a gap clearly
+   larger than that again, or a section start reads as one more bold sentence
+   (h3–h6 share the body size on purpose — see the ladder note below, so the
+   air above them is doing all the work of announcing a new section). */
 .md-body p {
-  margin: 0 0 var(--sp-2);
+  margin: 0 0 var(--sp-3);
 }
 
 .md-body p:last-child {
@@ -48,7 +55,7 @@
 .md-body h4,
 .md-body h5,
 .md-body h6 {
-  margin: var(--sp-4) 0 var(--sp-2);
+  margin: var(--sp-6) 0 var(--sp-2);
   color: var(--ink-1);
   font-family: var(--font-sans);
   font-weight: 600;
@@ -80,15 +87,18 @@
 
 .md-body ul,
 .md-body ol {
-  margin: 0 0 var(--sp-2);
+  margin: 0 0 var(--sp-3);
   padding-left: 1.4em;
 }
 
 .md-body ul { list-style: disc; }
 .md-body ol { list-style: decimal; }
 
+/* A list item routinely wraps to two or three lines here (agent prose is not
+   short), so items need a gap that survives wrapping — 4px puts the last line
+   of one item as close to the next bullet as to its own first line. */
 .md-body li {
-  margin-bottom: var(--sp-1);
+  margin-bottom: var(--sp-2);
   line-height: var(--leading-loose);
 }
 
@@ -130,13 +140,13 @@
   display: block;
   max-width: 100%;
   height: auto;
-  margin: var(--sp-2) 0;
+  margin: var(--sp-3) 0;
   border-radius: var(--r-2);
 }
 
 .md-body blockquote {
-  margin: 0 0 var(--sp-2);
-  padding: var(--sp-1) var(--sp-3);
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-1) var(--sp-4);
   border-left: 3px solid var(--line-1);
   color: var(--ink-2);
   font-style: italic;
@@ -147,7 +157,7 @@
 }
 
 .md-body hr {
-  margin: var(--sp-3) 0;
+  margin: var(--sp-5) 0;
   border: 0;
   border-top: 1px solid var(--line-2);
 }
@@ -175,9 +185,15 @@
   font-size: var(--fs-3);
 }
 
+/* Cells wrap to several lines in a narrow transcript column, so the row gutter
+   has to clear the wrapped leading — at 4px the last line of one row sits
+   closer to the next row than to its own first line, and the rule between them
+   stops reading as a separator. Only the vertical padding grows: the column is
+   `width: max-content`, so widening the inline padding pushes a table that
+   currently fits into horizontal scroll for no reading benefit. */
 .md-body th,
 .md-body td {
-  padding: var(--sp-1) var(--sp-2);
+  padding: var(--sp-2);
   border-bottom: 1px solid var(--line-2);
   text-align: left;
   vertical-align: top;
@@ -196,7 +212,7 @@
 
 .agent-code {
   position: relative;
-  margin: var(--sp-2) 0 0;
+  margin: var(--sp-3) 0 0;
   padding: var(--sp-3) var(--sp-4);
   border: 1px solid var(--line-2);
   border-radius: var(--r-2);
@@ -242,7 +258,7 @@
    makes the clipped edge legible rather than looking like a truncated table. */
 .md-table {
   max-width: 100%;
-  margin: 0 0 var(--sp-2);
+  margin: 0 0 var(--sp-3);
   overflow-x: auto;
   /* --line-1, not --line-2: this edge is where content gets clipped, so the
      frame has to be legible enough to read as a boundary rather than as the
@@ -433,7 +449,7 @@
 .doc-prose ul,
 .doc-prose ol,
 .doc-prose blockquote {
-  margin-bottom: var(--sp-3);
+  margin-bottom: var(--sp-4);
 }
 
 .doc-prose h1,
@@ -442,7 +458,7 @@
 .doc-prose h4,
 .doc-prose h5,
 .doc-prose h6 {
-  margin: var(--sp-5) 0 var(--sp-2);
+  margin: var(--sp-7) 0 var(--sp-2);
 }
 
 .doc-prose h1 { font-size: var(--fs-title); } /* 20px */

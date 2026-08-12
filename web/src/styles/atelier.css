@@ -104,7 +104,7 @@ body {
 .chat-panel { background: transparent; }
 
 .transcript { background: transparent; }
-.transcript-inner { width: min(100%, 960px); padding: var(--sp-7) var(--page-gutter) var(--sp-8); gap: var(--sp-5); }
+.transcript-inner { width: min(100%, 960px); padding: var(--sp-7) var(--page-gutter) var(--sp-8); gap: var(--sp-7); }
 .transcript-inner:not(:has(.transcript-empty)) { background: none; }
 .transcript-inner:has(.transcript-empty) {
   margin: 0 auto;
