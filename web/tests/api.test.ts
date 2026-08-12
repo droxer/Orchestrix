@@ -147,6 +147,7 @@ describe("apiJson", () => {
     await cancelRun("thread 1");
     await assignTask("task 1", "agent 1");
     await startTask("task 1");
+    await startTask("task 2", { assignments: [{ agentId: "agent selected" }] });
     await assignControlPanelDaemonNode({ nodeId: "node 1", employeeId: "alice" });
 
     assert.deepEqual(requests, [
@@ -155,6 +156,7 @@ describe("apiJson", () => {
       { path: "/api/v1/threads/thread%201/cancellations", method: "POST", body: { reason: "Cancelled from Relay Web UI." } },
       { path: "/api/v1/tasks/task%201/assignment", method: "PUT", body: { agentId: "agent 1" } },
       { path: "/api/v1/tasks/task%201/runs", method: "POST", body: {} },
+      { path: "/api/v1/tasks/task%202/runs", method: "POST", body: { assignments: [{ agentId: "agent selected" }] } },
       { path: "/api/v1/admin/daemon-nodes/node%201/assignment", method: "PUT", body: { employeeId: "alice" } },
     ]);
   });

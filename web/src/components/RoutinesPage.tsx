@@ -20,7 +20,7 @@ import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
 import { filterRoutineTasks, latestRoutineSession, routineDueTone, routineState, runningRoutineCount, runningRoutineIds, TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, type RoutineFilters, type RoutineState } from "../lib/routine";
 import { ROUTINE_STATE_SHAPE, RoutineStateBadge } from "./RoutineStateBadge";
 import { StateMark } from "./StateMark";
-import { emptyRoutineForm, taskAssignmentMutationFields, taskBoardFormsEqual, type RoutineTaskFormState } from "../lib/taskBoardForm";
+import { emptyRoutineForm, taskAssignmentMutationFields, taskBoardFormsEqual, taskStartMutationInput, type RoutineTaskFormState } from "../lib/taskBoardForm";
 import { TaskDrawer } from "./task-board/TaskDrawer";
 import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
@@ -572,7 +572,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
     return {
       onEdit: () => editTask(task),
       onAssign: () => assignTask(task),
-      onStart: () => void startTaskMutation.mutate({ taskId: task.id }),
+      onStart: () => void startTaskMutation.mutate(taskStartMutationInput(task)),
     };
   }
 

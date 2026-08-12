@@ -447,6 +447,7 @@ def test_assigned_backlog_waits_for_scheduler_and_start_can_dispatch_manually(
         assert commands.status_code == 200
         [command] = commands.json()["commands"]
         assert command["type"] == "run.start"
+        assert command["logicalAgentId"] == agent["id"]
         assert command["agent"] == "codex"
         assert command["sessionId"] == started.json()["session"]["id"]
         assert command["taskGoal"] == "Run from backlog"

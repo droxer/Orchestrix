@@ -579,6 +579,11 @@ export interface RunInput {
   };
 }
 
+/** Task starts may pin a logical agent by id and let the server resolve its executor. */
+export type TaskRunAssignment = Omit<RunInput["assignments"][number], "agent"> & {
+  agent?: AgentName;
+};
+
 export interface CreateSessionInput {
   taskGoal: string;
   /** Computer selected as the immutable runtime for the thread. */

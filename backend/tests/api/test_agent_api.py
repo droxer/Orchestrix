@@ -1993,14 +1993,29 @@ def test_task_persists_and_dispatches_a_logical_agent_assignment(monkeypatch) ->
                 "status": "ready",
             }
         )
+        decoy_agent = client.post(
+            "/api/v1/admin/agents",
+            json={
+                "supervisorEmployeeId": "alice",
+                "displayName": "Earlier Builder",
+                "executorKind": "codex",
+            },
+        ).json()["agent"]
         agent = client.post(
             "/api/v1/admin/agents",
             json={
                 "supervisorEmployeeId": "alice",
-                "displayName": "Builder",
+                "displayName": "Selected Builder",
                 "executorKind": "codex",
             },
         ).json()["agent"]
+        assert (
+            client.post(
+                f"/api/v1/admin/agents/{decoy_agent['id']}/placements",
+                json={"daemonNodeId": "node_a"},
+            ).status_code
+            == 201
+        )
         assert (
             client.post(
                 f"/api/v1/admin/agents/{agent['id']}/placements",
@@ -2019,7 +2034,10 @@ def test_task_persists_and_dispatches_a_logical_agent_assignment(monkeypatch) ->
         task = client.post(
             "/api/v1/tasks", json={"title": "Build it", "assignedAgentId": agent["id"]}
         )
-        started = client.post(f"/api/v1/tasks/{task.json()['id']}/runs", json={})
+        started = client.post(
+            f"/api/v1/tasks/{task.json()['id']}/runs",
+            json={"assignments": [{"agentId": agent["id"]}]},
+        )
 
         assert task.status_code == 201
         assert task.json()["assignedAgent"] == "codex"
@@ -2028,6 +2046,13 @@ def test_task_persists_and_dispatches_a_logical_agent_assignment(monkeypatch) ->
         assert (
             started.json()["session"]["agentRuns"][0]["logicalAgentId"] == agent["id"]
         )
+        commands = client.get(
+            "/api/v1/daemon-nodes/node_a/commands",
+            headers={"Authorization": "Bearer node_token"},
+        )
+        assert commands.status_code == 200
+        [command] = commands.json()["commands"]
+        assert command["logicalAgentId"] == agent["id"]
 
 
 def test_task_owner_cannot_be_reassigned_to_another_employees_agent(
