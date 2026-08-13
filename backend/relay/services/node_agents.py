@@ -83,7 +83,7 @@ def sync_node_agents(ctx: NodeAgentContext, node: dict[str, Any]) -> None:
     node_computer_id = computer_id(node)
     if node.get("managedNodeId"):
         try:
-            ctx.agent_placement_store.list_placements()
+            _assert_placement_store_ready(ctx.agent_placement_store)
         except Exception as error:
             if _missing_agent_table(error):
                 logger.warning(
@@ -135,6 +135,11 @@ def sync_node_agents(ctx: NodeAgentContext, node: dict[str, Any]) -> None:
 def _missing_agent_table(error: Exception) -> bool:
     message = str(error)
     return "no such table" in message or "does not exist" in message
+
+
+def _assert_placement_store_ready(store: AgentPlacementStore) -> None:
+    """Probe placement schema availability without scanning live placements."""
+    store.list_placements(agent_id="__relay_schema_probe__")
 
 
 def _managed_runtime_ids(ctx: NodeAgentContext, managed_node_id: str) -> set[str]:

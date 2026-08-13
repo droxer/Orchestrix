@@ -1375,6 +1375,11 @@ def test_existing_thread_resumes_after_managed_runtime_replacement_without_read(
             }
         )
         sync_node_agents(app.state, replacement)
+        [preserved_placement] = app.state.agent_placement_store.list_placements(
+            agent_id=agent["id"]
+        )
+        assert preserved_placement["daemonNodeId"] == old_runtime_id
+        assert preserved_placement["computerId"] == f"managed:{managed['id']}"
 
         response = client.post(
             "/api/v1/agent-runs",
