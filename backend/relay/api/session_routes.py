@@ -184,29 +184,49 @@ def session_uses_agent(session: dict[str, Any], agent_id: str) -> bool:
 def ensure_sessions_managed_affinity(
     ctx: AppContext, sessions: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
+    """Backfill a legacy session's ``computerId`` from what it already knows.
+
+    A session that already recorded its own ``managedNodeId`` derives its
+    identity from that directly — it never round-trips through daemon
+    registration history. Only a session with neither field falls back to
+    ``historical_managed_node_ids``. Preferring the session's own record
+    means the identity handed to ``record_runtime_affinity`` can never
+    disagree with what the session already has, so the write-once guard
+    never has a reason to raise on a plain read.
+    """
     unresolved_runtime_ids = {
         session["daemonNodeId"]
         for session in sessions
         if not session.get("computerId")
+        and not session.get("managedNodeId")
         and isinstance(session.get("daemonNodeId"), str)
     }
-    if not unresolved_runtime_ids:
-        return sessions
-    identities = ctx.registry.daemon_store.historical_managed_node_ids(
-        unresolved_runtime_ids
+    identities = (
+        ctx.registry.daemon_store.historical_managed_node_ids(unresolved_runtime_ids)
+        if unresolved_runtime_ids
+        else {}
     )
-    if not identities:
-        return sessions
     controller = SessionController(ctx.session_store)
-    return [
-        controller.record_runtime_affinity(
-            session["id"], f"managed:{identities[session['daemonNodeId']]}"
-        )
-        if not session.get("computerId")
-        and session.get("daemonNodeId") in identities
-        else session
-        for session in sessions
-    ]
+    resolved: list[dict[str, Any]] = []
+    for session in sessions:
+        if session.get("computerId"):
+            resolved.append(session)
+        elif session.get("managedNodeId"):
+            resolved.append(
+                controller.record_runtime_affinity(
+                    session["id"], f"managed:{session['managedNodeId']}"
+                )
+            )
+        elif session.get("daemonNodeId") in identities:
+            resolved.append(
+                controller.record_runtime_affinity(
+                    session["id"],
+                    f"managed:{identities[session['daemonNodeId']]}",
+                )
+            )
+        else:
+            resolved.append(session)
+    return resolved
 
 
 def ensure_session_managed_affinity(

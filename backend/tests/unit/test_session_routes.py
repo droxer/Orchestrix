@@ -3,9 +3,11 @@ from __future__ import annotations
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
+from sqlalchemy import update
 
 from relay.api.session_routes import is_workspace_artifact, workspace_artifacts
 from relay.app import create_app
+from relay.persistence.store_common import store_transaction
 
 
 def test_is_workspace_artifact_only_allows_generated_files() -> None:
@@ -196,3 +198,78 @@ def test_session_read_backfills_managed_affinity_from_deleted_runtime_history(
         persisted = app.state.session_store.get_session(session["id"])
         assert persisted["managedNodeId"] == "computer_admin"
         assert persisted["events"][-1]["type"] == "session.runtime_affinity"
+
+
+def test_thread_read_does_not_500_when_registration_history_disagrees_with_the_sessions_own_managed_node(
+    monkeypatch,
+) -> None:
+    """修正轮次 2 回归：懒回填必须优先用 session 自己记录的 managedNodeId
+    派生 computerId，而不是回查 daemon 注册历史再拿回来跟自己比较 —— 否则
+    历史记录里一个不同的 managedNodeId 会让 record_runtime_affinity 的写
+    一次保护抛 ValueError，把一个只读 GET 打成 500。"""
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        response = client.post(
+            "/api/v1/auth/bootstrap",
+            json={
+                "token": "admin_token",
+                "username": "admin",
+                "password": "secret123",
+            },
+        )
+        assert response.status_code == 200
+
+        # 注册历史把 runtime_1 关联到 computer_B.
+        app.state.registry.daemon_store.register_node(
+            {
+                "id": "runtime_1",
+                "employeeId": "admin",
+                "managedNodeId": "computer_B",
+                "workspacePath": "/workspace/admin",
+                "sandboxMode": "boxlite",
+                "nodeLocation": "managed",
+                "status": "ready",
+                "agents": {"codex": "ready"},
+            }
+        )
+
+        # 存量 session：自己记的是 computer_A（与注册历史不一致）。创建时
+        # 走正常路径（无 managedNodeId、无 computerId，daemonNodeId 已知），
+        # 然后直接改写 snapshot 列注入 managedNodeId —— 模拟本次修复上线前
+        # 就已经存在、只带 managedNodeId、没有 computerId 的老快照（那些行
+        # 是旧代码写的，不可能再通过现在的 create_session/append_event 产
+        # 生，因为两者现在都会顺带派生出 computerId）。
+        store = app.state.session_store
+        session = store.create_session(
+            {
+                "workspacePath": "/workspace/admin",
+                "daemonNodeId": "runtime_1",
+                "ownerEmployeeId": "admin",
+                "taskGoal": "continue after replacement",
+                "participants": ["human", "codex"],
+            }
+        )
+        session_id = session["id"]
+        legacy_snapshot = {**session, "managedNodeId": "computer_A"}
+        legacy_snapshot.pop("events", None)
+        with store_transaction(store.engine) as conn:
+            conn.execute(
+                update(store.sessions)
+                .where(store.sessions.c.id == session_id)
+                .values(snapshot=legacy_snapshot)
+            )
+
+        precondition = store.get_session(session_id)
+        assert precondition.get("computerId") is None
+        assert precondition["managedNodeId"] == "computer_A"
+
+        fetched = client.get(f"/api/v1/threads/{session_id}")
+
+        assert fetched.status_code == 200, fetched.text
+        body = fetched.json()
+        assert body["computerId"] == "managed:computer_A"
+        assert body["managedNodeId"] == "computer_A"
+        persisted = app.state.session_store.get_session(session_id)
+        assert persisted["computerId"] == "managed:computer_A"
