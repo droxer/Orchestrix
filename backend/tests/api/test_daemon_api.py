@@ -484,7 +484,7 @@ def test_recovered_managed_node_can_register_replacement_agents(monkeypatch) -> 
             if agent["executorKind"] == "claude"
         ]
         assert [agent["compatibilityKey"] for agent in live_claude] == [
-            f"alice:{managed['id']}:claude"
+            f"alice:managed:{managed['id']}:claude"
         ]
 
 
@@ -865,7 +865,7 @@ def test_backend_startup_migrates_managed_agent_identity(monkeypatch) -> None:
             if item["executorKind"] == "codex"
         )
         assert migrated["id"] == legacy["id"]
-        assert migrated["compatibilityKey"] == f"alice:{managed['id']}:codex"
+        assert migrated["compatibilityKey"] == f"alice:managed:{managed['id']}:codex"
         [placement] = restarted.state.agent_placement_store.list_placements(
             agent_id=legacy["id"]
         )
