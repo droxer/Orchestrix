@@ -4,6 +4,7 @@ from typing import Any, Protocol
 
 from loguru import logger
 
+from ..core.computer_identity import computer_id
 from ..daemon_registry.scheduling import workspace_identity
 from ..persistence.agent_placement_store import create_node_placement
 from ..persistence.protocols import AgentPlacementStore, AgentStore, TeamStore
@@ -80,7 +81,7 @@ def sync_node_agents(ctx: NodeAgentContext, node: dict[str, Any]) -> None:
         return
     supported = set(node.get("supportedAgents") or []) | set(node.get("agents") or {})
     disabled = set(node.get("disabledAgents") or [])
-    computer_id = node.get("managedNodeId") or node["id"]
+    node_computer_id = computer_id(node)
     if node.get("managedNodeId"):
         try:
             _rebind_managed_node_placements(ctx, node, employee_id)
@@ -106,7 +107,7 @@ def sync_node_agents(ctx: NodeAgentContext, node: dict[str, Any]) -> None:
                 employee_id,
                 executor_kind,
                 node["id"],
-                computer_id=computer_id,
+                computer_id=node_computer_id,
             )
         except Exception as error:
             if _missing_agent_table(error):
@@ -232,8 +233,13 @@ def _belongs_to_other_computer(
     if not compatibility_key or not executor_kind:
         return False
     own_keys = {
-        _compatibility_key_for(employee_id, computer_id, executor_kind)
-        for computer_id in {managed_node_id, *runtime_ids}
+        _compatibility_key_for(
+            employee_id, f"managed:{managed_node_id}", executor_kind
+        ),
+        *(
+            _compatibility_key_for(employee_id, runtime_id, executor_kind)
+            for runtime_id in runtime_ids
+        ),
     }
     return compatibility_key not in own_keys
 
@@ -248,7 +254,7 @@ def _migrate_managed_compatibility_agent(
     managed_node_id = node.get("managedNodeId")
     if not managed_node_id:
         return None
-    stable_key = _compatibility_key_for(employee_id, managed_node_id, executor_kind)
+    stable_key = _compatibility_key_for(employee_id, computer_id(node), executor_kind)
     agents = ctx.agent_store.list_agents(supervisor_employee_id=employee_id)
     stable = next(
         (
@@ -334,7 +340,7 @@ def retire_superseded_compatibility_agents(
         _managed_runtime_ids(ctx, managed_node_id) if managed_node_id else set()
     )
     computer_scoped_key = _compatibility_key_for(
-        employee_id, node.get("managedNodeId") or node["id"], executor_kind
+        employee_id, computer_id(node), executor_kind
     )
     has_computer_scoped_sibling = any(
         agent.get("compatibilityKey") == computer_scoped_key

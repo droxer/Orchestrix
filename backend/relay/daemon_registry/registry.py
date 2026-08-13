@@ -32,6 +32,7 @@ from ..collaboration.policy import (
     decide_failure,
     validate_round_result,
 )
+from ..core.computer_identity import computer_id
 from ..core.environment import load_backend_env
 from ..core.ids import new_database_id, new_relay_id, new_sandbox_id, now_iso
 from ..core.models import (
@@ -665,29 +666,19 @@ class DaemonNodeRegistry:
     def _superseded_incarnations(self, sandbox: dict[str, Any]) -> list[dict[str, Any]]:
         """Live node rows describing the same Computer as `sandbox`.
 
-        A Computer is identified by (employeeId, workspaceId) for an employee
-        device and by managedNodeId for a managed one -- never by the daemon's
-        own sandboxId, which changes whenever the daemon process is replaced.
+        身份判定统一走 core.computer_identity.computer_id —— 不要在这里内联
+        重写它。无法解析出身份的 node（回退到 node:<id>）只匹配自己，因此
+        天然不会误退役别人。
         """
-        managed_node_id = sandbox.get("managedNodeId")
-        employee_id = sandbox.get("employeeId")
-        workspace_id = sandbox.get("workspaceId")
-        if not managed_node_id and not (employee_id and workspace_id):
+        identity = computer_id(sandbox)
+        if identity == f"node:{sandbox['id']}":
             return []
         return [
             node
             for node in self.sandboxes.values()
             if node["id"] != sandbox["id"]
             and not node.get("retiredAt")
-            and (
-                node.get("managedNodeId") == managed_node_id
-                if managed_node_id
-                else (
-                    not node.get("managedNodeId")
-                    and node.get("employeeId") == employee_id
-                    and node.get("workspaceId") == workspace_id
-                )
-            )
+            and computer_id(node) == identity
         ]
 
     def _retire_superseded_incarnations(self, sandbox: dict[str, Any]) -> None:

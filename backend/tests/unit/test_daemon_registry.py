@@ -6604,3 +6604,42 @@ def test_dead_heartbeat_events_are_prunable() -> None:
         assert "daemon.node.seen" not in remaining
         # The registration record is what survives a hard node delete, so it stays.
         assert "daemon.node.registered" in remaining
+
+
+def _machine_registry(root: str) -> DaemonNodeRegistry:
+    return DaemonNodeRegistry(LocalSessionStore(root), LocalDaemonStore(root))
+
+
+def _machine_payload(**overrides: Any) -> dict[str, Any]:
+    return {
+        "sandboxId": "node-1",
+        "employeeId": "alice",
+        "token": "node_token",
+        "workspacePath": "/workspace/alice",
+        "workspaceId": "machine-a",
+        "protocolVersion": 1,
+        "supportedAgents": ["claude"],
+        "capabilities": ["thread-workspaces"],
+        "status": "ready",
+        **overrides,
+    }
+
+
+def test_same_employee_and_machine_supersedes_across_workspace_paths() -> None:
+    with TemporaryDirectory() as root:
+        registry = _machine_registry(root)
+        registry.register(_machine_payload(sandboxId="node-old", workspacePath="/one"))
+        registry.register(_machine_payload(sandboxId="node-new", workspacePath="/two"))
+        assert registry.get("node-old")["retiredAt"]
+        assert not registry.get("node-new").get("retiredAt")
+
+
+def test_two_employees_on_one_machine_do_not_supersede_each_other() -> None:
+    with TemporaryDirectory() as root:
+        registry = _machine_registry(root)
+        registry.register(
+            _machine_payload(sandboxId="node-alice", employeeId="alice")
+        )
+        registry.register(_machine_payload(sandboxId="node-bob", employeeId="bob"))
+        assert not registry.get("node-alice").get("retiredAt")
+        assert not registry.get("node-bob").get("retiredAt")
