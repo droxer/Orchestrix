@@ -414,20 +414,21 @@ class SessionController:
         return self.store.get_session(session_id)
 
     def record_runtime_affinity(
-        self, session_id: str, managed_node_id: str
+        self, session_id: str, computer_id: str
     ) -> dict[str, Any]:
+        """把 thread 钉到一台 Computer。写一次，之后不可改。"""
         current = self.store.get_session(session_id)
-        existing = current.get("managedNodeId")
+        existing = current.get("computerId")
         if existing:
-            if existing != managed_node_id:
-                raise ValueError("Session already belongs to another managed Computer.")
+            if existing != computer_id:
+                raise ValueError("Session already belongs to another Computer.")
             return current
         return self._append(
             session_id,
             relay_event(
                 "session.runtime_affinity",
                 session_id,
-                {"managedNodeId": managed_node_id},
+                {"computerId": computer_id},
             ),
         )
 

@@ -456,7 +456,7 @@ class CollaborationConductor:
     ) -> dict[str, Any] | None:
         if (
             not session
-            or session.get("managedNodeId")
+            or session.get("computerId")
             or not session.get("daemonNodeId")
         ):
             return session
@@ -466,7 +466,7 @@ class CollaborationConductor:
         if not managed_node_id:
             return session
         return SessionController(self.ctx.session_store).record_runtime_affinity(
-            session["id"], managed_node_id
+            session["id"], f"managed:{managed_node_id}"
         )
 
     def _team_employee_id(

@@ -186,7 +186,7 @@ def ensure_sessions_managed_affinity(
     unresolved_runtime_ids = {
         session["daemonNodeId"]
         for session in sessions
-        if not session.get("managedNodeId")
+        if not session.get("computerId")
         and isinstance(session.get("daemonNodeId"), str)
     }
     if not unresolved_runtime_ids:
@@ -199,9 +199,9 @@ def ensure_sessions_managed_affinity(
     controller = SessionController(ctx.session_store)
     return [
         controller.record_runtime_affinity(
-            session["id"], identities[session["daemonNodeId"]]
+            session["id"], f"managed:{identities[session['daemonNodeId']]}"
         )
-        if not session.get("managedNodeId")
+        if not session.get("computerId")
         and session.get("daemonNodeId") in identities
         else session
         for session in sessions

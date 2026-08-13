@@ -116,6 +116,15 @@ class LocalSessionStore:
                         if payload.get("managedNodeId")
                         else {}
                     ),
+                    **(
+                        {"computerId": payload["computerId"]}
+                        if payload.get("computerId")
+                        else (
+                            {"computerId": f"managed:{payload['managedNodeId']}"}
+                            if payload.get("managedNodeId")
+                            else {}
+                        )
+                    ),
                     "taskGoal": payload["taskGoal"],
                     "participants": payload.get("participants", ["human"]),
                 },
@@ -666,6 +675,15 @@ class DatabaseSessionStore:
                         {"managedNodeId": payload["managedNodeId"]}
                         if payload.get("managedNodeId")
                         else {}
+                    ),
+                    **(
+                        {"computerId": payload["computerId"]}
+                        if payload.get("computerId")
+                        else (
+                            {"computerId": f"managed:{payload['managedNodeId']}"}
+                            if payload.get("managedNodeId")
+                            else {}
+                        )
                     ),
                     "taskGoal": payload["taskGoal"],
                     "participants": payload.get("participants", ["human"]),
