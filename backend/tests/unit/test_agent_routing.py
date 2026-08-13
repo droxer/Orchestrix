@@ -812,3 +812,122 @@ def test_legacy_session_with_managed_node_id_resolves_without_computer_id() -> N
         }
     ]
     assert resolve_session_daemon_node_id(session, nodes) == "node-new"
+
+
+def test_offline_computer_id_thread_refuses_instead_of_borrowing(
+    tmp_path: Path,
+) -> None:
+    """A pre-run thread pinned to a Computer that isn't online must refuse
+    dispatch, not silently pick a different machine (spec §4)."""
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Builder", "executorKind": "codex"}
+    )
+    placements.create_placement(agent, "node_b")
+    session = {
+        "id": "ses_pending",
+        "computerId": "device:alice:machine-a",
+        "workspacePath": "/workspace",
+        "agentRuns": [],
+    }
+    other_machine = {
+        **node("node_b", "codex", workspace_id="machine-b"),
+        "employeeId": "alice",
+    }
+
+    with pytest.raises(AgentRoutingError) as error:
+        resolve_agent_assignments(
+            [{"agentId": agent["id"]}],
+            employee_id="alice",
+            is_admin=False,
+            agent_store=agents,
+            placement_store=placements,
+            daemon_nodes=[other_machine],
+            session=session,
+        )
+
+    assert error.value.code == "node_offline"
+
+
+def test_offline_managed_node_id_thread_refuses_instead_of_borrowing(
+    tmp_path: Path,
+) -> None:
+    """Same guarantee for the pre-computerId managedNodeId shape."""
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Builder", "executorKind": "codex"}
+    )
+    placements.create_placement(agent, "node_b")
+    session = {
+        "id": "ses_pending",
+        "managedNodeId": "computer_one",
+        "workspacePath": "/workspace",
+        "agentRuns": [],
+    }
+    other_managed_node = {
+        **node("node_b", "codex"),
+        "employeeId": "alice",
+        "managedNodeId": "computer_two",
+    }
+
+    with pytest.raises(AgentRoutingError) as error:
+        resolve_agent_assignments(
+            [{"agentId": agent["id"]}],
+            employee_id="alice",
+            is_admin=False,
+            agent_store=agents,
+            placement_store=placements,
+            daemon_nodes=[other_managed_node],
+            session=session,
+        )
+
+    assert error.value.code == "node_offline"
+
+
+def test_legacy_rebind_chasing_uses_the_latest_run_with_a_daemon_node_id(
+    tmp_path: Path,
+) -> None:
+    """resolve_legacy_session_computer_id must anchor on the most recent run
+    that actually has a daemonNodeId, even when that run has no placementId
+    — it must not skip past it to chase an older run's placement rebind."""
+    from relay.services.agent_routing import resolve_legacy_session_computer_id
+
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Builder", "executorKind": "codex"}
+    )
+    old_placement = placements.create_placement(agent, "node_old")
+    placements.rebind_placement(old_placement["id"], "node_stale_target")
+    session = {
+        "id": "ses_existing",
+        "workspacePath": "/workspace",
+        "agentRuns": [
+            {
+                "logicalAgentId": agent["id"],
+                "placementId": old_placement["id"],
+                "daemonNodeId": "node_old",
+            },
+            {
+                "logicalAgentId": agent["id"],
+                "daemonNodeId": "node_newer",
+                # No placementId on the latest run: rebind-chasing must stop
+                # here rather than falling back to the older run above.
+            },
+        ],
+    }
+    nodes = {
+        "node_stale_target": {
+            "id": "node_stale_target",
+            "managedNodeId": "computer_stale",
+        },
+    }
+
+    assert (
+        resolve_legacy_session_computer_id(
+            session, placements, nodes, daemon_store=None
+        )
+        is None
+    )

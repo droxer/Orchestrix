@@ -449,22 +449,21 @@ def resolve_legacy_session_computer_id(
         (
             run
             for run in reversed(session.get("agentRuns") or [])
-            if run.get("placementId")
+            if run.get("daemonNodeId")
         ),
         None,
     )
-    if not prior_run:
+    node_id = session_node_id or (prior_run or {}).get("daemonNodeId")
+    if not prior_run or not prior_run.get("placementId"):
         return None
     placement = placement_store.get_placement(prior_run["placementId"])
     rebound_node_id = (placement or {}).get("daemonNodeId")
-    if not isinstance(rebound_node_id, str) or rebound_node_id == session_node_id:
+    if not isinstance(rebound_node_id, str) or rebound_node_id == node_id:
         return None
     rebound_node = nodes.get(rebound_node_id)
     if not rebound_node or not rebound_node.get("managedNodeId"):
         return None
-    previous_node = (
-        nodes.get(session_node_id) if isinstance(session_node_id, str) else None
-    )
+    previous_node = nodes.get(node_id) if isinstance(node_id, str) else None
     if previous_node and previous_node.get("managedNodeId") != rebound_node.get(
         "managedNodeId"
     ):
@@ -505,6 +504,17 @@ def _session_affinity(
                     {"workspacePath": session.get("workspacePath")}
                 ),
                 "node-affine",
+            )
+        if session.get("computerId"):
+            # The thread is pinned to a Computer (directly or recovered by
+            # resolve_legacy_session_computer_id above) but that Computer has
+            # no reachable node right now. An empty constraint set here would
+            # let dispatch silently pick a different machine — the thread's
+            # workspace lives on the pinned one, so refuse explicitly instead
+            # of quietly running somewhere the work was never done.
+            raise AgentRoutingError(
+                "node_offline",
+                "This thread's computer is not currently online.",
             )
         # Legacy sessions acquire runtime affinity after their first agent run.
         return set(), None, None
