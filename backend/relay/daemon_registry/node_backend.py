@@ -127,11 +127,18 @@ class ServerDaemonNodeBackend:
         )
         if not placement or placement.get("desiredState") != "active":
             raise ValueError("placement is not active")
+        from ..services.agent_routing import placement_node
+
+        current_node = placement_node(
+            placement,
+            {node["id"]: node for node in self.registry.monitor_nodes()},
+        )
         if (
             placement.get("agentId") != agent.get("id")
             or placement.get("supervisorEmployeeId")
             != agent.get("supervisorEmployeeId")
-            or placement.get("daemonNodeId") != assignment.get("daemonNodeId")
+            or not current_node
+            or current_node["id"] != assignment.get("daemonNodeId")
             or placement.get("executorKind") != agent.get("executorKind")
         ):
             raise ValueError("placement no longer matches the selected agent and node")

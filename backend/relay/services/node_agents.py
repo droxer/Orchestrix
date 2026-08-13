@@ -83,7 +83,7 @@ def sync_node_agents(ctx: NodeAgentContext, node: dict[str, Any]) -> None:
     node_computer_id = computer_id(node)
     if node.get("managedNodeId"):
         try:
-            _rebind_managed_node_placements(ctx, node, employee_id)
+            ctx.agent_placement_store.list_placements()
         except Exception as error:
             if _missing_agent_table(error):
                 logger.warning(
@@ -95,13 +95,6 @@ def sync_node_agents(ctx: NodeAgentContext, node: dict[str, Any]) -> None:
             raise
     for executor_kind in sorted(supported - disabled):
         try:
-            if node.get("managedNodeId"):
-                _migrate_managed_compatibility_agent(
-                    ctx,
-                    node,
-                    employee_id,
-                    executor_kind,
-                )
             agent = ctx.agent_store.ensure_compatibility_agent(
                 employee_id,
                 executor_kind,
@@ -120,28 +113,12 @@ def sync_node_agents(ctx: NodeAgentContext, node: dict[str, Any]) -> None:
         placements = ctx.agent_placement_store.list_placements(
             agent_id=agent["id"], include_removed=True
         )
-        placement = next(
-            (item for item in placements if item["daemonNodeId"] == node["id"]),
-            None,
-        )
         active = next(
             (item for item in placements if item.get("desiredState") != "removed"),
             None,
         )
-        if placement and placement.get("desiredState") != "removed":
+        if active:
             pass
-        elif active:
-            ctx.agent_placement_store.rebind_placement(
-                active["id"],
-                node["id"],
-                managed_node_id=node.get("managedNodeId"),
-            )
-        elif placement:
-            ctx.agent_placement_store.rebind_placement(
-                placement["id"],
-                node["id"],
-                managed_node_id=node.get("managedNodeId"),
-            )
         else:
             create_node_placement(ctx.agent_placement_store, agent, node)
         try:
@@ -176,118 +153,6 @@ def _managed_runtime_ids(ctx: NodeAgentContext, managed_node_id: str) -> set[str
     if historical_runtime_ids:
         runtime_ids.update(historical_runtime_ids(managed_node_id))
     return runtime_ids
-
-
-def _rebind_managed_node_placements(
-    ctx: NodeAgentContext,
-    node: dict[str, Any],
-    employee_id: str,
-) -> None:
-    """Move every logical agent on a managed Computer to its current runtime."""
-    managed_node_id = node.get("managedNodeId")
-    if not managed_node_id:
-        return
-    runtime_ids = _managed_runtime_ids(ctx, managed_node_id) | {node["id"]}
-    for placement in ctx.agent_placement_store.list_placements():
-        if (
-            placement.get("managedNodeId") != managed_node_id
-            and placement.get("daemonNodeId") not in runtime_ids
-        ):
-            continue
-        agent = ctx.agent_store.get_agent(placement.get("agentId"))
-        if (
-            not agent
-            or agent.get("deletedAt")
-            or agent.get("supervisorEmployeeId") != employee_id
-        ):
-            continue
-        if _belongs_to_other_computer(
-            agent, employee_id, managed_node_id, runtime_ids
-        ):
-            continue
-        ctx.agent_placement_store.rebind_placement(
-            placement["id"],
-            node["id"],
-            managed_node_id=managed_node_id,
-        )
-
-
-def _belongs_to_other_computer(
-    agent: dict[str, Any],
-    employee_id: str,
-    managed_node_id: str,
-    runtime_ids: set[str],
-) -> bool:
-    """True when a compatibility agent stands in for a different Computer.
-
-    A compatibility agent represents one executor on one Computer, so a managed
-    Computer must never adopt one keyed to an employee device even if a
-    placement still carries a stale managedNodeId. Keys naming this Computer or
-    any of its own past runtimes are its own, and are still claimable — those
-    are what runtime replacement rebinds. Agents without a compatibility key
-    are not Computer-scoped and stay claimable too.
-    """
-    compatibility_key = agent.get("compatibilityKey")
-    executor_kind = agent.get("executorKind")
-    if not compatibility_key or not executor_kind:
-        return False
-    own_keys = {
-        _compatibility_key_for(
-            employee_id, f"managed:{managed_node_id}", executor_kind
-        ),
-        *(
-            _compatibility_key_for(employee_id, runtime_id, executor_kind)
-            for runtime_id in runtime_ids
-        ),
-    }
-    return compatibility_key not in own_keys
-
-
-def _migrate_managed_compatibility_agent(
-    ctx: NodeAgentContext,
-    node: dict[str, Any],
-    employee_id: str,
-    executor_kind: str,
-) -> dict[str, Any] | None:
-    """Move a prior incarnation's compatibility identity to its Computer."""
-    managed_node_id = node.get("managedNodeId")
-    if not managed_node_id:
-        return None
-    stable_key = _compatibility_key_for(employee_id, computer_id(node), executor_kind)
-    agents = ctx.agent_store.list_agents(supervisor_employee_id=employee_id)
-    stable = next(
-        (
-            agent
-            for agent in agents
-            if agent.get("compatibilityKey") == stable_key
-            and not agent.get("deletedAt")
-        ),
-        None,
-    )
-    if stable:
-        return stable
-    registry = getattr(ctx, "registry", None)
-    if not registry:
-        return None
-    incarnation_ids = _managed_runtime_ids(ctx, managed_node_id)
-    legacy_keys = {
-        _compatibility_key_for(employee_id, runtime_id, executor_kind)
-        for runtime_id in incarnation_ids
-    }
-    candidates = sorted(
-        (
-            agent
-            for agent in agents
-            if agent.get("compatibilityKey") in legacy_keys
-            and not agent.get("deletedAt")
-        ),
-        key=lambda agent: (agent.get("createdAt") or "", agent["id"]),
-    )
-    if not candidates:
-        return None
-    return ctx.agent_store.update_agent(
-        candidates[0]["id"], {"compatibilityKey": stable_key}
-    )
 
 
 def _retire_superseded_locked(
