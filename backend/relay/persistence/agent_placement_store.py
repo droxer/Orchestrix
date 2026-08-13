@@ -20,6 +20,7 @@ from sqlalchemy import (
     update,
 )
 
+from ..core.computer_identity import computer_id
 from ..core.ids import new_database_id, now_iso
 from ..core.models import AGENT_NAMES
 from .agent_store import DatabaseAgentStore
@@ -679,6 +680,11 @@ def _new_placement(
         "agentVersion": agent["version"],
         "workspacePolicy": workspace_policy,
         **({"managedNodeId": managed_node_id} if managed_node_id else {}),
+        **(
+            {"computerId": payload["computerId"]}
+            if payload.get("computerId")
+            else {}
+        ),
         "conditions": [],
         "createdAt": timestamp,
         "updatedAt": timestamp,
@@ -763,17 +769,16 @@ def create_node_placement(
     node: dict[str, Any],
     payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Create a placement stamped with its stable managed Computer identity."""
+    """Create a placement stamped with its stable Computer identity."""
     placement_payload = {
-        key: value for key, value in (payload or {}).items() if key != "managedNodeId"
+        key: value
+        for key, value in (payload or {}).items()
+        if key not in ("managedNodeId", "computerId")
     }
     if node.get("managedNodeId"):
         placement_payload["managedNodeId"] = node["managedNodeId"]
-    return placement_store.create_placement(
-        agent,
-        node["id"],
-        placement_payload or None,
-    )
+    placement_payload["computerId"] = computer_id(node)
+    return placement_store.create_placement(agent, node["id"], placement_payload)
 
 
 def _normalized_placement_snapshot(

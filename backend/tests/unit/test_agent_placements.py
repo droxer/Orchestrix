@@ -388,3 +388,25 @@ def test_placement_denormalized_agent_fields_cannot_drift(
     ):
         with pytest.raises(ValueError, match="Unsupported agent field"):
             store.update_agent(agent["id"], {field: value})
+
+
+def test_placement_records_the_computer_identity(tmp_path) -> None:
+    from relay.persistence.agent_placement_store import (
+        LocalAgentPlacementStore,
+        create_node_placement,
+    )
+    from relay.persistence.agent_store import LocalAgentStore
+
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Worker", "executorKind": "claude"}
+    )
+    node = {
+        "id": "node-1",
+        "employeeId": "alice",
+        "workspaceId": "machine-a",
+        "workspacePath": "/w",
+    }
+    placement = create_node_placement(placements, agent, node)
+    assert placement["computerId"] == "device:alice:machine-a"

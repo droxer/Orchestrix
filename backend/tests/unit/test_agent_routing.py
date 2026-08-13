@@ -705,3 +705,32 @@ def test_device_compatibility_agent_does_not_borrow_managed_capacity(
     [preserved] = placements.list_placements(agent_id=agent["id"])
     assert preserved["id"] == original["id"]
     assert preserved["daemonNodeId"] == "device_node"
+
+
+def test_placement_resolves_to_the_same_computer_under_a_new_node_id() -> None:
+    from relay.services.agent_routing import placement_node
+
+    placement = {"daemonNodeId": "node-old", "computerId": "device:alice:machine-a"}
+    nodes = {
+        "node-new": {
+            "id": "node-new",
+            "employeeId": "alice",
+            "workspaceId": "machine-a",
+        }
+    }
+    assert placement_node(placement, nodes)["id"] == "node-new"
+
+
+def test_legacy_placement_without_computer_id_falls_back_to_node_id() -> None:
+    from relay.services.agent_routing import placement_node
+
+    placement = {"daemonNodeId": "node-old"}
+    nodes = {"node-old": {"id": "node-old"}}
+    assert placement_node(placement, nodes)["id"] == "node-old"
+
+
+def test_placement_node_is_none_when_the_computer_is_offline() -> None:
+    from relay.services.agent_routing import placement_node
+
+    placement = {"daemonNodeId": "node-old", "computerId": "device:alice:machine-a"}
+    assert placement_node(placement, {}) is None

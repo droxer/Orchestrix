@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
+from ..core.computer_identity import computer_id
 from ..daemon_registry.scheduling import (
     node_accepts_run,
     workspace_identity,
@@ -42,6 +44,33 @@ def dispatch_failure_code(error: Exception) -> str:
         if code in message:
             return code
     return "dispatch_failed"
+
+
+def placement_node(
+    placement: Mapping[str, Any], nodes: Mapping[str, dict[str, Any]]
+) -> dict[str, Any] | None:
+    """找到当前承载该 placement 所属 Computer 的在线 node。
+
+    placement 记的是 computerId（稳定），不是 node id（会变）。老 placement
+    没有 computerId，退回按 node id 直查，行为等同改造前。
+    """
+    identity = placement.get("computerId")
+    if not identity:
+        return nodes.get(placement.get("daemonNodeId"))
+    candidates = [node for node in nodes.values() if computer_id(node) == identity]
+    if not candidates:
+        return None
+    return min(
+        candidates,
+        key=lambda node: (
+            0
+            if node.get("online")
+            and not node.get("stale")
+            and node.get("status") in ("ready", "busy", "running")
+            else 1,
+            node["id"],
+        ),
+    )
 
 
 def select_workspace_node(
@@ -210,7 +239,7 @@ def resolve_agent_assignments(
         candidates = []
         rejection_reasons: set[str] = set()
         for placement in placements:
-            node = nodes.get(placement["daemonNodeId"])
+            node = placement_node(placement, nodes)
             view = placement_status(placement, agent, node)
             if view["status"] not in ("ready", "busy"):
                 rejection_reasons.update(
