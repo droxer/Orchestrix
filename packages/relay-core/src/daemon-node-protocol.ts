@@ -107,8 +107,6 @@ export interface DaemonNodeRegistration {
   token: string;
   workspacePath?: string;
   workspaceId?: string;
-  /** Proper name for the value carried in `workspaceId`; both are sent for compatibility. */
-  machineId?: string;
   sandboxMode?: DaemonNodeSandboxMode;
   protocolVersion: number;
   supportedAgents: AgentName[];

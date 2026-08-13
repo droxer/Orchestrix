@@ -25,7 +25,10 @@ def computer_id(node: Mapping[str, Any]) -> str:
     if managed_node_id:
         return f"managed:{managed_node_id}"
     employee_id = _clean(node.get("employeeId"))
-    machine_id = _clean(node.get("machineId")) or _clean(node.get("workspaceId"))
+    # 字段名是历史遗留：workspaceId 的值是宿主 machine-id（daemon 端的
+    # ensureMachineId()），与工作目录无关。不要因为名字里有 workspace 就
+    # 以为它跟 workspacePath 有关。
+    machine_id = _clean(node.get("workspaceId"))
     if employee_id and machine_id:
         return f"device:{employee_id}:{machine_id}"
     return f"node:{node['id']}"

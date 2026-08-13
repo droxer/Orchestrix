@@ -564,14 +564,6 @@ class DaemonNodeRegistry:
                 if payload.get("workspaceId") or (existing or {}).get("workspaceId")
                 else {}
             ),
-            **(
-                {
-                    "machineId": payload.get("machineId")
-                    or (existing or {}).get("machineId")
-                }
-                if payload.get("machineId") or (existing or {}).get("machineId")
-                else {}
-            ),
             **({"sandboxMode": sandbox_mode} if sandbox_mode else {}),
             **(
                 {
