@@ -60,12 +60,20 @@ from .store_common import (
     metadata as shared_metadata,
 )
 
+_AFFINITY_LOCKS: dict[str, RLock] = {}
+_AFFINITY_LOCKS_GUARD = RLock()
+
+
+def _shared_affinity_lock(key: str) -> RLock:
+    with _AFFINITY_LOCKS_GUARD:
+        return _AFFINITY_LOCKS.setdefault(key, RLock())
+
 
 class LocalSessionStore:
     def __init__(self, root_dir: str | Path = DEFAULT_RELAY_DATA_DIR):
         self.root_dir = Path(root_dir)
         self.sessions_dir = self.root_dir / "sessions"
-        self._lock = RLock()
+        self._lock = _shared_affinity_lock(f"local:{self.sessions_dir.resolve()}")
         self._event_listener: Callable[[str], None] | None = None
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
 
@@ -591,7 +599,7 @@ class DatabaseSessionStore:
         create_schema: bool = False,
     ):
         self.engine = shared_engine(database_url)
-        self._affinity_lock = RLock()
+        self._affinity_lock = _shared_affinity_lock(f"database:{self.engine.url}")
         self._event_listener: Callable[[str], None] | None = None
         self._event_notification_channel: str | None = None
         if create_schema:

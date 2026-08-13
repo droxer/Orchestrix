@@ -36,21 +36,22 @@ def test_runtime_affinity_is_write_once(tmp_path: Path) -> None:
 
 
 def test_concurrent_runtime_affinity_backfill_appends_one_event(tmp_path: Path) -> None:
-    controller = _controller(tmp_path)
-    session = controller.create_session("Ship it")
+    first_controller = _controller(tmp_path)
+    second_controller = _controller(tmp_path)
+    session = first_controller.create_session("Ship it")
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(
             pool.map(
-                lambda _index: controller.record_runtime_affinity(
+                lambda controller: controller.record_runtime_affinity(
                     session["id"], "managed:mnode-7"
                 ),
-                range(2),
+                (first_controller, second_controller),
             )
         )
 
     assert {result["computerId"] for result in results} == {"managed:mnode-7"}
-    stored = controller.store.get_session(session["id"])
+    stored = first_controller.store.get_session(session["id"])
     affinity_events = [
         event
         for event in stored["events"]
@@ -106,28 +107,29 @@ def test_dispatch_backfill_persists_legacy_daemon_history_once(tmp_path: Path) -
 
 
 def test_database_runtime_affinity_is_atomic_and_write_once(tmp_path: Path) -> None:
-    store = DatabaseSessionStore(
-        f"sqlite:///{tmp_path}/relay.db", create_schema=True
-    )
-    controller = SessionController(store)
-    session = controller.create_session("Ship it")
+    database_url = f"sqlite:///{tmp_path}/relay.db"
+    first_store = DatabaseSessionStore(database_url, create_schema=True)
+    second_store = DatabaseSessionStore(database_url)
+    first_controller = SessionController(first_store)
+    second_controller = SessionController(second_store)
+    session = first_controller.create_session("Ship it")
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(
             pool.map(
-                lambda _index: controller.record_runtime_affinity(
+                lambda controller: controller.record_runtime_affinity(
                     session["id"], "managed:mnode-7"
                 ),
-                range(2),
+                (first_controller, second_controller),
             )
         )
     assert {result["computerId"] for result in results} == {"managed:mnode-7"}
     with pytest.raises(ValueError):
-        controller.record_runtime_affinity(session["id"], "managed:mnode-8")
+        first_controller.record_runtime_affinity(session["id"], "managed:mnode-8")
 
     affinity_events = [
         event
-        for event in store.get_session(session["id"])["events"]
+        for event in first_store.get_session(session["id"])["events"]
         if event["type"] == "session.runtime_affinity"
     ]
     assert len(affinity_events) == 1

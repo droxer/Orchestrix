@@ -184,15 +184,14 @@ def session_uses_agent(session: dict[str, Any], agent_id: str) -> bool:
 def ensure_sessions_managed_affinity(
     ctx: AppContext, sessions: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """Backfill a legacy session's ``computerId`` from what it already knows.
+    """Derive a legacy session's ``computerId`` for a read response only.
 
     A session that already recorded its own ``managedNodeId`` derives its
     identity from that directly — it never round-trips through daemon
     registration history. Only a session with neither field falls back to
     ``historical_managed_node_ids``. Preferring the session's own record
-    means the identity handed to ``record_runtime_affinity`` can never
-    disagree with what the session already has, so the write-once guard
-    never has a reason to raise on a plain read.
+    This helper never appends an event. Explicit dispatch paths persist the
+    same derivation; GET/list/workspace reads must remain side-effect free.
     """
     unresolved_runtime_ids = {
         session["daemonNodeId"]
@@ -206,23 +205,22 @@ def ensure_sessions_managed_affinity(
         if unresolved_runtime_ids
         else {}
     )
-    controller = SessionController(ctx.session_store)
     resolved: list[dict[str, Any]] = []
     for session in sessions:
         if session.get("computerId"):
             resolved.append(session)
         elif session.get("managedNodeId"):
             resolved.append(
-                controller.record_runtime_affinity(
-                    session["id"], f"managed:{session['managedNodeId']}"
-                )
+                {**session, "computerId": f"managed:{session['managedNodeId']}"}
             )
         elif session.get("daemonNodeId") in identities:
+            managed_node_id = identities[session["daemonNodeId"]]
             resolved.append(
-                controller.record_runtime_affinity(
-                    session["id"],
-                    f"managed:{identities[session['daemonNodeId']]}",
-                )
+                {
+                    **session,
+                    "managedNodeId": managed_node_id,
+                    "computerId": f"managed:{managed_node_id}",
+                }
             )
         else:
             resolved.append(session)

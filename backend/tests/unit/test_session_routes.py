@@ -3,11 +3,10 @@ from __future__ import annotations
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
-from sqlalchemy import update
-
 from relay.api.session_routes import is_workspace_artifact, workspace_artifacts
 from relay.app import create_app
 from relay.persistence.store_common import store_transaction
+from sqlalchemy import update
 
 
 def test_is_workspace_artifact_only_allows_generated_files() -> None:
@@ -195,18 +194,21 @@ def test_session_read_backfills_managed_affinity_from_deleted_runtime_history(
 
         assert fetched.status_code == 200, fetched.text
         assert fetched.json()["managedNodeId"] == "computer_admin"
+        assert fetched.json()["computerId"] == "managed:computer_admin"
         persisted = app.state.session_store.get_session(session["id"])
-        assert persisted["managedNodeId"] == "computer_admin"
-        assert persisted["events"][-1]["type"] == "session.runtime_affinity"
+        assert persisted.get("managedNodeId") is None
+        assert persisted.get("computerId") is None
+        assert all(
+            event["type"] != "session.runtime_affinity"
+            for event in persisted["events"]
+        )
 
 
 def test_thread_read_does_not_500_when_registration_history_disagrees_with_the_sessions_own_managed_node(
     monkeypatch,
 ) -> None:
-    """修正轮次 2 回归：懒回填必须优先用 session 自己记录的 managedNodeId
-    派生 computerId，而不是回查 daemon 注册历史再拿回来跟自己比较 —— 否则
-    历史记录里一个不同的 managedNodeId 会让 record_runtime_affinity 的写
-    一次保护抛 ValueError，把一个只读 GET 打成 500。"""
+    """只读推导必须优先用 session 自己记录的 managedNodeId，而不是
+    daemon 注册历史；GET 返回派生身份，但不写事件或 snapshot。"""
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
@@ -272,4 +274,8 @@ def test_thread_read_does_not_500_when_registration_history_disagrees_with_the_s
         assert body["computerId"] == "managed:computer_A"
         assert body["managedNodeId"] == "computer_A"
         persisted = app.state.session_store.get_session(session_id)
-        assert persisted["computerId"] == "managed:computer_A"
+        assert persisted.get("computerId") is None
+        assert all(
+            event["type"] != "session.runtime_affinity"
+            for event in persisted["events"]
+        )
