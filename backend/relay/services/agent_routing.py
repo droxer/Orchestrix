@@ -98,71 +98,51 @@ def select_workspace_node(
 
 def resolve_session_daemon_node_id(
     session: dict[str, Any] | None,
-    placement_store: Any,
     daemon_nodes: list[dict[str, Any]],
-    daemon_store: Any | None = None,
 ) -> str | None:
-    """Resolve a thread's stable Computer affinity to its current runtime."""
+    """把 thread 钉住的 Computer 解析到它当前的 runtime node。
+
+    Computer 离线时返回 None —— 不改派到别的机器。thread 的产物在那台机器
+    的目录里，换机器执行等于给 agent 一个空目录：看着在干活，实际上下文已丢。
+
+    身份优先级：
+    1. `session["computerId"]`（Task 5 起，session.created / session.runtime_affinity
+       事件 replay 后物化的稳定身份）。
+    2. 没有 `computerId` 但有 `managedNodeId`（Task 5 之前创建、尚未回填的 session）——
+       派生 `managed:{managedNodeId}`，与 `_apply_session_runtime_affinity` 在 replay
+       层做的兼容派生完全一致，理由同样成立：老 session 不该因为身份模型升级就无法
+       跟着托管节点换 id 后继续解析。
+    3. 都没有——落回 `session["daemonNodeId"]` 字面值。这是 `POST /tasks` 产生的
+       pending thread（尚未选定任何 node）唯一能解析出节点的路径，必须保留。
+    """
     if not session:
         return None
-    session_node_id = session.get("daemonNodeId")
-    nodes = {node["id"]: node for node in daemon_nodes}
-    managed_node_id = session.get("managedNodeId")
-    if (
-        not managed_node_id
-        and isinstance(session_node_id, str)
-        and session_node_id
-    ):
-        managed_node_id = (nodes.get(session_node_id) or {}).get("managedNodeId")
-        if not managed_node_id:
-            historical_managed_node_id = getattr(
-                daemon_store, "historical_managed_node_id", None
-            )
-            if historical_managed_node_id:
-                managed_node_id = historical_managed_node_id(session_node_id)
-    if isinstance(managed_node_id, str) and managed_node_id:
-        candidates = [
-            node
-            for node in daemon_nodes
-            if node.get("managedNodeId") == managed_node_id
-            and not node.get("retiredAt")
-        ]
-        if candidates:
-            return min(
-                candidates,
-                key=lambda node: (
-                    0
-                    if node.get("online")
-                    and not node.get("stale")
-                    and node.get("status") in ("ready", "busy", "running")
-                    else 1,
-                    node["id"],
-                ),
-            )["id"]
-    prior_run = next(
-        (
-            run
-            for run in reversed(session.get("agentRuns") or [])
-            if run.get("daemonNodeId")
+    identity = session.get("computerId")
+    if not identity:
+        managed_node_id = session.get("managedNodeId")
+        if isinstance(managed_node_id, str) and managed_node_id:
+            identity = f"managed:{managed_node_id}"
+    if not identity:
+        recorded = session.get("daemonNodeId")
+        return recorded if isinstance(recorded, str) and recorded else None
+    candidates = [
+        node
+        for node in daemon_nodes
+        if computer_id(node) == identity and not node.get("retiredAt")
+    ]
+    if not candidates:
+        return None
+    return min(
+        candidates,
+        key=lambda node: (
+            0
+            if node.get("online")
+            and not node.get("stale")
+            and node.get("status") in ("ready", "busy", "running")
+            else 1,
+            node["id"],
         ),
-        None,
-    )
-    node_id = session_node_id or (prior_run or {}).get("daemonNodeId")
-    if not prior_run or not prior_run.get("placementId"):
-        return node_id if isinstance(node_id, str) and node_id else None
-    placement = placement_store.get_placement(prior_run["placementId"])
-    rebound_node_id = (placement or {}).get("daemonNodeId")
-    if not isinstance(rebound_node_id, str) or rebound_node_id == node_id:
-        return node_id if isinstance(node_id, str) and node_id else None
-    rebound_node = nodes.get(rebound_node_id)
-    if not rebound_node or not rebound_node.get("managedNodeId"):
-        return node_id if isinstance(node_id, str) and node_id else None
-    previous_node = nodes.get(node_id) if isinstance(node_id, str) else None
-    if previous_node and previous_node.get("managedNodeId") != rebound_node.get(
-        "managedNodeId"
-    ):
-        return node_id
-    return rebound_node_id
+    )["id"]
 
 
 def resolve_agent_assignments(
@@ -419,6 +399,79 @@ def _workspace_candidate_allowed(
     )
 
 
+def resolve_legacy_session_computer_id(
+    session: Mapping[str, Any],
+    placement_store: Any,
+    nodes: Mapping[str, dict[str, Any]],
+    daemon_store: Any | None,
+) -> str | None:
+    """Recover a pre-Task-5 session's Computer identity, read-only.
+
+    `resolve_session_daemon_node_id` only reads what's already on the
+    session (`computerId`, then `managedNodeId`, then a literal
+    `daemonNodeId`). Sessions created before Task 5 wired up
+    `session.runtime_affinity` may carry none of the first two — their only
+    trace of identity is the daemon node they last ran on. Two call paths
+    never go through `_backfill_runtime_affinity`
+    (`collaboration/service.py`), which persists that recovery for the
+    request-response dispatch path: the TaskScheduler's continuation
+    dispatch (`tasks/scheduler.py`) and the read-only workspace-browse route
+    (`api/agent_workspace_routes.py`). This gives them the same recovery
+    in-memory, once per call, without writing anything — so the write-once
+    guard in `SessionController.record_runtime_affinity` (raises
+    `ValueError` on a conflicting identity) can never fire here, which
+    matters because one of the two paths is read-only and must not 500.
+
+    Priority mirrors `_backfill_runtime_affinity`: the node currently
+    registered under the session's last known `daemonNodeId` may itself
+    carry a `managedNodeId`; failing that, the daemon registry's history of
+    that runtime id is consulted; failing that, a placement rebind (a
+    managed Computer redeployed under a new node id after the session's
+    last run) is followed only when the destination is itself managed.
+    """
+    if session.get("computerId"):
+        return session["computerId"]
+    if session.get("managedNodeId"):
+        return f"managed:{session['managedNodeId']}"
+    session_node_id = session.get("daemonNodeId")
+    managed_node_id = None
+    if isinstance(session_node_id, str) and session_node_id:
+        managed_node_id = (nodes.get(session_node_id) or {}).get("managedNodeId")
+        if not managed_node_id:
+            historical_managed_node_id = getattr(
+                daemon_store, "historical_managed_node_id", None
+            )
+            if historical_managed_node_id:
+                managed_node_id = historical_managed_node_id(session_node_id)
+    if managed_node_id:
+        return f"managed:{managed_node_id}"
+    prior_run = next(
+        (
+            run
+            for run in reversed(session.get("agentRuns") or [])
+            if run.get("placementId")
+        ),
+        None,
+    )
+    if not prior_run:
+        return None
+    placement = placement_store.get_placement(prior_run["placementId"])
+    rebound_node_id = (placement or {}).get("daemonNodeId")
+    if not isinstance(rebound_node_id, str) or rebound_node_id == session_node_id:
+        return None
+    rebound_node = nodes.get(rebound_node_id)
+    if not rebound_node or not rebound_node.get("managedNodeId"):
+        return None
+    previous_node = (
+        nodes.get(session_node_id) if isinstance(session_node_id, str) else None
+    )
+    if previous_node and previous_node.get("managedNodeId") != rebound_node.get(
+        "managedNodeId"
+    ):
+        return None
+    return f"managed:{rebound_node['managedNodeId']}"
+
+
 def _session_affinity(
     session: dict[str, Any] | None,
     placement_store: Any,
@@ -427,6 +480,11 @@ def _session_affinity(
 ) -> tuple[set[str], tuple[str, str] | None, str | None]:
     if not session:
         return set(), None, None
+    identity = resolve_legacy_session_computer_id(
+        session, placement_store, nodes, daemon_store
+    )
+    if identity and identity != session.get("computerId"):
+        session = {**session, "computerId": identity}
     prior_run = next(
         (
             run
@@ -435,9 +493,7 @@ def _session_affinity(
         ),
         None,
     )
-    session_node_id = resolve_session_daemon_node_id(
-        session, placement_store, list(nodes.values()), daemon_store
-    )
+    session_node_id = resolve_session_daemon_node_id(session, list(nodes.values()))
     if not prior_run:
         if isinstance(session_node_id, str) and session_node_id:
             node = nodes.get(session_node_id)

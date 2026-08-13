@@ -734,3 +734,81 @@ def test_placement_node_is_none_when_the_computer_is_offline() -> None:
 
     placement = {"daemonNodeId": "node-old", "computerId": "device:alice:machine-a"}
     assert placement_node(placement, {}) is None
+
+
+def test_thread_follows_its_computer_across_a_new_node_id() -> None:
+    from relay.services.agent_routing import resolve_session_daemon_node_id
+
+    session = {"id": "s1", "computerId": "device:alice:machine-a"}
+    nodes = [
+        {
+            "id": "node-new",
+            "employeeId": "alice",
+            "workspaceId": "machine-a",
+            "online": True,
+            "stale": False,
+            "status": "ready",
+        }
+    ]
+    assert resolve_session_daemon_node_id(session, nodes) == "node-new"
+
+
+def test_offline_computer_resolves_to_nothing_instead_of_borrowing() -> None:
+    from relay.services.agent_routing import resolve_session_daemon_node_id
+
+    session = {"id": "s1", "computerId": "device:alice:machine-a"}
+    other_machine = [
+        {
+            "id": "node-other",
+            "employeeId": "alice",
+            "workspaceId": "machine-b",
+            "online": True,
+            "stale": False,
+            "status": "ready",
+        }
+    ]
+    assert resolve_session_daemon_node_id(session, other_machine) is None
+
+
+def test_online_node_wins_over_an_offline_one_on_the_same_computer() -> None:
+    from relay.services.agent_routing import resolve_session_daemon_node_id
+
+    session = {"id": "s1", "computerId": "managed:mnode-7"}
+    nodes = [
+        {"id": "node-a", "managedNodeId": "mnode-7", "online": False, "status": "stopped"},
+        {
+            "id": "node-b",
+            "managedNodeId": "mnode-7",
+            "online": True,
+            "stale": False,
+            "status": "ready",
+        },
+    ]
+    assert resolve_session_daemon_node_id(session, nodes) == "node-b"
+
+
+def test_session_without_computer_id_falls_back_to_its_recorded_node() -> None:
+    from relay.services.agent_routing import resolve_session_daemon_node_id
+
+    session = {"id": "s1", "daemonNodeId": "node-old"}
+    assert resolve_session_daemon_node_id(session, []) == "node-old"
+
+
+def test_legacy_session_with_managed_node_id_resolves_without_computer_id() -> None:
+    from relay.services.agent_routing import resolve_session_daemon_node_id
+
+    session = {
+        "id": "s1",
+        "daemonNodeId": "node-old",
+        "managedNodeId": "computer_one",
+    }
+    nodes = [
+        {
+            "id": "node-new",
+            "managedNodeId": "computer_one",
+            "online": True,
+            "stale": False,
+            "status": "ready",
+        }
+    ]
+    assert resolve_session_daemon_node_id(session, nodes) == "node-new"

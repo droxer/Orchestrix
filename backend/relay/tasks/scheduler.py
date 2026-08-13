@@ -313,6 +313,7 @@ class TaskScheduler:
                         placement_store=self.backend.agent_placement_store,
                         daemon_nodes=daemon_nodes,
                         session=resume_session,
+                        daemon_store=self.registry.daemon_store,
                     )
                 node = self.registry.get(assignments[0]["daemonNodeId"])
             except TeamDispatchError as error:

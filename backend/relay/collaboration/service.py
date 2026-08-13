@@ -275,12 +275,7 @@ class CollaborationConductor:
             )
 
         daemon_nodes = self.ctx.registry.monitor_nodes()
-        session_node_id = resolve_session_daemon_node_id(
-            session,
-            self.ctx.agent_placement_store,
-            daemon_nodes,
-            self.ctx.registry.daemon_store,
-        )
+        session_node_id = resolve_session_daemon_node_id(session, daemon_nodes)
         requested_original_runtime = bool(
             session
             and session.get("managedNodeId")
