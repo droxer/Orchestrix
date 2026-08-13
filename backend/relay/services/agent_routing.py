@@ -6,6 +6,7 @@ from typing import Any
 from ..core.computer_identity import computer_id
 from ..daemon_registry.scheduling import node_accepts_run
 from ..persistence.agent_placement_store import placement_status
+from ..sessions.controller import SessionController
 
 
 class AgentRoutingError(ValueError):
@@ -252,16 +253,11 @@ def resolve_legacy_session_computer_id(
     session (`computerId`, then `managedNodeId`, then a literal
     `daemonNodeId`). Sessions created before Task 5 wired up
     `session.runtime_affinity` may carry none of the first two — their only
-    trace of identity is the daemon node they last ran on. Two call paths
-    never go through `_backfill_runtime_affinity`
-    (`collaboration/service.py`), which persists that recovery for the
-    request-response dispatch path: the TaskScheduler's continuation
-    dispatch (`tasks/scheduler.py`) and the read-only workspace-browse route
-    (`api/agent_workspace_routes.py`). This gives them the same recovery
-    in-memory, once per call, without writing anything — so the write-once
-    guard in `SessionController.record_runtime_affinity` (raises
-    `ValueError` on a conflicting identity) can never fire here, which
-    matters because one of the two paths is read-only and must not 500.
+    trace of identity is the daemon node they last ran on. Explicit dispatch
+    paths call `persist_legacy_session_computer_id` to append the recovered
+    identity once. The workspace-browse route calls this resolver directly
+    and keeps the recovery in memory, so a read-only request never invokes
+    the write-once guard or turns an identity conflict into a 500.
 
     Priority mirrors `_backfill_runtime_affinity`: the node currently
     registered under the session's last known `daemonNodeId` may itself
@@ -310,6 +306,27 @@ def resolve_legacy_session_computer_id(
     ):
         return None
     return f"managed:{rebound_node['managedNodeId']}"
+
+
+def persist_legacy_session_computer_id(
+    session: dict[str, Any] | None,
+    *,
+    session_store: Any,
+    placement_store: Any,
+    nodes: Mapping[str, dict[str, Any]],
+    daemon_store: Any | None,
+) -> dict[str, Any] | None:
+    """Persist a legacy Computer identity from an explicit write path."""
+    if not session or session.get("computerId"):
+        return session
+    identity = resolve_legacy_session_computer_id(
+        session, placement_store, nodes, daemon_store
+    )
+    if not identity:
+        return session
+    return SessionController(session_store).record_runtime_affinity(
+        session["id"], identity
+    )
 
 
 def _session_affinity(

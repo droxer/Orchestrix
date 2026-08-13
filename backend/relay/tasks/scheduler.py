@@ -17,6 +17,7 @@ from ..services.agent_routing import (
     AgentRoutingError,
     dispatch_failure_code,
     dispatch_reason_code,
+    persist_legacy_session_computer_id,
     resolve_agent_assignments,
 )
 from ..services.task_rounds import (
@@ -289,6 +290,14 @@ class TaskScheduler:
             try:
                 employee_id = task_execution_employee_id(task)
                 daemon_nodes = self.registry.monitor_nodes()
+                if resume_session:
+                    resume_session = persist_legacy_session_computer_id(
+                        resume_session,
+                        session_store=self.registry.store,
+                        placement_store=self.backend.agent_placement_store,
+                        nodes={node["id"]: node for node in daemon_nodes},
+                        daemon_store=self.registry.daemon_store,
+                    )
                 if team_id:
                     assignments = resolve_team_task_assignments(
                         task,

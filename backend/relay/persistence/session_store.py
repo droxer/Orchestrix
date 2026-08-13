@@ -196,6 +196,31 @@ class LocalSessionStore:
         self._notify_event(session_id)
         return session
 
+    def record_runtime_affinity(
+        self, session_id: str, computer_id: str
+    ) -> dict[str, Any]:
+        with self._lock:
+            current = self.get_session(session_id)
+            existing = current.get("computerId")
+            if existing:
+                if existing != computer_id:
+                    raise ValueError("Session already belongs to another Computer.")
+                return current
+            existing_managed_node_id = current.get("managedNodeId")
+            if (
+                existing_managed_node_id
+                and computer_id != f"managed:{existing_managed_node_id}"
+            ):
+                raise ValueError("Session already belongs to another Computer.")
+            return self.append_event(
+                session_id,
+                relay_event(
+                    "session.runtime_affinity",
+                    session_id,
+                    {"computerId": computer_id},
+                ),
+            )
+
     def _notify_event(self, session_id: str) -> None:
         if not self._event_listener:
             return
@@ -566,6 +591,7 @@ class DatabaseSessionStore:
         create_schema: bool = False,
     ):
         self.engine = shared_engine(database_url)
+        self._affinity_lock = RLock()
         self._event_listener: Callable[[str], None] | None = None
         self._event_notification_channel: str | None = None
         if create_schema:
@@ -826,6 +852,73 @@ class DatabaseSessionStore:
                     raise
                 time.sleep(0.01 * (attempt + 1))
         raise RuntimeError("unreachable")
+
+    def record_runtime_affinity(
+        self, session_id: str, computer_id: str
+    ) -> dict[str, Any]:
+        event = relay_event(
+            "session.runtime_affinity", session_id, {"computerId": computer_id}
+        )
+        wrote_event = False
+        with self._affinity_lock, store_transaction(self.engine) as conn:
+            row = (
+                conn.execute(
+                    select(
+                        self.sessions.c.id,
+                        self.sessions.c.snapshot,
+                        self.sessions.c.version,
+                    )
+                    .where(self.sessions.c.id == session_id)
+                    .with_for_update()
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                raise KeyError(session_id)
+            current = row["snapshot"] or {}
+            existing = current.get("computerId")
+            if existing:
+                if existing != computer_id:
+                    raise ValueError("Session already belongs to another Computer.")
+            else:
+                existing_managed_node_id = current.get("managedNodeId")
+                if (
+                    existing_managed_node_id
+                    and computer_id != f"managed:{existing_managed_node_id}"
+                ):
+                    raise ValueError("Session already belongs to another Computer.")
+                session_pk = row["id"]
+                sequence = int(row["version"] or 0)
+                conn.execute(
+                    insert(self.events).values(
+                        **session_event_to_row(session_pk, sequence, event)
+                    )
+                )
+                session = apply_session_event(
+                    compact_session_snapshot(current, event_count=sequence + 1),
+                    event,
+                    retain_event=False,
+                )
+                conn.execute(
+                    update(self.sessions)
+                    .where(self.sessions.c.id == session_pk)
+                    .values(
+                        **session_to_row(
+                            session, version=sequence + 1, database_id=session_pk
+                        )
+                    )
+                )
+                publish_database_notification(
+                    conn,
+                    self.engine,
+                    self._event_notification_channel,
+                    f"session:{session_id}",
+                )
+                wrote_event = True
+        if wrote_event:
+            self._notify_event(session_id)
+        return self.get_session(session_id)
 
     def _append_event_once(
         self, session_id: str, event: dict[str, Any]

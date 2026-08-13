@@ -420,29 +420,7 @@ class SessionController:
         self, session_id: str, computer_id: str
     ) -> dict[str, Any]:
         """把 thread 钉到一台 Computer。写一次，之后不可改。"""
-        current = self.store.get_session(session_id)
-        existing = current.get("computerId")
-        if existing:
-            if existing != computer_id:
-                raise ValueError("Session already belongs to another Computer.")
-            return current
-        # 存量 session 可能只带 managedNodeId、还没在 replay 时派生出
-        # computerId（老快照）。用它做同样的一次性保护，防止把老 session
-        # 误钉到另一台 managed Computer。
-        existing_managed_node_id = current.get("managedNodeId")
-        if (
-            existing_managed_node_id
-            and computer_id != f"managed:{existing_managed_node_id}"
-        ):
-            raise ValueError("Session already belongs to another Computer.")
-        return self._append(
-            session_id,
-            relay_event(
-                "session.runtime_affinity",
-                session_id,
-                {"computerId": computer_id},
-            ),
-        )
+        return self.store.record_runtime_affinity(session_id, computer_id)
 
     def delete_session(
         self,
