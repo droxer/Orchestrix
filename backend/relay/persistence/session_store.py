@@ -326,6 +326,23 @@ class LocalSessionStore:
         ]
         return sorted(sessions, key=lambda item: item["updatedAt"], reverse=True)
 
+    def has_agent_run(self, logical_agent_id: str, placement_ids: set[str]) -> bool:
+        """Check compact snapshots without hydrating any session event log."""
+        if not self.sessions_dir.exists():
+            return False
+        with self._lock:
+            snapshots = (
+                _read_json(self._snapshot_path(path.name))
+                for path in self.sessions_dir.iterdir()
+                if path.is_dir() and self._snapshot_path(path.name).exists()
+            )
+            return any(
+                run.get("logicalAgentId") == logical_agent_id
+                or run.get("placementId") in placement_ids
+                for snapshot in snapshots
+                for run in snapshot.get("agentRuns") or []
+            )
+
     def list_session_summaries(
         self, *, owner_employee_id: str | None = None, limit: int = 100
     ) -> list[dict[str, Any]]:
@@ -1220,6 +1237,17 @@ class DatabaseSessionStore:
             }
             for row in rows
         ]
+
+    def has_agent_run(self, logical_agent_id: str, placement_ids: set[str]) -> bool:
+        """Check materialized snapshots only; event hydration is unnecessary here."""
+        with store_transaction(self.engine) as conn:
+            snapshots = conn.execute(select(self.sessions.c.snapshot)).scalars()
+            return any(
+                run.get("logicalAgentId") == logical_agent_id
+                or run.get("placementId") in placement_ids
+                for snapshot in snapshots
+                for run in (snapshot or {}).get("agentRuns") or []
+            )
 
     def list_session_summaries(
         self, *, owner_employee_id: str | None = None, limit: int = 100

@@ -17,6 +17,7 @@ class SessionStore(Protocol):
     def record_runtime_affinity(
         self, session_id: str, computer_id: str
     ) -> dict[str, Any]: ...
+    def has_agent_run(self, logical_agent_id: str, placement_ids: set[str]) -> bool: ...
     def get_session_header(self, session_id: str) -> dict[str, Any]: ...
     def read_event_page(
         self,
@@ -157,6 +158,13 @@ class AgentPlacementStore(Protocol):
     def realize_agent_version(
         self, placement_id: str, agent_version: int
     ) -> dict[str, Any]: ...
+    def attach_first_managed_placement(
+        self,
+        agent: dict[str, Any],
+        node: dict[str, Any],
+        *,
+        expected_placement_ids: set[str],
+    ) -> dict[str, Any] | None: ...
 
 
 class TeamStore(Protocol):

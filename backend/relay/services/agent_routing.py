@@ -5,7 +5,7 @@ from typing import Any
 
 from ..core.computer_identity import computer_id
 from ..daemon_registry.scheduling import node_accepts_run
-from ..persistence.agent_placement_store import create_node_placement, placement_status
+from ..persistence.agent_placement_store import placement_status
 from ..sessions.controller import SessionController
 
 
@@ -269,12 +269,7 @@ def _attach_never_run_agent_to_managed_capacity(
     ):
         return None
     placement_ids = {placement["id"] for placement in placements}
-    if any(
-        run.get("logicalAgentId") == agent["id"]
-        or run.get("placementId") in placement_ids
-        for stored_session in session_store.list_sessions()
-        for run in stored_session.get("agentRuns") or []
-    ):
+    if session_store.has_agent_run(agent["id"], placement_ids):
         return None
     candidate = min(
         (
@@ -285,8 +280,12 @@ def _attach_never_run_agent_to_managed_capacity(
             and node.get("online")
             and not node.get("stale")
             and node.get("status") in ("ready", "running")
-            and agent["executorKind"]
-            in (set(node.get("supportedAgents") or []) | set(node.get("agents") or {}))
+            and placement_status(
+                {"desiredState": "active", "executorKind": agent["executorKind"]},
+                agent,
+                node,
+            )["status"]
+            in ("ready", "busy")
             and agent["executorKind"] not in set(node.get("disabledAgents") or [])
             and (not selected_node_ids or node["id"] in selected_node_ids)
             and node_accepts_run(node, active_runs=node.get("activeRuns") or [])
@@ -296,8 +295,10 @@ def _attach_never_run_agent_to_managed_capacity(
     )
     if candidate is None:
         return None
-    placement = create_node_placement(placement_store, agent, candidate)
-    return placement, candidate
+    placement = placement_store.attach_first_managed_placement(
+        agent, candidate, expected_placement_ids=placement_ids
+    )
+    return (placement, candidate) if placement else None
 
 
 def resolve_legacy_session_computer_id(

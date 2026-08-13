@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -82,6 +83,86 @@ def test_database_store_moves_an_agent_between_computers(tmp_path: Path) -> None
 
     active = placements.list_placements(agent_id=agent["id"])
     assert [placement["daemonNodeId"] for placement in active] == ["node_b"]
+
+
+@pytest.mark.parametrize("store_kind", ["local", "database"])
+def test_first_managed_attachment_is_idempotent_across_store_instances(
+    tmp_path: Path, store_kind: str
+) -> None:
+    if store_kind == "database":
+        database_url = f"sqlite:///{tmp_path}/first-attach.db"
+        agents = DatabaseAgentStore(database_url, create_schema=True)
+        first_store = DatabaseAgentPlacementStore(database_url, create_schema=True)
+        second_store = DatabaseAgentPlacementStore(database_url)
+    else:
+        agents = LocalAgentStore(tmp_path)
+        first_store = LocalAgentPlacementStore(tmp_path)
+        second_store = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Worker", "executorKind": "claude"}
+    )
+    phantom = first_store.create_placement(agent, "node-missing")
+    target = {
+        "id": "node-ready",
+        "employeeId": "alice",
+        "managedNodeId": "computer-ready",
+    }
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(
+            pool.map(
+                lambda store: store.attach_first_managed_placement(
+                    agent,
+                    target,
+                    expected_placement_ids={phantom["id"]},
+                ),
+                (first_store, second_store),
+            )
+        )
+
+    assert results[0] is not None and results[1] is not None
+    assert results[0]["id"] == results[1]["id"]
+    [active] = first_store.list_placements(agent_id=agent["id"])
+    assert active["computerId"] == "managed:computer-ready"
+
+
+@pytest.mark.parametrize("store_kind", ["local", "database"])
+def test_first_managed_attachment_allows_only_one_competing_computer(
+    tmp_path: Path, store_kind: str
+) -> None:
+    if store_kind == "database":
+        database_url = f"sqlite:///{tmp_path}/competing-attach.db"
+        agents = DatabaseAgentStore(database_url, create_schema=True)
+        first_store = DatabaseAgentPlacementStore(database_url, create_schema=True)
+        second_store = DatabaseAgentPlacementStore(database_url)
+    else:
+        agents = LocalAgentStore(tmp_path)
+        first_store = LocalAgentPlacementStore(tmp_path)
+        second_store = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Worker", "executorKind": "claude"}
+    )
+    phantom = first_store.create_placement(agent, "node-missing")
+    targets = (
+        {"id": "node-a", "employeeId": "alice", "managedNodeId": "computer-a"},
+        {"id": "node-b", "employeeId": "alice", "managedNodeId": "computer-b"},
+    )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(
+            pool.map(
+                lambda pair: pair[0].attach_first_managed_placement(
+                    agent,
+                    pair[1],
+                    expected_placement_ids={phantom["id"]},
+                ),
+                ((first_store, targets[0]), (second_store, targets[1])),
+            )
+        )
+
+    assert sum(result is not None for result in results) == 1
+    [active] = first_store.list_placements(agent_id=agent["id"])
+    assert active["computerId"] in {"managed:computer-a", "managed:computer-b"}
 
 
 @pytest.mark.parametrize("database", [False, True])

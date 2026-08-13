@@ -758,6 +758,40 @@ def test_phantom_placement_with_run_history_does_not_attach_elsewhere(
     assert len(placements.list_placements(agent_id=agent["id"])) == 1
 
 
+def test_phantom_placement_does_not_attach_to_non_ready_executor(
+    tmp_path: Path,
+) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    sessions = LocalSessionStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Worker", "executorKind": "claude"}
+    )
+    original = placements.create_placement(agent, "node-missing")
+    non_ready = {
+        **node("node-spare", "claude"),
+        "employeeId": "alice",
+        "managedNodeId": "mnode-spare",
+        "agents": {"claude": "error"},
+        "supportedAgents": ["claude"],
+    }
+
+    with pytest.raises(AgentRoutingError) as error:
+        resolve_agent_assignments(
+            [{"agentId": agent["id"]}],
+            employee_id="alice",
+            is_admin=False,
+            agent_store=agents,
+            placement_store=placements,
+            daemon_nodes=[non_ready],
+            session_store=sessions,
+        )
+
+    assert error.value.code == "agent_offline"
+    [preserved] = placements.list_placements(agent_id=agent["id"])
+    assert preserved["id"] == original["id"]
+
+
 def test_placement_resolves_to_the_same_computer_under_a_new_node_id() -> None:
     from relay.services.agent_routing import placement_node
 
