@@ -318,7 +318,7 @@ def retire_superseded_compatibility_agents(
     Re-provisioning a computer mints a new node id, and the compatibility key
     embeds it, so the old agent would linger in the roster next to its
     replacement. Only retire when the other node is provably the same computer
-    (same managed node, or — for employee devices — the same workspace
+    (same managed node, or — for employee devices — the same stable Computer
     identity) and is no longer online, so a legitimately separate second
     computer always keeps its agents.
 
