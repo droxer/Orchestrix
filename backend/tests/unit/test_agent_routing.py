@@ -6,6 +6,8 @@ from types import SimpleNamespace
 import pytest
 from relay.persistence.agent_placement_store import LocalAgentPlacementStore
 from relay.persistence.agent_store import LocalAgentStore
+from relay.persistence.session_store import LocalSessionStore
+from relay.persistence.stores import relay_event
 from relay.services.agent_routing import AgentRoutingError, resolve_agent_assignments
 
 
@@ -706,6 +708,54 @@ def test_assignment_does_not_borrow_another_managed_computer(tmp_path: Path) -> 
     assert error.value.code == "node_offline"
     [preserved] = placements.list_placements(agent_id=agent["id"])
     assert preserved["daemonNodeId"] == "node-home"
+
+
+def test_phantom_placement_with_run_history_does_not_attach_elsewhere(
+    tmp_path: Path,
+) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    sessions = LocalSessionStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Worker", "executorKind": "claude"}
+    )
+    placement = placements.create_placement(agent, "node-missing")
+    session = sessions.create_session(
+        {"workspacePath": "/workspace", "taskGoal": "Existing work"}
+    )
+    sessions.append_event(
+        session["id"],
+        relay_event(
+            "agent.started",
+            session["id"],
+            {
+                "runId": "run-1",
+                "agent": "claude",
+                "logicalAgentId": agent["id"],
+                "placementId": placement["id"],
+                "daemonNodeId": "node-missing",
+            },
+        ),
+    )
+    spare = {
+        **node("node-spare", "claude"),
+        "employeeId": "alice",
+        "managedNodeId": "mnode-spare",
+    }
+
+    with pytest.raises(AgentRoutingError) as error:
+        resolve_agent_assignments(
+            [{"agentId": agent["id"]}],
+            employee_id="alice",
+            is_admin=False,
+            agent_store=agents,
+            placement_store=placements,
+            daemon_nodes=[spare],
+            session_store=sessions,
+        )
+
+    assert error.value.code == "agent_offline"
+    assert len(placements.list_placements(agent_id=agent["id"])) == 1
 
 
 def test_placement_resolves_to_the_same_computer_under_a_new_node_id() -> None:

@@ -313,6 +313,7 @@ class CollaborationConductor:
             session=session,
             required_node_id=required_node_id,
             daemon_store=self.ctx.registry.daemon_store,
+            session_store=self.ctx.session_store,
         )
         resolved = compile_assignment_work_graph(
             resolved,

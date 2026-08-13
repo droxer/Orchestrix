@@ -5,7 +5,7 @@ from typing import Any
 
 from ..core.computer_identity import computer_id
 from ..daemon_registry.scheduling import node_accepts_run
-from ..persistence.agent_placement_store import placement_status
+from ..persistence.agent_placement_store import create_node_placement, placement_status
 from ..sessions.controller import SessionController
 
 
@@ -129,6 +129,7 @@ def resolve_agent_assignments(
     session: dict[str, Any] | None = None,
     required_node_id: str | None = None,
     daemon_store: Any | None = None,
+    session_store: Any | None = None,
 ) -> list[dict[str, Any]]:
     nodes = {node["id"]: node for node in daemon_nodes}
     resolved: list[dict[str, Any]] = []
@@ -202,6 +203,17 @@ def resolve_agent_assignments(
                 rejection_reasons.add("workspace_unavailable")
                 continue
             candidates.append((placement, node))
+        if not candidates and session is None and session_store is not None:
+            attached = _attach_never_run_agent_to_managed_capacity(
+                agent,
+                placements,
+                placement_store=placement_store,
+                session_store=session_store,
+                nodes=nodes,
+                selected_node_ids=selected_node_ids,
+            )
+            if attached:
+                candidates.append(attached)
         if not candidates:
             code = _best_rejection_code(rejection_reasons)
             raise AgentRoutingError(
@@ -239,6 +251,53 @@ def resolve_agent_assignments(
             }
         )
     return resolved
+
+
+def _attach_never_run_agent_to_managed_capacity(
+    agent: dict[str, Any],
+    placements: list[dict[str, Any]],
+    *,
+    placement_store: Any,
+    session_store: Any,
+    nodes: Mapping[str, dict[str, Any]],
+    selected_node_ids: set[str],
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    """Attach a phantom, never-run agent to its first real Computer."""
+    if not placements or any(
+        placement.get("computerId") or placement.get("daemonNodeId") in nodes
+        for placement in placements
+    ):
+        return None
+    placement_ids = {placement["id"] for placement in placements}
+    if any(
+        run.get("logicalAgentId") == agent["id"]
+        or run.get("placementId") in placement_ids
+        for stored_session in session_store.list_sessions()
+        for run in stored_session.get("agentRuns") or []
+    ):
+        return None
+    candidate = min(
+        (
+            node
+            for node in nodes.values()
+            if node.get("managedNodeId")
+            and node.get("employeeId") == agent.get("supervisorEmployeeId")
+            and node.get("online")
+            and not node.get("stale")
+            and node.get("status") in ("ready", "running")
+            and agent["executorKind"]
+            in (set(node.get("supportedAgents") or []) | set(node.get("agents") or {}))
+            and agent["executorKind"] not in set(node.get("disabledAgents") or [])
+            and (not selected_node_ids or node["id"] in selected_node_ids)
+            and node_accepts_run(node, active_runs=node.get("activeRuns") or [])
+        ),
+        key=lambda node: node["id"],
+        default=None,
+    )
+    if candidate is None:
+        return None
+    placement = create_node_placement(placement_store, agent, candidate)
+    return placement, candidate
 
 
 def resolve_legacy_session_computer_id(
