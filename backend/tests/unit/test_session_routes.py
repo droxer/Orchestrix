@@ -105,6 +105,51 @@ def test_session_creation_persists_the_selected_computer(monkeypatch) -> None:
         assert created.json()["daemonNodeId"] == "node_a"
 
 
+def test_session_creation_on_an_employee_device_computer_persists_a_device_identity(
+    monkeypatch,
+) -> None:
+    """Important 3 回归：employee-device 节点（无 managedNodeId，只有
+    employeeId + workspaceId）创建出的 thread，snapshot 必须带 device:
+    身份 —— 懒回填对这类节点永远拿不到 managedNodeId 历史，只能靠创建路径
+    自己写对。"""
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        response = client.post(
+            "/api/v1/auth/bootstrap",
+            json={
+                "token": "admin_token",
+                "username": "admin",
+                "password": "secret123",
+            },
+        )
+        assert response.status_code == 200
+        app.state.registry.register(
+            {
+                "sandboxId": "node_device_a",
+                "employeeId": "admin",
+                "workspaceId": "machine-abc123",
+                "token": "node_token",
+                "workspacePath": "/workspace/admin",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+
+        created = client.post(
+            "/api/v1/threads",
+            json={"taskGoal": "Start here", "daemonNodeId": "node_device_a"},
+        )
+
+        assert created.status_code == 201, created.text
+        body = created.json()
+        assert body["daemonNodeId"] == "node_device_a"
+        assert body.get("managedNodeId") is None
+        assert body["computerId"] == "device:admin:machine-abc123"
+
+
 def test_session_read_backfills_managed_affinity_from_deleted_runtime_history(
     monkeypatch,
 ) -> None:

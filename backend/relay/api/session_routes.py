@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from loguru import logger
 from starlette.concurrency import run_in_threadpool
 
+from ..core.computer_identity import computer_id as resolve_computer_id
 from ..core.models import AGENT_NAMES
 from ..persistence.stores import valid_agent
 from ..services.event_notifier import session_event_key
@@ -443,6 +444,7 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
         body, "daemon_node_id"
     )
     managed_node_id = None
+    session_computer_id = None
     task_id = body.get("taskId") if isinstance(body.get("taskId"), str) else None
     task = get_task_for_actor(ctx.task_store, task_id, actor) if task_id else None
     owner = owner_employee_id_for_create(actor, body)
@@ -496,6 +498,7 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
                 403, "The selected computer belongs to another employee."
             )
         managed_node_id = node.get("managedNodeId")
+        session_computer_id = resolve_computer_id(node)
     controller = SessionController(
         ctx.session_store,
         task_store=ctx.task_store,
@@ -503,6 +506,7 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
         workspace_path=workspace_path,
         daemon_node_id=daemon_node_id,
         managed_node_id=managed_node_id,
+        computer_id=session_computer_id,
         **thread_ownership,
     )
     session = controller.create_session(

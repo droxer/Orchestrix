@@ -14,6 +14,7 @@ from ..collaboration.models import (
     COLLABORATION_NEW_SESSION_STATE_KEY,
     CollaborationIdempotencyError,
 )
+from ..core.computer_identity import computer_id
 from ..core.ids import new_sandbox_id, now_iso
 from ..core.models import AGENT_NAMES, DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS
 from ..persistence.protocols import AgentPlacementStore, AgentStore, SessionStore
@@ -592,6 +593,7 @@ class ServerDaemonNodeBackend:
             team_id=team_id,
             daemon_node_id=sandbox_id,
             managed_node_id=sandbox.get("managedNodeId"),
+            computer_id=computer_id(sandbox),
         )
 
     @staticmethod

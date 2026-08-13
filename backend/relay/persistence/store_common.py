@@ -322,6 +322,8 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         session["daemonNodeId"] = created["daemonNodeId"]
     if created.get("managedNodeId"):
         session["managedNodeId"] = created["managedNodeId"]
+    if created.get("computerId"):
+        session["computerId"] = created["computerId"]
     for event in events:
         apply_session_event(session, event)
     return session

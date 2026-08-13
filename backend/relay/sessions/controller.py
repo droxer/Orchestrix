@@ -57,6 +57,7 @@ class SessionController:
         team_id: str | None = None,
         daemon_node_id: str | None = None,
         managed_node_id: str | None = None,
+        computer_id: str | None = None,
     ):
         self.store = store
         self.task_store = task_store
@@ -67,6 +68,7 @@ class SessionController:
         self.team_id = team_id
         self.daemon_node_id = daemon_node_id
         self.managed_node_id = managed_node_id
+        self.computer_id = computer_id
         self.active_session_id = ""
 
     def create_session(
@@ -97,6 +99,7 @@ class SessionController:
                     if self.managed_node_id
                     else {}
                 ),
+                **({"computerId": self.computer_id} if self.computer_id else {}),
                 "taskGoal": task_goal,
                 "participants": participants or ["human"],
                 "status": "running",
@@ -423,6 +426,15 @@ class SessionController:
             if existing != computer_id:
                 raise ValueError("Session already belongs to another Computer.")
             return current
+        # 存量 session 可能只带 managedNodeId、还没在 replay 时派生出
+        # computerId（老快照）。用它做同样的一次性保护，防止把老 session
+        # 误钉到另一台 managed Computer。
+        existing_managed_node_id = current.get("managedNodeId")
+        if (
+            existing_managed_node_id
+            and computer_id != f"managed:{existing_managed_node_id}"
+        ):
+            raise ValueError("Session already belongs to another Computer.")
         return self._append(
             session_id,
             relay_event(

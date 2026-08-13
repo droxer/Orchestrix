@@ -3464,6 +3464,7 @@ class DaemonNodeRegistry:
             owner_employee_id=sandbox.get("employeeId"),
             daemon_node_id=sandbox.get("id"),
             managed_node_id=sandbox.get("managedNodeId"),
+            computer_id=computer_id(sandbox),
         )
 
     def _age_ms(self, iso_timestamp: str) -> int:
