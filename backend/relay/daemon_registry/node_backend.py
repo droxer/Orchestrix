@@ -23,10 +23,7 @@ from ..sessions import SessionController, initial_agent_state
 from ..sessions.bridge import latest_user_turn_marker
 from .credentials import sandbox_node_auth_error, sandbox_ui_auth_error
 from .registry import DaemonNodeRegistry
-from .scheduling import (
-    node_accepts_run,
-    workspace_identity_record,
-)
+from .scheduling import node_accepts_run
 
 
 class ServerDaemonNodeBackend:
@@ -136,15 +133,10 @@ class ServerDaemonNodeBackend:
             != agent.get("supervisorEmployeeId")
             or placement.get("daemonNodeId") != assignment.get("daemonNodeId")
             or placement.get("executorKind") != agent.get("executorKind")
-            or (placement.get("workspacePolicy") or {"kind": "node-affine"})
-            != (assignment.get("workspacePolicy") or {"kind": "node-affine"})
         ):
             raise ValueError("placement no longer matches the selected agent and node")
-        node = self.registry.get(assignment.get("daemonNodeId"))
-        if not node:
+        if not self.registry.get(assignment.get("daemonNodeId")):
             raise ValueError("daemon node is no longer available")
-        if assignment.get("workspaceIdentity") != workspace_identity_record(node):
-            raise ValueError("daemon node workspace identity changed")
 
     def provision(self, payload: dict[str, Any]) -> dict[str, Any]:
         requested_sandbox_id = payload.get("sandboxId")
@@ -274,7 +266,6 @@ class ServerDaemonNodeBackend:
             self._validate_run_assignments(
                 sandbox_id,
                 request,
-                existing_session,
                 active_runs_by_node,
             )
             actor_employee_id, owner_agent_id, owner_employee_id = self._run_owner(
@@ -344,13 +335,6 @@ class ServerDaemonNodeBackend:
                 "executorKind": assignment.get("executorKind")
                 or assignment.get("agent"),
             }
-            if assignment.get("agentId") and not assignment.get("workspaceIdentity"):
-                identity = workspace_identity_record(
-                    self.registry.get(assignment.get("daemonNodeId") or sandbox_id)
-                    or {}
-                )
-                if identity:
-                    resolved["workspaceIdentity"] = identity
             resolved_assignments.append(resolved)
         return {**request, "assignments": resolved_assignments}
 
@@ -484,20 +468,8 @@ class ServerDaemonNodeBackend:
         self,
         sandbox_id: str,
         request: dict[str, Any],
-        existing_session: dict[str, Any] | None,
         active_runs_by_node: dict[str, list[dict[str, Any]]],
     ) -> None:
-        if existing_session and request.get("agentFirst") is True:
-            from ..services.agent_routing import (
-                validate_session_workspace_assignments,
-            )
-
-            validate_session_workspace_assignments(
-                request["assignments"],
-                session=existing_session,
-                placement_store=self.agent_placement_store,
-                daemon_nodes=self.registry.monitor_nodes(),
-            )
         for assignment in request["assignments"]:
             node_id = assignment.get("daemonNodeId") or sandbox_id
             node = self.registry.get(node_id)

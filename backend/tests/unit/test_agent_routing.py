@@ -401,42 +401,6 @@ def test_session_without_prior_run_does_not_invent_node_affinity(
     assert resolved[0]["daemonNodeId"] == "node_a"
 
 
-def test_node_affine_session_rejects_workspace_drift_on_same_node_id(
-    tmp_path: Path,
-) -> None:
-    agents = LocalAgentStore(tmp_path)
-    placements = LocalAgentPlacementStore(tmp_path)
-    agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
-    )
-    placement = placements.create_placement(agent, "node_a")
-    session = {
-        "id": "ses_existing",
-        "workspacePath": "/workspace",
-        "agentRuns": [
-            {
-                "logicalAgentId": agent["id"],
-                "placementId": placement["id"],
-                "daemonNodeId": "node_a",
-                "workspaceIdentity": {"kind": "id", "value": "repo:original"},
-            }
-        ],
-    }
-
-    with pytest.raises(AgentRoutingError) as error:
-        resolve_agent_assignments(
-            [{"agentId": agent["id"]}],
-            employee_id="alice",
-            is_admin=False,
-            agent_store=agents,
-            placement_store=placements,
-            daemon_nodes=[node("node_a", "codex", workspace_id="repo:replacement")],
-            session=session,
-        )
-
-    assert error.value.code == "workspace_unavailable"
-
-
 def test_managed_runtime_replacement_keeps_existing_session_affinity(
     tmp_path: Path,
 ) -> None:
@@ -705,6 +669,43 @@ def test_device_compatibility_agent_does_not_borrow_managed_capacity(
     [preserved] = placements.list_placements(agent_id=agent["id"])
     assert preserved["id"] == original["id"]
     assert preserved["daemonNodeId"] == "device_node"
+
+
+def test_assignment_does_not_borrow_another_managed_computer(tmp_path: Path) -> None:
+    """原机器离线时，派发必须失败而不是改派到另一台托管机器。"""
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Worker", "executorKind": "claude"}
+    )
+    placements.create_placement(agent, "node-home", {"managedNodeId": "mnode-home"})
+    offline_home = {
+        **node("node-home", "claude"),
+        "employeeId": "alice",
+        "managedNodeId": "mnode-home",
+        "online": False,
+        "stale": True,
+        "status": "stopped",
+    }
+    spare = {
+        **node("node-spare", "claude"),
+        "employeeId": "alice",
+        "managedNodeId": "mnode-spare",
+    }
+
+    with pytest.raises(AgentRoutingError) as error:
+        resolve_agent_assignments(
+            [{"agentId": agent["id"]}],
+            employee_id="alice",
+            is_admin=False,
+            agent_store=agents,
+            placement_store=placements,
+            daemon_nodes=[offline_home, spare],
+        )
+
+    assert error.value.code == "node_offline"
+    [preserved] = placements.list_placements(agent_id=agent["id"])
+    assert preserved["daemonNodeId"] == "node-home"
 
 
 def test_placement_resolves_to_the_same_computer_under_a_new_node_id() -> None:

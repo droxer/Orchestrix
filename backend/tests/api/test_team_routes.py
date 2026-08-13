@@ -869,15 +869,25 @@ def test_unroutable_team_start_requests_capacity_and_queues_scheduler_retry(
         )
         assert registered.status_code == 200
 
+        # `lead`'s only placement points at a node id that was never actually
+        # registered as a live daemon (a phantom fixture placement), so it
+        # never held real capacity to begin with. Newly registering a real
+        # managed node for the employee used to make this dispatch succeed
+        # via `_agent_placements_with_managed_capacity`'s fallback: an agent
+        # with no live placement got auto-attached to any online managed
+        # node for its employee. Task 7 deletes that fallback entirely (spec
+        # §4: an offline Computer's work must never silently move to another
+        # machine). That auto-attach-on-first-capacity behavior is a
+        # different case — the agent never ran anywhere, so there is no
+        # workspace to lose — but it shared the same removed code path, so
+        # this test now asserts the current (post-deletion) behavior:
+        # dispatch is skipped rather than silently relocated. Restoring a
+        # narrower "first-time capacity attach only" mechanism is tracked
+        # separately (plan Task 10) and is out of scope for this task.
         tick = asyncio.run(app.state.task_scheduler.tick())
 
-        assert tick.dispatched == 1
-        commands = client.get(
-            f"/api/v1/daemon-nodes/{runtime['sandboxId']}/commands",
-            headers={"Authorization": f"Bearer {runtime['token']}"},
-        ).json()["commands"]
-        [command] = commands
-        assert command["logicalAgentId"] == lead["id"]
+        assert tick.dispatched == 0
+        assert tick.skipped == 1
 
 
 def test_team_reviewer_reviews_the_leads_work_and_carries_its_role(monkeypatch) -> None:

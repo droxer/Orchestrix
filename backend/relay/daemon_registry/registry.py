@@ -79,12 +79,6 @@ from .scheduling import (
     normalize_run_capacity,
     workspace_paths_match,
 )
-from .scheduling import (
-    workspace_identity as workspace_identity,
-)
-from .scheduling import (
-    workspace_identity_record as workspace_identity_record,
-)
 
 load_backend_env()
 
@@ -2642,11 +2636,6 @@ class DaemonNodeRegistry:
                 else {}
             ),
             **(
-                {"workspaceIdentity": assignment["workspaceIdentity"]}
-                if assignment.get("workspaceIdentity")
-                else {}
-            ),
-            **(
                 {"workspacePath": sandbox["workspacePath"]}
                 if sandbox.get("workspacePath")
                 else {}
@@ -2760,11 +2749,6 @@ class DaemonNodeRegistry:
                 **(
                     {"agentVersion": command["agentVersion"]}
                     if command.get("agentVersion")
-                    else {}
-                ),
-                **(
-                    {"workspaceIdentity": command["workspaceIdentity"]}
-                    if command.get("workspaceIdentity")
                     else {}
                 ),
                 **({"brief": assignment["brief"]} if assignment.get("brief") else {}),

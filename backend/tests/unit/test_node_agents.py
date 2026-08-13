@@ -320,6 +320,53 @@ def test_reregistration_retires_superseded_compatibility_agent(tmp_path: Path) -
         "id": "node_old",
         "employeeId": "alice",
         "workspacePath": "/home/alice/proj",
+        "workspaceId": "machine-a",
+        "online": False,
+    }
+    new_node = {
+        "id": "node_new",
+        "employeeId": "alice",
+        "workspacePath": "/home/alice/proj",
+        "workspaceId": "machine-a",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+        "online": True,
+    }
+    ctx, agents, placements = _registry_ctx(tmp_path, [old_node, new_node])
+    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old")
+    placements.create_placement(stale, "node_old")
+
+    sync_node_agents(ctx, new_node)
+
+    survivors = agents.list_agents(supervisor_employee_id="alice")
+    assert {agent["compatibilityKey"] for agent in survivors} == {
+        "alice:device:alice:machine-a:claude"
+    }
+    assert agents.get_agent(stale["id"]).get("deletedAt")
+    assert placements.list_placements(daemon_node_id="node_old") == []
+    assert len(placements.list_placements(daemon_node_id="node_new")) == 1
+
+
+def test_reregistration_without_workspace_id_keeps_both_agents(
+    tmp_path: Path,
+) -> None:
+    """Pre-machine-id daemons that only ever reported ``workspacePath`` don't
+    get retired across a re-registration.
+
+    Without a ``workspaceId``, `computer_id` falls back to ``node:{id}`` — so
+    each node id counts as its own Computer and two nodes can never be
+    recognized as "the same machine, re-provisioned under a new id". That is
+    a real loss of dedup for such very old daemons (see
+    `test_reregistration_retires_superseded_compatibility_agent` for the
+    current, `workspaceId`-reporting case that still retires correctly), but
+    retiring an agent is destructive — wrongly treating two distinct
+    computers as one would delete a compatibility agent that is still in
+    use. The conservative direction is the safe one, so both agents survive.
+    """
+    old_node = {
+        "id": "node_old",
+        "employeeId": "alice",
+        "workspacePath": "/home/alice/proj",
         "online": False,
     }
     new_node = {
@@ -338,11 +385,10 @@ def test_reregistration_retires_superseded_compatibility_agent(tmp_path: Path) -
 
     survivors = agents.list_agents(supervisor_employee_id="alice")
     assert {agent["compatibilityKey"] for agent in survivors} == {
-        "alice:node:node_new:claude"
+        "alice:node_old:claude",
+        "alice:node:node_new:claude",
     }
-    assert agents.get_agent(stale["id"]).get("deletedAt")
-    assert placements.list_placements(daemon_node_id="node_old") == []
-    assert len(placements.list_placements(daemon_node_id="node_new")) == 1
+    assert agents.get_agent(stale["id"]).get("deletedAt") is None
 
 
 def test_sync_keeps_agent_on_a_different_computer(tmp_path: Path) -> None:

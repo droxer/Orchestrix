@@ -5,7 +5,6 @@ from typing import Any, Protocol
 from loguru import logger
 
 from ..core.computer_identity import computer_id
-from ..daemon_registry.scheduling import workspace_identity
 from ..persistence.agent_placement_store import create_node_placement
 from ..persistence.protocols import AgentPlacementStore, AgentStore, TeamStore
 from .team_membership import remove_agent_from_teams
@@ -333,7 +332,6 @@ def retire_superseded_compatibility_agents(
     registry = getattr(ctx, "registry", None)
     if registry is None:
         return []
-    identity = workspace_identity(node)
     nodes_by_id = {item["id"]: item for item in registry.monitor_nodes()}
     managed_node_id = node.get("managedNodeId")
     managed_runtime_ids = (
@@ -405,9 +403,7 @@ def retire_superseded_compatibility_agents(
                 "managedNodeId"
             ) == other.get("managedNodeId")
         else:
-            same_computer = (
-                identity is not None and workspace_identity(other) == identity
-            )
+            same_computer = computer_id(node) == computer_id(other)
         if not same_computer or _node_has_active_work(ctx, node_id):
             continue
         if _retire_compatibility_agent(ctx, agent, employee_id):

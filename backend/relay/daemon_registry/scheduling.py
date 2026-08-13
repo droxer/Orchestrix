@@ -73,18 +73,3 @@ def workspace_paths_match(left: str | None, right: str | None) -> bool:
         and os.path.normcase(os.path.abspath(left))
         == os.path.normcase(os.path.abspath(right))
     )
-
-
-def workspace_identity(node: dict[str, Any]) -> tuple[str, str] | None:
-    workspace_id = node.get("workspaceId")
-    if isinstance(workspace_id, str) and workspace_id.strip():
-        return ("id", workspace_id.strip())
-    workspace_path = node.get("workspacePath")
-    if isinstance(workspace_path, str) and workspace_path.strip():
-        return ("path", os.path.normcase(os.path.abspath(workspace_path)))
-    return None
-
-
-def workspace_identity_record(node: dict[str, Any]) -> dict[str, str] | None:
-    identity = workspace_identity(node)
-    return {"kind": identity[0], "value": identity[1]} if identity else None

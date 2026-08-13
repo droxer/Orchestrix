@@ -11,7 +11,6 @@ from ..daemon_registry import (
     sandbox_ui_auth_error,
     sandbox_ui_token_matches,
 )
-from ..daemon_registry.scheduling import workspace_identity_record
 from ..persistence.agent_placement_store import create_node_placement
 from .deps import AppContextDep
 from .helpers import (
@@ -213,6 +212,4 @@ def _resolve_legacy_assignment(
         "agentVersion": agent["version"],
         "placementId": placement["id"],
         "daemonNodeId": sandbox_id,
-        "workspaceIdentity": workspace_identity_record(node or {}),
-        "workspacePolicy": placement.get("workspacePolicy"),
     }

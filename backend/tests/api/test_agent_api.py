@@ -673,10 +673,6 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
         run = response.json()["agentRuns"][0]
         assert run["logicalAgentId"] == agent["id"]
         assert run["daemonNodeId"] == "node_a"
-        assert run["workspaceIdentity"] == {
-            "kind": "path",
-            "value": "/workspace/alice",
-        }
         monitor_node = next(
             node
             for node in client.get("/api/v1/daemon-nodes").json()["nodes"]
