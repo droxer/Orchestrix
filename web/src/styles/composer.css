@@ -72,6 +72,14 @@
   color: var(--action);
 }
 
+/* The pick outlived its machine: it survives a heartbeat flap on purpose, but
+   the trigger has to stop reading as live, the same way the readout does. */
+.thread-runtime-select[data-online="false"],
+.thread-runtime-select[data-online="false"] > svg,
+.thread-runtime-select[data-online="false"][data-ownership="managed"] > svg {
+  color: var(--ink-3);
+}
+
 /* Read-only twin of the trigger, for a thread already pinned to its computer.
    It deliberately does NOT borrow the trigger's chrome (no plate, no hover, no
    chevron) — same rail, same anatomy, but nothing that invites a click. The

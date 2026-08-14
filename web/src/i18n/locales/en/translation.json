@@ -552,7 +552,6 @@
     "associated_node_count_other": "{{count}} nodes",
     "col_employee": "Employee / node",
     "col_status": "Status",
-    "col_agents": "Agents",
     "col_last_seen": "Last seen",
     "col_token": "Token",
     "node_id": "Node ID",

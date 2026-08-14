@@ -53,6 +53,7 @@ import {
 } from "./lib/threadRunning";
 import {
   agentsForThreadNode,
+  assignableThreadComputers,
   resolveNewThreadComputer,
   selectableThreadComputers,
   teamsForThreadNode,
@@ -215,6 +216,14 @@ export function App() {
     }),
     [activeSessionId, composingNew, myThreads, selectedSessionId],
   );
+  // Every machine this employee could run on, live or not. A pick is allowed
+  // to survive inside this set and nowhere else: the fleet list spans
+  // employees and keeps tombstones for deleted nodes, so "still listed" is not
+  // "still mine to use".
+  const assignableComputers = useMemo(
+    () => assignableThreadComputers(runtimeNodes, selectedEmployee),
+    [runtimeNodes, selectedEmployee],
+  );
   const selectableComputers = useMemo(
     () => selectableThreadComputers(runtimeNodes, selectedEmployee),
     [runtimeNodes, selectedEmployee],
@@ -247,12 +256,14 @@ export function App() {
   );
   // Same resolution for the pick on a not-yet-started thread, so the trigger
   // keeps naming the chosen computer through a poll that drops it from the
-  // selectable set. Held stable so the memoized picker ignores heartbeats.
+  // selectable set — but only within this employee's own machines, so the
+  // trigger can never name someone else's. Held stable so the memoized picker
+  // ignores heartbeats.
   const selectedThreadComputer = useMemo(
     () => (initializingThread && selectedThreadNodeId
-      ? runtimeNodes.find((node) => node.id === selectedThreadNodeId) ?? null
+      ? assignableComputers.find((node) => node.id === selectedThreadNodeId) ?? null
       : null),
-    [initializingThread, runtimeNodes, selectedThreadNodeId],
+    [assignableComputers, initializingThread, selectedThreadNodeId],
   );
   const stableSelectedThreadComputer = useStableValue(
     selectedThreadComputer,
@@ -300,10 +311,10 @@ export function App() {
   useEffect(() => {
     if (!initializingThread) return;
     setNewThreadNodeId((previous) => {
-      const next = resolveNewThreadComputer(previous, threadComputers, runtimeNodes);
+      const next = resolveNewThreadComputer(previous, threadComputers, assignableComputers);
       return next === previous ? previous : next;
     });
-  }, [initializingThread, runtimeNodes, threadComputers]);
+  }, [assignableComputers, initializingThread, threadComputers]);
 
   // A team picked while staging only holds while the picked computer hosts
   // the whole roster; switching computers drops the pick back to an agent.
@@ -695,11 +706,9 @@ export function App() {
     setPendingUserMessage(null);
     setSelectedSessionId(undefined);
     setActiveSessionId(null);
-    setNewThreadNodeId((current) => (
-      threadComputers.some((node) => node.id === current)
-        ? current
-        : threadComputers[0]?.id ?? null
-    ));
+    // Same rule as the staging effect: a pick survives a heartbeat flap, and
+    // only a machine that is no longer this employee's drops it.
+    setNewThreadNodeId((current) => resolveNewThreadComputer(current, threadComputers, assignableComputers));
     composerRef.current?.clear();
     atBottomRef.current = true;
     syncThreadUrl(null);

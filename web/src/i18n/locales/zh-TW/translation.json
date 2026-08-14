@@ -552,7 +552,6 @@
     "associated_node_count_other": "{{count}} 個節點",
     "col_employee": "員工 / 節點",
     "col_status": "狀態",
-    "col_agents": "Agent",
     "col_last_seen": "最後上線",
     "col_token": "憑證",
     "node_id": "節點 ID",

@@ -552,7 +552,6 @@
     "associated_node_count_other": "{{count}} 个节点",
     "col_employee": "员工 / 节点",
     "col_status": "状态",
-    "col_agents": "Agent",
     "col_last_seen": "最后在线",
     "col_token": "令牌",
     "node_id": "节点 ID",

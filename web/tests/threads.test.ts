@@ -13,6 +13,7 @@ import {
 } from "../src/lib/threads.js";
 import {
   agentsForThreadNode,
+  assignableThreadComputers,
   threadNeedsRuntimeSelection,
   resolveNewThreadComputer,
   selectableThreadComputers,
@@ -324,20 +325,47 @@ describe("new-thread computer selection", () => {
 
   it("keeps the picked computer when a poll reports it briefly unselectable", () => {
     const picked = ready("node_b");
-    const known = [ready("node_a"), { ...picked, stale: true }];
-    const selectable = selectableThreadComputers(known, "alice");
+    const fleet = [ready("node_a"), { ...picked, stale: true }];
+    const assignable = assignableThreadComputers(fleet, "alice");
+    const selectable = selectableThreadComputers(fleet, "alice");
 
     assert.deepEqual(selectable.map((node) => node.id), ["node_a"]);
-    assert.equal(resolveNewThreadComputer("node_b", selectable, known), "node_b");
+    assert.equal(resolveNewThreadComputer("node_b", selectable, assignable), "node_b");
   });
 
   it("falls back to the first selectable computer only once the pick is gone", () => {
-    const known = [ready("node_a"), ready("node_c")];
-    const selectable = selectableThreadComputers(known, "alice");
+    const fleet = [ready("node_a"), ready("node_c")];
+    const assignable = assignableThreadComputers(fleet, "alice");
+    const selectable = selectableThreadComputers(fleet, "alice");
 
-    assert.equal(resolveNewThreadComputer("node_b", selectable, known), "node_a");
-    assert.equal(resolveNewThreadComputer(null, selectable, known), "node_a");
+    assert.equal(resolveNewThreadComputer("node_b", selectable, assignable), "node_a");
+    assert.equal(resolveNewThreadComputer(null, selectable, assignable), "node_a");
     assert.equal(resolveNewThreadComputer("node_b", [], []), null);
+  });
+
+  it("drops a pick that belongs to another employee", () => {
+    // The fleet spans employees for an admin actor, so switching who you are
+    // acting as must not leave the previous employee's machine picked.
+    const fleet = [ready("node_a"), ready("bobs_node", { employeeId: "bob" })];
+    const assignable = assignableThreadComputers(fleet, "alice");
+    const selectable = selectableThreadComputers(fleet, "alice");
+
+    assert.deepEqual(assignable.map((node) => node.id), ["node_a"]);
+    assert.equal(resolveNewThreadComputer("bobs_node", selectable, assignable), "node_a");
+  });
+
+  it("drops a pick whose computer has been deleted or retired", () => {
+    const fleet = [
+      ready("node_a"),
+      ready("tombstone", { status: "deleted", online: false }),
+      ready("retired", { retiredAt: "2026-07-26T10:00:00Z" }),
+    ];
+    const assignable = assignableThreadComputers(fleet, "alice");
+    const selectable = selectableThreadComputers(fleet, "alice");
+
+    assert.deepEqual(assignable.map((node) => node.id), ["node_a"]);
+    assert.equal(resolveNewThreadComputer("tombstone", selectable, assignable), "node_a");
+    assert.equal(resolveNewThreadComputer("retired", selectable, assignable), "node_a");
   });
 
   it("ignores heartbeat churn when keying the computer list", () => {
@@ -349,6 +377,16 @@ describe("new-thread computer selection", () => {
       threadComputerSignature(first),
       threadComputerSignature([ready("node_a"), ready("node_b")]),
     );
+  });
+
+  it("re-keys when a computer's ownership resolves", () => {
+    // The rows and the trigger draw their mark from nodeLocation, so a node
+    // that stops being pending has to re-render even though the list is
+    // otherwise identical.
+    const pending = [ready("node_a")];
+    const located = [ready("node_a", { nodeLocation: "employee-device" })];
+
+    assert.notEqual(threadComputerSignature(pending), threadComputerSignature(located));
   });
 });
 

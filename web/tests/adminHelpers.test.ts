@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
-  agentsForEmployee,
+  agentsOnNodes,
   buildEmployeeSummaries,
   employeeEmptyStateTranslationKey,
   employeeSummaryStatus,
@@ -279,11 +279,13 @@ function agent(input: Partial<EmployeeAgent> & Pick<EmployeeAgent, "id">): Emplo
   };
 }
 
-describe("agentsForEmployee", () => {
+describe("agentsOnNodes", () => {
   const alice = buildEmployeeSummaries(
     [employee({ id: "alice" })],
     [node({ id: "n1", employeeId: "alice" }), node({ id: "n2", employeeId: "alice" })],
   )[0];
+  const agentsForEmployee = (member: typeof alice, agents: EmployeeAgent[]) =>
+    agentsOnNodes(member.nodes.map((n) => n.id), agents);
 
   it("resolves agents through the employee's nodes, not agent.employeeId", () => {
     const agents = [

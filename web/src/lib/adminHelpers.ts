@@ -319,11 +319,6 @@ export function agentsOnNodes(nodeIds: Iterable<string>, agents: EmployeeAgent[]
   );
 }
 
-/** Agents running on the computers a given employee owns. */
-export function agentsForEmployee(member: EmployeeNodeSummary, agents: EmployeeAgent[]): EmployeeAgent[] {
-  return agentsOnNodes(member.nodes.map((node) => node.id), agents);
-}
-
 export function readStoredNodeTokens(): StoredNodeTokenMap {
   return { ...volatileNodeTokens };
 }

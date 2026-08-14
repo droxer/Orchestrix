@@ -87,6 +87,17 @@ export const ThreadRuntimeSelect = memo(function ThreadRuntimeSelect({
   const selected = nodes.find((node) => node.id === value) ?? selectedNode ?? undefined;
   const selectedOwnership = selected ? nodeOwnershipProfile(selected) : null;
   const SelectedMark = selectedOwnership ? nodeOwnershipIcon(selectedOwnership) : null;
+  // Holding the pick through a heartbeat flap is right; hiding that the
+  // machine is gone is not. When the pick is not among the selectable options
+  // the trigger says so — the rows stay cue-free because they are all live.
+  const selectedUnavailable = Boolean(selected) && !nodes.some((node) => node.id === selected?.id);
+  const selectedTitle = selected
+    ? [
+      runtimeLabel(selected),
+      t(`admin.v2.node_ownership_${selectedOwnership}`),
+      ...(selectedUnavailable ? [t("nodes.presence_offline")] : []),
+    ].join(" · ")
+    : undefined;
   return (
     <div className="thread-runtime-rail" aria-label={t("thread.runtime_label")}>
       <span className="thread-runtime-context">{t("thread.runs_on")}</span>
@@ -98,16 +109,18 @@ export const ThreadRuntimeSelect = memo(function ThreadRuntimeSelect({
           size="sm"
           className="thread-runtime-select"
           data-ownership={selectedOwnership ?? undefined}
+          data-online={selected ? (selectedUnavailable ? "false" : "true") : undefined}
           disabled={nodes.length === 0}
           aria-label={t("thread.choose_computer")}
-          title={selected
-            ? `${runtimeLabel(selected)} · ${t(`admin.v2.node_ownership_${selectedOwnership}`)}`
-            : undefined}
+          title={selectedTitle}
         >
           {SelectedMark ? <SelectedMark size={16} aria-hidden="true" /> : null}
           <span className="thread-runtime-select-name">
             {selected ? runtimeLabel(selected) : t("thread.no_computers")}
           </span>
+          {selectedUnavailable ? (
+            <span className="sr-only">{t("nodes.presence_offline")}</span>
+          ) : null}
         </SelectTrigger>
         <SelectContent
           align="start"

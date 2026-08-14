@@ -22,13 +22,32 @@ type ThreadAgent = {
   }>;
 };
 
-export function selectableThreadComputers<T extends ThreadComputer>(
+/**
+ * Every computer this employee could ever run a thread on, live or not.
+ *
+ * The fleet list spans employees (an admin's `/daemon-nodes` returns every
+ * machine they own) and keeps a tombstone row for a deleted node, so "still in
+ * the fleet" is not the same question as "still this employee's to use". This
+ * is the set a pick is allowed to survive in; `selectableThreadComputers`
+ * narrows it further to what can take work right now.
+ */
+export function assignableThreadComputers<T extends ThreadComputer>(
   nodes: readonly T[],
   employeeId: string,
 ): T[] {
   return nodes.filter(
     (node) => node.employeeId === employeeId
-      && node.online
+      && !node.retiredAt
+      && node.status !== "deleted",
+  );
+}
+
+export function selectableThreadComputers<T extends ThreadComputer>(
+  nodes: readonly T[],
+  employeeId: string,
+): T[] {
+  return assignableThreadComputers(nodes, employeeId).filter(
+    (node) => node.online
       && !node.stale
       && ["ready", "running", "busy"].includes(node.status),
   );
@@ -43,29 +62,38 @@ export function selectableThreadComputers<T extends ThreadComputer>(
  * `useMemo([nodes])` hands the composer a new array on every tick and
  * re-renders the picker forever. Keying on this signature means a poll that
  * changed nothing the picker can see produces no work at all.
+ *
+ * `nodeLocation` is in the key because the rows and the trigger draw their
+ * ownership mark from it: a node whose location resolves while it is already
+ * on the list would otherwise keep the pending ring.
  */
 export function threadComputerSignature(
-  nodes: readonly (ThreadComputer & { displayName?: string })[],
+  nodes: readonly (ThreadComputer & { displayName?: string; nodeLocation?: string })[],
 ): string {
-  return nodes.map((node) => `${node.id}:${node.displayName ?? ""}`).join("|");
+  return nodes
+    .map((node) => `${node.id}:${node.displayName ?? ""}:${node.nodeLocation ?? ""}`)
+    .join("|");
 }
 
 /**
  * Which computer a new thread should target, given the previous choice.
  *
- * Returns the previous choice whenever that computer still exists, even if the
- * latest poll reports it unselectable. Staleness is a time threshold the daemon
- * heartbeat crosses and re-crosses, so a node flapping out of the selectable
- * set for one poll used to silently reassign the user's thread to whichever
- * computer happened to sort first. A pick only moves when its computer is gone
- * from the fleet entirely.
+ * Returns the previous choice whenever that computer is still assignable, even
+ * if the latest poll reports it unselectable. Staleness is a time threshold the
+ * daemon heartbeat crosses and re-crosses, so a node flapping out of the
+ * selectable set for one poll used to silently reassign the user's thread to
+ * whichever computer happened to sort first.
+ *
+ * `assignable` must be the *employee-scoped* list, not the raw fleet: a pick
+ * that outlives a switch to another employee, or a node that has since been
+ * deleted, would otherwise stick and be dispatched to.
  */
 export function resolveNewThreadComputer(
   previousId: string | null,
   selectable: readonly ThreadComputer[],
-  known: readonly ThreadComputer[],
+  assignable: readonly ThreadComputer[],
 ): string | null {
-  if (previousId && known.some((node) => node.id === previousId)) return previousId;
+  if (previousId && assignable.some((node) => node.id === previousId)) return previousId;
   return selectable[0]?.id ?? null;
 }
 
