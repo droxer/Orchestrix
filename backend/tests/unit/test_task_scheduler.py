@@ -23,7 +23,11 @@ def _logical_backend(
 ):
     agent_store = LocalEmployeeAgentStore(root)
     placement_store = LocalAgentPlacementStore(root)
-    payload = {"displayName": "Builder", "executorKind": "codex"}
+    payload = {
+        "displayName": "Builder",
+        "executorKind": "codex",
+        "defaultRole": "implementer",
+    }
     if instructions:
         payload["instructions"] = instructions
     agent = agent_store.create_agent("alice", payload)
@@ -295,7 +299,12 @@ def test_scheduler_dispatches_task_by_logical_agent_placement() -> None:
                 "ui_token",
             )
             agent = agent_store.create_agent(
-                "alice", {"displayName": "Builder", "executorKind": "codex"}
+                "alice",
+                {
+                    "displayName": "Builder",
+                    "executorKind": "codex",
+                    "defaultRole": "implementer",
+                },
             )
             placement_store.create_placement(agent, "node_builder")
             task = task_store.create_task(
@@ -760,10 +769,20 @@ def test_scheduler_dispatches_all_team_members_lead_first() -> None:
             agent_store = LocalEmployeeAgentStore(root)
             placements = LocalAgentPlacementStore(root)
             lead = agent_store.create_agent(
-                "alice", {"displayName": "Lead", "executorKind": "codex"}
+                "alice",
+                {
+                    "displayName": "Lead",
+                    "executorKind": "codex",
+                    "defaultRole": "implementer",
+                },
             )
             support = agent_store.create_agent(
-                "alice", {"displayName": "Support", "executorKind": "claude"}
+                "alice",
+                {
+                    "displayName": "Support",
+                    "executorKind": "claude",
+                    "defaultRole": "implementer",
+                },
             )
             placements.create_placement(lead, "sbx_alice")
             placements.create_placement(support, "sbx_alice")
@@ -881,10 +900,20 @@ def test_scheduler_promotes_team_routine_into_team_owned_thread() -> None:
             agent_store = LocalEmployeeAgentStore(root)
             placements = LocalAgentPlacementStore(root)
             lead = agent_store.create_agent(
-                "alice", {"displayName": "Lead", "executorKind": "codex"}
+                "alice",
+                {
+                    "displayName": "Lead",
+                    "executorKind": "codex",
+                    "defaultRole": "implementer",
+                },
             )
             support = agent_store.create_agent(
-                "alice", {"displayName": "Support", "executorKind": "claude"}
+                "alice",
+                {
+                    "displayName": "Support",
+                    "executorKind": "claude",
+                    "defaultRole": "implementer",
+                },
             )
             placements.create_placement(lead, "sbx_alice")
             placements.create_placement(support, "sbx_alice")
@@ -971,6 +1000,7 @@ def test_scheduler_records_team_unavailable_without_claiming() -> None:
                 {
                     "displayName": "Unavailable",
                     "executorKind": "codex",
+                    "defaultRole": "implementer",
                     "enabled": False,
                 },
             )
@@ -1025,7 +1055,12 @@ def test_scheduler_requests_managed_capacity_for_unroutable_team_lead() -> None:
             agent_store = LocalEmployeeAgentStore(root)
             placements = LocalAgentPlacementStore(root)
             lead = agent_store.create_agent(
-                "alice", {"displayName": "Lead", "executorKind": "codex"}
+                "alice",
+                {
+                    "displayName": "Lead",
+                    "executorKind": "codex",
+                    "defaultRole": "implementer",
+                },
             )
             backend = ServerDaemonNodeBackend(
                 registry,
@@ -1096,7 +1131,8 @@ def _round_scheduler_fixture(root: str, *, max_task_rounds: int):
     agent_store = LocalEmployeeAgentStore(root)
     placements = LocalAgentPlacementStore(root)
     agent = agent_store.create_agent(
-        "alice", {"displayName": "Solo", "executorKind": "codex"}
+        "alice",
+        {"displayName": "Solo", "executorKind": "codex", "defaultRole": "implementer"},
     )
     placements.create_placement(agent, "sbx_alice")
     backend = ServerDaemonNodeBackend(

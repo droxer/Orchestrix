@@ -169,13 +169,13 @@ def test_database_team_updates_merge_from_the_locked_snapshot(
 def test_validate_team_payload_checks_membership(tmp_path: Path) -> None:
     agents = LocalAgentStore(tmp_path)
     lead = agents.create_agent(
-        "alice", {"displayName": "Lead", "executorKind": "codex"}
+        "alice", {"displayName": "Lead", "executorKind": "codex", "defaultRole": "implementer"}
     )
     support = agents.create_agent(
-        "alice", {"displayName": "Support", "executorKind": "claude"}
+        "alice", {"displayName": "Support", "executorKind": "claude", "defaultRole": "implementer"}
     )
     outsider = agents.create_agent(
-        "bob", {"displayName": "Outsider", "executorKind": "pi"}
+        "bob", {"displayName": "Outsider", "executorKind": "pi", "defaultRole": "implementer"}
     )
 
     from relay.persistence.team_store import validate_team_payload

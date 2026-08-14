@@ -63,7 +63,7 @@ def test_database_profile_snapshots_store_only_versioned_image_urls(
     agents = DatabaseAgentStore(database_url, create_schema=True)
     teams = DatabaseTeamStore(database_url, create_schema=True)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice", {"displayName": "Builder", "executorKind": "codex", "defaultRole": "implementer"}
     )
     team = teams.create_team(
         "alice",

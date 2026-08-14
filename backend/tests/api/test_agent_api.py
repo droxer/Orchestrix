@@ -91,6 +91,7 @@ def test_employee_agent_admin_routes_require_admin(monkeypatch) -> None:
                     "supervisorEmployeeId": "alice",
                     "displayName": "Builder",
                     "executorKind": "codex",
+                    "defaultRole": "implementer",
                 },
             ).status_code
             == 401
@@ -242,6 +243,7 @@ def test_agent_policies_are_rejected_until_runtime_enforcement_exists(
                 "supervisorEmployeeId": "alice",
                 "displayName": "Restricted",
                 "executorKind": "codex",
+                "defaultRole": "implementer",
                 "toolPolicy": {"allowedTools": ["read"]},
             },
         )
@@ -254,6 +256,7 @@ def test_agent_policies_are_rejected_until_runtime_enforcement_exists(
                 "supervisorEmployeeId": "alice",
                 "displayName": "Builder",
                 "executorKind": "codex",
+                "defaultRole": "implementer",
             },
         ).json()["agent"]
         rejected_update = client.patch(
@@ -439,6 +442,7 @@ def test_admin_places_agents_on_different_runtime_nodes(monkeypatch) -> None:
                 "supervisorEmployeeId": "alice",
                 "displayName": "Researcher",
                 "executorKind": "claude",
+                "defaultRole": "implementer",
             },
         ).json()["agent"]
         builder = client.post(
@@ -447,6 +451,7 @@ def test_admin_places_agents_on_different_runtime_nodes(monkeypatch) -> None:
                 "supervisorEmployeeId": "alice",
                 "displayName": "Builder",
                 "executorKind": "codex",
+                "defaultRole": "implementer",
             },
         ).json()["agent"]
         first = client.post(
@@ -544,6 +549,7 @@ def test_agent_placements_describe_managed_and_local_runtime_nodes(monkeypatch) 
                 "supervisorEmployeeId": "alice",
                 "displayName": "Managed Builder",
                 "executorKind": "codex",
+                "defaultRole": "implementer",
             },
         ).json()["agent"]
         local_agent = client.post(
@@ -552,6 +558,7 @@ def test_agent_placements_describe_managed_and_local_runtime_nodes(monkeypatch) 
                 "supervisorEmployeeId": "alice",
                 "displayName": "Local Builder",
                 "executorKind": "codex",
+                "defaultRole": "implementer",
             },
         ).json()["agent"]
         assert (
@@ -628,6 +635,7 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
                 "supervisorEmployeeId": "alice",
                 "displayName": "Builder",
                 "executorKind": "codex",
+                "defaultRole": "implementer",
             },
         ).json()["agent"]
         placement_response = client.post(
@@ -1435,7 +1443,12 @@ def test_existing_session_dispatch_normalizes_legacy_agent_supervisor(
             }
         )
         agent = app.state.agent_store.create_agent(
-            "alice", {"displayName": "Builder", "executorKind": "codex"}
+            "alice",
+            {
+                "displayName": "Builder",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+            },
         )
         placement = app.state.agent_placement_store.create_placement(agent, "node_a")
         legacy_agent = {**agent, "employeeId": "alice"}
@@ -1498,10 +1511,20 @@ def test_logical_agent_handoff_records_the_target_agent_id(monkeypatch) -> None:
             }
         )
         builder = app.state.agent_store.create_agent(
-            "alice", {"displayName": "Builder", "executorKind": "codex"}
+            "alice",
+            {
+                "displayName": "Builder",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+            },
         )
         reviewer = app.state.agent_store.create_agent(
-            "alice", {"displayName": "Reviewer", "executorKind": "codex"}
+            "alice",
+            {
+                "displayName": "Reviewer",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+            },
         )
         for agent in (builder, reviewer):
             app.state.agent_placement_store.create_placement(agent, "node_a")
@@ -1567,10 +1590,20 @@ def test_employee_cannot_dispatch_a_team_across_shared_workspace_nodes(
                 }
             )
         planner = app.state.agent_store.create_agent(
-            "alice", {"displayName": "Planner", "executorKind": "claude"}
+            "alice",
+            {
+                "displayName": "Planner",
+                "executorKind": "claude",
+                "defaultRole": "implementer",
+            },
         )
         builder = app.state.agent_store.create_agent(
-            "alice", {"displayName": "Builder", "executorKind": "codex"}
+            "alice",
+            {
+                "displayName": "Builder",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+            },
         )
         for agent, node_id in ((planner, "node_a"), (builder, "node_b")):
             app.state.agent_placement_store.create_placement(
@@ -1641,7 +1674,12 @@ def test_new_thread_runs_on_the_selected_computer(monkeypatch) -> None:
                 }
             )
         builder = app.state.agent_store.create_agent(
-            "alice", {"displayName": "Builder", "executorKind": "codex"}
+            "alice",
+            {
+                "displayName": "Builder",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+            },
         )
         app.state.agent_placement_store.create_placement(builder, "node_b")
         assert client.post("/api/v1/auth/logout").status_code == 200
@@ -1716,7 +1754,12 @@ def test_new_thread_rejects_an_agent_outside_the_selected_computer(
                 }
             )
         builder = app.state.agent_store.create_agent(
-            "alice", {"displayName": "Builder", "executorKind": "codex"}
+            "alice",
+            {
+                "displayName": "Builder",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+            },
         )
         app.state.agent_placement_store.create_placement(builder, "node_b")
         assert client.post("/api/v1/auth/logout").status_code == 200
@@ -1775,6 +1818,7 @@ def test_employee_cannot_list_or_dispatch_another_employees_agent(monkeypatch) -
                 "supervisorEmployeeId": "alice",
                 "displayName": "Builder",
                 "executorKind": "codex",
+                "defaultRole": "implementer",
             },
         ).json()["agent"]
         assert (
@@ -2006,6 +2050,7 @@ def test_compatibility_agent_drops_from_roster_when_its_computer_is_gone(
                 "supervisorEmployeeId": "alice",
                 "displayName": "Freelancer",
                 "executorKind": "claude",
+                "defaultRole": "implementer",
             },
         )
         app.state.registry.register(
@@ -2172,6 +2217,7 @@ def test_task_persists_and_dispatches_a_logical_agent_assignment(monkeypatch) ->
                 "supervisorEmployeeId": "alice",
                 "displayName": "Earlier Builder",
                 "executorKind": "codex",
+                "defaultRole": "implementer",
             },
         ).json()["agent"]
         agent = client.post(
@@ -2180,6 +2226,7 @@ def test_task_persists_and_dispatches_a_logical_agent_assignment(monkeypatch) ->
                 "supervisorEmployeeId": "alice",
                 "displayName": "Selected Builder",
                 "executorKind": "codex",
+                "defaultRole": "implementer",
             },
         ).json()["agent"]
         assert (
@@ -2254,6 +2301,7 @@ def test_task_owner_cannot_be_reassigned_to_another_employees_agent(
                     "supervisorEmployeeId": employee_id,
                     "displayName": "Builder",
                     "executorKind": "codex",
+                    "defaultRole": "implementer",
                 },
             ).json()["agent"]
 
@@ -2306,6 +2354,7 @@ def test_employee_task_writes_require_named_agents_and_preserve_status(
                 "supervisorEmployeeId": "alice",
                 "displayName": "Builder",
                 "executorKind": "codex",
+                "defaultRole": "implementer",
             },
         ).json()["agent"]
         assert client.post("/api/v1/auth/logout").status_code == 200
@@ -2452,6 +2501,7 @@ def test_failed_agent_first_run_finalizes_instead_of_wedging(monkeypatch) -> Non
                 "supervisorEmployeeId": "alice",
                 "displayName": "Elon Musk",
                 "executorKind": "codex",
+                "defaultRole": "implementer",
             },
         ).json()["agent"]
         assert (
@@ -2504,7 +2554,13 @@ def test_failed_agent_first_run_finalizes_instead_of_wedging(monkeypatch) -> Non
         assert client.get(f"/api/v1/threads/{session_id}").json()["status"] == "failed"
 
 
-def test_agent_role_is_visible_and_can_be_cleared(monkeypatch) -> None:
+def test_agent_role_is_visible_but_not_patchable(monkeypatch) -> None:
+    """defaultRole is part of the birth certificate: it decides what an agent
+    is for, so changing it is indistinguishable from swapping in a different
+    colleague. It has to be readable everywhere the agent is rendered, but
+    neither the admin route nor the employee's own route may PATCH it —
+    both reach the same store-level rejection.
+    """
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
@@ -2539,21 +2595,24 @@ def test_agent_role_is_visible_and_can_be_cleared(monkeypatch) -> None:
             == "reviewer"
         )
 
+        # defaultRole is no longer a patchable field at all: clearing it and
+        # setting an invalid value both fail the same way, as an unsupported
+        # field rather than an invalid enum value.
         cleared = client.patch(
             f"/api/v1/admin/agents/{agent['id']}", json={"defaultRole": None}
         )
-        assert cleared.status_code == 200
-        assert not cleared.json()["agent"].get("defaultRole")
+        assert cleared.status_code == 400
+        assert "defaultRole" in cleared.text
 
-        assert (
-            client.patch(
-                f"/api/v1/admin/agents/{agent['id']}", json={"defaultRole": "wizard"}
-            ).status_code
-            == 400
+        invalid = client.patch(
+            f"/api/v1/admin/agents/{agent['id']}", json={"defaultRole": "wizard"}
         )
+        assert invalid.status_code == 400
+        assert "defaultRole" in invalid.text
 
-        # The supervisor sets the role from their own agent page, which is the
-        # only place the picker is rendered.
+        # The supervisor's own route rejects it identically — the role isn't
+        # personality, so it doesn't belong on the picker the supervisor uses
+        # to tune their agent.
         assert client.post("/api/v1/auth/logout").status_code == 200
         assert (
             client.post(
@@ -2565,12 +2624,14 @@ def test_agent_role_is_visible_and_can_be_cleared(monkeypatch) -> None:
         owned = client.patch(
             f"/api/v1/agents/{agent['id']}", json={"defaultRole": "planner"}
         )
-        assert owned.status_code == 200, owned.text
-        assert owned.json()["agent"]["defaultRole"] == "planner"
+        assert owned.status_code == 400
+        assert "defaultRole" in owned.text
+
+        # The role itself is untouched by the rejected attempts.
+        still_alice = client.get("/api/v1/agents").json()["agents"]
         assert (
-            not client.patch(
-                f"/api/v1/agents/{agent['id']}", json={"defaultRole": None}
-            )
-            .json()["agent"]
-            .get("defaultRole")
+            next(item for item in still_alice if item["id"] == agent["id"])[
+                "defaultRole"
+            ]
+            == "reviewer"
         )

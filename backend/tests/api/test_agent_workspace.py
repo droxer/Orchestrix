@@ -31,6 +31,7 @@ def _agent(client: TestClient) -> dict:
             "supervisorEmployeeId": "alice",
             "displayName": "Builder",
             "executorKind": "codex",
+            "defaultRole": "implementer",
         },
     )
     assert response.status_code == 201, response.text
@@ -326,6 +327,7 @@ def test_team_shared_scope_allows_a_current_member_before_its_first_run(
             "supervisorEmployeeId": "alice",
             "displayName": "Reviewer",
             "executorKind": "claude",
+            "defaultRole": "implementer",
         },
     )
     assert member_response.status_code == 201, member_response.text
@@ -386,6 +388,7 @@ def test_team_shared_scope_allows_a_current_member_before_its_first_run(
             "supervisorEmployeeId": "alice",
             "displayName": "Outsider",
             "executorKind": "pi",
+            "defaultRole": "implementer",
         },
     )
     outsider = outsider_response.json()["agent"]

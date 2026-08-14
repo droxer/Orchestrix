@@ -56,6 +56,7 @@ def _create_agent(
             "supervisorEmployeeId": employee_id,
             "displayName": f"{executor_kind.title()} Task Agent",
             "executorKind": executor_kind,
+            "defaultRole": "implementer",
         },
     )
     assert response.status_code == 201
@@ -285,7 +286,7 @@ def test_routine_cadence_change_and_reenable_recalculate_next_run(monkeypatch) -
             json={
                 "supervisorEmployeeId": "alice",
                 "displayName": "Scheduler",
-                "executorKind": "codex",
+                "executorKind": "codex", "defaultRole": "implementer",
             },
         ).json()["agent"]
         created = client.post(
@@ -398,7 +399,7 @@ def test_assigned_backlog_waits_for_scheduler_and_start_can_dispatch_manually(
             json={
                 "supervisorEmployeeId": "alice",
                 "displayName": "Builder",
-                "executorKind": "codex",
+                "executorKind": "codex", "defaultRole": "implementer",
             },
         ).json()["agent"]
         assert (
@@ -986,7 +987,7 @@ def test_scheduler_dispatches_assigned_backlog_task(monkeypatch) -> None:
             json={
                 "supervisorEmployeeId": "alice",
                 "displayName": "Scheduled Builder",
-                "executorKind": "codex",
+                "executorKind": "codex", "defaultRole": "implementer",
             },
         ).json()["agent"]
         assert (
@@ -1062,7 +1063,7 @@ def test_routine_start_dispatches_occurrence_not_definition(monkeypatch) -> None
             json={
                 "supervisorEmployeeId": "alice",
                 "displayName": "Routine Builder",
-                "executorKind": "codex",
+                "executorKind": "codex", "defaultRole": "implementer",
             },
         ).json()["agent"]
         assert (

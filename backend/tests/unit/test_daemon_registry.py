@@ -5121,10 +5121,10 @@ def test_same_node_workflow_revalidates_placement_before_next_enqueue() -> None:
                 agent_placement_store=placements,
             )
             researcher = agents.create_agent(
-                "alice", {"displayName": "Researcher", "executorKind": "claude"}
+                "alice", {"displayName": "Researcher", "executorKind": "claude", "defaultRole": "implementer"}
             )
             builder = agents.create_agent(
-                "alice", {"displayName": "Builder", "executorKind": "codex"}
+                "alice", {"displayName": "Builder", "executorKind": "codex", "defaultRole": "implementer"}
             )
             first_placement = placements.create_placement(
                 researcher,

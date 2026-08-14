@@ -3598,7 +3598,7 @@ def test_admin_can_soft_delete_employee_and_unassign_nodes(monkeypatch) -> None:
             json={
                 "supervisorEmployeeId": "alice",
                 "displayName": "Builder",
-                "executorKind": "codex",
+                "executorKind": "codex", "defaultRole": "implementer",
             },
         ).json()["agent"]
         placement = client.post(
@@ -3671,7 +3671,7 @@ def test_admin_can_soft_delete_employee_and_unassign_nodes(monkeypatch) -> None:
                 json={
                     "supervisorEmployeeId": "alice",
                     "displayName": "Orphan",
-                    "executorKind": "codex",
+                    "executorKind": "codex", "defaultRole": "implementer",
                 },
             ).status_code
             == 404

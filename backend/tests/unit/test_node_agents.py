@@ -100,13 +100,13 @@ def test_existing_legacy_named_agent_is_renamed_to_runtime_name(tmp_path: Path) 
     placements = LocalAgentPlacementStore(tmp_path)
     ctx = SimpleNamespace(agent_store=agents, agent_placement_store=placements)
     legacy = agents.create_agent(
-        "alice", {"displayName": "Codex · node_alice", "executorKind": "codex"}
+        "alice", {"displayName": "Codex · node_alice", "executorKind": "codex", "defaultRole": "implementer"}
     )
     legacy = agents.update_agent(
         legacy["id"], {"compatibilityKey": "alice:node_alice:codex"}
     )
     renamed = agents.create_agent(
-        "alice", {"displayName": "Renamed By User", "executorKind": "claude"}
+        "alice", {"displayName": "Renamed By User", "executorKind": "claude", "defaultRole": "implementer"}
     )
     renamed = agents.update_agent(
         renamed["id"], {"compatibilityKey": "alice:node_alice:claude"}
@@ -198,7 +198,7 @@ def test_removing_node_agents_updates_team_membership(tmp_path: Path) -> None:
     sync_node_agents(ctx, node)
     doomed = agents.list_agents(supervisor_employee_id="alice")[0]
     survivor = agents.create_agent(
-        "alice", {"displayName": "Survivor", "executorKind": "claude"}
+        "alice", {"displayName": "Survivor", "executorKind": "claude", "defaultRole": "implementer"}
     )
     team = teams.create_team(
         "alice",
@@ -228,7 +228,7 @@ def test_removing_node_retires_custom_logical_agent_with_no_other_computer(
         agent_placement_store=placements,
     )
     custom = agents.create_agent(
-        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+        "alice", {"displayName": "Researcher", "executorKind": "claude", "defaultRole": "implementer"}
     )
     placement = placements.create_placement(custom, "node_doomed")
 
@@ -518,7 +518,7 @@ def test_sync_retires_legacy_two_segment_agent_on_same_node(tmp_path: Path) -> N
     }
     ctx, agents, placements = _registry_ctx(tmp_path, [node])
     legacy = agents.create_agent(
-        "alice", {"displayName": "Captain America", "executorKind": "claude"}
+        "alice", {"displayName": "Captain America", "executorKind": "claude", "defaultRole": "implementer"}
     )
     legacy = agents.update_agent(legacy["id"], {"compatibilityKey": "alice:claude"})
     placements.create_placement(legacy, "node_local")
@@ -551,7 +551,7 @@ def test_sync_keeps_legacy_agent_on_a_different_node(tmp_path: Path) -> None:
     }
     ctx, agents, placements = _registry_ctx(tmp_path, [other, node])
     legacy = agents.create_agent(
-        "alice", {"displayName": "Captain America", "executorKind": "claude"}
+        "alice", {"displayName": "Captain America", "executorKind": "claude", "defaultRole": "implementer"}
     )
     legacy = agents.update_agent(legacy["id"], {"compatibilityKey": "alice:claude"})
     placements.create_placement(legacy, "node_other")
@@ -665,7 +665,7 @@ def test_reprovisioned_managed_computer_keeps_custom_agent_placement(
         historical_runtime_ids={"runtime_old", "runtime_new"},
     )
     custom = agents.create_agent(
-        "alice", {"displayName": "Release Builder", "executorKind": "codex"}
+        "alice", {"displayName": "Release Builder", "executorKind": "codex", "defaultRole": "implementer"}
     )
     original = create_node_placement(placements, custom, old_node)
 

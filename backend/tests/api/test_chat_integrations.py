@@ -154,6 +154,7 @@ def test_chat_integration_setup_flow_redacts_secrets(monkeypatch) -> None:
                 "supervisorEmployeeId": "alice",
                 "displayName": "Chat agent",
                 "executorKind": "codex",
+                "defaultRole": "implementer",
             },
         ).json()["agent"]
 

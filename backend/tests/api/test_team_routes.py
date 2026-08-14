@@ -43,6 +43,7 @@ def _agent(
     executor: str,
     *,
     place: bool = True,
+    role: str = "implementer",
 ) -> dict:
     response = client.post(
         "/api/v1/admin/agents",
@@ -50,6 +51,7 @@ def _agent(
             "supervisorEmployeeId": employee_id,
             "displayName": name,
             "executorKind": executor,
+            "defaultRole": role,
         },
     )
     assert response.status_code == 201
@@ -906,21 +908,9 @@ def test_team_reviewer_reviews_the_leads_work_and_carries_its_role(monkeypatch) 
                 "status": "ready",
             }
         )
-        lead = _agent(client, "alice", "Lead", "codex", place=False)
-        reviewer = _agent(client, "alice", "Reviewer", "claude", place=False)
-        assert (
-            client.patch(
-                f"/api/v1/admin/agents/{lead['id']}",
-                json={"defaultRole": "implementer"},
-            ).status_code
-            == 200
-        )
-        assert (
-            client.patch(
-                f"/api/v1/admin/agents/{reviewer['id']}",
-                json={"defaultRole": "reviewer"},
-            ).status_code
-            == 200
+        lead = _agent(client, "alice", "Lead", "codex", place=False, role="implementer")
+        reviewer = _agent(
+            client, "alice", "Reviewer", "claude", place=False, role="reviewer"
         )
         for agent in (lead, reviewer):
             assert (
@@ -1450,15 +1440,8 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
                 "status": "ready",
             }
         )
-        lead = _agent(client, "alice", "Lead", "codex")
+        lead = _agent(client, "alice", "Lead", "codex", role="reviewer")
         support = _agent(client, "alice", "Support", "claude")
-        assert (
-            client.patch(
-                f"/api/v1/admin/agents/{lead['id']}",
-                json={"defaultRole": "reviewer"},
-            ).status_code
-            == 200
-        )
         for agent in (lead, support):
             assert (
                 client.post(

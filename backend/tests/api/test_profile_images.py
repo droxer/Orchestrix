@@ -49,6 +49,7 @@ def test_employee_updates_and_removes_agent_and_team_profile_images(
                 "supervisorEmployeeId": "alice",
                 "displayName": "Builder",
                 "executorKind": "codex",
+                "defaultRole": "implementer",
             },
         ).json()["agent"]
         client.app.state.agent_placement_store.create_placement(
@@ -114,6 +115,7 @@ def test_employee_cannot_update_another_employees_profile_image(monkeypatch) -> 
                 "supervisorEmployeeId": "bob",
                 "displayName": "Builder",
                 "executorKind": "codex",
+                "defaultRole": "implementer",
             },
         ).json()["agent"]
         assert client.post("/api/v1/auth/logout").status_code == 200
@@ -143,6 +145,7 @@ def test_profile_image_endpoint_rejects_unsupported_data(monkeypatch) -> None:
                 "supervisorEmployeeId": "alice",
                 "displayName": "Builder",
                 "executorKind": "codex",
+                "defaultRole": "implementer",
             },
         ).json()["agent"]
 
