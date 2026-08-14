@@ -626,7 +626,7 @@ def test_scheduler_materializes_and_dispatches_legacy_assignment() -> None:
             updated = task_store.get_task(legacy["id"])
             assert updated["assignedAgentId"]
             materialized = backend.agent_store.get_agent(updated["assignedAgentId"])
-            assert materialized["compatibilityKey"] == "alice:sbx_alice:codex"
+            assert materialized["compatibilityKey"] == "alice:node:sbx_alice:codex"
             commands = registry.take_commands("sbx_alice", "node_token")
             assert commands[0]["logicalAgentId"] == materialized["id"]
 

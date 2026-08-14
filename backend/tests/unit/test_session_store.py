@@ -627,7 +627,79 @@ def test_agent_started_backfills_session_daemon_node() -> None:
                     },
                 ),
             )
-            assert moved["daemonNodeId"] == "node_a"
+            assert moved["daemonNodeId"] == "node_b"
+
+
+def test_agent_run_history_uses_the_index_projection() -> None:
+    with TemporaryDirectory() as root:
+        stores = (
+            LocalSessionStore(Path(root) / "local"),
+            DatabaseSessionStore(f"sqlite:///{root}/relay.db", create_schema=True),
+        )
+        for store in stores:
+            session = store.create_session(
+                {"workspacePath": "/workspace", "taskGoal": "indexed"}
+            )
+            store.append_event(
+                session["id"],
+                relay_event(
+                    "agent.started",
+                    session["id"],
+                    {
+                        "runId": "run-indexed",
+                        "agent": "codex",
+                        "logicalAgentId": "11111111-1111-1111-1111-111111111111",
+                        "placementId": "22222222-2222-2222-2222-222222222222",
+                    },
+                ),
+            )
+
+            assert store.has_agent_run("11111111-1111-1111-1111-111111111111", set())
+            assert store.has_agent_run(
+                "33333333-3333-3333-3333-333333333333",
+                {"22222222-2222-2222-2222-222222222222"},
+            )
+            store.delete_session(session["id"])
+            assert store.has_agent_run("11111111-1111-1111-1111-111111111111", set())
+
+
+def test_local_agent_run_index_backfills_from_authoritative_events() -> None:
+    with TemporaryDirectory() as root:
+        root_path = Path(root)
+        session_id = "44444444-4444-4444-4444-444444444444"
+        session_dir = root_path / "sessions" / session_id
+        session_dir.mkdir(parents=True)
+        created = relay_event(
+            "session.created",
+            session_id,
+            {"workspacePath": "/workspace", "taskGoal": "recover stale snapshot"},
+        )
+        started = relay_event(
+            "agent.started",
+            session_id,
+            {
+                "runId": "run-before-crash",
+                "agent": "codex",
+                "logicalAgentId": "55555555-5555-5555-5555-555555555555",
+                "placementId": "66666666-6666-6666-6666-666666666666",
+            },
+        )
+        (session_dir / "events.jsonl").write_text(
+            "".join(f"{json.dumps(event)}\n" for event in (created, started)),
+            encoding="utf-8",
+        )
+        (session_dir / "snapshot.json").write_text(
+            json.dumps(materialize_events([created])),
+            encoding="utf-8",
+        )
+
+        store = LocalSessionStore(root_path)
+
+        assert store.has_agent_run("55555555-5555-5555-5555-555555555555", set())
+        assert store.has_agent_run(
+            "77777777-7777-7777-7777-777777777777",
+            {"66666666-6666-6666-6666-666666666666"},
+        )
 
 
 def test_database_session_store_persists_events_and_artifacts() -> None:
@@ -676,7 +748,7 @@ def test_database_session_store_persists_events_and_artifacts() -> None:
                     "runId": "run_1",
                     "agent": "codex",
                     "role": "fixer",
-                    },
+                },
             ),
         )
         completed_event = relay_event(
@@ -881,7 +953,7 @@ def test_deleted_session_stays_deleted_and_retains_token_usage() -> None:
                     {
                         "runId": "run_1",
                         "agent": "codex",
-                        },
+                    },
                 ),
             )
             store.append_event(

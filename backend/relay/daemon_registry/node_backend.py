@@ -270,6 +270,9 @@ class ServerDaemonNodeBackend:
                 request = self._resume_prepared_request(request, prepared_request)
             sandbox = self._validate_run_target(sandbox_id, request)
             existing_session = self._existing_session(request)
+            self._validate_existing_session_computer(
+                existing_session, sandbox_id, request
+            )
             self._validate_run_assignments(
                 sandbox_id,
                 request,
@@ -503,6 +506,51 @@ class ServerDaemonNodeBackend:
                 raise ValueError(
                     f"capacity_exhausted: Sandbox {node_id} has no available execution slot."
                 )
+
+    def _validate_existing_session_computer(
+        self,
+        session: dict[str, Any] | None,
+        sandbox_id: str,
+        request: dict[str, Any],
+    ) -> None:
+        if not session:
+            return
+        nodes = {node["id"]: node for node in self.registry.list_ready()}
+        identity = session.get("computerId")
+        if not identity and session.get("managedNodeId"):
+            identity = f"managed:{session['managedNodeId']}"
+        if not identity and self.agent_placement_store is not None:
+            from ..services.agent_routing import resolve_legacy_session_computer_id
+
+            identity = resolve_legacy_session_computer_id(
+                session,
+                self.agent_placement_store,
+                nodes,
+                self.registry.daemon_store,
+            )
+        if identity is None:
+            recorded = session.get("daemonNodeId")
+            if not recorded:
+                return
+            if recorded in nodes:
+                identity = computer_id(nodes[recorded])
+            elif recorded == sandbox_id:
+                return
+            else:
+                raise ValueError(
+                    "workspace_unavailable: the legacy thread's Computer cannot be recovered."
+                )
+        assignment_node_ids = {
+            assignment.get("daemonNodeId") or sandbox_id
+            for assignment in request["assignments"]
+        }
+        if identity and any(
+            node_id not in nodes or computer_id(nodes[node_id]) != identity
+            for node_id in assignment_node_ids
+        ):
+            raise ValueError(
+                "workspace_unavailable: selected runtime is not on the thread's Computer."
+            )
 
     def _run_owner(
         self, request: dict[str, Any], sandbox: dict[str, Any]

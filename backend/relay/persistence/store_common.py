@@ -371,12 +371,12 @@ def _apply_collaboration_round_started(
 
 
 def _apply_agent_started(session: dict[str, Any], event: dict[str, Any]) -> None:
-    if event.get("daemonNodeId") and not session.get("daemonNodeId"):
+    if any(run["id"] == event["runId"] for run in session["agentRuns"]):
+        return
+    if event.get("daemonNodeId"):
         session["daemonNodeId"] = event["daemonNodeId"]
     if event.get("managedNodeId") and not session.get("managedNodeId"):
         session["managedNodeId"] = event["managedNodeId"]
-    if any(run["id"] == event["runId"] for run in session["agentRuns"]):
-        return
     run = {
         "id": event["runId"],
         "agent": event["agent"],

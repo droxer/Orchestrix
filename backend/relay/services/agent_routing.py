@@ -101,21 +101,15 @@ def resolve_session_daemon_node_id(
     candidates = [
         node
         for node in daemon_nodes
-        if computer_id(node) == identity and not node.get("retiredAt")
+        if computer_id(node) == identity
+        and not node.get("retiredAt")
+        and node.get("online")
+        and not node.get("stale")
+        and node.get("status") in ("ready", "busy", "running")
     ]
     if not candidates:
         return None
-    return min(
-        candidates,
-        key=lambda node: (
-            0
-            if node.get("online")
-            and not node.get("stale")
-            and node.get("status") in ("ready", "busy", "running")
-            else 1,
-            node["id"],
-        ),
-    )["id"]
+    return min(candidates, key=lambda node: node["id"])["id"]
 
 
 def resolve_agent_assignments(
@@ -354,6 +348,8 @@ def resolve_legacy_session_computer_id(
     if not prior_run or not prior_run.get("placementId"):
         return None
     placement = placement_store.get_placement(prior_run["placementId"])
+    if (placement or {}).get("computerId"):
+        return placement["computerId"]
     rebound_node_id = (placement or {}).get("daemonNodeId")
     if not isinstance(rebound_node_id, str) or rebound_node_id == node_id:
         return None

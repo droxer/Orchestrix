@@ -505,9 +505,7 @@ def test_legacy_pre_run_session_follows_managed_runtime_history(
     agent = agents.create_agent(
         "alice", {"displayName": "Builder", "executorKind": "codex"}
     )
-    placements.create_placement(
-        agent, "node_new", {"managedNodeId": "computer_one"}
-    )
+    placements.create_placement(agent, "node_new", {"managedNodeId": "computer_one"})
     session = {
         "id": "ses_legacy",
         "daemonNodeId": "node_old",
@@ -855,12 +853,33 @@ def test_offline_computer_resolves_to_nothing_instead_of_borrowing() -> None:
     assert resolve_session_daemon_node_id(session, other_machine) is None
 
 
+def test_offline_runtime_on_the_same_computer_resolves_to_nothing() -> None:
+    from relay.services.agent_routing import resolve_session_daemon_node_id
+
+    session = {"id": "s1", "computerId": "managed:mnode-7"}
+    offline = [
+        {
+            "id": "node-old",
+            "managedNodeId": "mnode-7",
+            "online": False,
+            "stale": True,
+            "status": "stopped",
+        }
+    ]
+    assert resolve_session_daemon_node_id(session, offline) is None
+
+
 def test_online_node_wins_over_an_offline_one_on_the_same_computer() -> None:
     from relay.services.agent_routing import resolve_session_daemon_node_id
 
     session = {"id": "s1", "computerId": "managed:mnode-7"}
     nodes = [
-        {"id": "node-a", "managedNodeId": "mnode-7", "online": False, "status": "stopped"},
+        {
+            "id": "node-a",
+            "managedNodeId": "mnode-7",
+            "online": False,
+            "status": "stopped",
+        },
         {
             "id": "node-b",
             "managedNodeId": "mnode-7",
@@ -1015,4 +1034,41 @@ def test_legacy_rebind_chasing_uses_the_latest_run_with_a_daemon_node_id(
             session, placements, nodes, daemon_store=None
         )
         is None
+    )
+
+
+def test_legacy_session_recovers_device_identity_from_its_run_placement(
+    tmp_path: Path,
+) -> None:
+    from relay.persistence.agent_placement_store import create_node_placement
+    from relay.services.agent_routing import resolve_legacy_session_computer_id
+
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Builder", "executorKind": "codex"}
+    )
+    placement = create_node_placement(
+        placements,
+        agent,
+        {
+            "id": "node-old",
+            "employeeId": "alice",
+            "workspaceId": "machine-a",
+        },
+    )
+    session = {
+        "id": "ses-legacy",
+        "daemonNodeId": "node-old",
+        "agentRuns": [
+            {
+                "daemonNodeId": "node-old",
+                "placementId": placement["id"],
+            }
+        ],
+    }
+
+    assert (
+        resolve_legacy_session_computer_id(session, placements, {}, daemon_store=None)
+        == "device:alice:machine-a"
     )

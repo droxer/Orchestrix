@@ -9,6 +9,7 @@ from typing import Any
 
 from loguru import logger
 
+from ..core.computer_identity import computer_id
 from ..core.models import AgentName
 from ..daemon_registry import node_accepts_run
 from ..persistence.agent_placement_store import create_node_placement
@@ -75,7 +76,7 @@ def materialize_legacy_agent_assignment(
         employee_id,
         executor_kind,
         node["id"],
-        computer_id=node.get("managedNodeId") or node["id"],
+        computer_id=computer_id(node),
     )
     placement = next(
         (

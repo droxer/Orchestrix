@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
+from ..core.computer_identity import computer_id
 from ..daemon_registry import (
     provisioned_sandbox_record,
     public_sandbox_record,
@@ -199,9 +200,16 @@ def _resolve_legacy_assignment(
         employee_id,
         assignment["agent"],
         sandbox_id,
-        computer_id=(node or {}).get("managedNodeId") or sandbox_id,
+        computer_id=computer_id(node or {"id": sandbox_id}),
     )
-    placement = next((item for item in ctx.agent_placement_store.list_placements(agent_id=agent["id"]) if item["daemonNodeId"] == sandbox_id), None)
+    placement = next(
+        (
+            item
+            for item in ctx.agent_placement_store.list_placements(agent_id=agent["id"])
+            if item["daemonNodeId"] == sandbox_id
+        ),
+        None,
+    )
     if placement is None:
         placement = create_node_placement(
             ctx.agent_placement_store, agent, node or {"id": sandbox_id}
