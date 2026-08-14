@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from loguru import logger
 from starlette.concurrency import run_in_threadpool
 
+from ..core.computer_identity import computer_id as resolve_computer_id
 from ..core.models import AGENT_NAMES
 from ..persistence.stores import valid_agent
 from ..services.event_notifier import session_event_key
@@ -183,29 +184,47 @@ def session_uses_agent(session: dict[str, Any], agent_id: str) -> bool:
 def ensure_sessions_managed_affinity(
     ctx: AppContext, sessions: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
+    """Derive a legacy session's ``computerId`` for a read response only.
+
+    A session that already recorded its own ``managedNodeId`` derives its
+    identity from that directly — it never round-trips through daemon
+    registration history. Only a session with neither field falls back to
+    ``historical_managed_node_ids``. Preferring the session's own record
+    This helper never appends an event. Explicit dispatch paths persist the
+    same derivation; GET/list/workspace reads must remain side-effect free.
+    """
     unresolved_runtime_ids = {
         session["daemonNodeId"]
         for session in sessions
-        if not session.get("managedNodeId")
+        if not session.get("computerId")
+        and not session.get("managedNodeId")
         and isinstance(session.get("daemonNodeId"), str)
     }
-    if not unresolved_runtime_ids:
-        return sessions
-    identities = ctx.registry.daemon_store.historical_managed_node_ids(
-        unresolved_runtime_ids
+    identities = (
+        ctx.registry.daemon_store.historical_managed_node_ids(unresolved_runtime_ids)
+        if unresolved_runtime_ids
+        else {}
     )
-    if not identities:
-        return sessions
-    controller = SessionController(ctx.session_store)
-    return [
-        controller.record_runtime_affinity(
-            session["id"], identities[session["daemonNodeId"]]
-        )
-        if not session.get("managedNodeId")
-        and session.get("daemonNodeId") in identities
-        else session
-        for session in sessions
-    ]
+    resolved: list[dict[str, Any]] = []
+    for session in sessions:
+        if session.get("computerId"):
+            resolved.append(session)
+        elif session.get("managedNodeId"):
+            resolved.append(
+                {**session, "computerId": f"managed:{session['managedNodeId']}"}
+            )
+        elif session.get("daemonNodeId") in identities:
+            managed_node_id = identities[session["daemonNodeId"]]
+            resolved.append(
+                {
+                    **session,
+                    "managedNodeId": managed_node_id,
+                    "computerId": f"managed:{managed_node_id}",
+                }
+            )
+        else:
+            resolved.append(session)
+    return resolved
 
 
 def ensure_session_managed_affinity(
@@ -443,6 +462,7 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
         body, "daemon_node_id"
     )
     managed_node_id = None
+    session_computer_id = None
     task_id = body.get("taskId") if isinstance(body.get("taskId"), str) else None
     task = get_task_for_actor(ctx.task_store, task_id, actor) if task_id else None
     owner = owner_employee_id_for_create(actor, body)
@@ -496,6 +516,7 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
                 403, "The selected computer belongs to another employee."
             )
         managed_node_id = node.get("managedNodeId")
+        session_computer_id = resolve_computer_id(node)
     controller = SessionController(
         ctx.session_store,
         task_store=ctx.task_store,
@@ -503,6 +524,7 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
         workspace_path=workspace_path,
         daemon_node_id=daemon_node_id,
         managed_node_id=managed_node_id,
+        computer_id=session_computer_id,
         **thread_ownership,
     )
     session = controller.create_session(

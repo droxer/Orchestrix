@@ -14,6 +14,7 @@ from ..collaboration.models import (
     COLLABORATION_NEW_SESSION_STATE_KEY,
     CollaborationIdempotencyError,
 )
+from ..core.computer_identity import computer_id
 from ..core.ids import new_sandbox_id, now_iso
 from ..core.models import AGENT_NAMES, DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS
 from ..persistence.protocols import AgentPlacementStore, AgentStore, SessionStore
@@ -22,10 +23,7 @@ from ..sessions import SessionController, initial_agent_state
 from ..sessions.bridge import latest_user_turn_marker
 from .credentials import sandbox_node_auth_error, sandbox_ui_auth_error
 from .registry import DaemonNodeRegistry
-from .scheduling import (
-    node_accepts_run,
-    workspace_identity_record,
-)
+from .scheduling import node_accepts_run
 
 
 class ServerDaemonNodeBackend:
@@ -129,21 +127,23 @@ class ServerDaemonNodeBackend:
         )
         if not placement or placement.get("desiredState") != "active":
             raise ValueError("placement is not active")
+        from ..services.agent_routing import placement_node
+
+        current_node = placement_node(
+            placement,
+            {node["id"]: node for node in self.registry.monitor_nodes()},
+        )
         if (
             placement.get("agentId") != agent.get("id")
             or placement.get("supervisorEmployeeId")
             != agent.get("supervisorEmployeeId")
-            or placement.get("daemonNodeId") != assignment.get("daemonNodeId")
+            or not current_node
+            or current_node["id"] != assignment.get("daemonNodeId")
             or placement.get("executorKind") != agent.get("executorKind")
-            or (placement.get("workspacePolicy") or {"kind": "node-affine"})
-            != (assignment.get("workspacePolicy") or {"kind": "node-affine"})
         ):
             raise ValueError("placement no longer matches the selected agent and node")
-        node = self.registry.get(assignment.get("daemonNodeId"))
-        if not node:
+        if not self.registry.get(assignment.get("daemonNodeId")):
             raise ValueError("daemon node is no longer available")
-        if assignment.get("workspaceIdentity") != workspace_identity_record(node):
-            raise ValueError("daemon node workspace identity changed")
 
     def provision(self, payload: dict[str, Any]) -> dict[str, Any]:
         requested_sandbox_id = payload.get("sandboxId")
@@ -270,10 +270,12 @@ class ServerDaemonNodeBackend:
                 request = self._resume_prepared_request(request, prepared_request)
             sandbox = self._validate_run_target(sandbox_id, request)
             existing_session = self._existing_session(request)
+            self._validate_existing_session_computer(
+                existing_session, sandbox_id, request
+            )
             self._validate_run_assignments(
                 sandbox_id,
                 request,
-                existing_session,
                 active_runs_by_node,
             )
             actor_employee_id, owner_agent_id, owner_employee_id = self._run_owner(
@@ -343,13 +345,6 @@ class ServerDaemonNodeBackend:
                 "executorKind": assignment.get("executorKind")
                 or assignment.get("agent"),
             }
-            if assignment.get("agentId") and not assignment.get("workspaceIdentity"):
-                identity = workspace_identity_record(
-                    self.registry.get(assignment.get("daemonNodeId") or sandbox_id)
-                    or {}
-                )
-                if identity:
-                    resolved["workspaceIdentity"] = identity
             resolved_assignments.append(resolved)
         return {**request, "assignments": resolved_assignments}
 
@@ -483,20 +478,8 @@ class ServerDaemonNodeBackend:
         self,
         sandbox_id: str,
         request: dict[str, Any],
-        existing_session: dict[str, Any] | None,
         active_runs_by_node: dict[str, list[dict[str, Any]]],
     ) -> None:
-        if existing_session and request.get("agentFirst") is True:
-            from ..services.agent_routing import (
-                validate_session_workspace_assignments,
-            )
-
-            validate_session_workspace_assignments(
-                request["assignments"],
-                session=existing_session,
-                placement_store=self.agent_placement_store,
-                daemon_nodes=self.registry.monitor_nodes(),
-            )
         for assignment in request["assignments"]:
             node_id = assignment.get("daemonNodeId") or sandbox_id
             node = self.registry.get(node_id)
@@ -523,6 +506,51 @@ class ServerDaemonNodeBackend:
                 raise ValueError(
                     f"capacity_exhausted: Sandbox {node_id} has no available execution slot."
                 )
+
+    def _validate_existing_session_computer(
+        self,
+        session: dict[str, Any] | None,
+        sandbox_id: str,
+        request: dict[str, Any],
+    ) -> None:
+        if not session:
+            return
+        nodes = {node["id"]: node for node in self.registry.list_ready()}
+        identity = session.get("computerId")
+        if not identity and session.get("managedNodeId"):
+            identity = f"managed:{session['managedNodeId']}"
+        if not identity and self.agent_placement_store is not None:
+            from ..services.agent_routing import resolve_legacy_session_computer_id
+
+            identity = resolve_legacy_session_computer_id(
+                session,
+                self.agent_placement_store,
+                nodes,
+                self.registry.daemon_store,
+            )
+        if identity is None:
+            recorded = session.get("daemonNodeId")
+            if not recorded:
+                return
+            if recorded in nodes:
+                identity = computer_id(nodes[recorded])
+            elif recorded == sandbox_id:
+                return
+            else:
+                raise ValueError(
+                    "workspace_unavailable: the legacy thread's Computer cannot be recovered."
+                )
+        assignment_node_ids = {
+            assignment.get("daemonNodeId") or sandbox_id
+            for assignment in request["assignments"]
+        }
+        if identity and any(
+            node_id not in nodes or computer_id(nodes[node_id]) != identity
+            for node_id in assignment_node_ids
+        ):
+            raise ValueError(
+                "workspace_unavailable: selected runtime is not on the thread's Computer."
+            )
 
     def _run_owner(
         self, request: dict[str, Any], sandbox: dict[str, Any]
@@ -592,6 +620,7 @@ class ServerDaemonNodeBackend:
             team_id=team_id,
             daemon_node_id=sandbox_id,
             managed_node_id=sandbox.get("managedNodeId"),
+            computer_id=computer_id(sandbox),
         )
 
     @staticmethod

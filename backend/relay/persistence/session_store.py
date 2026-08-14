@@ -60,14 +60,23 @@ from .store_common import (
     metadata as shared_metadata,
 )
 
+_AFFINITY_LOCKS: dict[str, RLock] = {}
+_AFFINITY_LOCKS_GUARD = RLock()
+
+
+def _shared_affinity_lock(key: str) -> RLock:
+    with _AFFINITY_LOCKS_GUARD:
+        return _AFFINITY_LOCKS.setdefault(key, RLock())
+
 
 class LocalSessionStore:
     def __init__(self, root_dir: str | Path = DEFAULT_RELAY_DATA_DIR):
         self.root_dir = Path(root_dir)
         self.sessions_dir = self.root_dir / "sessions"
-        self._lock = RLock()
+        self._lock = _shared_affinity_lock(f"local:{self.sessions_dir.resolve()}")
         self._event_listener: Callable[[str], None] | None = None
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
+        self._ensure_agent_runs_index()
 
     def set_event_listener(
         self, listener: Callable[[str], None], *, database_channel: str | None = None
@@ -116,6 +125,15 @@ class LocalSessionStore:
                         if payload.get("managedNodeId")
                         else {}
                     ),
+                    **(
+                        {"computerId": payload["computerId"]}
+                        if payload.get("computerId")
+                        else (
+                            {"computerId": f"managed:{payload['managedNodeId']}"}
+                            if payload.get("managedNodeId")
+                            else {}
+                        )
+                    ),
                     "taskGoal": payload["taskGoal"],
                     "participants": payload.get("participants", ["human"]),
                 },
@@ -162,6 +180,10 @@ class LocalSessionStore:
             if self._tombstone_path(session_id).exists():
                 raise KeyError(session_id)
             self._session_dir(session_id).mkdir(parents=True, exist_ok=True)
+            # Projection first is fail-closed: a filesystem failure may block a
+            # future first attachment, but can never forget a run that started.
+            if event.get("type") == "agent.started":
+                self._record_agent_run(event)
             _append_jsonl(self._events_path(session_id), event)
             logger.debug(
                 "Session event appended",
@@ -186,6 +208,31 @@ class LocalSessionStore:
                 }
         self._notify_event(session_id)
         return session
+
+    def record_runtime_affinity(
+        self, session_id: str, computer_id: str
+    ) -> dict[str, Any]:
+        with self._lock:
+            current = self.get_session(session_id)
+            existing = current.get("computerId")
+            if existing:
+                if existing != computer_id:
+                    raise ValueError("Session already belongs to another Computer.")
+                return current
+            existing_managed_node_id = current.get("managedNodeId")
+            if (
+                existing_managed_node_id
+                and computer_id != f"managed:{existing_managed_node_id}"
+            ):
+                raise ValueError("Session already belongs to another Computer.")
+            return self.append_event(
+                session_id,
+                relay_event(
+                    "session.runtime_affinity",
+                    session_id,
+                    {"computerId": computer_id},
+                ),
+            )
 
     def _notify_event(self, session_id: str) -> None:
         if not self._event_listener:
@@ -280,9 +327,23 @@ class LocalSessionStore:
         sessions = [
             self.get_session(path.name)
             for path in self.sessions_dir.iterdir()
-            if path.is_dir()
+            if path.is_dir() and self._events_path(path.name).exists()
         ]
         return sorted(sessions, key=lambda item: item["updatedAt"], reverse=True)
+
+    def has_agent_run(self, logical_agent_id: str, placement_ids: set[str]) -> bool:
+        """Query constant-time marker files without scanning session histories."""
+        with self._lock:
+            if (
+                self._agent_runs_index_dir() / "logical" / safe_name(logical_agent_id)
+            ).exists():
+                return True
+            return any(
+                (
+                    self._agent_runs_index_dir() / "placement" / safe_name(placement_id)
+                ).exists()
+                for placement_id in placement_ids
+            )
 
     def list_session_summaries(
         self, *, owner_employee_id: str | None = None, limit: int = 100
@@ -292,7 +353,9 @@ class LocalSessionStore:
         summaries = [
             _read_json(self._snapshot_path(path.name))
             for path in self.sessions_dir.iterdir()
-            if path.is_dir() and self._snapshot_path(path.name).exists()
+            if path.is_dir()
+            and path != self._agent_runs_index_dir()
+            and self._snapshot_path(path.name).exists()
         ]
         if owner_employee_id is not None:
             summaries = [
@@ -445,9 +508,40 @@ class LocalSessionStore:
     def _token_usage_ledger_path(self) -> Path:
         return self.sessions_dir / "token-usage.jsonl"
 
+    def _agent_runs_index_dir(self) -> Path:
+        return self.sessions_dir / "agent-run-index"
+
+    def _agent_runs_index_marker(self) -> Path:
+        return self._agent_runs_index_dir() / ".complete"
+
+    def _record_agent_run(self, event: dict[str, Any]) -> None:
+        for kind, value in (
+            ("logical", event.get("logicalAgentId")),
+            ("placement", event.get("placementId")),
+        ):
+            if not value:
+                continue
+            directory = self._agent_runs_index_dir() / kind
+            directory.mkdir(parents=True, exist_ok=True)
+            (directory / safe_name(value)).touch(exist_ok=True)
+
+    def _ensure_agent_runs_index(self) -> None:
+        marker = self._agent_runs_index_marker()
+        if marker.exists():
+            return
+        for path in self.sessions_dir.iterdir():
+            events_path = self._events_path(path.name)
+            if not path.is_dir() or not events_path.exists():
+                continue
+            for event in _read_jsonl(events_path):
+                if event.get("type") == "agent.started":
+                    self._record_agent_run(event)
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.touch(exist_ok=True)
+
 
 class DatabaseSessionStore:
-    REQUIRED_SCHEMA_REVISION = "20260729_0043"
+    REQUIRED_SCHEMA_REVISION = "20260814_0062"
     metadata = shared_metadata
 
     sessions = Table(
@@ -537,6 +631,19 @@ class DatabaseSessionStore:
         Index("ix_session_run_token_usage_completed_at", "completed_at"),
         Index("ix_session_run_token_usage_owner_employee_id", "owner_employee_id"),
     )
+    agent_runs = Table(
+        "session_agent_runs",
+        metadata,
+        database_id_column(),
+        # No FK: the fact that an agent has run must survive thread deletion.
+        Column("session_id", entity_uuid_type(), nullable=False),
+        Column("run_id", Text, nullable=False),
+        Column("logical_agent_id", Text, nullable=True),
+        Column("placement_id", Text, nullable=True),
+        UniqueConstraint("session_id", "run_id", name="uq_session_agent_runs_run"),
+        Index("ix_session_agent_runs_logical_agent", "logical_agent_id"),
+        Index("ix_session_agent_runs_placement", "placement_id"),
+    )
     tombstones = Table(
         "session_tombstones",
         metadata,
@@ -557,6 +664,7 @@ class DatabaseSessionStore:
         create_schema: bool = False,
     ):
         self.engine = shared_engine(database_url)
+        self._affinity_lock = _shared_affinity_lock(f"database:{self.engine.url}")
         self._event_listener: Callable[[str], None] | None = None
         self._event_notification_channel: str | None = None
         if create_schema:
@@ -576,6 +684,7 @@ class DatabaseSessionStore:
             "session_events",
             "session_artifacts",
             "session_run_token_usage",
+            "session_agent_runs",
             "session_tombstones",
         }
         missing = required_tables.difference(schema.get_table_names())
@@ -590,6 +699,7 @@ class DatabaseSessionStore:
                 self.events,
                 self.artifacts,
                 self.run_token_usage,
+                self.agent_runs,
                 self.tombstones,
             )
         }
@@ -604,6 +714,7 @@ class DatabaseSessionStore:
         required_unique_constraints = {
             "session_events": {("session_id", "sequence")},
             "session_run_token_usage": {("session_id", "run_id")},
+            "session_agent_runs": {("session_id", "run_id")},
         }
         for table_name, expected in required_unique_constraints.items():
             actual = {
@@ -666,6 +777,15 @@ class DatabaseSessionStore:
                         {"managedNodeId": payload["managedNodeId"]}
                         if payload.get("managedNodeId")
                         else {}
+                    ),
+                    **(
+                        {"computerId": payload["computerId"]}
+                        if payload.get("computerId")
+                        else (
+                            {"computerId": f"managed:{payload['managedNodeId']}"}
+                            if payload.get("managedNodeId")
+                            else {}
+                        )
                     ),
                     "taskGoal": payload["taskGoal"],
                     "participants": payload.get("participants", ["human"]),
@@ -787,6 +907,7 @@ class DatabaseSessionStore:
             )
         for run in session.get("agentRuns", []):
             if run.get("id"):
+                self._insert_agent_run(conn, session_row["id"], run)
                 self._sync_run_token_usage(
                     conn, session_row["id"], session, str(run["id"])
                 )
@@ -808,6 +929,73 @@ class DatabaseSessionStore:
                     raise
                 time.sleep(0.01 * (attempt + 1))
         raise RuntimeError("unreachable")
+
+    def record_runtime_affinity(
+        self, session_id: str, computer_id: str
+    ) -> dict[str, Any]:
+        event = relay_event(
+            "session.runtime_affinity", session_id, {"computerId": computer_id}
+        )
+        wrote_event = False
+        with self._affinity_lock, store_transaction(self.engine) as conn:
+            row = (
+                conn.execute(
+                    select(
+                        self.sessions.c.id,
+                        self.sessions.c.snapshot,
+                        self.sessions.c.version,
+                    )
+                    .where(self.sessions.c.id == session_id)
+                    .with_for_update()
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                raise KeyError(session_id)
+            current = row["snapshot"] or {}
+            existing = current.get("computerId")
+            if existing:
+                if existing != computer_id:
+                    raise ValueError("Session already belongs to another Computer.")
+            else:
+                existing_managed_node_id = current.get("managedNodeId")
+                if (
+                    existing_managed_node_id
+                    and computer_id != f"managed:{existing_managed_node_id}"
+                ):
+                    raise ValueError("Session already belongs to another Computer.")
+                session_pk = row["id"]
+                sequence = int(row["version"] or 0)
+                conn.execute(
+                    insert(self.events).values(
+                        **session_event_to_row(session_pk, sequence, event)
+                    )
+                )
+                session = apply_session_event(
+                    compact_session_snapshot(current, event_count=sequence + 1),
+                    event,
+                    retain_event=False,
+                )
+                conn.execute(
+                    update(self.sessions)
+                    .where(self.sessions.c.id == session_pk)
+                    .values(
+                        **session_to_row(
+                            session, version=sequence + 1, database_id=session_pk
+                        )
+                    )
+                )
+                publish_database_notification(
+                    conn,
+                    self.engine,
+                    self._event_notification_channel,
+                    f"session:{session_id}",
+                )
+                wrote_event = True
+        if wrote_event:
+            self._notify_event(session_id)
+        return self.get_session(session_id)
 
     def _append_event_once(
         self, session_id: str, event: dict[str, Any]
@@ -855,6 +1043,17 @@ class DatabaseSessionStore:
                 self._sync_run_token_usage(
                     conn, session_pk, session, str(event.get("runId") or "")
                 )
+            elif event.get("type") == "agent.started":
+                run = next(
+                    (
+                        item
+                        for item in session.get("agentRuns") or []
+                        if item.get("id") == event.get("runId")
+                    ),
+                    None,
+                )
+                if run:
+                    self._insert_agent_run(conn, session_pk, run)
             publish_database_notification(
                 conn,
                 self.engine,
@@ -1101,6 +1300,41 @@ class DatabaseSessionStore:
             }
             for row in rows
         ]
+
+    def has_agent_run(self, logical_agent_id: str, placement_ids: set[str]) -> bool:
+        """Use indexed run projections rather than scanning session snapshots."""
+        predicates = [self.agent_runs.c.logical_agent_id == logical_agent_id]
+        if placement_ids:
+            predicates.append(self.agent_runs.c.placement_id.in_(placement_ids))
+        with store_transaction(self.engine) as conn:
+            return (
+                conn.execute(
+                    select(self.agent_runs.c.id).where(or_(*predicates)).limit(1)
+                ).first()
+                is not None
+            )
+
+    def _insert_agent_run(
+        self, conn: Any, session_pk: str, run: dict[str, Any]
+    ) -> None:
+        if not run.get("logicalAgentId") and not run.get("placementId"):
+            return
+        exists = conn.execute(
+            select(self.agent_runs.c.id)
+            .where(self.agent_runs.c.session_id == session_pk)
+            .where(self.agent_runs.c.run_id == run["id"])
+        ).first()
+        if exists:
+            return
+        conn.execute(
+            insert(self.agent_runs).values(
+                id=new_database_id(),
+                session_id=session_pk,
+                run_id=run["id"],
+                logical_agent_id=run.get("logicalAgentId"),
+                placement_id=run.get("placementId"),
+            )
+        )
 
     def list_session_summaries(
         self, *, owner_employee_id: str | None = None, limit: int = 100

@@ -20,7 +20,6 @@ from .scheduling import (
     effective_role_for_assignment,
     node_accepts_run,
     normalize_agent_role_map,
-    workspace_identity,
     workspace_paths_match,
 )
 from .node_backend import ServerDaemonNodeBackend
@@ -45,5 +44,4 @@ __all__ = [
     "sandbox_ui_auth_error",
     "sandbox_ui_token_matches",
     "workspace_paths_match",
-    "workspace_identity",
 ]

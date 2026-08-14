@@ -57,6 +57,7 @@ class SessionController:
         team_id: str | None = None,
         daemon_node_id: str | None = None,
         managed_node_id: str | None = None,
+        computer_id: str | None = None,
     ):
         self.store = store
         self.task_store = task_store
@@ -67,6 +68,7 @@ class SessionController:
         self.team_id = team_id
         self.daemon_node_id = daemon_node_id
         self.managed_node_id = managed_node_id
+        self.computer_id = computer_id
         self.active_session_id = ""
 
     def create_session(
@@ -97,6 +99,7 @@ class SessionController:
                     if self.managed_node_id
                     else {}
                 ),
+                **({"computerId": self.computer_id} if self.computer_id else {}),
                 "taskGoal": task_goal,
                 "participants": participants or ["human"],
                 "status": "running",
@@ -414,22 +417,10 @@ class SessionController:
         return self.store.get_session(session_id)
 
     def record_runtime_affinity(
-        self, session_id: str, managed_node_id: str
+        self, session_id: str, computer_id: str
     ) -> dict[str, Any]:
-        current = self.store.get_session(session_id)
-        existing = current.get("managedNodeId")
-        if existing:
-            if existing != managed_node_id:
-                raise ValueError("Session already belongs to another managed Computer.")
-            return current
-        return self._append(
-            session_id,
-            relay_event(
-                "session.runtime_affinity",
-                session_id,
-                {"managedNodeId": managed_node_id},
-            ),
-        )
+        """把 thread 钉到一台 Computer。写一次，之后不可改。"""
+        return self.store.record_runtime_affinity(session_id, computer_id)
 
     def delete_session(
         self,

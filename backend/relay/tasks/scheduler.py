@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Any, Callable
+from typing import Any
 
 from loguru import logger
 
+from ..core.computer_identity import computer_id
 from ..core.models import AgentName
 from ..daemon_registry import node_accepts_run
 from ..persistence.agent_placement_store import create_node_placement
@@ -17,6 +19,7 @@ from ..services.agent_routing import (
     AgentRoutingError,
     dispatch_failure_code,
     dispatch_reason_code,
+    persist_legacy_session_computer_id,
     resolve_agent_assignments,
 )
 from ..services.task_rounds import (
@@ -73,7 +76,7 @@ def materialize_legacy_agent_assignment(
         employee_id,
         executor_kind,
         node["id"],
-        computer_id=node.get("managedNodeId") or node["id"],
+        computer_id=computer_id(node),
     )
     placement = next(
         (
@@ -289,6 +292,14 @@ class TaskScheduler:
             try:
                 employee_id = task_execution_employee_id(task)
                 daemon_nodes = self.registry.monitor_nodes()
+                if resume_session:
+                    resume_session = persist_legacy_session_computer_id(
+                        resume_session,
+                        session_store=self.registry.store,
+                        placement_store=self.backend.agent_placement_store,
+                        nodes={node["id"]: node for node in daemon_nodes},
+                        daemon_store=self.registry.daemon_store,
+                    )
                 if team_id:
                     assignments = resolve_team_task_assignments(
                         task,
@@ -296,6 +307,7 @@ class TaskScheduler:
                         agent_store=self.backend.agent_store,
                         placement_store=self.backend.agent_placement_store,
                         daemon_nodes=daemon_nodes,
+                        session_store=self.registry.store,
                     )
                     agent = assignments[0]["agent"]
                 else:
@@ -313,6 +325,8 @@ class TaskScheduler:
                         placement_store=self.backend.agent_placement_store,
                         daemon_nodes=daemon_nodes,
                         session=resume_session,
+                        daemon_store=self.registry.daemon_store,
+                        session_store=self.registry.store,
                     )
                 node = self.registry.get(assignments[0]["daemonNodeId"])
             except TeamDispatchError as error:

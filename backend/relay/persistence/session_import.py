@@ -157,7 +157,11 @@ def migrate_local_sessions(
         raise ValueError(f"Legacy sessions directory does not exist: {sessions_dir}")
     reserved_event_ids: set[str] = set()
     reserved_artifact_ids: set[str] = set()
-    for session_dir in sorted(path for path in sessions_dir.iterdir() if path.is_dir()):
+    for session_dir in sorted(
+        path
+        for path in sessions_dir.iterdir()
+        if path.is_dir() and (path / "events.jsonl").is_file()
+    ):
         report["discovered"] += 1
         session_id = session_dir.name
         try:

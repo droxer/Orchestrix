@@ -13,6 +13,7 @@ from starlette.concurrency import run_in_threadpool
 
 from ..core.ids import new_database_id
 from ..services.agent_routing import (
+    resolve_legacy_session_computer_id,
     resolve_session_daemon_node_id,
 )
 from ..services.agent_workspace_snapshot import snapshot_file, snapshot_listing
@@ -168,12 +169,22 @@ def _select_thread_node(
         return None
     capability = "workspace-read-shared" if scope == "shared" else "workspace-read"
     nodes = ctx.registry.monitor_nodes()
-    node_id = resolve_session_daemon_node_id(
-        session,
-        ctx.agent_placement_store,
-        nodes,
-        ctx.registry.daemon_store,
+    nodes_by_id = {node["id"]: node for node in nodes}
+    # Read-only recovery for sessions that predate Task 5's computerId
+    # backfill; never persists, so it cannot trip the write-once guard in
+    # SessionController.record_runtime_affinity. See
+    # resolve_legacy_session_computer_id's docstring for why this route
+    # needs its own recovery instead of relying on collaboration's
+    # _backfill_runtime_affinity.
+    identity = resolve_legacy_session_computer_id(
+        session, ctx.agent_placement_store, nodes_by_id, ctx.registry.daemon_store
     )
+    effective_session = (
+        {**session, "computerId": identity}
+        if identity and identity != session.get("computerId")
+        else session
+    )
+    node_id = resolve_session_daemon_node_id(effective_session, nodes)
     node = next((item for item in nodes if item["id"] == node_id), None)
     if (
         node is None

@@ -8,6 +8,7 @@ from typing import Any
 from ..core.ids import new_database_id, new_relay_id
 from ..services.agent_routing import (
     AgentRoutingError,
+    persist_legacy_session_computer_id,
     resolve_agent_assignments,
     resolve_session_daemon_node_id,
 )
@@ -275,12 +276,7 @@ class CollaborationConductor:
             )
 
         daemon_nodes = self.ctx.registry.monitor_nodes()
-        session_node_id = resolve_session_daemon_node_id(
-            session,
-            self.ctx.agent_placement_store,
-            daemon_nodes,
-            self.ctx.registry.daemon_store,
-        )
+        session_node_id = resolve_session_daemon_node_id(session, daemon_nodes)
         requested_original_runtime = bool(
             session
             and session.get("managedNodeId")
@@ -317,6 +313,7 @@ class CollaborationConductor:
             session=session,
             required_node_id=required_node_id,
             daemon_store=self.ctx.registry.daemon_store,
+            session_store=self.ctx.session_store,
         )
         resolved = compile_assignment_work_graph(
             resolved,
@@ -454,19 +451,13 @@ class CollaborationConductor:
     def _backfill_runtime_affinity(
         self, session: dict[str, Any] | None
     ) -> dict[str, Any] | None:
-        if (
-            not session
-            or session.get("managedNodeId")
-            or not session.get("daemonNodeId")
-        ):
-            return session
-        managed_node_id = self.ctx.registry.daemon_store.historical_managed_node_id(
-            session["daemonNodeId"]
-        )
-        if not managed_node_id:
-            return session
-        return SessionController(self.ctx.session_store).record_runtime_affinity(
-            session["id"], managed_node_id
+        nodes = self.ctx.registry.monitor_nodes()
+        return persist_legacy_session_computer_id(
+            session,
+            session_store=self.ctx.session_store,
+            placement_store=self.ctx.agent_placement_store,
+            nodes={node["id"]: node for node in nodes},
+            daemon_store=self.ctx.registry.daemon_store,
         )
 
     def _team_employee_id(

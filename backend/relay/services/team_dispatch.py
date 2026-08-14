@@ -76,6 +76,7 @@ def resolve_team_task_assignments(
     agent_store: Any,
     placement_store: Any,
     daemon_nodes: list[dict[str, Any]],
+    session_store: Any | None = None,
 ) -> list[dict[str, Any]]:
     team, agents = _task_team_agents(
         task,
@@ -89,6 +90,7 @@ def resolve_team_task_assignments(
         agent_store=agent_store,
         placement_store=placement_store,
         daemon_nodes=daemon_nodes,
+        session_store=session_store,
     )
 
 

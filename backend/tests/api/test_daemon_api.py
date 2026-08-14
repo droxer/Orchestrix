@@ -484,7 +484,7 @@ def test_recovered_managed_node_can_register_replacement_agents(monkeypatch) -> 
             if agent["executorKind"] == "claude"
         ]
         assert [agent["compatibilityKey"] for agent in live_claude] == [
-            f"alice:{managed['id']}:claude"
+            f"alice:managed:{managed['id']}:claude"
         ]
 
 
@@ -801,7 +801,7 @@ def test_stopped_managed_runtime_preserves_agent_for_restart(monkeypatch) -> Non
         assert preserved["managedNodeId"] == managed["id"]
 
 
-def test_backend_startup_migrates_managed_agent_identity(monkeypatch) -> None:
+def test_backend_startup_retires_superseded_managed_agent_identity(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         original = create_app(root)
@@ -857,20 +857,22 @@ def test_backend_startup_migrates_managed_agent_identity(monkeypatch) -> None:
 
         restarted = create_app(root)
 
-        migrated = next(
+        current = next(
             item
             for item in restarted.state.agent_store.list_agents(
                 supervisor_employee_id="alice"
             )
             if item["executorKind"] == "codex"
         )
-        assert migrated["id"] == legacy["id"]
-        assert migrated["compatibilityKey"] == f"alice:{managed['id']}:codex"
+        assert current["id"] != legacy["id"]
+        assert current["compatibilityKey"] == f"alice:managed:{managed['id']}:codex"
+        assert restarted.state.agent_store.get_agent(legacy["id"]).get("deletedAt")
         [placement] = restarted.state.agent_placement_store.list_placements(
-            agent_id=legacy["id"]
+            agent_id=current["id"]
         )
         assert placement["daemonNodeId"] == replacement["id"]
         assert placement["daemonNodeId"] != old_runtime_id
+        assert placement["computerId"] == f"managed:{managed['id']}"
 
 
 def test_failed_managed_node_is_visible_as_failed(monkeypatch) -> None:

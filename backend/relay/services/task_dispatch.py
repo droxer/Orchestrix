@@ -244,6 +244,7 @@ class TaskDispatcher:
                 agent_store=self.ctx.agent_store,
                 placement_store=self.ctx.agent_placement_store,
                 daemon_nodes=self.ctx.registry.monitor_nodes(),
+                session_store=self.ctx.session_store,
             )
             self.team_assignment_resolved = True
             return None
@@ -337,6 +338,7 @@ class TaskDispatcher:
                     agent_store=self.ctx.agent_store,
                     placement_store=self.ctx.agent_placement_store,
                     daemon_nodes=self.ctx.registry.monitor_nodes(),
+                    session_store=self.ctx.session_store,
                 )
             except AgentRoutingError as error:
                 if not self.record_pending:

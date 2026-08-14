@@ -5,21 +5,21 @@ from threading import RLock
 from typing import Any
 
 from sqlalchemy import (
-    JSON,
     BigInteger,
     Column,
     DateTime,
     ForeignKey,
     Index,
     Table,
-    UniqueConstraint,
     Text,
+    UniqueConstraint,
     insert,
     select,
     text,
     update,
 )
 
+from ..core.computer_identity import computer_id
 from ..core.ids import new_database_id, now_iso
 from ..core.models import AGENT_NAMES
 from .agent_store import DatabaseAgentStore
@@ -31,20 +31,29 @@ from .store_common import (
     _read_json,
     _read_jsonl,
     _write_json,
+    create_all_tables,
     database_id_column,
     entity_uuid_type,
-    create_all_tables,
     json_type,
+    safe_name,
     shared_engine,
     store_transaction,
+)
+from .store_common import (
     metadata as shared_metadata,
-    safe_name,
 )
 
 PLACEMENT_DESIRED_STATES = frozenset({"active", "draining", "removed"})
 PLACEMENT_PATCH_FIELDS = frozenset(
     {"desiredState", "priority", "workspacePolicy", "agentVersion", "conditions"}
 )
+_PLACEMENT_LOCKS: dict[str, RLock] = {}
+_PLACEMENT_LOCKS_GUARD = RLock()
+
+
+def _shared_placement_lock(key: str) -> RLock:
+    with _PLACEMENT_LOCKS_GUARD:
+        return _PLACEMENT_LOCKS.setdefault(key, RLock())
 
 
 class LocalAgentPlacementStore:
@@ -53,7 +62,7 @@ class LocalAgentPlacementStore:
     def __init__(self, root_dir: str | Path = DEFAULT_RELAY_DATA_DIR):
         self.root = Path(root_dir) / "agent-placements"
         self.root.mkdir(parents=True, exist_ok=True)
-        self._lock = RLock()
+        self._lock = _shared_placement_lock(f"local:{self.root.resolve()}")
 
     def create_placement(
         self,
@@ -85,6 +94,31 @@ class LocalAgentPlacementStore:
                 self.update_placement(placement["id"], {"desiredState": "removed"})
                 raise
             return placement
+
+    def attach_first_managed_placement(
+        self,
+        agent: dict[str, Any],
+        node: dict[str, Any],
+        *,
+        expected_placement_ids: set[str],
+    ) -> dict[str, Any] | None:
+        """Atomically replace only the legacy placements the caller inspected."""
+        target_computer_id = computer_id(node)
+        with self._lock:
+            active = self.list_placements(agent_id=agent["id"])
+            stable = [placement for placement in active if placement.get("computerId")]
+            if stable:
+                return next(
+                    (
+                        placement
+                        for placement in stable
+                        if placement.get("computerId") == target_computer_id
+                    ),
+                    None,
+                )
+            if {placement["id"] for placement in active} != expected_placement_ids:
+                return None
+            return create_node_placement(self, agent, node)
 
     def get_placement(self, placement_id: str) -> dict[str, Any] | None:
         path = self._snapshot_path(placement_id)
@@ -286,7 +320,7 @@ class DatabaseAgentPlacementStore:
 
     def __init__(self, database_url: str, *, create_schema: bool = False):
         self.engine = shared_engine(database_url)
-        self._lock = RLock()
+        self._lock = _shared_placement_lock(f"database:{self.engine.url}")
         if create_schema:
             create_all_tables(self.engine)
 
@@ -331,41 +365,117 @@ class DatabaseAgentPlacementStore:
                 raise ValueError(
                     "Agent already has an active placement on this daemon node."
                 )
-            for row, existing in zip(rows, active, strict=True):
-                removed = {
-                    **existing,
-                    "desiredState": "removed",
-                    "updatedAt": now_iso(),
-                }
-                sequence = int(row["event_version"] or 0)
-                removed_event = _placement_event(
-                    existing["id"], "placement.removed", removed
-                )
+            self._create_placement_locked(conn, placement, rows, active)
+        return placement
+
+    def attach_first_managed_placement(
+        self,
+        agent: dict[str, Any],
+        node: dict[str, Any],
+        *,
+        expected_placement_ids: set[str],
+    ) -> dict[str, Any] | None:
+        """Atomically attach a never-run agent without racing another dispatcher."""
+        target_computer_id = computer_id(node)
+        with self._lock, store_transaction(self.engine) as conn:
+            conn.execute(
+                select(DatabaseAgentStore.agents.c.id)
+                .where(DatabaseAgentStore.agents.c.id == agent["id"])
+                .with_for_update()
+            ).first()
+            rows = (
                 conn.execute(
-                    insert(self.events_table).values(
-                        **_placement_event_row(row["id"], sequence, removed_event)
+                    select(
+                        self.placements.c.id,
+                        self.placements.c.snapshot,
+                        self.placements.c.supervisor_employee_id,
+                        self.placements.c.event_version,
                     )
+                    .where(self.placements.c.agent_id == agent["id"])
+                    .where(self.placements.c.desired_state != "removed")
+                    .with_for_update()
                 )
-                conn.execute(
-                    update(self.placements)
-                    .where(self.placements.c.id == row["id"])
-                    .values(
-                        **_placement_row(
-                            removed,
-                            event_version=sequence + 1,
-                            database_id=row["id"],
-                        )
-                    )
+                .mappings()
+                .all()
+            )
+            active = [
+                _normalized_placement_snapshot(
+                    row["snapshot"], row["supervisor_employee_id"]
                 )
-            event = _placement_event(placement["id"], "placement.created", placement)
-            row = _placement_row(placement, event_version=1)
-            conn.execute(insert(self.placements).values(**row))
+                for row in rows
+            ]
+            stable = [placement for placement in active if placement.get("computerId")]
+            if stable:
+                return next(
+                    (
+                        placement
+                        for placement in stable
+                        if placement.get("computerId") == target_computer_id
+                    ),
+                    None,
+                )
+            if {placement["id"] for placement in active} != expected_placement_ids:
+                return None
+            placement = _new_placement(
+                agent,
+                node["id"],
+                {
+                    **(
+                        {"managedNodeId": node["managedNodeId"]}
+                        if node.get("managedNodeId")
+                        else {}
+                    ),
+                    "computerId": target_computer_id,
+                },
+            )
+            self._create_placement_locked(conn, placement, rows, active)
+            return placement
+
+    def _create_placement_locked(
+        self,
+        conn: Any,
+        placement: dict[str, Any],
+        rows: list[Any],
+        active: list[dict[str, Any]],
+    ) -> None:
+        if _has_active_placement(active, placement["daemonNodeId"]):
+            raise ValueError(
+                "Agent already has an active placement on this daemon node."
+            )
+        for row, existing in zip(rows, active, strict=True):
+            removed = {
+                **existing,
+                "desiredState": "removed",
+                "updatedAt": now_iso(),
+            }
+            sequence = int(row["event_version"] or 0)
+            removed_event = _placement_event(
+                existing["id"], "placement.removed", removed
+            )
             conn.execute(
                 insert(self.events_table).values(
-                    **_placement_event_row(row["id"], 0, event)
+                    **_placement_event_row(row["id"], sequence, removed_event)
                 )
             )
-        return placement
+            conn.execute(
+                update(self.placements)
+                .where(self.placements.c.id == row["id"])
+                .values(
+                    **_placement_row(
+                        removed,
+                        event_version=sequence + 1,
+                        database_id=row["id"],
+                    )
+                )
+            )
+        event = _placement_event(placement["id"], "placement.created", placement)
+        row = _placement_row(placement, event_version=1)
+        conn.execute(insert(self.placements).values(**row))
+        conn.execute(
+            insert(self.events_table).values(
+                **_placement_event_row(row["id"], 0, event)
+            )
+        )
 
     def get_placement(self, placement_id: str) -> dict[str, Any] | None:
         with store_transaction(self.engine) as conn:
@@ -679,6 +789,11 @@ def _new_placement(
         "agentVersion": agent["version"],
         "workspacePolicy": workspace_policy,
         **({"managedNodeId": managed_node_id} if managed_node_id else {}),
+        **(
+            {"computerId": payload["computerId"]}
+            if payload.get("computerId")
+            else {}
+        ),
         "conditions": [],
         "createdAt": timestamp,
         "updatedAt": timestamp,
@@ -763,17 +878,16 @@ def create_node_placement(
     node: dict[str, Any],
     payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Create a placement stamped with its stable managed Computer identity."""
+    """Create a placement stamped with its stable Computer identity."""
     placement_payload = {
-        key: value for key, value in (payload or {}).items() if key != "managedNodeId"
+        key: value
+        for key, value in (payload or {}).items()
+        if key not in ("managedNodeId", "computerId")
     }
     if node.get("managedNodeId"):
         placement_payload["managedNodeId"] = node["managedNodeId"]
-    return placement_store.create_placement(
-        agent,
-        node["id"],
-        placement_payload or None,
-    )
+    placement_payload["computerId"] = computer_id(node)
+    return placement_store.create_placement(agent, node["id"], placement_payload)
 
 
 def _normalized_placement_snapshot(

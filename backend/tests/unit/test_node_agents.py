@@ -2,9 +2,13 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from relay.persistence.agent_placement_store import LocalAgentPlacementStore
+from relay.persistence.agent_placement_store import (
+    LocalAgentPlacementStore,
+    create_node_placement,
+)
 from relay.persistence.agent_store import LocalAgentStore
 from relay.persistence.team_store import LocalTeamStore
+from relay.services.agent_routing import placement_node
 from relay.services.node_agents import remove_node_agents, sync_node_agents
 
 
@@ -83,8 +87,8 @@ def test_each_computer_gets_its_own_compatibility_agents(tmp_path: Path) -> None
     ]
     assert len(codex_agents) == 2
     assert {agent["compatibilityKey"] for agent in codex_agents} == {
-        "alice:node_one:codex",
-        "alice:node_two:codex",
+        "alice:node:node_one:codex",
+        "alice:node:node_two:codex",
     }
     for agent in codex_agents:
         agent_placements = placements.list_placements(agent_id=agent["id"])
@@ -147,7 +151,7 @@ def test_deleting_a_computer_removes_only_its_agents(tmp_path: Path) -> None:
     assert len(removed) == 2
     survivors = agents.list_agents(supervisor_employee_id="alice")
     assert {agent["compatibilityKey"] for agent in survivors} == {
-        "alice:node_keep:claude"
+        "alice:node:node_keep:claude"
     }
     assert placements.list_placements(daemon_node_id="node_doomed") == []
     # The surviving computer's agent and placement are untouched.
@@ -320,6 +324,53 @@ def test_reregistration_retires_superseded_compatibility_agent(tmp_path: Path) -
         "id": "node_old",
         "employeeId": "alice",
         "workspacePath": "/home/alice/proj",
+        "workspaceId": "machine-a",
+        "online": False,
+    }
+    new_node = {
+        "id": "node_new",
+        "employeeId": "alice",
+        "workspacePath": "/home/alice/proj",
+        "workspaceId": "machine-a",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+        "online": True,
+    }
+    ctx, agents, placements = _registry_ctx(tmp_path, [old_node, new_node])
+    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old")
+    placements.create_placement(stale, "node_old")
+
+    sync_node_agents(ctx, new_node)
+
+    survivors = agents.list_agents(supervisor_employee_id="alice")
+    assert {agent["compatibilityKey"] for agent in survivors} == {
+        "alice:device:alice:machine-a:claude"
+    }
+    assert agents.get_agent(stale["id"]).get("deletedAt")
+    assert placements.list_placements(daemon_node_id="node_old") == []
+    assert len(placements.list_placements(daemon_node_id="node_new")) == 1
+
+
+def test_reregistration_without_workspace_id_keeps_both_agents(
+    tmp_path: Path,
+) -> None:
+    """Pre-machine-id daemons that only ever reported ``workspacePath`` don't
+    get retired across a re-registration.
+
+    Without a ``workspaceId``, `computer_id` falls back to ``node:{id}`` — so
+    each node id counts as its own Computer and two nodes can never be
+    recognized as "the same machine, re-provisioned under a new id". That is
+    a real loss of dedup for such very old daemons (see
+    `test_reregistration_retires_superseded_compatibility_agent` for the
+    current, `workspaceId`-reporting case that still retires correctly), but
+    retiring an agent is destructive — wrongly treating two distinct
+    computers as one would delete a compatibility agent that is still in
+    use. The conservative direction is the safe one, so both agents survive.
+    """
+    old_node = {
+        "id": "node_old",
+        "employeeId": "alice",
+        "workspacePath": "/home/alice/proj",
         "online": False,
     }
     new_node = {
@@ -338,11 +389,10 @@ def test_reregistration_retires_superseded_compatibility_agent(tmp_path: Path) -
 
     survivors = agents.list_agents(supervisor_employee_id="alice")
     assert {agent["compatibilityKey"] for agent in survivors} == {
-        "alice:node_new:claude"
+        "alice:node_old:claude",
+        "alice:node:node_new:claude",
     }
-    assert agents.get_agent(stale["id"]).get("deletedAt")
-    assert placements.list_placements(daemon_node_id="node_old") == []
-    assert len(placements.list_placements(daemon_node_id="node_new")) == 1
+    assert agents.get_agent(stale["id"]).get("deletedAt") is None
 
 
 def test_sync_keeps_agent_on_a_different_computer(tmp_path: Path) -> None:
@@ -368,7 +418,7 @@ def test_sync_keeps_agent_on_a_different_computer(tmp_path: Path) -> None:
 
     survivors = agents.list_agents(supervisor_employee_id="alice")
     assert {agent["compatibilityKey"] for agent in survivors} == {
-        "alice:node_new:claude",
+        "alice:node:node_new:claude",
         "alice:node_other:claude",
     }
     assert not agents.get_agent(other["id"]).get("deletedAt")
@@ -477,7 +527,7 @@ def test_sync_retires_legacy_two_segment_agent_on_same_node(tmp_path: Path) -> N
 
     survivors = agents.list_agents(supervisor_employee_id="alice")
     assert {agent["compatibilityKey"] for agent in survivors} == {
-        "alice:node_local:claude"
+        "alice:node:node_local:claude"
     }
     assert agents.get_agent(legacy["id"]).get("deletedAt")
 
@@ -511,7 +561,7 @@ def test_sync_keeps_legacy_agent_on_a_different_node(tmp_path: Path) -> None:
     assert not agents.get_agent(legacy["id"]).get("deletedAt")
 
 
-def test_reprovisioned_managed_node_migrates_old_agent_identity(tmp_path: Path) -> None:
+def test_reprovisioned_managed_node_retires_old_runtime_identity(tmp_path: Path) -> None:
     new_node = {
         "id": "node_new",
         "employeeId": "alice",
@@ -531,11 +581,32 @@ def test_reprovisioned_managed_node_migrates_old_agent_identity(tmp_path: Path) 
 
     sync_node_agents(ctx, new_node)
 
-    [migrated] = agents.list_agents(supervisor_employee_id="alice")
-    assert migrated["id"] == stale["id"]
-    assert migrated["compatibilityKey"] == "alice:managed_one:claude"
-    [placement] = placements.list_placements(agent_id=stale["id"])
+    [current] = agents.list_agents(supervisor_employee_id="alice")
+    assert current["id"] != stale["id"]
+    assert current["compatibilityKey"] == "alice:managed:managed_one:claude"
+    assert agents.get_agent(stale["id"]).get("deletedAt")
+    [placement] = placements.list_placements(agent_id=current["id"])
     assert placement["daemonNodeId"] == "node_new"
+
+
+def test_agent_stays_routable_after_a_new_node_id_without_rebinding(
+    tmp_path: Path,
+) -> None:
+    old_node = {
+        "id": "node-old",
+        "employeeId": "alice",
+        "workspaceId": "machine-a",
+        "supportedAgents": ["claude"],
+        "workspacePath": "/w",
+    }
+    ctx, _agents, placements_store = _registry_ctx(tmp_path, [old_node])
+    sync_node_agents(ctx, old_node)
+    [placement] = placements_store.list_placements()
+
+    new_node = {**old_node, "id": "node-new", "online": True, "status": "ready"}
+
+    assert placement_node(placement, {"node-new": new_node})["id"] == "node-new"
+    assert placement["daemonNodeId"] == "node-old"
 
 
 def test_reprovisioned_managed_computer_preserves_agent_and_placement_identity(
@@ -567,13 +638,14 @@ def test_reprovisioned_managed_computer_preserves_agent_and_placement_identity(
 
     current_agents = agents.list_agents(supervisor_employee_id="alice")
     assert [agent["id"] for agent in current_agents] == [original_agent["id"]]
-    assert current_agents[0]["compatibilityKey"] == "alice:computer_one:claude"
+    assert current_agents[0]["compatibilityKey"] == "alice:managed:computer_one:claude"
     current_placement = placements.list_placements(agent_id=original_agent["id"])[0]
     assert current_placement["id"] == original_placement["id"]
-    assert current_placement["daemonNodeId"] == "runtime_new"
+    assert current_placement["daemonNodeId"] == "runtime_old"
+    assert placement_node(current_placement, {"runtime_new": new_node}) == new_node
 
 
-def test_reprovisioned_managed_computer_rebinds_custom_agent_placement(
+def test_reprovisioned_managed_computer_keeps_custom_agent_placement(
     tmp_path: Path,
 ) -> None:
     old_node = {
@@ -595,17 +667,18 @@ def test_reprovisioned_managed_computer_rebinds_custom_agent_placement(
     custom = agents.create_agent(
         "alice", {"displayName": "Release Builder", "executorKind": "codex"}
     )
-    original = placements.create_placement(custom, "runtime_old")
+    original = create_node_placement(placements, custom, old_node)
 
     sync_node_agents(ctx, old_node)
     nodes[:] = [new_node]
     sync_node_agents(ctx, new_node)
 
     assert not agents.get_agent(custom["id"]).get("deletedAt")
-    [rebound] = placements.list_placements(agent_id=custom["id"])
-    assert rebound["id"] == original["id"]
-    assert rebound["daemonNodeId"] == "runtime_new"
-    assert rebound["managedNodeId"] == "computer_one"
+    [preserved] = placements.list_placements(agent_id=custom["id"])
+    assert preserved["id"] == original["id"]
+    assert preserved["daemonNodeId"] == "runtime_old"
+    assert preserved["managedNodeId"] == "computer_one"
+    assert placement_node(preserved, {"runtime_new": new_node}) == new_node
 
 
 def test_managed_sync_does_not_retire_agent_from_another_managed_computer(
@@ -643,7 +716,7 @@ def test_managed_sync_does_not_retire_agent_from_another_managed_computer(
     assert placements.get_placement(other_placement["id"])["desiredState"] == "active"
 
 
-def test_managed_reprovision_collects_agents_for_missing_old_runtimes(
+def test_managed_reprovision_keeps_placement_for_missing_old_runtime(
     tmp_path: Path,
 ) -> None:
     old_node = {
@@ -670,73 +743,12 @@ def test_managed_reprovision_collects_agents_for_missing_old_runtimes(
 
     survivors = agents.list_agents(supervisor_employee_id="alice")
     assert [agent["id"] for agent in survivors] == [original_agent_id]
-    assert (
-        placements.list_placements(agent_id=original_agent_id)[0]["daemonNodeId"]
-        == "runtime_new"
-    )
+    [preserved] = placements.list_placements(agent_id=original_agent_id)
+    assert preserved["daemonNodeId"] == "runtime_missing"
+    assert placement_node(preserved, {"runtime_new": new_node}) == new_node
 
 
-def test_managed_sync_does_not_steal_an_employee_device_agent(tmp_path: Path) -> None:
-    """A device agent must not ping-pong between its device and a managed node.
-
-    The managed Computer's sync claims placements carrying its managedNodeId,
-    and the device's sync claims back the agents keyed to the device. If either
-    side leaves a stale Computer identity behind, the two rebind the same
-    placement back and forth forever and every thread pinned to one node starts
-    rejecting the agent with workspace_unavailable.
-    """
-    agents = LocalAgentStore(tmp_path)
-    placements = LocalAgentPlacementStore(tmp_path)
-    ctx = SimpleNamespace(agent_store=agents, agent_placement_store=placements)
-    device = {
-        "id": "device_node",
-        "employeeId": "alice",
-        "supportedAgents": ["claude"],
-        "agents": {"claude": "ready"},
-    }
-    managed = {
-        "id": "managed_runtime",
-        "managedNodeId": "computer_managed",
-        "employeeId": "alice",
-        "supportedAgents": ["claude"],
-        "agents": {"claude": "ready"},
-    }
-
-    sync_node_agents(ctx, device)
-    sync_node_agents(ctx, managed)
-
-    device_agent = next(
-        agent
-        for agent in agents.list_agents(supervisor_employee_id="alice")
-        if agent["compatibilityKey"] == "alice:device_node:claude"
-    )
-    # Seed the observed broken state: the device agent's placement was moved to
-    # the managed runtime while its own node was briefly offline, so it now
-    # carries the managed Computer's identity.
-    [seeded] = placements.list_placements(agent_id=device_agent["id"])
-    placements.rebind_placement(
-        seeded["id"], "managed_runtime", managed_node_id="computer_managed"
-    )
-
-    for _ in range(3):
-        sync_node_agents(ctx, device)
-        sync_node_agents(ctx, managed)
-
-    [placement] = placements.list_placements(agent_id=device_agent["id"])
-    assert placement["daemonNodeId"] == "device_node"
-    assert placement.get("managedNodeId") is None
-
-    managed_agent = next(
-        agent
-        for agent in agents.list_agents(supervisor_employee_id="alice")
-        if agent["compatibilityKey"] == "alice:computer_managed:claude"
-    )
-    [managed_placement] = placements.list_placements(agent_id=managed_agent["id"])
-    assert managed_placement["daemonNodeId"] == "managed_runtime"
-    assert managed_placement["managedNodeId"] == "computer_managed"
-
-
-def test_managed_runtime_replacement_still_rebinds_its_own_agents(
+def test_managed_runtime_replacement_keeps_placement_routable(
     tmp_path: Path,
 ) -> None:
     agents = LocalAgentStore(tmp_path)
@@ -757,11 +769,12 @@ def test_managed_runtime_replacement_still_rebinds_its_own_agents(
     agent = next(
         agent
         for agent in agents.list_agents(supervisor_employee_id="alice")
-        if agent["compatibilityKey"] == "alice:computer_managed:claude"
+        if agent["compatibilityKey"] == "alice:managed:computer_managed:claude"
     )
     [placement] = placements.list_placements(agent_id=agent["id"])
-    assert placement["daemonNodeId"] == "runtime_two"
+    assert placement["daemonNodeId"] == "runtime_one"
     assert placement["managedNodeId"] == "computer_managed"
+    assert placement_node(placement, {"runtime_two": replacement}) == replacement
 
 
 def test_soft_deleted_employee_does_not_get_agents_rematerialized(

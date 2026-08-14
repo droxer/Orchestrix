@@ -322,6 +322,8 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         session["daemonNodeId"] = created["daemonNodeId"]
     if created.get("managedNodeId"):
         session["managedNodeId"] = created["managedNodeId"]
+    if created.get("computerId"):
+        session["computerId"] = created["computerId"]
     for event in events:
         apply_session_event(session, event)
     return session
@@ -369,12 +371,12 @@ def _apply_collaboration_round_started(
 
 
 def _apply_agent_started(session: dict[str, Any], event: dict[str, Any]) -> None:
-    if event.get("daemonNodeId") and not session.get("daemonNodeId"):
+    if any(run["id"] == event["runId"] for run in session["agentRuns"]):
+        return
+    if event.get("daemonNodeId"):
         session["daemonNodeId"] = event["daemonNodeId"]
     if event.get("managedNodeId") and not session.get("managedNodeId"):
         session["managedNodeId"] = event["managedNodeId"]
-    if any(run["id"] == event["runId"] for run in session["agentRuns"]):
-        return
     run = {
         "id": event["runId"],
         "agent": event["agent"],
@@ -472,8 +474,21 @@ def _apply_session_archived(session: dict[str, Any], _event: dict[str, Any]) -> 
 def _apply_session_runtime_affinity(
     session: dict[str, Any], event: dict[str, Any]
 ) -> None:
-    if not session.get("managedNodeId"):
-        session["managedNodeId"] = event["managedNodeId"]
+    """Thread 一次性钉住一台 Computer；先到先得，后来者不覆盖。
+
+    老事件只带 managedNodeId，在此派生为 managed:<id>，因此不需要任何
+    Alembic 回填 —— snapshot 是 replay 的产物。
+    """
+    if session.get("computerId"):
+        return
+    identity = event.get("computerId")
+    if not identity and event.get("managedNodeId"):
+        identity = f"managed:{event['managedNodeId']}"
+    if not identity:
+        return
+    session["computerId"] = identity
+    if identity.startswith("managed:") and not session.get("managedNodeId"):
+        session["managedNodeId"] = identity.split(":", 1)[1]
 
 
 def _apply_session_renamed(session: dict[str, Any], event: dict[str, Any]) -> None:

@@ -878,6 +878,13 @@ def test_unroutable_team_start_requests_capacity_and_queues_scheduler_retry(
         ).json()["commands"]
         [command] = commands
         assert command["logicalAgentId"] == lead["id"]
+        placements = app.state.agent_placement_store.list_placements(
+            agent_id=lead["id"]
+        )
+        assert any(
+            placement.get("computerId") == f"managed:{managed['id']}"
+            for placement in placements
+        )
 
 
 def test_team_reviewer_reviews_the_leads_work_and_carries_its_role(monkeypatch) -> None:
