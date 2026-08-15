@@ -190,7 +190,35 @@
 }
 
 .agents-roster-row-runtime {
-  color: var(--ink-2);
+  display: inline-grid;
+  grid-template-columns: 19px auto;
+  align-items: stretch;
+  height: 19px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-1);
+  background: var(--surface-1);
+  color: var(--ink-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-1);
+  font-weight: 600;
+  letter-spacing: var(--type-code-track);
+  line-height: 17px;
+}
+
+.agents-roster-row-runtime-mark {
+  display: grid;
+  place-items: center;
+  border-right: 1px solid var(--line-1);
+  background: var(--surface-2);
+}
+
+.agents-roster-row-runtime-mark > svg {
+  display: block;
+}
+
+.agents-roster-row-runtime-label {
+  padding: 0 var(--sp-1-5);
 }
 
 .agents-roster-row-meta-separator {

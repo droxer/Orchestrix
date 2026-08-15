@@ -7,6 +7,7 @@ import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import type { AgentName, CurrentUser, EmployeeAgent, LogicalAgentAvailability } from "../types";
 import { AgentStateBadge } from "./AgentStateBadge";
+import { AgentMark } from "./AgentMark";
 import { StatusPill, TonePill } from "./StatusPill";
 import { AgentDetailPage } from "./AgentDetailPage";
 import { PageHeader } from "./PageHeader";
@@ -164,7 +165,10 @@ function RosterRow({
             >
               <span className="agents-roster-row-runtime">
                 <span className="sr-only">{t("agents_page.runtime")}: </span>
-                <span translate="no">{runtime}</span>
+                <span className="agents-roster-row-runtime-mark" aria-hidden="true">
+                  <AgentMark agent={agent.executorKind} size={10} />
+                </span>
+                <span className="agents-roster-row-runtime-label" translate="no">{runtime}</span>
               </span>
               <span className="agents-roster-row-meta-separator" aria-hidden="true">·</span>
               {placementDescriptions.length ? (
