@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createAgent, listSandboxes } from "../../api";
 import { computersForEmployee, runtimesForComputer, type NodeLike } from "../../lib/createAgent";
 import { EMPLOYEE_AGENTS_QUERY_KEY } from "../../hooks/useEmployeeAgents";
+import { agentLabel } from "../../lib/plan";
 import { AGENT_ROLE_OPTIONS } from "../../types";
 import type { AgentName, AgentRole, EmployeeAgent, SandboxRecord } from "../../types";
 import { Button } from "@/components/ui/button";
@@ -228,13 +229,14 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
             >
               <SelectTrigger className="w-full" aria-labelledby={runtimeLabelId}>
                 <SelectValue placeholder={t("agents_page.create_runtime_placeholder")}>
-                  {(value: string | null) => value ?? t("agents_page.create_runtime_placeholder")}
+                  {(value: string | null) =>
+                    value ? agentLabel(value as AgentName) : t("agents_page.create_runtime_placeholder")}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {runtimeOptions.map((kind) => (
                   <SelectItem key={kind} value={kind}>
-                    <span translate="no">{kind}</span>
+                    <span translate="no">{agentLabel(kind)}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
