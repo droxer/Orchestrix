@@ -18,6 +18,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { AgentMark } from "./AgentMark";
 
 type MemberDraft = {
   agentId: string;
@@ -123,7 +124,7 @@ export function ProjectDrawer({
       setError(t("project.computer_required"));
       return;
     }
-    if (!members.length || !leadAgentId) {
+    if (members.length && !leadAgentId) {
       setError(t("project.members_required"));
       return;
     }
@@ -135,7 +136,7 @@ export function ProjectDrawer({
       const result = await createProjectMutation.mutateAsync({
         name: name.trim(),
         daemonNodeId: computerId,
-        leadAgentId,
+        leadAgentId: leadAgentId || null,
         members: members.map((member) => ({
           agentId: member.agentId,
           role: member.role,
@@ -156,73 +157,64 @@ export function ProjectDrawer({
     <Drawer
       open={open}
       onClose={close}
-      title={t("project.create")}
-      subtitle={t("project.drawer_subtitle")}
-      width="form"
+      kicker={t("project.setup_kicker")}
+      title={t("project.setup_title")}
+      subtitle={t("project.setup_subtitle")}
+      width="wide"
       closeLabel={t("admin.v2.close_drawer")}
       bodyClassName="adm-drawer-body--column"
     >
-      <form className="adm-form project-drawer-form" onSubmit={(event) => void submit(event)} noValidate>
-        <Field label={t("project.name")}>
-          <Input ref={nameRef} data-modal-initial-focus maxLength={120} value={name} onChange={(event) => setName(event.target.value)} />
-        </Field>
-        <Field label={t("project.computer")} hint={projectComputers.length === 0 ? t("project.no_computers") : t("project.choose_computer_hint")}>
-          <Select value={computerId} onValueChange={selectComputer}>
-            <SelectTrigger className="w-full" disabled={projectComputers.length === 0}><SelectValue placeholder={t("project.choose_computer")} /></SelectTrigger>
-            <SelectContent>
-              {projectComputers.map((computer) => (
-                <SelectItem key={computer.id} value={computer.id}>
-                  {computer.displayName || computer.id}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-        <fieldset className="team-member-fieldset">
-          <legend>{t("project.members")}</legend>
+      <form className="project-setup-form" onSubmit={(event) => void submit(event)} noValidate>
+        <div className="project-setup-intro">
+          <div className="project-setup-step"><span>01</span><div><strong>{t("project.setup_step_brief")}</strong><small>{t("project.setup_step_brief_hint")}</small></div></div>
+          <div className="project-setup-step"><span>02</span><div><strong>{t("project.setup_step_crew")}</strong><small>{t("project.setup_step_crew_hint")}</small></div></div>
+        </div>
+
+        <section className="project-setup-section project-setup-basics" aria-labelledby="project-setup-basics-title">
+          <div className="project-setup-section-heading"><span className="project-setup-eyebrow">{t("project.setup_identity")}</span><h2 id="project-setup-basics-title">{t("project.setup_identity_title")}</h2></div>
+          <div className="project-setup-basics-grid">
+            <Field label={t("project.name")}>
+              <Input ref={nameRef} data-modal-initial-focus className="project-name-input" maxLength={120} placeholder={t("project.setup_name_placeholder")} value={name} onChange={(event) => setName(event.target.value)} />
+            </Field>
+            <Field label={t("project.computer")} hint={projectComputers.length === 0 ? t("project.no_computers") : t("project.setup_computer_hint")}>
+              <Select value={computerId} onValueChange={selectComputer}>
+                <SelectTrigger className="w-full project-computer-select" disabled={projectComputers.length === 0}><SelectValue placeholder={t("project.choose_computer")} /></SelectTrigger>
+                <SelectContent>
+                  {projectComputers.map((computer) => <SelectItem key={computer.id} value={computer.id}>{computer.displayName || computer.id}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+        </section>
+
+        <section className="project-setup-section" aria-labelledby="project-setup-roster-title">
+          <div className="project-setup-section-heading project-setup-roster-heading"><div><span className="project-setup-eyebrow">{t("project.setup_roster")}</span><h2 id="project-setup-roster-title">{t("project.setup_roster_title")}</h2></div><span className="project-setup-count">{members.length.toString().padStart(2, "0")} / 32 {t("project.setup_selected")}</span></div>
           {availableAgents.length > 0 ? (
-            <div className="team-member-options">
+            <div className="project-setup-agent-grid">
               {availableAgents.map((agent) => {
                 const selected = members.some((member) => member.agentId === agent.id);
                 return (
-                  <label key={agent.id} className="team-member-option">
-                    <Checkbox
-                      checked={selected}
-                      onCheckedChange={() => toggleMember(agent)}
-                      aria-label={agent.displayName}
-                    />
-                    <span className="team-member-option-main">
-                      <span className="team-member-option-name">{agent.displayName}</span>
-                      <span className="team-member-option-meta">{agent.executorKind}</span>
-                    </span>
+                  <label key={agent.id} className={`project-agent-option${selected ? " is-selected" : ""}`}>
+                    <Checkbox checked={selected} onCheckedChange={() => toggleMember(agent)} aria-label={agent.displayName} />
+                    <span className="project-agent-mark"><AgentMark agent={agent.executorKind} size={18} /></span>
+                    <span className="project-agent-copy"><strong>{agent.displayName}</strong><small>{agent.executorKind} · {agent.availability}</small></span>
+                    <span className="project-agent-check" aria-hidden="true">{selected ? "✓" : "+"}</span>
                   </label>
                 );
               })}
             </div>
-          ) : (
-            <p className="project-empty-hint">
-              {computerId ? t("project.no_agents_on_computer") : t("project.choose_computer_hint")}
-            </p>
-          )}
-        </fieldset>
-        {members.length ? (
-          <Field label={t("project.lead")}>
-            <Select value={leadAgentId} onValueChange={(value) => setLeadAgentId(value ?? "")}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {members.map((member) => {
-                  const agent = agents.find((candidate) => candidate.id === member.agentId);
-                  return <SelectItem key={member.agentId} value={member.agentId}>{agent?.displayName ?? member.agentId}</SelectItem>;
-                })}
-              </SelectContent>
-            </Select>
+          ) : <p className="project-empty-hint">{computerId ? t("project.no_agents_on_computer") : t("project.choose_computer_hint")}</p>}
+        </section>
+
+        {members.length ? <section className="project-setup-section project-setup-briefs" aria-labelledby="project-setup-briefs-title">
+          <div className="project-setup-section-heading"><span className="project-setup-eyebrow">{t("project.setup_briefs")}</span><h2 id="project-setup-briefs-title">{t("project.setup_briefs_title")}</h2></div>
+          <Field label={t("project.lead")} hint={t("project.setup_lead_hint")}>
+            <Select value={leadAgentId} onValueChange={(value) => setLeadAgentId(value ?? "")}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{members.map((member) => { const agent = agents.find((candidate) => candidate.id === member.agentId); return <SelectItem key={member.agentId} value={member.agentId}>{agent?.displayName ?? member.agentId}</SelectItem>; })}</SelectContent></Select>
           </Field>
-        ) : null}
-        {members.map((member) => {
+          <div className="project-member-brief-grid">{members.map((member, index) => {
           const agent = agents.find((candidate) => candidate.id === member.agentId);
-          return (
-            <section key={member.agentId} className="project-member-card">
-              <h3>{agent?.displayName ?? member.agentId}</h3>
+          return <section key={member.agentId} className="project-member-card">
+              <div className="project-member-card-heading"><span className="project-member-index">0{index + 1}</span><div><h3>{agent?.displayName ?? member.agentId}</h3><small>{agent?.executorKind}</small></div></div>
               <Field label={t("project.role")}>
                 <Select value={member.role} onValueChange={(value) => updateMember(member.agentId, { role: value as AgentRole })}>
                   <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -238,11 +230,12 @@ export function ProjectDrawer({
               <Field label={t("project.instructions")}>
                 <Textarea maxLength={8000} value={member.instructions} onChange={(event) => updateMember(member.agentId, { instructions: event.target.value })} />
               </Field>
-            </section>
-          );
-        })}
+            </section>;
+        })}</div>
+        </section> : null}
         {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
-        <div className="adm-form-actions">
+        <div className="project-setup-actions adm-form-actions">
+          <span className="project-setup-action-note">{members.length ? t("project.setup_members_ready", { count: members.length }) : t("project.setup_members_empty")}</span>
           <Button size="cta" type="button" variant="ghost" onClick={close} disabled={createProjectMutation.isPending}>{t("dialog.cancel")}</Button>
           <Button size="cta" type="submit" loading={createProjectMutation.isPending}>{t("project.create")}</Button>
         </div>
