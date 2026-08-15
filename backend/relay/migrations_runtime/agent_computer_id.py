@@ -53,20 +53,47 @@ def _computer_id_from_placements(
     不解析 compatibilityKey：spec ① 之后 key 的中段是带前缀的身份
     （形如 alice:device:alice:machine-a:claude），按冒号切分无法无歧义还原。
 
+    只信 active placement：`list_placements` 默认排除 removed 的记录，
+    两个 store 的排序键都是 (priority, id)，而 id 是随机 uuid —— 曾换过
+    computer 的 agent 会同时留有一条 active 和至少一条 removed（旧）
+    placement，若不区分 active/removed 直接取「排序后第一条带 computerId
+    的」，会有约一半概率把已废弃的旧 computer 写进不可变的出生证明。
+
+    只有一条 active 都没有时才回落到 include_removed=True，并在其中按
+    createdAt 取最新的一条（不是任意一条）——避免同样的随机排序问题。
+
     spec ① 只给**新建**的 placement 写了 computerId，所以生产库里绝大多数
     存量 placement 没有这个字段 —— 只读它会让迁移在真实数据上几乎全部空转。
     因此对没有该字段的 placement，用它的 daemonNodeId 去注册表换算身份。
     """
-    placements = placement_store.list_placements(agent_id=agent_id, include_removed=True)
+    active_placements = placement_store.list_placements(agent_id=agent_id)
+    computer_id_value = _first_computer_id(active_placements)
+    if computer_id_value:
+        return computer_id_value
+
+    all_placements = placement_store.list_placements(
+        agent_id=agent_id, include_removed=True
+    )
+    newest_first = sorted(
+        all_placements, key=lambda item: item.get("createdAt") or "", reverse=True
+    )
+    computer_id_value = _first_computer_id(newest_first)
+    if computer_id_value:
+        return computer_id_value
+
+    if registry is None:
+        return None
+    nodes = {node["id"]: node for node in registry.monitor_nodes()}
+    for placement in newest_first:
+        node = nodes.get(placement.get("daemonNodeId"))
+        if node:
+            return computer_id(node)
+    return None
+
+
+def _first_computer_id(placements: list[dict[str, Any]]) -> str | None:
     for placement in placements:
         computer_id_value = placement.get("computerId")
         if computer_id_value:
             return computer_id_value
-    if registry is None:
-        return None
-    nodes = {node["id"]: node for node in registry.monitor_nodes()}
-    for placement in placements:
-        node = nodes.get(placement.get("daemonNodeId"))
-        if node:
-            return computer_id(node)
     return None
