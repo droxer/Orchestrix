@@ -718,8 +718,8 @@ def test_task_start_without_agent_runs_ready_team_pipeline(monkeypatch) -> None:
         _bootstrap_admin(client)
         _create_user(client, "alice", employee_id="alice")
         # Simulate the control-plane provisioning record that authorizes this
-        # daemon to materialize Alice's compatibility agents.
-        app.state.registry.register(
+        # daemon to register on Alice's behalf.
+        provisioned = app.state.registry.register(
             {
                 "sandboxId": "sbx_alice",
                 "employeeId": "alice",
@@ -734,6 +734,17 @@ def test_task_start_without_agent_runs_ready_team_pipeline(monkeypatch) -> None:
             "ui_token",
             authorized_node_location="employee-device",
         )
+        computer = computer_id(provisioned)
+        for executor_kind in ("claude", "codex"):
+            app.state.agent_store.create_agent(
+                "alice",
+                {
+                    "displayName": executor_kind.title(),
+                    "executorKind": executor_kind,
+                    "defaultRole": "implementer",
+                    "computerId": computer,
+                },
+            )
         registered = client.post(
             "/api/v1/daemon-node-registrations",
             json={

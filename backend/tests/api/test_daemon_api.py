@@ -10,6 +10,7 @@ from uuid import UUID
 from fastapi.testclient import TestClient
 from relay.app import create_app
 from relay.core.computer_identity import computer_id
+from relay.services.agent_routing import placement_node
 from relay.services.node_agents import sync_node_agents
 from relay.sessions.controller import SessionController
 
@@ -416,6 +417,9 @@ def test_admin_can_recover_deleted_managed_node(monkeypatch) -> None:
 
 
 def test_recovered_managed_node_can_register_replacement_agents(monkeypatch) -> None:
+    """Deleting the managed node retires every agent placed on it (one agent
+    = one computer), so after recovery the employee must declare a fresh
+    agent for it — recovery does not resurrect the old one."""
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
@@ -433,6 +437,15 @@ def test_recovered_managed_node_can_register_replacement_agents(monkeypatch) -> 
         app.state.managed_node_store.complete_enrollment(
             managed["id"], attempt["id"], runtime["id"]
         )
+        original = app.state.agent_store.create_agent(
+            "alice",
+            {
+                "displayName": "Claude",
+                "executorKind": "claude",
+                "defaultRole": "implementer",
+                "computerId": f"managed:{managed['id']}",
+            },
+        )
         registered = client.post(
             "/api/v1/daemon-node-registrations",
             json={
@@ -449,6 +462,8 @@ def test_recovered_managed_node_can_register_replacement_agents(monkeypatch) -> 
         deleted = client.delete(f"/api/v1/admin/managed-nodes/{managed['id']}")
         assert deleted.status_code == 202, deleted.text
         app.state.managed_node_store.update_node(managed["id"], {"phase": "deleted"})
+        # Deleting the computer retired the original agent along with it.
+        assert app.state.agent_store.get_agent(original["id"]).get("deletedAt")
         recovered = client.post(f"/api/v1/admin/managed-nodes/{managed['id']}/recover")
         assert recovered.status_code == 202, recovered.text
 
@@ -475,18 +490,35 @@ def test_recovered_managed_node_can_register_replacement_agents(monkeypatch) -> 
                 "status": "ready",
             },
         )
-
         assert re_registered.status_code == 200, re_registered.text
-        live_claude = [
-            agent
-            for agent in app.state.agent_store.list_agents(
+
+        # Re-registering the recovered computer does not, by itself, bring
+        # any agent back — the employee has to declare one for it.
+        assert [
+            item
+            for item in app.state.agent_store.list_agents(
                 supervisor_employee_id="alice"
             )
-            if agent["executorKind"] == "claude"
-        ]
-        assert [agent["compatibilityKey"] for agent in live_claude] == [
-            f"alice:managed:{managed['id']}:claude"
-        ]
+            if item["executorKind"] == "claude"
+        ] == []
+
+        replacement_agent = app.state.agent_store.create_agent(
+            "alice",
+            {
+                "displayName": "Claude",
+                "executorKind": "claude",
+                "defaultRole": "implementer",
+                "computerId": f"managed:{managed['id']}",
+            },
+        )
+        assert replacement_agent["id"] != original["id"]
+        sync_node_agents(app.state, app.state.registry.get(replacement["id"]))
+
+        [placement] = app.state.agent_placement_store.list_placements(
+            agent_id=replacement_agent["id"]
+        )
+        nodes = {node["id"]: node for node in app.state.registry.monitor_nodes()}
+        assert placement_node(placement, nodes)["id"] == replacement["id"]
 
 
 def test_recovered_managed_node_conflicts_with_replacement_policy_slot(
@@ -723,14 +755,16 @@ def test_running_managed_runtime_retirement_preserves_agent_and_placement(
                 "status": "ready",
             }
         )
-        sync_node_agents(app.state, runtime)
-        agent = next(
-            item
-            for item in app.state.agent_store.list_agents(
-                supervisor_employee_id="alice"
-            )
-            if item["executorKind"] == "codex"
+        agent = app.state.agent_store.create_agent(
+            "alice",
+            {
+                "displayName": "Codex",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": f"managed:{managed['id']}",
+            },
         )
+        sync_node_agents(app.state, runtime)
         [placement] = app.state.agent_placement_store.list_placements(
             agent_id=agent["id"]
         )
@@ -776,14 +810,16 @@ def test_stopped_managed_runtime_preserves_agent_for_restart(monkeypatch) -> Non
                 "status": "ready",
             }
         )
-        sync_node_agents(app.state, runtime)
-        agent = next(
-            item
-            for item in app.state.agent_store.list_agents(
-                supervisor_employee_id="alice"
-            )
-            if item["executorKind"] == "codex"
+        agent = app.state.agent_store.create_agent(
+            "alice",
+            {
+                "displayName": "Codex",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": f"managed:{managed['id']}",
+            },
         )
+        sync_node_agents(app.state, runtime)
         [placement] = app.state.agent_placement_store.list_placements(
             agent_id=agent["id"]
         )
@@ -800,80 +836,6 @@ def test_stopped_managed_runtime_preserves_agent_for_restart(monkeypatch) -> Non
         )
         assert preserved["id"] == placement["id"]
         assert preserved["managedNodeId"] == managed["id"]
-
-
-def test_backend_startup_retires_superseded_managed_agent_identity(monkeypatch) -> None:
-    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
-    with TemporaryDirectory() as root:
-        original = create_app(root)
-        managed = original.state.managed_node_store.create_node({"employeeId": "alice"})
-        attempt, _credential = original.state.managed_node_store.create_attempt(
-            managed["id"]
-        )
-        runtime, runtime_token = original.state.registry.enroll_managed_node(
-            managed,
-            attempt,
-            {"workspacePath": "/workspace"},
-        )
-        original.state.managed_node_store.complete_enrollment(
-            managed["id"], attempt["id"], runtime["id"]
-        )
-        runtime = original.state.registry.register(
-            {
-                "sandboxId": runtime["id"],
-                "token": runtime_token,
-                "protocolVersion": 1,
-                "supportedAgents": ["codex"],
-                "capabilities": ["thread-workspaces"],
-                "status": "ready",
-            }
-        )
-        legacy = original.state.agent_store.ensure_compatibility_agent(
-            "alice", "codex", runtime["id"]
-        )
-        original.state.agent_placement_store.create_placement(legacy, runtime["id"])
-        old_runtime_id = runtime["id"]
-        original.state.registry.delete(old_runtime_id)
-        replacement_attempt, _credential = (
-            original.state.managed_node_store.create_attempt(managed["id"])
-        )
-        replacement, replacement_token = original.state.registry.enroll_managed_node(
-            original.state.managed_node_store.get_node(managed["id"]),
-            replacement_attempt,
-            {"workspacePath": "/workspace"},
-        )
-        original.state.managed_node_store.complete_enrollment(
-            managed["id"], replacement_attempt["id"], replacement["id"]
-        )
-        replacement = original.state.registry.register(
-            {
-                "sandboxId": replacement["id"],
-                "token": replacement_token,
-                "protocolVersion": 1,
-                "supportedAgents": ["codex"],
-                "capabilities": ["thread-workspaces"],
-                "status": "ready",
-            }
-        )
-
-        restarted = create_app(root)
-
-        current = next(
-            item
-            for item in restarted.state.agent_store.list_agents(
-                supervisor_employee_id="alice"
-            )
-            if item["executorKind"] == "codex"
-        )
-        assert current["id"] != legacy["id"]
-        assert current["compatibilityKey"] == f"alice:managed:{managed['id']}:codex"
-        assert restarted.state.agent_store.get_agent(legacy["id"]).get("deletedAt")
-        [placement] = restarted.state.agent_placement_store.list_placements(
-            agent_id=current["id"]
-        )
-        assert placement["daemonNodeId"] == replacement["id"]
-        assert placement["daemonNodeId"] != old_runtime_id
-        assert placement["computerId"] == f"managed:{managed['id']}"
 
 
 def test_failed_managed_node_is_visible_as_failed(monkeypatch) -> None:

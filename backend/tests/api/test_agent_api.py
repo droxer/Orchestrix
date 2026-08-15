@@ -297,9 +297,11 @@ def test_unprovisioned_daemon_registration_cannot_mint_logical_agents(
         )
 
 
-def test_control_plane_provisioned_node_materializes_compatibility_agents(
+def test_control_plane_provisioned_node_registration_does_not_materialize_agents(
     monkeypatch,
 ) -> None:
+    """Registering a computer no longer conjures an agent — agents are only
+    declared explicitly by employees (POST /agents)."""
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
@@ -339,7 +341,7 @@ def test_control_plane_provisioned_node_materializes_compatibility_agents(
 
         assert registered.status_code == 200
         agents = client.get("/api/v1/admin/agents?employeeId=alice").json()["agents"]
-        assert any(agent["executorKind"] == "codex" for agent in agents)
+        assert agents == []
 
 
 def test_agent_policies_are_rejected_until_runtime_enforcement_exists(
@@ -871,10 +873,26 @@ def test_mentioning_an_agent_grows_the_room_and_later_messages_reach_it(
                 "status": "ready",
             }
         )
+        computer = computer_id(node)
+        owner = app.state.agent_store.create_agent(
+            "admin",
+            {
+                "displayName": "Codex",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": computer,
+            },
+        )
+        outsider = app.state.agent_store.create_agent(
+            "admin",
+            {
+                "displayName": "Claude",
+                "executorKind": "claude",
+                "defaultRole": "implementer",
+                "computerId": computer,
+            },
+        )
         sync_node_agents(app.state, node)
-        agents = app.state.agent_store.list_agents(supervisor_employee_id="admin")
-        owner = next(agent for agent in agents if agent["executorKind"] == "codex")
-        outsider = next(agent for agent in agents if agent["executorKind"] == "claude")
         session = app.state.session_store.create_session(
             {
                 "daemonNodeId": node["id"],
@@ -920,10 +938,26 @@ def test_leading_named_mention_cannot_silently_dispatch_to_the_room(
                 "status": "ready",
             }
         )
+        computer = computer_id(node)
+        owner = app.state.agent_store.create_agent(
+            "admin",
+            {
+                "displayName": "Claude",
+                "executorKind": "claude",
+                "defaultRole": "implementer",
+                "computerId": computer,
+            },
+        )
+        kimi = app.state.agent_store.create_agent(
+            "admin",
+            {
+                "displayName": "Kimi",
+                "executorKind": "kimi",
+                "defaultRole": "implementer",
+                "computerId": computer,
+            },
+        )
         sync_node_agents(app.state, node)
-        agents = app.state.agent_store.list_agents(supervisor_employee_id="admin")
-        owner = next(agent for agent in agents if agent["executorKind"] == "claude")
-        kimi = next(agent for agent in agents if agent["executorKind"] == "kimi")
         session = app.state.session_store.create_session(
             {
                 "daemonNodeId": node["id"],
@@ -970,10 +1004,26 @@ def test_mentioning_two_agents_dispatches_one_round_with_both(monkeypatch) -> No
                 "status": "ready",
             }
         )
+        computer = computer_id(node)
+        owner = app.state.agent_store.create_agent(
+            "admin",
+            {
+                "displayName": "Codex",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": computer,
+            },
+        )
+        other = app.state.agent_store.create_agent(
+            "admin",
+            {
+                "displayName": "Claude",
+                "executorKind": "claude",
+                "defaultRole": "implementer",
+                "computerId": computer,
+            },
+        )
         sync_node_agents(app.state, node)
-        agents = app.state.agent_store.list_agents(supervisor_employee_id="admin")
-        owner = next(agent for agent in agents if agent["executorKind"] == "codex")
-        other = next(agent for agent in agents if agent["executorKind"] == "claude")
         session = app.state.session_store.create_session(
             {
                 "daemonNodeId": node["id"],
@@ -1025,10 +1075,26 @@ def test_room_message_fans_out_to_every_participant(monkeypatch) -> None:
                 "status": "ready",
             }
         )
+        computer = computer_id(node)
+        owner = app.state.agent_store.create_agent(
+            "admin",
+            {
+                "displayName": "Codex",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": computer,
+            },
+        )
+        joiner = app.state.agent_store.create_agent(
+            "admin",
+            {
+                "displayName": "Claude",
+                "executorKind": "claude",
+                "defaultRole": "implementer",
+                "computerId": computer,
+            },
+        )
         sync_node_agents(app.state, node)
-        agents = app.state.agent_store.list_agents(supervisor_employee_id="admin")
-        owner = next(agent for agent in agents if agent["executorKind"] == "codex")
-        joiner = next(agent for agent in agents if agent["executorKind"] == "claude")
         session = app.state.session_store.create_session(
             {
                 "daemonNodeId": node["id"],
@@ -1087,26 +1153,26 @@ def test_mentioning_an_agent_from_another_computer_is_rejected(monkeypatch) -> N
                 "status": "ready",
             }
         )
+        owner = app.state.agent_store.create_agent(
+            "admin",
+            {
+                "displayName": "Codex",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": computer_id(node),
+            },
+        )
+        elsewhere = app.state.agent_store.create_agent(
+            "admin",
+            {
+                "displayName": "Codex Elsewhere",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": computer_id(other_node),
+            },
+        )
         sync_node_agents(app.state, node)
         sync_node_agents(app.state, other_node)
-        agents = app.state.agent_store.list_agents(supervisor_employee_id="admin")
-        placements = app.state.agent_placement_store
-        owner = next(
-            agent
-            for agent in agents
-            if any(
-                placement["daemonNodeId"] == node["id"]
-                for placement in placements.list_placements(agent_id=agent["id"])
-            )
-        )
-        elsewhere = next(
-            agent
-            for agent in agents
-            if all(
-                placement["daemonNodeId"] != node["id"]
-                for placement in placements.list_placements(agent_id=agent["id"])
-            )
-        )
         session = app.state.session_store.create_session(
             {
                 "daemonNodeId": node["id"],
@@ -1154,14 +1220,16 @@ def test_semantic_message_retry_reconciles_a_prepared_attempt_without_duplicate_
                 "status": "ready",
             }
         )
-        sync_node_agents(app.state, node)
-        owner = next(
-            agent
-            for agent in app.state.agent_store.list_agents(
-                supervisor_employee_id="admin"
-            )
-            if agent["executorKind"] == "codex"
+        owner = app.state.agent_store.create_agent(
+            "admin",
+            {
+                "displayName": "Codex",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": computer_id(node),
+            },
         )
+        sync_node_agents(app.state, node)
         session = app.state.session_store.create_session(
             {
                 "daemonNodeId": node["id"],
@@ -1266,14 +1334,16 @@ def test_new_thread_retry_resumes_the_session_owned_by_its_prepared_admission(
                 "status": "ready",
             }
         )
-        sync_node_agents(app.state, node)
-        agent = next(
-            item
-            for item in app.state.agent_store.list_agents(
-                supervisor_employee_id="admin"
-            )
-            if item["executorKind"] == "codex"
+        agent = app.state.agent_store.create_agent(
+            "admin",
+            {
+                "displayName": "Codex",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": computer_id(node),
+            },
         )
+        sync_node_agents(app.state, node)
         original = SessionController.record_collaboration_round_started
         attempts = 0
 
@@ -1333,14 +1403,16 @@ def test_completed_thread_retry_reopens_after_message_commit_interruption(
                 "status": "ready",
             }
         )
-        sync_node_agents(app.state, node)
-        owner = next(
-            agent
-            for agent in app.state.agent_store.list_agents(
-                supervisor_employee_id="admin"
-            )
-            if agent["executorKind"] == "codex"
+        owner = app.state.agent_store.create_agent(
+            "admin",
+            {
+                "displayName": "Codex",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": computer_id(node),
+            },
         )
+        sync_node_agents(app.state, node)
         session = app.state.session_store.create_session(
             {
                 "daemonNodeId": node["id"],
@@ -1417,14 +1489,16 @@ def test_admin_can_replay_a_scoped_message_for_an_employee_owned_thread(
                 "status": "ready",
             }
         )
-        sync_node_agents(app.state, node)
-        agent = next(
-            item
-            for item in app.state.agent_store.list_agents(
-                supervisor_employee_id="alice"
-            )
-            if item["executorKind"] == "codex"
+        agent = app.state.agent_store.create_agent(
+            "alice",
+            {
+                "displayName": "Codex",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": computer_id(node),
+            },
         )
+        sync_node_agents(app.state, node)
         session = app.state.session_store.create_session(
             {
                 "daemonNodeId": node["id"],
@@ -1478,14 +1552,16 @@ def test_existing_thread_resumes_after_managed_runtime_replacement_without_read(
                 "status": "ready",
             }
         )
-        sync_node_agents(app.state, runtime)
-        agent = next(
-            item
-            for item in app.state.agent_store.list_agents(
-                supervisor_employee_id="admin"
-            )
-            if item["executorKind"] == "codex"
+        agent = app.state.agent_store.create_agent(
+            "admin",
+            {
+                "displayName": "Codex",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": f"managed:{managed['id']}",
+            },
         )
+        sync_node_agents(app.state, runtime)
         old_runtime_id = runtime["id"]
         session = app.state.session_store.create_session(
             {
@@ -2155,9 +2231,15 @@ def test_legacy_run_reuses_compatibility_agent_after_device_reregistration(
         assert agents[0]["compatibilityKey"] == "alice:device:alice:machine-a:codex"
 
 
-def test_compatibility_agent_drops_from_roster_when_its_computer_is_gone(
+def test_agent_stays_on_roster_when_its_computer_is_gone(
     monkeypatch,
 ) -> None:
+    """Explicitly declared agents have no compatibilityKey, so the roster's
+    live-computer filter (`agent_routes.list_agents`) never applies to them —
+    an agent whose computer is unassigned stays visible rather than dropping
+    out. (The old compatibilityKey-gated drop no longer fires for any agent,
+    since only the retired auto-creation path ever set that key; making the
+    roster reflect binding status instead is tracked separately.)"""
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
@@ -2185,7 +2267,7 @@ def test_compatibility_agent_drops_from_roster_when_its_computer_is_gone(
                 "computerId": _birth_computer_id(client, "alice", "claude"),
             },
         )
-        app.state.registry.register(
+        node_a = app.state.registry.register(
             {
                 "sandboxId": "node_a",
                 "employeeId": "alice",
@@ -2197,18 +2279,18 @@ def test_compatibility_agent_drops_from_roster_when_its_computer_is_gone(
                 "status": "ready",
             }
         )
-        # Materialize the node's compatibility agent + placement.
-        from types import SimpleNamespace
-
-        from relay.services.node_agents import sync_node_agents
-
-        sync_node_agents(
-            SimpleNamespace(
-                agent_store=app.state.agent_store,
-                agent_placement_store=app.state.agent_placement_store,
-            ),
-            app.state.registry.get("node_a"),
+        # Declaring the agent while its computer is already live auto-places it.
+        declared = client.post(
+            "/api/v1/admin/agents",
+            json={
+                "supervisorEmployeeId": "alice",
+                "displayName": "Codex",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": computer_id(node_a),
+            },
         )
+        assert declared.status_code == 201, declared.text
 
         assert client.post("/api/v1/auth/logout").status_code == 200
         assert (
@@ -2223,8 +2305,9 @@ def test_compatibility_agent_drops_from_roster_when_its_computer_is_gone(
         assert "Freelancer" in names
         assert "Codex" in names
 
-        # Unassigning the computer retires the placement; the per-computer agent
-        # must leave the roster while the placement-less custom agent remains.
+        # Unassigning the computer retires the placement, but neither agent has
+        # a compatibilityKey (explicit declaration never sets one), so both
+        # stay on the roster.
         assert client.post("/api/v1/auth/logout").status_code == 200
         assert (
             client.post(
@@ -2246,14 +2329,19 @@ def test_compatibility_agent_drops_from_roster_when_its_computer_is_gone(
         )
 
         after = client.get("/api/v1/agents").json()["agents"]
-        assert {agent["displayName"] for agent in after} == {"Freelancer"}
+        assert {agent["displayName"] for agent in after} == {"Freelancer", "Codex"}
 
 
-def test_compatibility_agent_drops_when_its_computer_is_deregistered(
+def test_agent_stays_on_roster_when_its_computer_is_deregistered(
     monkeypatch,
 ) -> None:
-    """A placement left dangling at a node that vanished from the registry must
-    not linger as a struck-through, computer-less entry in the header/roster."""
+    """A placement left dangling at a node that vanished from the registry
+    used to drop the agent from the roster, but only agents carrying a
+    compatibilityKey were ever subject to that filter. Explicitly declared
+    agents (the only kind created now) never get one, so the agent stays
+    visible even with a dangling placement. (Deriving a real binding status
+    for this case, instead of leaving the roster silent about it, is tracked
+    separately.)"""
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
@@ -2270,7 +2358,7 @@ def test_compatibility_agent_drops_when_its_computer_is_deregistered(
             ).status_code
             == 201
         )
-        app.state.registry.register(
+        node_a = app.state.registry.register(
             {
                 "sandboxId": "node_a",
                 "employeeId": "alice",
@@ -2282,17 +2370,18 @@ def test_compatibility_agent_drops_when_its_computer_is_deregistered(
                 "status": "ready",
             }
         )
-        from types import SimpleNamespace
-
-        from relay.services.node_agents import sync_node_agents
-
-        sync_node_agents(
-            SimpleNamespace(
-                agent_store=app.state.agent_store,
-                agent_placement_store=app.state.agent_placement_store,
-            ),
-            app.state.registry.get("node_a"),
+        # Declaring the agent while its computer is already live auto-places it.
+        declared = client.post(
+            "/api/v1/admin/agents",
+            json={
+                "supervisorEmployeeId": "alice",
+                "displayName": "Codex",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": computer_id(node_a),
+            },
         )
+        assert declared.status_code == 201, declared.text
 
         assert client.post("/api/v1/auth/logout").status_code == 200
         assert (
@@ -2307,11 +2396,15 @@ def test_compatibility_agent_drops_when_its_computer_is_deregistered(
         )
 
         # The computer vanishes from the registry (crash / re-enroll under a new
-        # id) WITHOUT the placement being retired — the exact stale state seen in
-        # the header. The dangling active placement must no longer surface it.
+        # id) WITHOUT the placement being retired. The agent still has no
+        # compatibilityKey, so the roster's live-computer filter never applies
+        # to it and it stays visible despite the dangling placement.
         app.state.registry.delete("node_a")
 
-        assert client.get("/api/v1/agents").json()["agents"] == []
+        assert any(
+            agent["displayName"] == "Codex"
+            for agent in client.get("/api/v1/agents").json()["agents"]
+        )
 
 
 def test_task_persists_and_dispatches_a_logical_agent_assignment(monkeypatch) -> None:
