@@ -8,6 +8,8 @@ import type {
   ChatIntegrationsResponse,
   ChatProvider,
   ComputerTokenResponse,
+  CreateAgentInput,
+  CreateAgentResponse,
   CreateControlPanelEmployeeInput,
   CreateControlPanelEmployeeResponse,
   CreateControlPanelDaemonNodeInput,
@@ -171,6 +173,10 @@ export function updateDaemonNodeDisabledAgents(
 
 export function listEmployeeAgents(signal?: AbortSignal): Promise<EmployeeAgentsResponse> {
   return apiJson<EmployeeAgentsResponse>("/agents", { signal });
+}
+
+export function createAgent(body: CreateAgentInput): Promise<CreateAgentResponse> {
+  return apiJson<CreateAgentResponse>("/agents", { method: "POST", body });
 }
 
 export function listControlPanelAgents(employeeId?: string, signal?: AbortSignal): Promise<EmployeeAgentsResponse> {

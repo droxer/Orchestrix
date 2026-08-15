@@ -14,6 +14,7 @@ from relay.chat.provider_health import (
     probe_chat_integration,
     provision_chat_integration,
 )
+from relay.core.computer_identity import computer_id
 
 
 async def _healthy_provider(_settings):
@@ -148,12 +149,27 @@ def test_chat_integration_setup_flow_redacts_secrets(monkeypatch) -> None:
             ).status_code
             == 201
         )
+        node = client.app.state.registry.register(
+            {
+                "sandboxId": "offline_node_alice",
+                "employeeId": "alice",
+                "workspaceId": "machine-alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "stopped",
+            }
+        )
         agent = client.post(
             "/api/v1/admin/agents",
             json={
                 "supervisorEmployeeId": "alice",
                 "displayName": "Chat agent",
                 "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": computer_id(node),
             },
         ).json()["agent"]
 

@@ -9,7 +9,9 @@ from uuid import UUID
 
 from fastapi.testclient import TestClient
 from relay.app import create_app
+from relay.core.computer_identity import computer_id
 from relay.persistence.agent_placement_store import LocalAgentPlacementStore
+from relay.services.agent_routing import placement_node
 from relay.services.node_agents import sync_node_agents
 from relay.sessions.controller import SessionController
 
@@ -415,9 +417,11 @@ def test_admin_can_recover_deleted_managed_node(monkeypatch) -> None:
         assert missing.status_code == 404
 
 
-def test_recovered_managed_node_registers_runtime_without_creating_agents(
-    monkeypatch,
-) -> None:
+def test_recovered_managed_node_reattaches_the_original_agent(monkeypatch) -> None:
+    """Deleting the managed node only removes its placement — the agent
+    itself was declared explicitly by the employee and is never erased by the
+    system. After recovery, re-registering backfills a placement for that
+    same agent; no fresh agent declaration is needed."""
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
@@ -435,6 +439,15 @@ def test_recovered_managed_node_registers_runtime_without_creating_agents(
         app.state.managed_node_store.complete_enrollment(
             managed["id"], attempt["id"], runtime["id"]
         )
+        original = app.state.agent_store.create_agent(
+            "alice",
+            {
+                "displayName": "Claude",
+                "executorKind": "claude",
+                "defaultRole": "implementer",
+                "computerId": f"managed:{managed['id']}",
+            },
+        )
         registered = client.post(
             "/api/v1/daemon-node-registrations",
             json={
@@ -451,6 +464,12 @@ def test_recovered_managed_node_registers_runtime_without_creating_agents(
         deleted = client.delete(f"/api/v1/admin/managed-nodes/{managed['id']}")
         assert deleted.status_code == 202, deleted.text
         app.state.managed_node_store.update_node(managed["id"], {"phase": "deleted"})
+        # Deleting the computer only removed the original agent's placement.
+        assert not app.state.agent_store.get_agent(original["id"]).get("deletedAt")
+        assert (
+            app.state.agent_placement_store.list_placements(agent_id=original["id"])
+            == []
+        )
         recovered = client.post(f"/api/v1/admin/managed-nodes/{managed['id']}/recover")
         assert recovered.status_code == 202, recovered.text
 
@@ -477,16 +496,15 @@ def test_recovered_managed_node_registers_runtime_without_creating_agents(
                 "status": "ready",
             },
         )
-
         assert re_registered.status_code == 200, re_registered.text
-        live_claude = [
-            agent
-            for agent in app.state.agent_store.list_agents(
-                supervisor_employee_id="alice"
-            )
-            if agent["executorKind"] == "claude"
-        ]
-        assert live_claude == []
+
+        # Re-registering the recovered computer backfills a placement for the
+        # same declared agent — no new agent is required.
+        [placement] = app.state.agent_placement_store.list_placements(
+            agent_id=original["id"]
+        )
+        nodes = {node["id"]: node for node in app.state.registry.monitor_nodes()}
+        assert placement_node(placement, nodes)["id"] == replacement["id"]
 
 
 def test_recovered_managed_node_conflicts_with_replacement_policy_slot(
@@ -723,14 +741,16 @@ def test_running_managed_runtime_retirement_preserves_agent_and_placement(
                 "status": "ready",
             }
         )
-        sync_node_agents(app.state, runtime)
-        agent = next(
-            item
-            for item in app.state.agent_store.list_agents(
-                supervisor_employee_id="alice"
-            )
-            if item["executorKind"] == "codex"
+        agent = app.state.agent_store.create_agent(
+            "alice",
+            {
+                "displayName": "Codex",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": f"managed:{managed['id']}",
+            },
         )
+        sync_node_agents(app.state, runtime)
         [placement] = app.state.agent_placement_store.list_placements(
             agent_id=agent["id"]
         )
@@ -776,14 +796,16 @@ def test_stopped_managed_runtime_preserves_agent_for_restart(monkeypatch) -> Non
                 "status": "ready",
             }
         )
-        sync_node_agents(app.state, runtime)
-        agent = next(
-            item
-            for item in app.state.agent_store.list_agents(
-                supervisor_employee_id="alice"
-            )
-            if item["executorKind"] == "codex"
+        agent = app.state.agent_store.create_agent(
+            "alice",
+            {
+                "displayName": "Codex",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": f"managed:{managed['id']}",
+            },
         )
+        sync_node_agents(app.state, runtime)
         [placement] = app.state.agent_placement_store.list_placements(
             agent_id=agent["id"]
         )
@@ -3608,18 +3630,38 @@ def test_admin_can_soft_delete_employee_and_unassign_nodes(monkeypatch) -> None:
         )
         assert provision.status_code == 201
         node_id = provision.json()["node"]["id"]
+        # Mark the node ready with the codex runtime directly on the
+        # registry (bypassing the HTTP registration route, which also runs
+        # sync_node_agents and would materialize unrelated compatibility
+        # agents for every executor kind — out of scope here). A
+        # provisioned-but-never-registered node has no known runtimes yet,
+        # so creation needs this before it can succeed.
+        app.state.registry.update_status(
+            node_id, {"status": "ready", "agents": {"codex": "ready"}}
+        )
         agent = client.post(
             "/api/v1/admin/agents",
             json={
                 "supervisorEmployeeId": "alice",
                 "displayName": "Builder",
                 "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": computer_id(app.state.registry.get(node_id)),
             },
         ).json()["agent"]
-        placement = client.post(
-            f"/api/v1/admin/agents/{agent['id']}/placements",
-            json={"daemonNodeId": node_id},
-        ).json()["placement"]
+        # The node is now live, so creation already auto-placed the agent —
+        # only fall back to an explicit placement call if it did not.
+        auto_placed = app.state.agent_placement_store.list_placements(
+            agent_id=agent["id"]
+        )
+        placement = (
+            auto_placed[0]
+            if auto_placed
+            else client.post(
+                f"/api/v1/admin/agents/{agent['id']}/placements",
+                json={"daemonNodeId": node_id},
+            ).json()["placement"]
+        )
         team = client.post(
             "/api/v1/admin/teams",
             json={
@@ -3686,7 +3728,7 @@ def test_admin_can_soft_delete_employee_and_unassign_nodes(monkeypatch) -> None:
                 json={
                     "supervisorEmployeeId": "alice",
                     "displayName": "Orphan",
-                    "executorKind": "codex",
+                    "executorKind": "codex", "defaultRole": "implementer",
                 },
             ).status_code
             == 404

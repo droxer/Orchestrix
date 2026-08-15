@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import type { AgentName, CurrentUser, EmployeeAgent, LogicalAgentAvailability } from "../types";
 import { AgentStateBadge } from "./AgentStateBadge";
-import { StatusPill } from "./StatusPill";
+import { StatusPill, TonePill } from "./StatusPill";
 import { AgentWorkspacePage, type WorkspacePageTab } from "./AgentWorkspacePage";
 import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
@@ -17,6 +17,7 @@ import { FilterSelect } from "./FiltersBar";
 import { SearchInput } from "@/components/ui/search-input";
 import { describeAgentPlacements } from "../lib/agentPlacements";
 import { OWNERSHIP_ICON } from "./AgentPlacementBadge";
+import { CreateAgentDialog } from "./agents/CreateAgentDialog";
 
 interface AgentsPageProps {
   currentUser: CurrentUser;
@@ -97,6 +98,17 @@ function RosterFilterBar({
   );
 }
 
+/** "available" is the healthy default and stays silent — only the three
+    unusable bindings get a badge, so the roster surfaces a defect instead
+    of quietly leaving an agent unreachable. */
+function BindingStatusBadge({ status }: { status: EmployeeAgent["bindingStatus"] }) {
+  const { t } = useTranslation();
+  if (!status || status === "available") return null;
+  return (
+    <TonePill tone="bad" label={t(`agents_page.binding_status_${status}`)} />
+  );
+}
+
 function RosterRow({
   agent,
   selected,
@@ -169,6 +181,7 @@ function RosterRow({
               <StatusPill value={agent.availability} />
             </span>
           ) : null}
+          <BindingStatusBadge status={agent.bindingStatus} />
         </Button>
       </article>
     </li>
@@ -228,6 +241,7 @@ export function AgentsPage({
   }, [activeAgents, availability, descriptors, query]);
 
   const loading = isFetching && agents.length === 0;
+  const [createOpen, setCreateOpen] = useState(false);
 
   // The detail pane remounts per agent (key={workspaceAgent.id}), so an
   // in-flight profile draft cannot survive a roster switch — hold the
@@ -269,6 +283,13 @@ export function AgentsPage({
           count={t("agents_page.sub", { count: activeAgents.length })}
           titleVariant="display"
           layout="stacked"
+          actions={
+            currentUser.employeeId ? (
+              <Button size="cta" type="button" onClick={() => setCreateOpen(true)}>
+                {t("agents_page.create_action")}
+              </Button>
+            ) : null
+          }
         />
 
         {isDetailRoute ? null : (
@@ -321,6 +342,15 @@ export function AgentsPage({
           />
         )}
       </div>
+
+      {currentUser.employeeId ? (
+        <CreateAgentDialog
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          employeeId={currentUser.employeeId}
+          onCreated={(agent) => onOpenWorkspace(agent)}
+        />
+      ) : null}
     </section>
   );
 }

@@ -4,6 +4,7 @@ import base64
 
 from fastapi.testclient import TestClient
 from relay.app import create_app
+from relay.core.computer_identity import computer_id
 from relay.core.ids import new_relay_id
 
 
@@ -25,12 +26,30 @@ def _agent(client: TestClient) -> dict:
         ).status_code
         == 201
     )
+    # An offline birth-certificate computer: enough to mint a computerId
+    # without auto-placing the agent, so tests that build their own live
+    # placement/node afterward see exactly the placements they create.
+    node = client.app.state.registry.register(
+        {
+            "sandboxId": "offline_node_alice",
+            "employeeId": "alice",
+            "workspaceId": "machine-alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "capabilities": ["thread-workspaces"],
+            "status": "stopped",
+        }
+    )
     response = client.post(
         "/api/v1/admin/agents",
         json={
             "supervisorEmployeeId": "alice",
             "displayName": "Builder",
             "executorKind": "codex",
+            "defaultRole": "implementer",
+            "computerId": computer_id(node),
         },
     )
     assert response.status_code == 201, response.text
@@ -384,12 +403,27 @@ def test_team_shared_scope_allows_a_current_member_before_its_first_run(
     client = TestClient(app)
     _bootstrap(client)
     lead = _agent(client)
+    node = client.app.state.registry.register(
+        {
+            "sandboxId": "offline_node_alice",
+            "employeeId": "alice",
+            "workspaceId": "machine-alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex", "claude"],
+            "capabilities": ["thread-workspaces"],
+            "status": "stopped",
+        }
+    )
     member_response = client.post(
         "/api/v1/admin/agents",
         json={
             "supervisorEmployeeId": "alice",
             "displayName": "Reviewer",
             "executorKind": "claude",
+            "defaultRole": "implementer",
+            "computerId": computer_id(node),
         },
     )
     assert member_response.status_code == 201, member_response.text
@@ -444,12 +478,27 @@ def test_team_shared_scope_allows_a_current_member_before_its_first_run(
     assert response.status_code == 200, response.text
     assert response.json()["source"] == "live"
 
+    node = client.app.state.registry.register(
+        {
+            "sandboxId": "offline_node_alice",
+            "employeeId": "alice",
+            "workspaceId": "machine-alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex", "claude", "pi"],
+            "capabilities": ["thread-workspaces"],
+            "status": "stopped",
+        }
+    )
     outsider_response = client.post(
         "/api/v1/admin/agents",
         json={
             "supervisorEmployeeId": "alice",
             "displayName": "Outsider",
             "executorKind": "pi",
+            "defaultRole": "implementer",
+            "computerId": computer_id(node),
         },
     )
     outsider = outsider_response.json()["agent"]
@@ -468,24 +517,27 @@ def test_project_member_reads_shared_project_workspace_before_first_run(
     client = TestClient(app)
     _bootstrap(client)
     lead = _agent(client)
-    member_response = client.post(
-        "/api/v1/admin/agents",
-        json={
-            "supervisorEmployeeId": "alice",
+    # node_1 isn't registered until later in this test, so these can't go
+    # through the HTTP route (it requires a live node for the computerId) —
+    # go through the store directly, same as the project below.
+    member = app.state.agent_store.create_agent(
+        "alice",
+        {
             "displayName": "Project reviewer",
             "executorKind": "claude",
+            "defaultRole": "reviewer",
+            "computerId": "node:node_1",
         },
     )
-    member = member_response.json()["agent"]
-    outsider_response = client.post(
-        "/api/v1/admin/agents",
-        json={
-            "supervisorEmployeeId": "alice",
+    outsider = app.state.agent_store.create_agent(
+        "alice",
+        {
             "displayName": "Project outsider",
             "executorKind": "pi",
+            "defaultRole": "implementer",
+            "computerId": "node:node_1",
         },
     )
-    outsider = outsider_response.json()["agent"]
     project = app.state.project_store.create_project(
         "alice",
         {

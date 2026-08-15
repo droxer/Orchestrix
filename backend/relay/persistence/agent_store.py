@@ -46,7 +46,6 @@ AGENT_PATCH_FIELDS = frozenset(
     {
         "displayName",
         "profileImageUrl",
-        "defaultRole",
         "instructions",
         "skillPolicy",
         "toolPolicy",
@@ -130,6 +129,7 @@ class LocalAgentStore:
                 {
                     "displayName": _compatibility_display_name(owned, executor_kind),
                     "executorKind": executor_kind,
+                    "defaultRole": "implementer",
                 },
             )
             return self._create_agent({**agent, "compatibilityKey": key})
@@ -202,6 +202,37 @@ class LocalAgentStore:
                 "updatedAt": now_iso(),
             }
             self._append(agent_id, "agent.deleted", {"agent": updated})
+            return updated
+
+    def set_birth_certificate(
+        self, agent_id: str, *, computer_id: str, default_role: str
+    ) -> dict[str, Any]:
+        """One-time migration use only: backfill a birth certificate onto a
+        legacy agent and clear its compatibility identity.
+
+        These fields are fixed at creation and immutable on the normal path;
+        legacy records predate the concept and can only get it via migration.
+        Do not call this from anywhere else.
+
+        Clearing compatibilityKey must go through here too — update_agent
+        won't work, because _updated_agent routes that field through
+        _required_string (agent_store.py:828), which treats an empty string
+        as a missing required value and raises ValueError.
+        """
+        with self._lock:
+            current = self.get_agent(agent_id)
+            if not current:
+                raise KeyError(agent_id)
+            updated = {
+                key: value for key, value in current.items() if key != "compatibilityKey"
+            }
+            updated |= {
+                "computerId": computer_id,
+                "defaultRole": default_role,
+                "version": int(current.get("version") or 1) + 1,
+                "updatedAt": now_iso(),
+            }
+            self._append(agent_id, "agent.updated", {"agent": updated})
             return updated
 
     def events(self, agent_id: str) -> list[dict[str, Any]]:
@@ -395,6 +426,7 @@ class DatabaseAgentStore:
             {
                 "displayName": _compatibility_display_name(owned, executor_kind),
                 "executorKind": executor_kind,
+                "defaultRole": "implementer",
             },
         )
         return self._create_agent({**agent, "compatibilityKey": key})
@@ -472,6 +504,38 @@ class DatabaseAgentStore:
             "updatedAt": timestamp,
         }
         return self._append(agent_id, "agent.deleted", updated, {"agent": updated})
+
+    def set_birth_certificate(
+        self, agent_id: str, *, computer_id: str, default_role: str
+    ) -> dict[str, Any]:
+        """Migration-only: backfill an existing agent's birth certificate and
+        clear its compatibility identity.
+
+        These fields are fixed at creation and unpatchable on the normal
+        path; legacy records predate the concept, so only this migration
+        entry point backfills them. Do not call from anywhere else.
+
+        Clearing compatibilityKey must go through here rather than
+        update_agent, because _updated_agent routes that field through
+        _required_string (agent_store.py:~828), and an empty string there
+        is treated as a missing required field and raises ValueError.
+        `_agent_row` writes `compatibility_key` from `agent.get(...)`, so
+        omitting the key from `updated` writes the column as NULL, freeing
+        it from the `uq_agents_live_compatibility_key` partial unique index.
+        """
+        current = self.get_agent(agent_id)
+        if not current:
+            raise KeyError(agent_id)
+        updated = {
+            key: value for key, value in current.items() if key != "compatibilityKey"
+        }
+        updated |= {
+            "computerId": computer_id,
+            "defaultRole": default_role,
+            "version": int(current.get("version") or 1) + 1,
+            "updatedAt": now_iso(),
+        }
+        return self._append(agent_id, "agent.updated", updated, {"agent": updated})
 
     def events(self, agent_id: str) -> list[dict[str, Any]]:
         with store_transaction(self.engine) as conn:
@@ -594,11 +658,13 @@ def _new_agent(
         display_name = generate_agent_name(taken=name_taken or (lambda _: False))
     executor_kind = _required_string(payload, "executorKind")
     default_role = _optional_string(payload, "defaultRole")
+    if not default_role:
+        raise ValueError("defaultRole is required.")
     if not supervisor_employee_id:
         raise ValueError("supervisorEmployeeId is required.")
     if executor_kind not in AGENT_NAMES:
         raise ValueError(f"executorKind must be one of: {', '.join(AGENT_NAMES)}.")
-    if default_role is not None and default_role not in AGENT_ROLES:
+    if default_role not in AGENT_ROLES:
         raise ValueError(f"defaultRole must be one of: {', '.join(AGENT_ROLES)}.")
     timestamp = now_iso()
     return {
@@ -606,7 +672,12 @@ def _new_agent(
         "supervisorEmployeeId": supervisor_employee_id,
         "displayName": display_name,
         "executorKind": executor_kind,
-        **({"defaultRole": default_role} if default_role else {}),
+        "defaultRole": default_role,
+        **(
+            {"computerId": _optional_string(payload, "computerId")}
+            if _optional_string(payload, "computerId")
+            else {}
+        ),
         **(
             {"instructions": payload["instructions"].strip()}
             if isinstance(payload.get("instructions"), str)
@@ -674,19 +745,6 @@ def _normalize_agent_identity_patch(
         ):
             raise ValueError("profileImageUrl is invalid.")
         normalized["profileImageUrl"] = image_url
-    if "defaultRole" in patch:
-        raw_role = patch["defaultRole"]
-        # null or "" clears the role: an agent that was given the wrong one has
-        # to be able to return to the default team contribution behavior.
-        if raw_role is None or (isinstance(raw_role, str) and not raw_role.strip()):
-            normalized["defaultRole"] = None
-        else:
-            role = _required_string(patch, "defaultRole")
-            if role not in AGENT_ROLES:
-                raise ValueError(
-                    f"defaultRole must be one of: {', '.join(AGENT_ROLES)}."
-                )
-            normalized["defaultRole"] = role
     if "compatibilityKey" in patch:
         normalized["compatibilityKey"] = _required_string(patch, "compatibilityKey")
     return normalized

@@ -41,11 +41,17 @@ def test_rejects_collaboration_across_nodes_even_with_shared_workspace(
         {
             "displayName": "Researcher",
             "executorKind": "claude",
+            "defaultRole": "implementer",
             "instructions": "Compare sources before answering.",
         },
     )
     builder = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(
         researcher, "node_a", {"workspacePolicy": {"kind": "shared-path"}}
@@ -77,10 +83,20 @@ def test_agents_on_same_computer_resolve_together(tmp_path: Path) -> None:
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     researcher = agents.create_agent(
-        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Researcher",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     builder = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(researcher, "node_a")
     placements.create_placement(builder, "node_a")
@@ -109,7 +125,12 @@ def test_employee_cannot_route_another_employees_agent(tmp_path: Path) -> None:
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Researcher",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(agent, "node_a")
 
@@ -132,7 +153,12 @@ def test_managed_capacity_does_not_replace_a_healthy_local_placement(
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     local_placement = placements.create_placement(agent, "node_local")
     local_node = {**node("node_local", "codex"), "employeeId": "alice"}
@@ -162,7 +188,12 @@ def test_managed_capacity_does_not_move_an_offline_agent_to_another_computer(
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     original = placements.create_placement(
         agent, "runtime_a", {"managedNodeId": "computer_a"}
@@ -203,7 +234,12 @@ def test_legacy_nonempty_policy_blocks_dispatch(
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Restricted", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Restricted",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(agent, "node_a")
     get_agent = agents.get_agent
@@ -233,10 +269,20 @@ def test_canonical_workspace_id_does_not_override_node_scope(tmp_path: Path) -> 
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     researcher = agents.create_agent(
-        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Researcher",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     builder = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(
         researcher, "node_a", {"workspacePolicy": {"kind": "shared-path"}}
@@ -275,10 +321,20 @@ def test_node_affine_placements_reject_cross_node_workflow(tmp_path: Path) -> No
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     researcher = agents.create_agent(
-        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Researcher",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     builder = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(researcher, "node_a")
     placements.create_placement(builder, "node_b")
@@ -303,10 +359,20 @@ def test_different_workspace_ids_reject_cross_node_workflow(tmp_path: Path) -> N
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     first = agents.create_agent(
-        "alice", {"displayName": "First", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "First",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     second = agents.create_agent(
-        "alice", {"displayName": "Second", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Second",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(first, "node_a")
     placements.create_placement(second, "node_b")
@@ -333,10 +399,20 @@ def test_node_affine_session_rejects_followup_on_different_node(
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     first = agents.create_agent(
-        "alice", {"displayName": "First", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "First",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     second = agents.create_agent(
-        "alice", {"displayName": "Second", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Second",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     first_placement = placements.create_placement(first, "node_a")
     placements.create_placement(second, "node_b")
@@ -375,7 +451,12 @@ def test_session_without_prior_run_does_not_invent_node_affinity(
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(agent, "node_a")
 
@@ -409,7 +490,12 @@ def test_managed_runtime_replacement_keeps_existing_session_affinity(
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     placement = placements.create_placement(agent, "node_old")
     session = {
@@ -459,7 +545,12 @@ def test_managed_runtime_replacement_keeps_pre_run_session_affinity(
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(
         agent,
@@ -503,7 +594,12 @@ def test_legacy_pre_run_session_follows_managed_runtime_history(
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(agent, "node_new", {"managedNodeId": "computer_one"})
     session = {
@@ -542,10 +638,20 @@ def test_shared_path_session_rejects_followup_on_different_node(
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     first = agents.create_agent(
-        "alice", {"displayName": "First", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "First",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     second = agents.create_agent(
-        "alice", {"displayName": "Second", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Second",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     first_placement = placements.create_placement(
         first, "node_a", {"workspacePolicy": {"kind": "shared-path"}}
@@ -586,7 +692,12 @@ def test_offline_agent_returns_stable_reason(tmp_path: Path) -> None:
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(agent, "node_a")
 
@@ -607,7 +718,12 @@ def test_saturated_placement_returns_capacity_exhausted(tmp_path: Path) -> None:
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(agent, "node_a")
     saturated = {
@@ -676,7 +792,12 @@ def test_assignment_does_not_borrow_another_managed_computer(tmp_path: Path) -> 
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Worker", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Worker",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(agent, "node-home", {"managedNodeId": "mnode-home"})
     offline_home = {
@@ -715,7 +836,12 @@ def test_phantom_placement_with_run_history_does_not_attach_elsewhere(
     placements = LocalAgentPlacementStore(tmp_path)
     sessions = LocalSessionStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Worker", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Worker",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     placement = placements.create_placement(agent, "node-missing")
     session = sessions.create_session(
@@ -763,7 +889,12 @@ def test_phantom_placement_does_not_attach_to_non_ready_executor(
     placements = LocalAgentPlacementStore(tmp_path)
     sessions = LocalSessionStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Worker", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Worker",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     original = placements.create_placement(agent, "node-missing")
     non_ready = {
@@ -926,7 +1057,12 @@ def test_offline_computer_id_thread_refuses_instead_of_borrowing(
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(agent, "node_b")
     session = {
@@ -961,7 +1097,12 @@ def test_offline_managed_node_id_thread_refuses_instead_of_borrowing(
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(agent, "node_b")
     session = {
@@ -1001,7 +1142,12 @@ def test_legacy_rebind_chasing_uses_the_latest_run_with_a_daemon_node_id(
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     old_placement = placements.create_placement(agent, "node_old")
     placements.rebind_placement(old_placement["id"], "node_stale_target")
@@ -1046,7 +1192,12 @@ def test_legacy_session_recovers_device_identity_from_its_run_placement(
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     placement = create_node_placement(
         placements,

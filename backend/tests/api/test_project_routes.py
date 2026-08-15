@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
 from relay.app import create_app
-from relay.persistence.agent_placement_store import create_node_placement
+from relay.core.computer_identity import computer_id
 
 
 def _bootstrap(client: TestClient) -> None:
@@ -52,18 +52,20 @@ def _register_computer(
 
 
 def _agent(client: TestClient, app, node: dict, name: str, executor: str) -> dict:
+    # Declaring an agent whose computer is already live auto-places it, so no
+    # separate placement call is needed here.
     response = client.post(
         "/api/v1/admin/agents",
         json={
             "supervisorEmployeeId": "alice",
             "displayName": name,
             "executorKind": executor,
+            "defaultRole": "implementer",
+            "computerId": computer_id(node),
         },
     )
     assert response.status_code == 201, response.text
-    agent = response.json()["agent"]
-    create_node_placement(app.state.agent_placement_store, agent, node)
-    return agent
+    return response.json()["agent"]
 
 
 def _login_alice(client: TestClient) -> None:

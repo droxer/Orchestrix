@@ -22,10 +22,20 @@ def test_agents_can_be_placed_on_different_nodes(tmp_path: Path) -> None:
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     researcher = agents.create_agent(
-        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Researcher",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     builder = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
 
     first = placements.create_placement(researcher, "node_a")
@@ -41,7 +51,12 @@ def test_moving_an_agent_to_a_new_computer_supersedes_the_old_placement(
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Researcher",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
 
     first = placements.create_placement(agent, "node_a")
@@ -58,7 +73,12 @@ def test_reassigning_the_same_computer_is_rejected(tmp_path: Path) -> None:
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Researcher",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(agent, "node_a")
 
@@ -75,7 +95,12 @@ def test_database_store_moves_an_agent_between_computers(tmp_path: Path) -> None
     agents = DatabaseAgentStore(database_url, create_schema=True)
     placements = DatabaseAgentPlacementStore(database_url, create_schema=True)
     agent = agents.create_agent(
-        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Researcher",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
 
     placements.create_placement(agent, "node_a")
@@ -99,7 +124,12 @@ def test_first_managed_attachment_is_idempotent_across_store_instances(
         first_store = LocalAgentPlacementStore(tmp_path)
         second_store = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Worker", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Worker",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     phantom = first_store.create_placement(agent, "node-missing")
     target = {
@@ -140,7 +170,12 @@ def test_first_managed_attachment_allows_only_one_competing_computer(
         first_store = LocalAgentPlacementStore(tmp_path)
         second_store = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Worker", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Worker",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     phantom = first_store.create_placement(agent, "node-missing")
     targets = (
@@ -177,7 +212,12 @@ def test_runtime_rebind_preserves_placement_identity(
         agents = LocalAgentStore(tmp_path)
         placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     original = placements.create_placement(agent, "runtime_old")
 
@@ -198,7 +238,12 @@ def test_database_move_keeps_old_placement_when_insert_fails(tmp_path: Path) -> 
     agents = DatabaseAgentStore(database_url, create_schema=True)
     placements = DatabaseAgentPlacementStore(database_url, create_schema=True)
     agent = agents.create_agent(
-        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Researcher",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(agent, "node_a")
     with placements.engine.begin() as conn:
@@ -226,7 +271,12 @@ def test_local_move_keeps_old_placement_when_create_fails(
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Researcher",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(agent, "node_a")
     append = placements._append
@@ -251,7 +301,12 @@ def test_reconcile_collapses_pre_invariant_multi_placements(tmp_path: Path) -> N
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Researcher",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     # Simulate data created before the one-agent-one-computer invariant by
     # appending a second active placement straight to the event log (bypassing
@@ -278,7 +333,12 @@ def test_database_reconcile_collapses_pre_invariant_multi_placements(
     agents = DatabaseAgentStore(database_url, create_schema=True)
     placements = DatabaseAgentPlacementStore(database_url, create_schema=True)
     agent = agents.create_agent(
-        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Researcher",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     placements.create_placement(agent, "node_low", {"priority": 200})
     extra = _new_placement(agent, "node_top", {"priority": 50})
@@ -303,7 +363,12 @@ def test_placement_availability_is_derived_from_agent_and_node_health(
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     placement = placements.create_placement(agent, "node_a")
     node = {
@@ -338,7 +403,12 @@ def test_realized_agent_versions_never_move_backward(
         agents = LocalAgentStore(tmp_path)
         placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     placement = placements.create_placement(agent, "node_a")
 
@@ -353,7 +423,12 @@ def test_database_agent_placement_store_matches_local_contract(tmp_path: Path) -
     agents = DatabaseAgentStore(database_url, create_schema=True)
     placements = DatabaseAgentPlacementStore(database_url, create_schema=True)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
 
     placement = placements.create_placement(agent, "node_a", {"priority": 20})
@@ -379,7 +454,12 @@ def test_database_placement_store_normalizes_legacy_owner_snapshot(
     agents = DatabaseAgentStore(database_url, create_schema=True)
     placements = DatabaseAgentPlacementStore(database_url, create_schema=True)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     placement = placements.create_placement(agent, "node_a")
     legacy = {**placement, "employeeId": "alice"}
@@ -406,7 +486,12 @@ def test_rebinding_to_an_unmanaged_node_clears_the_computer_identity(
         agents = LocalAgentStore(tmp_path)
         placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     original = placements.create_placement(agent, "runtime_old")
     managed = placements.rebind_placement(
@@ -436,7 +521,12 @@ def test_rebind_repairs_a_stale_computer_identity_on_the_same_node(
         agents = LocalAgentStore(tmp_path)
         placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
+        "alice",
+        {
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+        },
     )
     original = placements.create_placement(agent, "device_node")
     placements.rebind_placement(
@@ -463,7 +553,12 @@ def test_placement_denormalized_agent_fields_cannot_drift(
         else DatabaseAgentStore(f"sqlite:///{tmp_path}/agents.db", create_schema=True)
     )
     agent = store.create_agent(
-        "alice", {"displayName": "Planner", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Planner",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
 
     for field, value in (
@@ -484,7 +579,12 @@ def test_placement_records_the_computer_identity(tmp_path) -> None:
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
-        "alice", {"displayName": "Worker", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Worker",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     node = {
         "id": "node-1",

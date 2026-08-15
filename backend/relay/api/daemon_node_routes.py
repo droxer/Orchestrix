@@ -21,6 +21,7 @@ from ..services.event_notifier import daemon_command_key
 from ..services.node_agents import (
     assert_node_agent_runs_drained,
     remove_node_agents,
+    sync_node_agents,
 )
 from .deps import AppContextDep
 from .helpers import (
@@ -469,6 +470,21 @@ async def register_daemon_node(request: Request, ctx: AppContextDep) -> dict[str
                 "employee-device" if admin_authorized_ownership else None
             ),
         )
+        ownership_was_control_plane_authorized = bool(
+            admin_authorized_ownership
+            or (
+                prior
+                and prior.get("employeeId") == sandbox.get("employeeId")
+                and (
+                    prior.get("managedNodeId")
+                    or prior.get("provisioningAttemptId")
+                    or prior.get("nodeLocation")
+                    or prior.get("status") == "provisioning"
+                )
+            )
+        )
+        if ownership_was_control_plane_authorized:
+            sync_node_agents(ctx, sandbox)
         if sandbox.get("managedNodeId") and sandbox.get("status") in (
             "ready",
             "running",

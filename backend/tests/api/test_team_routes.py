@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 from fastapi.testclient import TestClient
 from relay.api import task_routes
 from relay.app import create_app
+from relay.core.computer_identity import computer_id
 
 
 def _bootstrap(client: TestClient) -> None:
@@ -43,21 +44,57 @@ def _agent(
     executor: str,
     *,
     place: bool = True,
+    role: str = "implementer",
 ) -> dict:
+    # Give this employee's test computer a stable identity so agent creation
+    # can find it. A pre-existing node (registered by the test itself, or by
+    # an earlier _agent() call for the same employee) keeps its status and
+    # gains this executor in its supported set; otherwise a fresh offline node
+    # is registered so creation succeeds without silently auto-placing the
+    # agent (that would make the placement below a duplicate).
+    node_id = f"test_node_{employee_id}"
+    existing_node = client.app.state.registry.get(node_id)
+    # supportedAgents is a registration-payload field only; the registry
+    # never persists it on the stored node record (it's folded into the
+    # "agents" status dict and then dropped). Reading it back off
+    # `existing_node` is always empty, so re-registering here would silently
+    # forget every runtime a prior call had already made ready. Read the
+    # runtimes this node is actually ready for instead.
+    existing_ready = {
+        kind
+        for kind, status_value in (existing_node or {}).get("agents", {}).items()
+        if status_value == "ready"
+    }
+    node = client.app.state.registry.register(
+        {
+            "sandboxId": node_id,
+            "employeeId": employee_id,
+            "workspaceId": f"machine-{employee_id}",
+            "token": "node_token",
+            "workspacePath": f"/workspace/{employee_id}",
+            "protocolVersion": 1,
+            "supportedAgents": sorted(existing_ready | {executor}),
+            "capabilities": ["thread-workspaces"],
+            "status": (existing_node or {}).get("status", "stopped"),
+        }
+    )
     response = client.post(
         "/api/v1/admin/agents",
         json={
             "supervisorEmployeeId": employee_id,
             "displayName": name,
             "executorKind": executor,
+            "defaultRole": role,
+            "computerId": computer_id(node),
         },
     )
     assert response.status_code == 201
     agent = response.json()["agent"]
-    if place:
-        client.app.state.agent_placement_store.create_placement(
-            agent, f"test_node_{employee_id}"
-        )
+    already_placed = client.app.state.agent_placement_store.list_placements(
+        agent_id=agent["id"]
+    )
+    if place and not already_placed:
+        client.app.state.agent_placement_store.create_placement(agent, node_id)
     return agent
 
 
@@ -809,7 +846,24 @@ def test_unroutable_team_start_requests_capacity_and_queues_scheduler_retry(
         client = TestClient(app)
         _bootstrap(client)
         _employee(client, "alice")
-        lead = _agent(client, "alice", "Lead", "codex")
+        # This test exercises the legacy phantom-placement attach path
+        # (_attach_never_run_agent_to_managed_capacity in
+        # relay/services/agent_routing.py): an agent with a placement that
+        # has no computerId and points at a node that was never actually
+        # registered, representing pre-Task-3 data or anything created by
+        # writing directly to the store. computerId is optional at the
+        # store layer (Task 1) — only the POST /admin/agents API layer
+        # (create_agent_for_employee) requires one — so this fixture goes
+        # straight to the store to construct that state, bypassing the API.
+        lead = app.state.agent_store.create_agent(
+            "alice",
+            {
+                "displayName": "Lead",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+            },
+        )
+        app.state.agent_placement_store.create_placement(lead, "test_node_alice")
         team = client.post(
             "/api/v1/admin/teams",
             json={
@@ -906,21 +960,9 @@ def test_team_reviewer_reviews_the_leads_work_and_carries_its_role(monkeypatch) 
                 "status": "ready",
             }
         )
-        lead = _agent(client, "alice", "Lead", "codex", place=False)
-        reviewer = _agent(client, "alice", "Reviewer", "claude", place=False)
-        assert (
-            client.patch(
-                f"/api/v1/admin/agents/{lead['id']}",
-                json={"defaultRole": "implementer"},
-            ).status_code
-            == 200
-        )
-        assert (
-            client.patch(
-                f"/api/v1/admin/agents/{reviewer['id']}",
-                json={"defaultRole": "reviewer"},
-            ).status_code
-            == 200
+        lead = _agent(client, "alice", "Lead", "codex", place=False, role="implementer")
+        reviewer = _agent(
+            client, "alice", "Reviewer", "claude", place=False, role="reviewer"
         )
         for agent in (lead, reviewer):
             assert (
@@ -1450,15 +1492,8 @@ def test_message_to_a_team_thread_runs_every_member_lead_first(monkeypatch) -> N
                 "status": "ready",
             }
         )
-        lead = _agent(client, "alice", "Lead", "codex")
+        lead = _agent(client, "alice", "Lead", "codex", role="reviewer")
         support = _agent(client, "alice", "Support", "claude")
-        assert (
-            client.patch(
-                f"/api/v1/admin/agents/{lead['id']}",
-                json={"defaultRole": "reviewer"},
-            ).status_code
-            == 200
-        )
         for agent in (lead, support):
             assert (
                 client.post(

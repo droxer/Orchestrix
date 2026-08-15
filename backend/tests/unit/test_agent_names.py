@@ -63,7 +63,9 @@ def test_create_agent_generates_a_themed_name_when_display_name_is_missing(
 ) -> None:
     store = _make_store(store_kind, tmp_path)
 
-    agent = store.create_agent("alice", {"executorKind": "claude"})
+    agent = store.create_agent(
+        "alice", {"executorKind": "claude", "defaultRole": "implementer"}
+    )
 
     assert agent["displayName"] in AGENT_NAME_POOL
     assert store.events(agent["id"])[0]["agent"]["displayName"] == agent["displayName"]
@@ -76,7 +78,8 @@ def test_create_agent_generates_a_themed_name_when_display_name_is_blank(
     store = _make_store(store_kind, tmp_path)
 
     agent = store.create_agent(
-        "alice", {"displayName": "   ", "executorKind": "claude"}
+        "alice",
+        {"displayName": "   ", "executorKind": "claude", "defaultRole": "implementer"},
     )
 
     assert agent["displayName"] in AGENT_NAME_POOL
@@ -88,8 +91,12 @@ def test_generated_names_are_unique_within_a_supervisor(
 ) -> None:
     store = _make_store(store_kind, tmp_path)
 
-    first = store.create_agent("alice", {"executorKind": "claude"})
-    second = store.create_agent("alice", {"executorKind": "codex"})
+    first = store.create_agent(
+        "alice", {"executorKind": "claude", "defaultRole": "implementer"}
+    )
+    second = store.create_agent(
+        "alice", {"executorKind": "codex", "defaultRole": "implementer"}
+    )
 
     assert first["displayName"].casefold() != second["displayName"].casefold()
 
@@ -101,7 +108,9 @@ def test_generated_names_do_not_collide_with_existing_agents(
     store = _make_store(store_kind, tmp_path)
     taken_names = set(AGENT_NAME_POOL)
     for _ in range(3):
-        agent = store.create_agent("alice", {"executorKind": "claude"})
+        agent = store.create_agent(
+            "alice", {"executorKind": "claude", "defaultRole": "implementer"}
+        )
         taken_names.discard(agent["displayName"])
 
     assert len(taken_names) == len(AGENT_NAME_POOL) - 3
@@ -111,7 +120,12 @@ def test_create_agent_still_honors_an_explicit_display_name(tmp_path: Path) -> N
     store = LocalAgentStore(tmp_path)
 
     agent = store.create_agent(
-        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+        "alice",
+        {
+            "displayName": "Researcher",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
 
     assert agent["displayName"] == "Researcher"

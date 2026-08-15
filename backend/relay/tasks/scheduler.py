@@ -82,12 +82,26 @@ def materialize_legacy_agent_assignment(
     if not node:
         return None
     node_computer_id = computer_id(node)
-    agent = agent_store.ensure_compatibility_agent(
-        employee_id,
-        executor_kind,
-        node["id"],
-        computer_id=node_computer_id,
+    candidates = sorted(
+        (
+            agent
+            for agent in agent_store.list_agents(supervisor_employee_id=employee_id)
+            if not agent.get("deletedAt")
+            and agent.get("enabled", True)
+            and agent["executorKind"] == executor_kind
+            and agent.get("computerId") == node_computer_id
+        ),
+        key=lambda agent: (agent.get("createdAt") or "", agent["id"]),
     )
+    if not candidates:
+        logger.info(
+            "No declared agent for this runtime; task stays queued",
+            employee_id=employee_id,
+            executor_kind=executor_kind,
+            computer_id=node_computer_id,
+        )
+        return None
+    agent = candidates[0]
     placement = next(
         (
             item

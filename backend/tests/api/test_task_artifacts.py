@@ -84,7 +84,7 @@ def test_task_artifacts_dedupes_regenerated_file_across_sessions(monkeypatch) ->
         task = _create_task_with_session(client, ws)
         first_session = task["linkedSessionIds"][0]
         agent = app.state.agent_store.create_agent(
-            "admin", {"displayName": "Artifact Reviewer", "executorKind": "claude"}
+            "admin", {"displayName": "Artifact Reviewer", "executorKind": "claude", "defaultRole": "implementer"}
         )
 
         # A second linked thread regenerates deck.pptx in a new session.

@@ -55,7 +55,7 @@ def seed_employee(ctx: SimpleNamespace) -> tuple[str, str]:
     user = ctx.auth_store.create_user("alice", "userpass", display_name="Alice")
     employee_id = user["employeeId"]
     agent = ctx.agent_store.create_agent(
-        employee_id, {"displayName": "Planner", "executorKind": "claude"}
+        employee_id, {"displayName": "Planner", "executorKind": "claude", "defaultRole": "implementer"}
     )
     return employee_id, agent["id"]
 

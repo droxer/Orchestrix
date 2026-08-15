@@ -9,6 +9,8 @@ from ..collaboration.models import RunIntent
 from ..collaboration.service import CollaborationConductor, CollaborationError
 from ..persistence.agent_placement_store import create_node_placement, placement_status
 from ..security.auth import require_admin_session
+from ..services.agent_binding import binding_status
+from ..services.agent_creation import AgentCreationError, create_agent_for_employee
 from ..services.agent_routing import placement_node
 from ..services.computer_names import computer_display_name
 from ..services.project_catalog import agent_has_active_project
@@ -23,25 +25,46 @@ from .helpers import (
 router = APIRouter()
 
 
-# What an agent's own supervisor may change. The role belongs here with the
-# personality: both describe how their agent works, and the supervisor is the
-# person who knows what job it should do on their team.
-AGENT_META_FIELDS = frozenset({"displayName", "instructions", "defaultRole"})
+# Employees can adjust their agent's personality at any time; the birth
+# certificate (computerId / executorKind / defaultRole) is fixed at creation
+# — changing the role is like swapping in a different coworker, so it should
+# be a new agent, not an edit.
+AGENT_META_FIELDS = frozenset({"displayName", "instructions"})
 
 
 @router.get("/agents")
 async def list_agents(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor(request, ctx.auth_store)
     agents = ctx.agent_store.list_agents(supervisor_employee_id=actor["employeeId"])
-    views = [
-        _agent_with_placements(ctx, agent)
-        for agent in agents
-        if agent.get("enabled", True) and not agent.get("compatibilityKey")
-    ]
-    # Compatibility agents translate old executor-kind assignments into the
-    # logical-agent pipeline. They are an internal migration bridge, not
-    # employee-facing Agent identities derived from runtime capabilities.
-    return {"agents": views}
+    nodes = ctx.registry.monitor_nodes()
+    # An agent an employee explicitly created always stays on the roster.
+    # If its computer or runtime is gone, flag it — let the employee decide
+    # whether to delete it. The system doesn't make that call for them.
+    return {
+        "agents": [
+            {
+                **_agent_with_placements(ctx, agent),
+                "bindingStatus": binding_status(agent, nodes),
+            }
+            for agent in agents
+            if agent.get("enabled", True)
+        ]
+    }
+
+
+@router.post("/agents", status_code=201)
+async def create_agent(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    actor = request_actor(request, ctx.auth_store)
+    body = await json_body(request)
+    try:
+        agent = create_agent_for_employee(ctx, actor["employeeId"], body)
+    except AgentCreationError as error:
+        raise HTTPException(error.status, str(error)) from error
+    except ValueError as error:
+        raise HTTPException(
+            409 if "already has" in str(error) else 400, str(error)
+        ) from error
+    return {"agent": _agent_with_placements(ctx, agent)}
 
 
 @router.patch("/agents/{agent_id}")
@@ -100,11 +123,14 @@ async def create_control_panel_agent(
     if not _employee_exists(ctx.auth_store, employee_id):
         raise HTTPException(404, "Employee not found.")
     try:
-        return {"agent": ctx.agent_store.create_agent(employee_id, body)}
+        agent = create_agent_for_employee(ctx, employee_id, body)
+    except AgentCreationError as error:
+        raise HTTPException(error.status, str(error)) from error
     except ValueError as error:
         raise HTTPException(
             409 if "already has" in str(error) else 400, str(error)
         ) from error
+    return {"agent": agent}
 
 
 @router.get("/admin/agents/{agent_id}")
@@ -115,7 +141,12 @@ async def get_control_panel_agent(
     agent = ctx.agent_store.get_agent(agent_id)
     if not agent:
         raise HTTPException(404, "Agent not found.")
-    return {"agent": _agent_with_placements(ctx, agent)}
+    return {
+        "agent": {
+            **_agent_with_placements(ctx, agent),
+            "bindingStatus": binding_status(agent, ctx.registry.monitor_nodes()),
+        }
+    }
 
 
 @router.patch("/admin/agents/{agent_id}")

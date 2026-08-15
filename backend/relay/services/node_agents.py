@@ -15,8 +15,6 @@ from ..persistence.protocols import (
 from .project_catalog import agent_has_active_project
 from .team_membership import remove_agent_from_teams
 
-_PLACEMENT_SCHEMA_PROBE_AGENT_ID = "00000000-0000-0000-0000-000000000000"
-
 
 class NodeAgentRegistry(Protocol):
     daemon_store: Any
@@ -55,9 +53,10 @@ def assert_node_agent_runs_drained(ctx: NodeAgentContext, node_id: str) -> None:
 def employee_is_live(ctx: NodeAgentContext, employee_id: str) -> bool:
     """Whether the employee exists and has not been soft-deleted.
 
-    `employees.deleted_at` only filters listings, so without this check an
-    explicit legacy materialization could recreate a compatibility identity for
-    an employee whose agents were just deleted.
+    `employees.deleted_at` only filters listings, so without this check a node
+    that keeps registering would backfill placements for an employee's
+    already-declared agents even after that employee (and their agents) were
+    just deleted.
 
     `auth_store` is not part of NodeAgentContext, so it is read defensively —
     test doubles and reduced contexts may not carry one.
@@ -77,11 +76,12 @@ def employee_is_live(ctx: NodeAgentContext, employee_id: str) -> bool:
 
 
 def sync_node_agents(ctx: NodeAgentContext, node: dict[str, Any]) -> None:
-    """Explicitly materialize legacy compatibility identities.
+    """Attach this Computer's already-declared agents to its current node.
 
-    Runtime registration never calls this helper: executor capabilities do not
-    define Logical Agents. It remains only for migration/cleanup coverage while
-    old executor-kind requests are supported.
+    Does not create agents — agents are declared explicitly by employees
+    (POST /agents). An employee can declare an agent while its computer is
+    offline, when there's no node to place it on yet; this backfills that
+    once the computer comes online.
     """
     employee_id = node.get("employeeId")
     if not employee_id:
@@ -93,68 +93,45 @@ def sync_node_agents(ctx: NodeAgentContext, node: dict[str, Any]) -> None:
             employee_id=employee_id,
         )
         return
-    supported = set(node.get("supportedAgents") or []) | set(node.get("agents") or {})
-    disabled = set(node.get("disabledAgents") or [])
     node_computer_id = computer_id(node)
-    if node.get("managedNodeId"):
-        try:
-            _assert_placement_store_ready(ctx.agent_placement_store)
-        except Exception as error:
-            if _missing_agent_table(error):
-                logger.warning(
-                    "Skipping agent sync during rolling upgrade",
-                    node_id=node.get("id"),
-                    error=str(error),
-                )
-                return
-            raise
-    for executor_kind in sorted(supported - disabled):
-        try:
-            agent = ctx.agent_store.ensure_compatibility_agent(
-                employee_id,
-                executor_kind,
-                node["id"],
-                computer_id=node_computer_id,
-            )
-        except Exception as error:
-            if _missing_agent_table(error):
-                logger.warning(
-                    "Skipping agent sync during rolling upgrade",
-                    node_id=node.get("id"),
-                    error=str(error),
-                )
-                return
-            raise
-        placements = ctx.agent_placement_store.list_placements(
-            agent_id=agent["id"], include_removed=True
-        )
-        active = next(
-            (item for item in placements if item.get("desiredState") != "removed"),
-            None,
-        )
-        if active:
-            pass
-        else:
-            create_node_placement(ctx.agent_placement_store, agent, node)
-        try:
-            _retire_superseded_locked(ctx, node, employee_id, executor_kind)
-        except Exception as error:
+    # node["agents"] always carries every AGENT_NAMES key regardless of what's
+    # actually installed (see registry.py / node_backend.py), so folding its
+    # full key set into `available` would always add back the entire agent
+    # roster — that's the bug Task 4 retires. Only entries whose status is
+    # "ready" indicate a runtime this node can actually run; supportedAgents
+    # is a convenience field some callers (and older node records) supply
+    # directly instead. Mirrors available_runtimes() in agent_creation.py.
+    available = set(node.get("supportedAgents") or [])
+    available |= {
+        kind
+        for kind, status in (node.get("agents") or {}).items()
+        if status == "ready"
+    }
+    available -= set(node.get("disabledAgents") or [])
+    try:
+        owned = ctx.agent_store.list_agents(supervisor_employee_id=employee_id)
+    except Exception as error:
+        if _missing_agent_table(error):
             logger.warning(
-                "Failed retiring superseded compatibility agents",
+                "Skipping agent sync during rolling upgrade",
                 node_id=node.get("id"),
-                executor_kind=executor_kind,
                 error=str(error),
             )
+            return
+        raise
+    for agent in owned:
+        if agent.get("deletedAt") or agent.get("computerId") != node_computer_id:
+            continue
+        if agent["executorKind"] not in available:
+            continue
+        if ctx.agent_placement_store.list_placements(agent_id=agent["id"]):
+            continue
+        create_node_placement(ctx.agent_placement_store, agent, node)
 
 
 def _missing_agent_table(error: Exception) -> bool:
     message = str(error)
     return "no such table" in message or "does not exist" in message
-
-
-def _assert_placement_store_ready(store: AgentPlacementStore) -> None:
-    """Probe placement schema availability without scanning live placements."""
-    store.list_placements(agent_id=_PLACEMENT_SCHEMA_PROBE_AGENT_ID)
 
 
 def _managed_runtime_ids(ctx: NodeAgentContext, managed_node_id: str) -> set[str]:
@@ -354,7 +331,12 @@ def _node_has_active_work(ctx: NodeAgentContext, node_id: str) -> bool:
 
 
 def remove_node_agents(ctx: NodeAgentContext, node_id: str) -> list[str]:
-    """Retire a node's compatibility agents under the dispatch lifecycle lock."""
+    """Remove a deleted node's placements, under the dispatch lifecycle lock.
+
+    Does not delete the agents themselves — only the placements pinned to
+    this node. Agents stay on the roster and can only be deleted by the
+    employee who declared them; see `_remove_node_agents_locked`.
+    """
     registry = getattr(ctx, "registry", None)
     dispatch_lock = getattr(registry, "dispatch_lock", None)
     if dispatch_lock:
@@ -364,15 +346,17 @@ def remove_node_agents(ctx: NodeAgentContext, node_id: str) -> list[str]:
 
 
 def _remove_node_agents_locked(ctx: NodeAgentContext, node_id: str) -> list[str]:
-    """Remove placements bound to a deleted Computer.
+    """Remove placements on a deleted computer.
 
-    Logical Agents are control-plane identities built on runtime capabilities;
-    losing a Computer makes an explicit Agent unplaced, not deleted. Only
-    compatibility agents created as an internal bridge for legacy executor-kind
-    requests are retired when their last placement disappears.
+    Agents are declared explicitly by employees and can only be deleted by
+    employees. Once the computer is gone, binding_status marks the agent
+    computer_gone and it stays on the roster — the system never erases it.
+    Legacy compatibility agents (identified by compatibilityKey) are the
+    exception: they were an internal migration bridge, not an employee-owned
+    identity, and are retired when their last placement disappears.
     """
     assert_node_agent_runs_drained(ctx, node_id)
-    removed_agents: list[str] = []
+    orphaned_agents: list[str] = []
     seen: set[str] = set()
     try:
         placements = ctx.agent_placement_store.list_placements(
@@ -385,7 +369,7 @@ def _remove_node_agents_locked(ctx: NodeAgentContext, node_id: str) -> list[str]
                 node_id=node_id,
                 error=str(error),
             )
-            return removed_agents
+            return orphaned_agents
         raise
     for placement in placements:
         if placement.get("desiredState") != "removed":
@@ -398,20 +382,22 @@ def _remove_node_agents_locked(ctx: NodeAgentContext, node_id: str) -> list[str]
         seen.add(agent_id)
         agent = ctx.agent_store.get_agent(agent_id)
         active_elsewhere = ctx.agent_placement_store.list_placements(agent_id=agent_id)
-        if (
-            agent
-            and agent.get("compatibilityKey")
-            and not agent.get("deletedAt")
-            and not active_elsewhere
-            and not (
-                getattr(ctx, "project_store", None)
-                and agent_has_active_project(ctx.project_store, agent_id)
-            )
+        if not agent or agent.get("deletedAt") or active_elsewhere:
+            continue
+        if not agent.get("compatibilityKey"):
+            # Employee-declared agents are never auto-deleted; the computer
+            # going away just leaves them unplaced (binding_status flags
+            # computer_gone). Report them so callers can log/notify.
+            orphaned_agents.append(agent_id)
+            continue
+        if getattr(ctx, "project_store", None) and agent_has_active_project(
+            ctx.project_store, agent_id
         ):
-            ctx.agent_store.delete_agent(agent_id)
-            if getattr(ctx, "team_store", None):
-                remove_agent_from_teams(
-                    ctx.team_store, agent_id, agent["supervisorEmployeeId"]
-                )
-            removed_agents.append(agent_id)
-    return removed_agents
+            continue
+        ctx.agent_store.delete_agent(agent_id)
+        if getattr(ctx, "team_store", None):
+            remove_agent_from_teams(
+                ctx.team_store, agent_id, agent["supervisorEmployeeId"]
+            )
+        orphaned_agents.append(agent_id)
+    return orphaned_agents

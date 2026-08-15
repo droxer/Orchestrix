@@ -513,6 +513,15 @@ export const AGENT_ROLE_OPTIONS: readonly AgentRole[] = [
   "fixer",
 ];
 
+/** Why an agent cannot currently run, derived live on every read — never
+    persisted. "available" means the agent's computer and runtime are both
+    present and reachable. */
+export type AgentBindingStatus =
+  | "available"
+  | "computer_gone"
+  | "computer_offline"
+  | "runtime_missing";
+
 export interface EmployeeAgent {
   id: string;
   employeeId: string;
@@ -530,9 +539,25 @@ export interface EmployeeAgent {
   version: number;
   availability: LogicalAgentAvailability;
   placements: AgentPlacement[];
+  /** The computer this agent was explicitly created on. */
+  computerId?: string;
+  bindingStatus?: AgentBindingStatus;
   createdAt: string;
   updatedAt: string;
   deletedAt?: string;
+}
+
+/** Body for POST /agents — explicit agent creation (computer -> runtime -> role). */
+export interface CreateAgentInput {
+  computerId: string;
+  executorKind: AgentName;
+  defaultRole: AgentRole;
+  displayName?: string;
+  instructions?: string;
+}
+
+export interface CreateAgentResponse {
+  agent: EmployeeAgent;
 }
 
 export interface EmployeeAgentsResponse {

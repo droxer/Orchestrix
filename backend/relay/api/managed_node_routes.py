@@ -11,6 +11,7 @@ from ..services.computer_names import normalize_computer_display_name
 from ..services.node_agents import (
     assert_node_agent_runs_drained,
     remove_node_agents,
+    sync_node_agents,
 )
 from .deps import AppContext, AppContextDep
 from .helpers import employee_record, json_body
@@ -143,10 +144,13 @@ async def delete_managed_node(
             if node:
                 _fence_active_runtime(ctx, node)
                 daemon_node_id = node.get("activeDaemonNodeId")
-                removed_agents = (
+                # These agents are not deleted — remove_node_agents only strips
+                # their placement on this computer. They stay on the roster,
+                # flagged computer_gone by binding_status.
+                orphaned_agents = (
                     remove_node_agents(ctx, daemon_node_id) if daemon_node_id else []
                 )
-                return {"node": node, "removedAgents": removed_agents}
+                return {"node": node, "orphanedAgents": orphaned_agents}
             orphaned_runtime_ids = [
                 runtime["id"]
                 for runtime in ctx.registry.control_panel_nodes()
@@ -271,7 +275,12 @@ async def retire_managed_node_runtime(
             if daemon_node_id and ctx.registry.get(daemon_node_id):
                 assert_node_agent_runs_drained(ctx, daemon_node_id)
                 runtime = ctx.registry.get(daemon_node_id)
-                if node.get("desiredState") == "deleted":
+                if node.get("desiredState") != "deleted" and runtime:
+                    # Runtime replacement preserves the stable Computer's
+                    # Logical Agents and Placements, including while stopped.
+                    # The next incarnation will rebind them during registration.
+                    sync_node_agents(ctx, runtime)
+                else:
                     remove_node_agents(ctx, daemon_node_id)
                 ctx.registry.delete(daemon_node_id)
     except KeyError as error:
