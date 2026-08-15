@@ -88,8 +88,11 @@ async def node_workspace_file(
     )
     _workspace_error(event)
     raw = event.get("contentBase64")
+    is_binary = bool(event.get("isBinary"))
     content = (
-        base64.b64decode(raw).decode("utf-8", errors="replace")
+        None
+        if is_binary
+        else base64.b64decode(raw).decode("utf-8", errors="replace")
         if isinstance(raw, str)
         else None
     )
@@ -99,9 +102,10 @@ async def node_workspace_file(
         "source": "live",
         "path": event.get("path", path),
         "exists": True,
-        "isBinary": bool(event.get("isBinary")),
+        "isBinary": is_binary,
         "bytes": event.get("bytes") or 0,
         "content": content,
+        "contentBase64": raw if is_binary and isinstance(raw, str) else None,
         "truncated": bool(event.get("truncated")),
         "limitBytes": WORKSPACE_FILE_PREVIEW_LIMIT,
         "generatedAt": _timestamp(),

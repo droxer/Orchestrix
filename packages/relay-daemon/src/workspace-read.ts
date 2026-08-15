@@ -14,6 +14,46 @@ import { agentWorkspaceSubpath } from "./agent-workspace.js";
 
 const DEFAULT_READ_LIMIT_BYTES = 256 * 1024;
 
+// A file preview is "binary" only when the bytes cannot be text: a NUL
+// anywhere (UTF-16 with a BOM is decoded below before this check) or bytes
+// that are not valid UTF-8. A truncated read can split a multi-byte codepoint
+// at the limit boundary, so the strict decode runs on the longest complete
+// UTF-8 prefix — otherwise a large text file would be misreported as binary.
+const UTF8_DECODER = new TextDecoder("utf-8", { fatal: true });
+const UTF16_LE_DECODER = new TextDecoder("utf-16le");
+const UTF16_BE_DECODER = new TextDecoder("utf-16be");
+
+/** Length of the longest prefix of `raw` that does not end mid-codepoint. */
+function completeUtf8PrefixLength(raw: Buffer): number {
+  const end = raw.length;
+  for (let i = Math.max(0, end - 3); i < end; i += 1) {
+    const byte = raw[i];
+    const sequenceLength = byte < 0x80 ? 0 : byte < 0xc2 ? -1 : byte < 0xe0 ? 2 : byte < 0xf0 ? 3 : byte < 0xf8 ? 4 : -1;
+    if (sequenceLength > 0 && i + sequenceLength > end) return i;
+  }
+  return end;
+}
+
+/** Decoded UTF-8 content for preview, or null when the bytes are not text. */
+function decodePreviewContent(raw: Buffer): Buffer | null {
+  // UTF-16 with a BOM is unambiguous text; transcode so the preview pipeline
+  // only ever carries UTF-8.
+  if (raw.length >= 2 && raw[0] === 0xff && raw[1] === 0xfe) {
+    return Buffer.from(UTF16_LE_DECODER.decode(raw.subarray(2)), "utf-8");
+  }
+  if (raw.length >= 2 && raw[0] === 0xfe && raw[1] === 0xff) {
+    return Buffer.from(UTF16_BE_DECODER.decode(raw.subarray(2)), "utf-8");
+  }
+  if (raw.includes(0)) return null;
+  const prefix = raw.subarray(0, completeUtf8PrefixLength(raw));
+  try {
+    UTF8_DECODER.decode(prefix);
+  } catch {
+    return null;
+  }
+  return prefix;
+}
+
 export class WorkspaceReadError extends Error {
   constructor(readonly code: DaemonWorkspaceErrorCode, message: string) {
     super(message);
@@ -128,13 +168,15 @@ export function readAgentWorkspaceFile(
   } catch (error) {
     throw new WorkspaceReadError("io-error", error instanceof Error ? error.message : String(error));
   }
-  const isBinary = raw.includes(0) || raw.toString("utf-8").includes("�");
+  // Binary files still ship their (capped) bytes so the preview can render
+  // images and PDFs; text files are normalized to UTF-8 first.
+  const content = decodePreviewContent(raw);
   return {
     path,
     bytes,
-    isBinary,
+    isBinary: content === null,
     truncated: bytes > limitBytes,
-    ...(isBinary ? {} : { contentBase64: raw.toString("base64") }),
+    contentBase64: (content ?? raw).toString("base64"),
   };
 }
 

@@ -22,8 +22,8 @@ export function ArtifactsEmpty({ title, hint }: { title: string; hint?: string }
           </li>
         ))}
       </ul>
-      <p className="workspace-empty-state-title">{title}</p>
-      {hint ? <p className="workspace-empty-state-hint">{hint}</p> : null}
+      <h2 className="relay-empty-title">{title}</h2>
+      {hint ? <p className="relay-empty-hint">{hint}</p> : null}
     </div>
   );
 }

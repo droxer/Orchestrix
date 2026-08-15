@@ -862,7 +862,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
             >
               <header className="backlog-lane-head">
                 <span className="backlog-lane-label">{t(`backlog.statuses.${status}`)}</span>
-                <span className="backlog-lane-count">{grouped[status].length}</span>
+                <span className="backlog-lane-count tnum">{grouped[status].length}</span>
               </header>
               <div className="backlog-task-list">
                 {grouped[status].length === 0 && inlineCreateStatus !== status ? (

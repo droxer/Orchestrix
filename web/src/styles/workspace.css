@@ -62,19 +62,21 @@
 .workspace-page-tab-count {
   color: var(--ink-3);
   font-size: var(--fs-2);
-  font-variant-numeric: tabular-nums;
 }
 
-/* Segmented tabs — scoped under .workspace-page so these beat the shared
-   atelier.css selectors (higher specificity) and restore layout/hover/active
-   treatment removed when legacy tab CSS was deleted. */
+/* Segmented tabs — same segmented-control language as .backlog-view-toggle
+   (line-1 border, gapless segments, surface-0 active fill), but tab-sized:
+   34px min-height with type-label-strong instead of 28px icon buttons.
+   Scoped under .workspace-page so these beat the shared atelier.css
+   selectors (higher specificity) and restore layout/hover/active treatment
+   removed when legacy tab CSS was deleted. */
 .workspace-page .workspace-page-tabs {
   display: inline-flex;
   align-items: stretch;
-  gap: var(--sp-0-5);
+  gap: 0;
   max-width: 100%;
   padding: var(--sp-0-5);
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-1);
 }
@@ -105,7 +107,7 @@
 
 .workspace-page .workspace-page-tab[aria-selected="true"],
 .workspace-page .workspace-page-tab.is-active {
-  background: var(--surface-3);
+  background: var(--surface-0);
   color: var(--ink-1);
   box-shadow: inset 0 0 0 1px var(--line-1);
 }
@@ -296,7 +298,6 @@
 .workspace-pane-head > span {
   color: var(--ink-3);
   font-size: var(--fs-2);
-  font-variant-numeric: tabular-nums;
 }
 
 .workspace-pane-head-actions {
@@ -374,7 +375,6 @@
 .workspace-activity-head > span {
   color: var(--ink-3);
   font-size: var(--fs-2);
-  font-variant-numeric: tabular-nums;
 }
 
 .workspace-activity-pick {
@@ -795,7 +795,7 @@
   padding: var(--sp-4);
 }
 
-.workspace-file-error .workspace-empty-state { margin: 0; }
+.workspace-file-error .relay-empty { margin: 0; }
 
 /* ---- selectable rows ------------------------------------------------ */
 
@@ -991,7 +991,7 @@
   font-family: var(--font-mono);
   letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
-  line-height: 1.55;
+  line-height: var(--leading-normal);
 }
 
 .code-view .code-gutter,
@@ -1038,40 +1038,14 @@
 
 /* ---- empty + error states ------------------------------------------- */
 
+/* Layout/announce wrapper for WorkspaceEmpty only — the visual language
+   (mark plate, title/body/hint type, 440px measure, sp-3 rhythm) is
+   RelayEmptyState's .relay-empty in empty-state.css. flex:1 lets
+   relay-empty's margin:auto center it in the pane. */
 .workspace-empty-state {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--sp-2);
-  margin: auto;
-  padding: var(--sp-8) var(--sp-7);
-  max-width: 360px;
-  text-align: center;
-}
-
-.workspace-empty-state-mark {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  margin-bottom: var(--sp-2);
-  border-radius: var(--r-2);
-  background: var(--surface-2);
-  color: var(--ink-3);
-  box-shadow: inset 0 0 0 1px var(--line-2);
-}
-
-.workspace-empty-state-title {
-  margin: 0;
-  color: var(--ink-1);
-  font: var(--type-title);
-  letter-spacing: var(--type-title-track);
-}
-
-.workspace-empty-state-hint {
-  margin: 0;
-  color: var(--ink-3);
-  font: var(--type-body-sm);
+  flex: 1;
 }
 
 /* ---- artifacts empty: ghost ledger ----------------------------------
@@ -1122,8 +1096,9 @@
 .artifacts-empty-tag {
   display: inline-flex;
   align-items: center;
-  padding: 1px 7px;
-  border: 1px dashed color-mix(in srgb, var(--info) 45%, transparent);
+  padding: var(--sp-hairline) var(--sp-2);
+  border: 1px dashed var(--tone-line);
+  --tone: var(--info);
   border-radius: var(--r-2);
   color: color-mix(in srgb, var(--info) 80%, transparent);
   font: var(--type-label-strong);
@@ -1147,16 +1122,16 @@
   font-size: var(--fs-2);
 }
 
-/* Idle-presence pulse: the tile stays the neutral mark plate; only the dot
-   carries the (grey) presence signal on the calm cadence. It is the only
-   surviving consumer of these keyframes, which the deleted metric strip
-   used to own, so they took its name. */
+/* Idle-presence pulse: the tile stays the neutral relay-empty avatar plate;
+   only the dot carries the (grey) presence signal on the calm cadence. It is
+   the only surviving consumer of these keyframes, which the deleted metric
+   strip used to own, so they took its name. */
 @keyframes workspace-presence-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.45; transform: scale(0.82); }
 }
 
-.workspace-empty-state-mark.is-pulse::after {
+.relay-empty-avatar.is-pulse::after {
   content: "";
   width: 8px;
   height: 8px;
@@ -1311,7 +1286,7 @@
   max-width: var(--measure);
   color: var(--ink-3);
   font: var(--type-body-sm);
-  line-height: 1.5;
+  line-height: var(--leading-normal);
   text-wrap: pretty;
 }
 
@@ -1329,7 +1304,7 @@
   border-top: 1px solid var(--line-2);
   color: var(--ink-2);
   font: var(--type-body-sm);
-  line-height: 1.7;
+  line-height: var(--leading-prose);
   overflow-wrap: anywhere;
 }
 
@@ -1350,7 +1325,7 @@
   color: var(--ink-1);
   font-weight: 600;
   letter-spacing: var(--track-0);
-  line-height: 1.25;
+  line-height: var(--leading-snug);
 }
 
 .agent-personality-document h1 {
@@ -1412,7 +1387,7 @@
   font-size: var(--fs-4);
   font-weight: 500;
   letter-spacing: var(--track-0);
-  line-height: 1.35;
+  line-height: var(--leading-snug);
   text-wrap: balance;
 }
 
@@ -1420,7 +1395,7 @@
   margin-top: var(--sp-2);
   color: var(--ink-3);
   font: var(--type-body-sm);
-  line-height: 1.5;
+  line-height: var(--leading-normal);
   text-wrap: pretty;
 }
 
@@ -1454,7 +1429,7 @@
   font-family: var(--font-mono);
   letter-spacing: var(--type-code-track);
   font-size: var(--fs-1);
-  line-height: 1.7;
+  line-height: var(--leading-loose);
 }
 
 .agent-personality-editor-guide li strong {
@@ -1483,7 +1458,7 @@
   margin: 0;
   color: var(--ink-2);
   font: var(--type-body-sm);
-  line-height: 1.5;
+  line-height: var(--leading-normal);
 }
 
 .agent-personality-editor-guide ol {
@@ -1499,7 +1474,7 @@
 .agent-personality-editor-guide li small {
   color: var(--ink-3);
   font: var(--type-micro);
-  line-height: 1.45;
+  line-height: var(--leading-normal);
 }
 
 .agent-personality-editor-toolbar {
@@ -1520,7 +1495,7 @@
   background: transparent;
   color: var(--action);
   font: var(--type-label-strong);
-  letter-spacing: 0;
+  letter-spacing: var(--track-0);
   text-transform: none;
   cursor: pointer;
 }
@@ -1543,7 +1518,7 @@
   border-radius: var(--r-2);
   background: var(--surface-0);
   font-size: var(--fs-3);
-  line-height: 1.7;
+  line-height: var(--leading-prose);
   tab-size: 2;
 }
 
@@ -1658,7 +1633,7 @@
   font-size: var(--fs-title);
   font-weight: 600;
   letter-spacing: var(--track-display);
-  line-height: 1.2;
+  line-height: var(--leading-tight);
 }
 
 .workspace-dossier-rename-actions {

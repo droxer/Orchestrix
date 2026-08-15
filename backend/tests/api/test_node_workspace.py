@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+
 from fastapi.testclient import TestClient
 from relay.app import create_app
 
@@ -45,6 +47,27 @@ def test_admin_browses_node_shared_workspace(monkeypatch, tmp_path):
     file = client.get("/api/v1/admin/daemon-nodes/node_1/workspace/file?path=shared.md")
     assert file.status_code == 200
     assert file.json()["content"] == "hello"
+    assert file.json()["contentBase64"] is None
+
+
+def test_node_workspace_file_passes_binary_bytes_through(monkeypatch, tmp_path):
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    app = create_app(tmp_path)
+    client = TestClient(app)
+    _bootstrap(client)
+    _register_node(app, capabilities=["workspace-read", "workspace-read-shared"])
+    png = b"\x89PNG\r\n\x1a\n" + bytes(8)
+
+    async def dispatch(_ctx, _node, _command):
+        return {"type": "workspace.file", "path": "logo.png", "bytes": len(png), "isBinary": True, "truncated": False, "contentBase64": base64.b64encode(png).decode()}
+
+    monkeypatch.setattr("relay.api.node_workspace_routes._dispatch", dispatch)
+    file = client.get("/api/v1/admin/daemon-nodes/node_1/workspace/file?path=logo.png")
+    assert file.status_code == 200, file.text
+    body = file.json()
+    assert body["isBinary"] is True
+    assert body["content"] is None
+    assert base64.b64decode(body["contentBase64"]) == png
 
 
 def test_node_workspace_requires_admin(monkeypatch, tmp_path):

@@ -260,6 +260,58 @@ def test_live_workspace_listing_uses_the_selected_placement(monkeypatch, tmp_pat
     assert response.json()["entries"][0]["name"] == "report.md"
 
 
+def test_live_workspace_file_passes_binary_bytes_through(monkeypatch, tmp_path):
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    app = create_app(tmp_path)
+    client = TestClient(app)
+    _bootstrap(client)
+    agent = _agent(client)
+    session = app.state.session_store.create_session(
+        {
+            "workspacePath": "/workspace",
+            "ownerEmployeeId": "alice",
+            "ownerAgentId": agent["id"],
+            "daemonNodeId": "node_1",
+            "taskGoal": "live binary",
+        }
+    )
+    app.state.registry.register(
+        {
+            "sandboxId": "node_1",
+            "employeeId": "alice",
+            "token": "node_token",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "capabilities": ["workspace-read", "thread-workspaces"],
+            "status": "ready",
+        }
+    )
+    app.state.agent_placement_store.create_placement(agent, "node_1", {})
+    png = b"\x89PNG\r\n\x1a\n" + bytes(8)
+
+    async def read(_ctx, _node, command):
+        assert command["type"] == "workspace.read"
+        return {
+            "type": "workspace.file",
+            "path": "logo.png",
+            "bytes": len(png),
+            "isBinary": True,
+            "truncated": False,
+            "contentBase64": base64.b64encode(png).decode(),
+        }
+
+    monkeypatch.setattr("relay.api.agent_workspace_routes._dispatch", read)
+    response = client.get(
+        f"/api/v1/agents/{agent['id']}/workspace/file"
+        f"?threadId={session['id']}&path=logo.png"
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["isBinary"] is True
+    assert body["content"] is None
+    assert base64.b64decode(body["contentBase64"]) == png
+
+
 def test_shared_scope_lists_the_thread_workspace_root(monkeypatch, tmp_path):
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     app = create_app(tmp_path)

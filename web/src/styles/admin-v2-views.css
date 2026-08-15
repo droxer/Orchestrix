@@ -50,7 +50,7 @@
 
 .team-member-options {
   display: grid;
-  gap: 1px;
+  gap: var(--sp-hairline);
   overflow: hidden;
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
@@ -94,6 +94,9 @@
   gap: var(--sp-1);
   color: var(--ink-3);
   font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
   font-size: var(--fs-2);
   letter-spacing: var(--type-code-track);
   white-space: nowrap;
@@ -239,7 +242,7 @@
 }
 
 .adm-node-chip:hover {
-  border-color: var(--ink-1);
+  border-color: var(--line-strong);
 }
 
 /* Official vendor glyph — identity, alongside the employee's agent name. */
@@ -272,6 +275,9 @@
 
 .adm-computer-chip-name {
   font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
   letter-spacing: var(--type-code-track);
 }
 
@@ -290,7 +296,6 @@
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: var(--sp-4);
-  font-variant-numeric: tabular-nums;
 }
 
 .adm-emp-metric {
@@ -414,14 +419,14 @@
   color: var(--ink-2);
   font: var(--type-label-strong);
   text-transform: none;
-  letter-spacing: 0;
+  letter-spacing: var(--track-0);
   cursor: pointer;
   transition: border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
 }
 
 .adm-fleet-chip:hover {
   color: var(--ink-1);
-  border-color: var(--ink-1);
+  border-color: var(--line-strong);
 }
 
 .adm-fleet-chip:focus-visible {
@@ -497,9 +502,9 @@
 
 .adm-node-history-list {
   display: grid;
-  gap: 1px;
+  gap: var(--sp-hairline);
   margin: 0;
-  padding: 1px;
+  padding: var(--sp-hairline);
   border-radius: var(--r-2);
   background: var(--line-1);
   list-style: none;
@@ -843,8 +848,10 @@
   contain-intrinsic-size: auto 240px;
 }
 
+/* Hover strengthens the hairline, same as the Card primitive's interactive
+   variant (--line-strong), instead of hand-mixing an action tint. */
 .adm-node-card:hover {
-  border-color: color-mix(in srgb, var(--action) 28%, var(--line-1));
+  border-color: var(--line-strong);
 }
 
 .adm-node-profile {
@@ -857,7 +864,7 @@
   border-radius: var(--r-2);
   background: var(--surface-1);
   font-size: var(--fs-2);
-  line-height: 1.35;
+  line-height: var(--leading-snug);
 }
 
 .adm-node-profile.is-compact {
@@ -930,6 +937,9 @@
 
 .adm-node-profile-sandbox {
   font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
   letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
   color: var(--ink-2);
@@ -937,6 +947,9 @@
 
 .adm-node-profile-locality {
   font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
   letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
   color: var(--ink-3);
@@ -944,10 +957,10 @@
 
 .adm-cred-hint {
   display: block;
-  margin-top: 0.15rem;
+  margin-top: var(--sp-0-5);
   font-size: var(--fs-2);
   color: var(--ink-3);
-  line-height: 1.35;
+  line-height: var(--leading-snug);
 }
 
 .adm-node-card-head {
@@ -998,7 +1011,7 @@
    at a glance, while health hues stay reserved for the status dot. */
 .adm-node-avatar--machine[data-ownership="managed"] {
   color: var(--action);
-  border-color: color-mix(in srgb, var(--action) 28%, var(--line-1));
+  border-color: var(--line-strong);
 }
 
 .adm-node-avatar--machine[data-ownership="pending"] {
@@ -1235,17 +1248,17 @@
 .adm-runtime-mark[data-presence="offline"] .adm-agent-dot,
 .adm-runtime-mark[data-presence="disabled"] .adm-agent-dot {
   background: transparent;
-  box-shadow: inset 0 0 0 1.25px var(--ink-4);
+  box-shadow: inset 0 0 0 1.5px var(--ink-4);
 }
 
 .adm-runtime-mark[data-presence="offline"].tone-warn .adm-agent-dot {
   background: transparent;
-  box-shadow: inset 0 0 0 1.25px var(--warn);
+  box-shadow: inset 0 0 0 1.5px var(--warn);
 }
 
 .adm-runtime-mark[data-presence="offline"].tone-bad .adm-agent-dot {
   background: transparent;
-  box-shadow: inset 0 0 0 1.25px var(--err);
+  box-shadow: inset 0 0 0 1.5px var(--err);
 }
 
 /* On a dark machine the whole runtime row recedes with the avatar — its
@@ -1314,7 +1327,7 @@
 .adm-agent-chip.tone-warn .adm-agent-dot { background: var(--warn); }
 .adm-agent-chip.tone-bad .adm-agent-dot {
   background: transparent;
-  box-shadow: inset 0 0 0 1.25px var(--err);
+  box-shadow: inset 0 0 0 1.5px var(--err);
 }
 .adm-agent-chip.tone-neutral .adm-agent-dot { background: var(--ink-4); }
 
@@ -1322,7 +1335,7 @@
    even though its last report said ready. */
 .adm-agent-chip[data-presence="offline"].tone-good .adm-agent-dot {
   background: transparent;
-  box-shadow: inset 0 0 0 1.25px var(--ink-4);
+  box-shadow: inset 0 0 0 1.5px var(--ink-4);
 }
 
 /* Official vendor glyph — identity, alongside the name label. Same
@@ -1422,9 +1435,12 @@
 
 .adm-agent-inventory-pill {
   font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
   letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
-  padding: 1px var(--sp-1-5);
+  padding: var(--sp-0-5) var(--sp-1-5);
   border-radius: var(--r-1);
   border: 1px solid var(--line-1);
   color: var(--ink-1);
@@ -1541,9 +1557,10 @@
 }
 
 .adm-view-notice {
+  --tone: var(--ok);
   margin: 0 0 var(--sp-3);
   padding: var(--sp-3);
-  border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent);
+  border: 1px solid var(--tone-line);
   border-radius: var(--r-2);
   color: var(--ok);
   background: color-mix(in srgb, var(--ok) 8%, transparent);
@@ -1553,7 +1570,7 @@
   margin: 0;
   color: var(--ink-3);
   font-size: var(--fs-3);
-  line-height: 1.45;
+  line-height: var(--leading-normal);
 }
 
 /* Empty connect stage — one composition: mark, copy, credentials. */
@@ -1671,9 +1688,8 @@
   font-family: var(--font-sans);
   font-size: var(--fs-3);
   font-weight: 500;
-  line-height: 1;
+  line-height: var(--leading-none);
   letter-spacing: var(--track-0);
-  font-variant-numeric: tabular-nums;
   color: var(--ink-1);
 }
 
@@ -1757,7 +1773,7 @@
   height: 64px;
   border-radius: var(--r-3);
   background: color-mix(in srgb, var(--action) 10%, transparent);
-  border-color: color-mix(in srgb, var(--action) 28%, transparent);
+  border-color: var(--line-strong);
   color: var(--action);
 }
 
@@ -1847,13 +1863,14 @@
 }
 
 .adm-chat-integration:hover {
-  border-color: color-mix(in srgb, var(--action) 28%, var(--line-1));
+  border-color: var(--line-strong);
   background: var(--surface-1);
 }
 
 .adm-chat-integration.active,
 .adm-chat-integration[data-active="true"] {
-  border-color: color-mix(in srgb, var(--action) 40%, var(--line-1));
+  /* Selected edge: nearest action-edge token (40% ≈ 30% on a 1px hairline). */
+  border-color: var(--line-drag);
   background: var(--action-soft);
 }
 
@@ -1902,7 +1919,8 @@
 }
 
 .adm-chat-ready.ready {
-  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+  --tone: var(--ok);
+  border-color: var(--tone-line);
   background: color-mix(in srgb, var(--ok) 8%, transparent);
   color: var(--ok);
 }
@@ -1933,7 +1951,7 @@
 .adm-chat-form > small {
   color: var(--ink-3);
   font-size: var(--fs-2);
-  line-height: 1.4;
+  line-height: var(--leading-snug);
 }
 
 .adm-chat-connection-form {

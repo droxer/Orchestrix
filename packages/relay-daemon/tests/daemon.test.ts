@@ -2158,10 +2158,44 @@ test("readAgentWorkspaceFile rejects escapes and caps text while identifying bin
     assert.throws(() => readAgentWorkspaceFile(root, "agent_1", "missing.txt"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "not-found");
     assert.equal(Buffer.from(readAgentWorkspaceFile(root, "agent_1", "small.txt").contentBase64 ?? "", "base64").toString(), "hello");
     assert.equal(readAgentWorkspaceFile(root, "agent_1", "bin.dat").isBinary, true);
+    // Binary bytes still ship (capped) so image/PDF previews can render.
+    assert.equal(readAgentWorkspaceFile(root, "agent_1", "bin.dat").contentBase64, Buffer.from([0, 1, 2]).toString("base64"));
     const capped = readAgentWorkspaceFile(root, "agent_1", "big.txt", 16);
     assert.equal(capped.truncated, true);
     assert.equal(Buffer.from(capped.contentBase64 ?? "", "base64").byteLength, 16);
     assert.equal(capped.bytes, 64);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("readAgentWorkspaceFile decodes UTF-16 and tolerates codepoints split by the read limit", () => {
+  const root = mkdtempSync(join(tmpdir(), "relay-ws-"));
+  try {
+    const home = join(root, agentWorkspaceSubpath("agent_1"));
+    mkdirSync(home, { recursive: true });
+    writeFileSync(join(home, "utf16le.txt"), Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("héllo", "utf16le")]));
+    writeFileSync(join(home, "utf16be.txt"), Buffer.concat([Buffer.from([0xfe, 0xff]), Buffer.from("héllo", "utf16le").swap16()]));
+    writeFileSync(join(home, "emoji.txt"), "ab🙂cd");
+    writeFileSync(join(home, "invalid.txt"), Buffer.from([0x61, 0xc0, 0xaf, 0x62]));
+
+    const le = readAgentWorkspaceFile(root, "agent_1", "utf16le.txt");
+    assert.equal(le.isBinary, false);
+    assert.equal(Buffer.from(le.contentBase64 ?? "", "base64").toString("utf-8"), "héllo");
+    const be = readAgentWorkspaceFile(root, "agent_1", "utf16be.txt");
+    assert.equal(be.isBinary, false);
+    assert.equal(Buffer.from(be.contentBase64 ?? "", "base64").toString("utf-8"), "héllo");
+
+    // "ab🙂" is 6 bytes (🙂 = 4); a 5-byte limit splits the codepoint — still text.
+    const split = readAgentWorkspaceFile(root, "agent_1", "emoji.txt", 5);
+    assert.equal(split.isBinary, false);
+    assert.equal(split.truncated, true);
+    assert.equal(Buffer.from(split.contentBase64 ?? "", "base64").toString("utf-8"), "ab");
+    const whole = readAgentWorkspaceFile(root, "agent_1", "emoji.txt");
+    assert.equal(Buffer.from(whole.contentBase64 ?? "", "base64").toString("utf-8"), "ab🙂cd");
+
+    // Genuinely invalid UTF-8 (overlong sequence) stays binary.
+    assert.equal(readAgentWorkspaceFile(root, "agent_1", "invalid.txt").isBinary, true);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

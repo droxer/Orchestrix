@@ -104,7 +104,7 @@ body {
 .chat-panel { background: transparent; }
 
 .transcript { background: transparent; }
-.transcript-inner { width: min(100%, 960px); padding: var(--sp-7) var(--page-gutter) var(--sp-8); gap: var(--sp-7); }
+.transcript-inner { width: min(100%, var(--thread-measure)); padding: var(--sp-7) var(--page-gutter) var(--sp-8); gap: var(--sp-7); }
 .transcript-inner:not(:has(.transcript-empty)) { background: none; }
 .transcript-inner:has(.transcript-empty) {
   margin: 0 auto;
@@ -123,7 +123,7 @@ body {
 
 @media (prefers-reduced-motion: no-preference) {
   .transcript-inner:has(.transcript-empty) {
-    animation: transcript-landing-drift 16s var(--ease) infinite alternate;
+    animation: transcript-landing-drift var(--t-ambient) var(--ease) infinite alternate;
   }
 }
 
@@ -152,7 +152,6 @@ html[data-theme="dark"] .transcript-inner:has(.transcript-empty) {
     radial-gradient(38% 30% at 68% 30%, color-mix(in srgb, var(--ink-1) 3%, transparent), transparent 70%);
   background-size: 150% 150%, 130% 130%;
 }
-html[data-theme="dark"] .rail-node { background: var(--surface-3); }
 
 @media (max-width: 820px) {
   .chat-header { padding-inline: var(--sp-4); }
@@ -187,11 +186,11 @@ html[data-theme="dark"] .rail-node { background: var(--surface-3); }
 /* Node cards use admin-v2-views.css for tone rail, radius, and raised fill. */
 
 .workspace-pick:hover {
-  border-color: color-mix(in srgb, var(--action) 28%, var(--line-1));
+  border-color: var(--line-strong);
 }
 
 .workspace-pick[data-active="true"] {
-  border-color: color-mix(in srgb, var(--action) 40%, var(--line-1));
+  border-color: var(--line-drag);
   background: var(--action-soft);
 }
 
@@ -259,15 +258,6 @@ html[data-theme="dark"] .rail-node { background: var(--surface-3); }
   font-family: var(--font-sans);
   letter-spacing: var(--track-0);
 }
-
-html[data-theme="dark"] .workspace-pick[data-active="true"] {
-  background: var(--action-soft);
-}
-
-html[data-theme="dark"] .adm-form-section,
-html[data-theme="dark"] .adm-assign-node,
-html[data-theme="dark"] .adm-placement-item,
-html[data-theme="dark"] .adm-agent-toggle-item { background: var(--surface-1); }
 
 html[data-theme="dark"] .mobile-topbar {
   background: var(--surface-0);

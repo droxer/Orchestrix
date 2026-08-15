@@ -51,8 +51,9 @@
   font-family: var(--font-display);
   font-size: var(--fs-3);
   font-weight: 600;
-  line-height: 1;
+  line-height: var(--leading-none);
   letter-spacing: var(--track-display);
+  font-feature-settings: "tnum" 1;
   font-variant-numeric: tabular-nums;
   color: var(--ink-1);
 }
@@ -136,13 +137,13 @@
 }
 
 .backlog-filter-chip:hover {
-  background: color-mix(in srgb, var(--ink-1) 5%, var(--surface-2));
+  background: var(--control-fill-hover);
 }
 
 .backlog-filter-chip[data-applied="true"],
 .backlog-filter-chip[data-active="true"] {
   background: var(--action-soft);
-  border-color: color-mix(in srgb, var(--action) 24%, var(--line-1));
+  border-color: var(--line-strong);
 }
 
 .backlog-filter-chip:focus-visible {
@@ -314,7 +315,6 @@
   font-family: var(--font-sans);
   font-size: var(--fs-3);
   font-weight: 500;
-  font-variant-numeric: tabular-nums;
   color: var(--ink-3);
 }
 
@@ -342,7 +342,7 @@
 }
 
 .backlog-task:hover {
-  border-color: color-mix(in srgb, var(--action) 28%, var(--line-1));
+  border-color: var(--line-strong);
   background: var(--surface-1);
 }
 
@@ -468,14 +468,15 @@
 
 .priority-badge[data-priority="high"] {
   --prio-accent: var(--warn);
-  border-color: color-mix(in srgb, var(--warn) 30%, var(--line-1));
+  --tone: var(--warn);
+  border-color: var(--tone-line);
   color: var(--warn);
 }
 
 .priority-bars {
   display: inline-flex;
   align-items: flex-end;
-  gap: 1.5px;
+  gap: var(--sp-0-5);
   height: 11px;
 }
 
@@ -510,6 +511,9 @@
    agree. Sized to the 8px dot cell the list rows already reserve. */
 .state-mark {
   --mark-accent: var(--ink-4);
+  /* The halo token reads --tone; a mark's accent is owned by the host rule
+     via --mark-accent, so alias it rather than re-tinting the halo. */
+  --tone: var(--mark-accent);
   position: relative;
   flex: none;
   display: inline-block;
@@ -517,7 +521,7 @@
   height: 8px;
   border-radius: var(--r-full);
   background: var(--mark-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mark-accent) 16%, transparent);
+  box-shadow: var(--ring-halo);
 }
 
 /* Hollow, not filled: the bad tier shares --action's brightness, so a solid
@@ -563,11 +567,12 @@
    paused dashes the pill border (the whole schedule is off). */
 .routine-state {
   --state-accent: var(--ink-3);
+  --tone: var(--state-accent);
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
-  padding: 1px var(--sp-2);
-  border: 1px solid color-mix(in srgb, var(--state-accent) 35%, transparent);
+  padding: var(--sp-0-5) var(--sp-2);
+  border: 1px solid var(--tone-line);
   border-radius: var(--r-2);
   color: var(--ink-2);
   font: var(--type-label);
@@ -749,14 +754,16 @@
    the neutral hover since reopening is constructive. */
 .backlog-task-actions .backlog-action-done:hover:not(:disabled),
 .backlog-row-actions .backlog-action-done:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--ok) 45%, var(--line-1));
+  --tone: var(--ok);
+  border-color: var(--tone-line);
   background: color-mix(in srgb, var(--ok) 10%, var(--surface-0));
   color: var(--ok);
 }
 
 .backlog-task-actions .backlog-action-block:hover:not(:disabled),
 .backlog-row-actions .backlog-action-block:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--err) 42%, var(--line-1));
+  --tone: var(--err);
+  border-color: var(--tone-line);
   background: color-mix(in srgb, var(--err) 9%, var(--surface-0));
   color: var(--err);
 }
@@ -844,7 +851,7 @@
   flex: 1;
   flex-direction: column;
   min-width: 0;
-  line-height: 1.25;
+  line-height: var(--leading-snug);
 }
 
 .task-assignment-option-copy > span:first-child {
@@ -1122,7 +1129,7 @@
 
 .task-drawer-artifact-main:hover {
   border-color: var(--line-1);
-  background: color-mix(in srgb, var(--ink-1) 4%, transparent);
+  background: var(--control-fill-hover);
 }
 
 .task-drawer-artifact-name {
@@ -1151,8 +1158,8 @@
   color: var(--ink-1);
 }
 
-/* ── Empty board — left-aligned inline empty state (own markup, no
-   RelayEmptyState) ──────────────────────────────────────────────── */
+/* ── Empty board — left-aligned inline empty state (own layout; title/body
+   type reuses relay-empty-title / relay-empty-body from empty-state.css) ── */
 
 .backlog-board-empty {
   display: flex;
@@ -1164,18 +1171,11 @@
   padding: var(--sp-7);
 }
 
-.backlog-board-empty-title {
-  margin: 0;
-  font: var(--type-title);
-  letter-spacing: var(--type-title-track);
-  color: var(--ink-1);
-}
-
+/* Left-aligned deltas over .relay-empty-body: wider measure, and the
+   pre-button spacing the centered variant gets from its actions block. */
 .backlog-board-empty-body {
-  margin: 0 0 var(--sp-3);
+  margin-bottom: var(--sp-3);
   max-width: var(--measure);
-  font: var(--type-body-sm);
-  color: var(--ink-2);
 }
 
 @media (max-width: 1100px) {
@@ -1312,7 +1312,7 @@
 }
 
 .backlog-view-btn:not([data-active="true"]):hover {
-  background: color-mix(in srgb, var(--ink-1) 6%, transparent);
+  background: var(--control-fill-hover);
   color: var(--ink-1);
 }
 
@@ -1415,7 +1415,7 @@
 .backlog-row[data-status="assigned"] { --row-accent: var(--info); }
 .backlog-row[data-status="running"] { --row-accent: var(--live); }
 .backlog-row[data-status="waiting_for_human"] { --row-accent: var(--warn); }
-.backlog-row[data-status="review"] { --row-accent: color-mix(in srgb, var(--info) 70%, var(--ink-1)); }
+.backlog-row[data-status="review"] { --row-accent: var(--info); }
 .backlog-row[data-status="blocked"] { --row-accent: var(--err); }
 .backlog-row[data-status="done"] { --row-accent: var(--ok); }
 
@@ -1527,14 +1527,14 @@
   border-radius: var(--r-full);
   font-size: var(--fs-1);
   font-weight: 600;
-  line-height: 1;
+  line-height: var(--leading-none);
   color: var(--ink-1);
   /* stylelint-disable-next-line function-disallowed-list -- procedurally generated
      per-identity hue (--avatar-hue, set inline by TaskAssignee.tsx from the assignee's
      name); there is no fixed primitive to reference since the hue itself is the value. */
-  background: color-mix(in srgb, hsl(var(--avatar-hue, 0) 70% 55%) 16%, transparent);
+  background: color-mix(in srgb, hsl(var(--avatar-hue, 0) var(--avatar-sat) var(--avatar-light)) 16%, transparent);
   /* stylelint-disable-next-line function-disallowed-list -- see above */
-  border: 1px solid color-mix(in srgb, hsl(var(--avatar-hue, 0) 70% 55%) 42%, var(--line-1));
+  border: 1px solid color-mix(in srgb, hsl(var(--avatar-hue, 0) var(--avatar-sat) var(--avatar-light)) 42%, var(--line-1));
 }
 
 .task-assignee[data-unassigned="true"] .task-assignee-avatar {
@@ -1584,7 +1584,7 @@
    .backlog-action-group` (margin --sp-1 + padding --sp-2+--sp-1 + 1px border)
    and the row gap (--sp-1). */
 .routine-page .backlog-row-actions {
-  padding-right: calc(2 * 28px + 4 * var(--sp-1) + var(--sp-2) + 1px);
+  padding-right: calc(2 * 28px + 4 * var(--sp-1) + var(--sp-2) + var(--sp-hairline));
 }
 
 .backlog-row-actions button:not([data-variant="icon"]) {
@@ -1666,7 +1666,7 @@
     -webkit-line-clamp: 2;
     line-clamp: 2;
     -webkit-box-orient: vertical;
-    line-height: 1.35;
+    line-height: var(--leading-snug);
   }
 
   /* Line 2: priority · status · due, with the assignee chip pushed right.
@@ -1771,11 +1771,13 @@
    the --t-pulse condition. Idle boards stay fully grey, so colour density
    across the grid reads as utilisation. */
 .routine-card[data-routine-state="running"] {
-  border-color: color-mix(in srgb, var(--live) 40%, var(--line-1));
+  --tone: var(--live);
+  border-color: var(--tone-line);
 }
 
 .routine-card[data-routine-state="overdue"] {
-  border-color: color-mix(in srgb, var(--err) 28%, var(--line-1));
+  --tone: var(--err);
+  border-color: var(--tone-line);
 }
 
 /* Paused routines dispatch nothing, so they recede: dimmer title and

@@ -214,6 +214,8 @@ export interface AgentWorkspaceFileResponse {
   isBinary: boolean;
   bytes: number;
   content: string | null;
+  /** Raw bytes (base64, capped at limitBytes) for binary previews — images, PDFs. */
+  contentBase64?: string | null;
   truncated: boolean;
   limitBytes: number;
   generatedAt: string;
@@ -238,6 +240,8 @@ export interface NodeWorkspaceFileResponse {
   isBinary: boolean;
   bytes: number;
   content: string | null;
+  /** Raw bytes (base64, capped at limitBytes) for binary previews — images, PDFs. */
+  contentBase64?: string | null;
   truncated: boolean;
   limitBytes: number;
   generatedAt: string;

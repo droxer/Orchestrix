@@ -175,7 +175,7 @@
   border: 1px solid currentColor;
   border-radius: var(--r-full);
   font-size: var(--fs-1);
-  line-height: 1;
+  line-height: var(--leading-none);
   translate: 0 2px;
 }
 

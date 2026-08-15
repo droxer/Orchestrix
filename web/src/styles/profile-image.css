@@ -30,14 +30,14 @@
      per-identity hue (--avatar-hue, set inline by IdentityMonogram.tsx from the
      display name); there is no fixed primitive to reference since the hue itself
      is the value. Matches .task-assignee-avatar in backlog.css. */
-  background: color-mix(in srgb, hsl(var(--avatar-hue, 0) 70% 55%) 22%, var(--surface-2));
+  background: color-mix(in srgb, hsl(var(--avatar-hue, 0) var(--avatar-sat) var(--avatar-light)) 22%, var(--surface-2));
   /* stylelint-disable-next-line function-disallowed-list -- see above */
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, hsl(var(--avatar-hue, 0) 70% 55%) 34%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, hsl(var(--avatar-hue, 0) var(--avatar-sat) var(--avatar-light)) 34%, transparent);
   color: var(--ink-1);
   font-family: var(--font-display);
-  font-size: var(--monogram-size, 12px);
+  font-size: var(--monogram-size, var(--fs-2));
   font-weight: 600;
-  line-height: 1;
+  line-height: var(--leading-none);
   letter-spacing: var(--track-display);
   user-select: none;
 }
@@ -127,7 +127,8 @@
 }
 
 .profile-image-picker-remove:hover {
-  border-color: color-mix(in srgb, var(--err) 45%, var(--line-1));
+  --tone: var(--err);
+  border-color: var(--tone-line);
   color: var(--err);
 }
 
@@ -138,8 +139,9 @@
   z-index: 2;
   width: max-content;
   max-width: min(260px, 70vw);
+  --tone: var(--err);
   padding: var(--sp-2) var(--sp-3);
-  border: 1px solid color-mix(in srgb, var(--err) 42%, var(--line-1));
+  border: 1px solid var(--tone-line);
   border-radius: var(--r-2);
   background: var(--surface-0);
   color: var(--err);
@@ -207,7 +209,8 @@
   }
 
   .profile-image-picker-remove:hover::before {
-    border-color: color-mix(in srgb, var(--err) 45%, var(--line-1));
+    --tone: var(--err);
+    border-color: var(--tone-line);
   }
 
   .profile-image-picker-remove > svg {

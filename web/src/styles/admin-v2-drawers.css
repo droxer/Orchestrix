@@ -83,7 +83,7 @@
   font-size: var(--fs-5);
   font-weight: 600;
   letter-spacing: var(--track-display);
-  line-height: 1.1;
+  line-height: var(--leading-display);
   color: var(--ink-1);
   overflow-wrap: anywhere;
 }
@@ -121,7 +121,7 @@
 }
 
 .adm-drawer-close:hover {
-  background: var(--surface-1);
+  background: var(--control-fill-hover);
   color: var(--ink-1);
 }
 
@@ -169,7 +169,7 @@
   margin: 0;
   font-size: var(--fs-2);
   color: var(--ink-3);
-  line-height: 1.5;
+  line-height: var(--leading-normal);
 }
 
 .adm-form-hint--notice {
@@ -179,7 +179,7 @@
   border: 1px solid var(--line-2);
   font-size: var(--fs-2);
   color: var(--ink-3);
-  line-height: 1.55;
+  line-height: var(--leading-normal);
 }
 
 .adm-form-error {
@@ -189,7 +189,7 @@
   background: color-mix(in srgb, var(--err) 6%, transparent);
   color: var(--err);
   font-size: var(--fs-3);
-  line-height: 1.5;
+  line-height: var(--leading-normal);
 }
 
 /* Pinned footer: the action bar stays flush to the drawer's bottom edge while
@@ -288,7 +288,7 @@
 .adm-assign-operator-handle {
   font-size: var(--fs-2);
   color: var(--ink-3);
-  line-height: 1.1;
+  line-height: var(--leading-display);
   word-break: break-all;
 }
 
@@ -364,8 +364,8 @@
 }
 
 .adm-assign-node:hover {
-  border-color: var(--ink-1);
-  background: var(--surface-1);
+  border-color: var(--line-strong);
+  background: var(--control-fill-hover);
 }
 
 .adm-assign-node-input:focus-visible + .adm-assign-node {
@@ -377,7 +377,7 @@
 .adm-assign-node.selected {
   border-color: var(--action);
   background: color-mix(in srgb, var(--action) 5%, var(--surface-0));
-  box-shadow: inset 2px 0 0 var(--action);
+  box-shadow: var(--accent-bar);
 }
 
 .adm-assign-node-body {
@@ -410,7 +410,7 @@
   font-size: var(--fs-2);
   color: var(--ink-3);
   word-break: break-all;
-  line-height: 1.3;
+  line-height: var(--leading-snug);
 }
 
 .adm-assign-node-path.muted {
@@ -464,7 +464,7 @@
 .adm-assign-empty-body {
   margin: 0;
   font-size: var(--fs-2);
-  line-height: 1.55;
+  line-height: var(--leading-normal);
   color: var(--ink-3);
 }
 
@@ -533,7 +533,7 @@
   font-size: var(--fs-5);
   font-weight: 500;
   color: var(--ink-1);
-  line-height: 1.1;
+  line-height: var(--leading-display);
   word-break: break-all;
 }
 
@@ -578,7 +578,7 @@
 .adm-provision-outcome-body {
   margin: 0;
   font-size: var(--fs-2);
-  line-height: 1.55;
+  line-height: var(--leading-normal);
   color: var(--ink-3);
 }
 
@@ -617,7 +617,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem;
+  gap: var(--sp-1);
   width: 100%;
   height: 34px;
   padding: 0 var(--sp-3);
@@ -706,7 +706,7 @@
 }
 
 .adm-placement-dot:not(.tone-neutral) {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone, transparent) 16%, transparent);
+  box-shadow: var(--ring-halo);
 }
 
 .adm-placement-body {
@@ -811,8 +811,9 @@
 
 .adm-copy-pill:hover { background: var(--action-hover); }
 .adm-copy-pill.copied {
+  --tone: var(--ok);
   background: var(--surface-0);
-  border-color: color-mix(in srgb, var(--ok) 28%, transparent);
+  border-color: var(--tone-line);
   color: var(--ok);
 }
 
@@ -820,7 +821,7 @@
   margin: var(--sp-4) 0 0;
   font-size: var(--fs-2);
   color: var(--ink-3);
-  line-height: 1.6;
+  line-height: var(--leading-loose);
 }
 
 .adm-cred-empty {
@@ -831,7 +832,7 @@
   border: 1px dashed var(--line-1);
   border-radius: var(--r-2);
   text-align: center;
-  line-height: 1.6;
+  line-height: var(--leading-loose);
 }
 
 /* ── Auth screens ─────────────────────────────────────────────────── */
@@ -852,7 +853,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-6);
-  box-shadow: inset 2px 0 0 var(--action), var(--shadow-2);
+  box-shadow: var(--accent-bar), var(--shadow-2);
 }
 
 .adm-auth-brand {
@@ -878,23 +879,11 @@
   margin: 0;
   font-size: var(--fs-3);
   color: var(--ink-3);
-  line-height: 1.6;
+  line-height: var(--leading-loose);
 }
 
 /* ── Responsive ───────────────────────────────────────────────────── */
-@media (max-width: 1040px) {
-  .adm-content {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 @media (max-width: 768px) {
-  .admin-console.adm-shell {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .adm-content-main { padding: var(--sp-4); }
-
   /* Employee-row mobile layout lives with the row itself in
      admin-v2-views.css (@media ≤720px) — one component, one breakpoint. */
 

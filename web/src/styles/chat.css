@@ -101,7 +101,8 @@
 }
 
 .chat-agent-select[data-availability="unavailable"] {
-  border-color: color-mix(in srgb, var(--err) 32%, var(--line-1));
+  --tone: var(--err);
+  border-color: var(--tone-line);
   background: color-mix(in srgb, var(--err) 6%, var(--surface-3));
   color: var(--err);
   opacity: 1;
@@ -143,8 +144,8 @@
   border: 1px solid currentColor;
   border-radius: var(--r-full);
   font-size: var(--fs-1);
-  font-weight: 650;
-  line-height: 1.25;
+  font-weight: 600;
+  line-height: var(--leading-snug);
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
 }
@@ -206,7 +207,7 @@
   color: var(--surface-0);
   font-size: var(--fs-1);
   font-weight: 600;
-  line-height: 1;
+  line-height: var(--leading-none);
 }
 
 .header-agent-busy-pip {
@@ -233,7 +234,7 @@
 }
 
 .transcript-inner {
-  width: min(100%, 960px);
+  width: min(100%, var(--thread-measure));
   min-height: 100%;
   margin: 0 auto;
   padding: var(--sp-7) var(--page-gutter) var(--sp-8);
@@ -362,7 +363,9 @@
 .msg-agent .rail-node.rail-node-agent {
   border-radius: var(--r-2);
   background: var(--surface-3);
-  border-color: color-mix(in srgb, var(--action) 32%, var(--line-1));
+  /* Nearest edge token: 32% ≈ --line-drag's 30% on a 1px hairline; this is a
+     static identity edge, not a hover or drag state. */
+  border-color: var(--line-drag);
 }
 
 /* The vendor glyph paints in ink against the light tile. */
@@ -415,13 +418,12 @@
   font-family: var(--font-sans);
   font-size: var(--fs-2);
   font-weight: 500;
-  font-variant-numeric: tabular-nums;
   white-space: nowrap;
   grid-column: 3;
   grid-row: 1;
   justify-self: end;
   align-self: start;
-  padding-top: 1px;
+  padding-top: var(--sp-0-5);
   text-align: right;
 }
 
@@ -456,10 +458,11 @@
 
 /* Local by necessity, not by preference: this ring is spaced off the canvas
    by a second shadow, which the shared single-shadow pulse-ring cannot carry.
-   The tint tracks pulse-ring's 40% so it reads at the same strength. */
+   The 6px spread and 40% tint match pulse-ring so it reads at the same
+   strength. */
 @keyframes agent-rail-pulse {
   0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 40%, transparent); }
-  100% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--live) 0%, transparent); }
+  100% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--live) 0%, transparent); }
 }
 
 /* The user turn is a compact, content-hugging bubble — not a full-width card.
@@ -471,7 +474,7 @@
   width: fit-content;
   max-width: min(100%, 42rem);
   gap: var(--sp-1);
-  padding: var(--sp-2) var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
   background: var(--surface-1);
   border: 1px solid var(--line-2);
   border-radius: var(--r-3);
@@ -483,7 +486,7 @@
   color: var(--ink-1);
   font-size: var(--fs-3);
   font-weight: 500;
-  line-height: var(--leading-normal);
+  line-height: var(--leading-prose);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -522,7 +525,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--sp-2);
-  margin-top: var(--sp-1);
+  margin-top: var(--sp-2);
 }
 
 /* Streaming turns render an empty footer until actions or usage appear. */
@@ -542,6 +545,7 @@
   background: none;
   color: var(--ink-4);
   font: var(--type-label);
+  font-feature-settings: "tnum" 1;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   cursor: default;
@@ -589,8 +593,9 @@
 }
 
 .msg-turn-action.is-copied {
+  --tone: var(--ok);
   color: var(--ok);
-  border-color: color-mix(in srgb, var(--ok) 28%, var(--line-1));
+  border-color: var(--tone-line);
 }
 
 .msg-turn-action:focus-visible {

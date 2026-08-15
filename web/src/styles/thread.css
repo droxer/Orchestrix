@@ -8,10 +8,6 @@
   min-height: 0;
   padding: var(--sp-4) 0 0;
   border-right: 1px solid var(--line-1);
-  background: var(--surface-0);
-}
-
-html[data-theme="dark"] .thread-panel {
   background: var(--surface-1);
 }
 
@@ -43,7 +39,6 @@ html[data-theme="dark"] .thread-panel {
   color: var(--ink-3);
   font-size: var(--fs-2);
   font-weight: 500;
-  font-variant-numeric: tabular-nums;
 }
 
 .conversation-header button {
@@ -251,7 +246,7 @@ html[data-theme="dark"] .thread-panel {
   padding: var(--page-gutter);
   color: var(--ink-3);
   font-size: var(--fs-3);
-  line-height: 1.5;
+  line-height: var(--leading-normal);
 }
 
 .conversation-copy {
@@ -322,17 +317,17 @@ html[data-theme="dark"] .thread-panel {
   transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
   opacity: 0;
   font-size: var(--fs-2);
-  line-height: 1;
+  line-height: var(--leading-none);
 }
 
 .conversation-rename-btn:hover {
   color: var(--ink-1);
-  background: color-mix(in srgb, var(--ink-1) 8%, transparent);
+  background: var(--control-fill-hover);
 }
 
 .conversation-remove-btn:hover {
   color: var(--err);
-  background: color-mix(in srgb, var(--ink-1) 8%, transparent);
+  background: var(--control-fill-hover);
 }
 
 .conversation-row:hover .conversation-rename-btn,
@@ -444,5 +439,4 @@ html[data-theme="dark"] .thread-panel {
 
 .conversation-group-count {
   color: var(--ink-4);
-  font-variant-numeric: tabular-nums;
 }

@@ -26,7 +26,7 @@ import {
 } from "./workspace/WorkspacePrimitives";
 import { PageHeader } from "./PageHeader";
 import { Button } from "@/components/ui/button";
-import { CodeView, isHtmlFile, isMarkdownFile, isRenderableFile, languageForFile } from "./CodeView";
+import { CodeView, imageMimeForFile, isHtmlFile, isMarkdownFile, isPdfFile, isRenderableFile, languageForFile } from "./CodeView";
 import { Markdown } from "./Markdown";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { AgentProfilePanel } from "./AgentProfilePanel";
@@ -699,7 +699,31 @@ function FilePreview({
   }
   if (!data) return null;
   if (data.isBinary) {
-    return <p className="artifact-viewer-status">{t("workspace.binary_file")}</p>;
+    const imageMime = imageMimeForFile(name);
+    const media = data.contentBase64
+      ? imageMime
+        ? { kind: "image" as const, src: `data:${imageMime};base64,${data.contentBase64}` }
+        : isPdfFile(name)
+          ? { kind: "pdf" as const, src: `data:application/pdf;base64,${data.contentBase64}` }
+          : null
+      : null;
+    if (!media) {
+      return <p className="artifact-viewer-status">{t("workspace.binary_file")}</p>;
+    }
+    return (
+      <div className="workspace-preview-viewport is-bleed">
+        <div className="artifact-viewer-body is-bleed">
+          {media.kind === "image" ? (
+            <img className="artifact-image-preview" src={media.src} alt={name} />
+          ) : (
+            <iframe className="artifact-frame-preview" title={name} src={media.src} />
+          )}
+          {data.truncated ? (
+            <p className="workspace-preview-truncated">{t("workspace.file_truncated", { limit: formatBytes(data.limitBytes, i18n.language) })}</p>
+          ) : null}
+        </div>
+      </div>
+    );
   }
   if (!data.content || !data.content.trim()) {
     return <p className="artifact-viewer-status">{t("workspace.empty_file")}</p>;
