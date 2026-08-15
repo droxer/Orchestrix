@@ -22,8 +22,10 @@ from .helpers import (
 router = APIRouter()
 
 
-# 员工可以随时调整自己 agent 的人格；出生证明（computerId / executorKind /
-# defaultRole）创建时定死 —— 改 role 等于换一个同事，应当新建而非修改。
+# Employees can adjust their agent's personality at any time; the birth
+# certificate (computerId / executorKind / defaultRole) is fixed at creation
+# — changing the role is like swapping in a different coworker, so it should
+# be a new agent, not an edit.
 AGENT_META_FIELDS = frozenset({"displayName", "instructions"})
 
 

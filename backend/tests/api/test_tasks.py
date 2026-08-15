@@ -5,7 +5,6 @@ from datetime import date
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
-
 from relay.api import task_routes
 from relay.app import create_app
 from relay.core.computer_identity import computer_id
@@ -65,6 +64,17 @@ def _create_agent(
         # this staying offline (status "stopped").
         offline_node_id = f"offline_node_{employee_id}"
         existing = client.app.state.registry.get(offline_node_id)
+        # supportedAgents is a registration-payload field only; the registry
+        # never persists it on the stored node record (it's folded into the
+        # "agents" status dict and then dropped). Reading it back off
+        # `existing` is always empty, so re-registering here would silently
+        # forget every runtime a prior call had already made ready. Read the
+        # runtimes this node is actually ready for instead.
+        existing_ready = {
+            kind
+            for kind, status_value in (existing or {}).get("agents", {}).items()
+            if status_value == "ready"
+        }
         node = client.app.state.registry.register(
             {
                 "sandboxId": offline_node_id,
@@ -73,10 +83,7 @@ def _create_agent(
                 "token": "node_token",
                 "workspacePath": f"/workspace/{employee_id}",
                 "protocolVersion": 1,
-                "supportedAgents": sorted(
-                    set((existing or {}).get("supportedAgents") or [])
-                    | {executor_kind}
-                ),
+                "supportedAgents": sorted(existing_ready | {executor_kind}),
                 "capabilities": ["thread-workspaces"],
                 "status": "stopped",
             }

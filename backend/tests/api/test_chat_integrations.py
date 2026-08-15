@@ -8,7 +8,6 @@ from tempfile import TemporaryDirectory
 
 import httpx
 from fastapi.testclient import TestClient
-
 from relay.app import create_app
 from relay.chat import DatabaseChatIntegrationStore, LocalChatIntegrationStore
 from relay.chat.provider_health import (

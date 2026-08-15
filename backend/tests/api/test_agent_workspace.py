@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 
 from fastapi.testclient import TestClient
-
 from relay.app import create_app
 from relay.core.computer_identity import computer_id
 from relay.core.ids import new_relay_id

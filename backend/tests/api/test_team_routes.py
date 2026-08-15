@@ -7,7 +7,6 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
-
 from relay.api import task_routes
 from relay.app import create_app
 from relay.core.computer_identity import computer_id
@@ -55,6 +54,17 @@ def _agent(
     # agent (that would make the placement below a duplicate).
     node_id = f"test_node_{employee_id}"
     existing_node = client.app.state.registry.get(node_id)
+    # supportedAgents is a registration-payload field only; the registry
+    # never persists it on the stored node record (it's folded into the
+    # "agents" status dict and then dropped). Reading it back off
+    # `existing_node` is always empty, so re-registering here would silently
+    # forget every runtime a prior call had already made ready. Read the
+    # runtimes this node is actually ready for instead.
+    existing_ready = {
+        kind
+        for kind, status_value in (existing_node or {}).get("agents", {}).items()
+        if status_value == "ready"
+    }
     node = client.app.state.registry.register(
         {
             "sandboxId": node_id,
@@ -63,10 +73,7 @@ def _agent(
             "token": "node_token",
             "workspacePath": f"/workspace/{employee_id}",
             "protocolVersion": 1,
-            "supportedAgents": sorted(
-                set((existing_node or {}).get("supportedAgents") or [])
-                | {executor}
-            ),
+            "supportedAgents": sorted(existing_ready | {executor}),
             "capabilities": ["thread-workspaces"],
             "status": (existing_node or {}).get("status", "stopped"),
         }

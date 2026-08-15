@@ -8,7 +8,6 @@ from typing import Any
 from uuid import UUID
 
 from fastapi.testclient import TestClient
-
 from relay.app import create_app
 from relay.core.computer_identity import computer_id
 from relay.services.node_agents import sync_node_agents

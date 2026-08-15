@@ -4,7 +4,6 @@ import base64
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
-
 from relay.app import create_app
 from relay.core.computer_identity import computer_id
 

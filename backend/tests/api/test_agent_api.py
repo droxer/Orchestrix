@@ -93,6 +93,17 @@ def _birth_computer_id(
     """
     node_id = f"admin_test_node_{employee_id}"
     existing = client.app.state.registry.get(node_id)
+    # supportedAgents is a registration-payload field only; the registry
+    # never persists it on the stored node record (it's folded into the
+    # "agents" status dict and then dropped). Reading it back off `existing`
+    # is always empty, so re-registering here would silently forget every
+    # runtime a prior call had already made ready. Read the runtimes this
+    # node is actually ready for instead.
+    existing_ready = {
+        kind
+        for kind, status_value in (existing or {}).get("agents", {}).items()
+        if status_value == "ready"
+    }
     node = client.app.state.registry.register(
         {
             "sandboxId": node_id,
@@ -101,9 +112,7 @@ def _birth_computer_id(
             "token": "node_token",
             "workspacePath": f"/workspace/{employee_id}",
             "protocolVersion": 1,
-            "supportedAgents": sorted(
-                set((existing or {}).get("supportedAgents") or []) | {executor_kind}
-            ),
+            "supportedAgents": sorted(existing_ready | {executor_kind}),
             "capabilities": ["thread-workspaces"],
             "status": status,
         }
@@ -2749,7 +2758,7 @@ def test_agent_role_is_visible_but_not_patchable(monkeypatch) -> None:
 
 
 def test_employee_creates_an_agent_on_their_own_computer(client_with_node) -> None:
-    client, node = client_with_node          # 沿用本文件既有的 fixture 写法
+    client, node = client_with_node  # 沿用本文件既有的 fixture 写法
     response = client.post(
         "/api/v1/agents",
         json={
@@ -2765,13 +2774,15 @@ def test_employee_creates_an_agent_on_their_own_computer(client_with_node) -> No
     assert agent["defaultRole"] == "implementer"
 
 
-def test_creation_rejects_a_runtime_the_computer_does_not_have(client_with_node) -> None:
+def test_creation_rejects_a_runtime_the_computer_does_not_have(
+    client_with_node,
+) -> None:
     client, node = client_with_node
     response = client.post(
         "/api/v1/agents",
         json={
             "computerId": node["computerId"],
-            "executorKind": "kimi",       # 该 node 只上报了 claude
+            "executorKind": "kimi",  # 该 node 只上报了 claude
             "defaultRole": "implementer",
         },
     )
@@ -2805,7 +2816,9 @@ def test_creation_rejects_an_unknown_role(client_with_node) -> None:
     assert response.status_code == 400
 
 
-def test_creation_is_allowed_while_the_computer_is_offline(client_with_offline_node) -> None:
+def test_creation_is_allowed_while_the_computer_is_offline(
+    client_with_offline_node,
+) -> None:
     """员工可以为暂时关机的电脑建 agent；上线后由 sync 补 placement。"""
     client, node = client_with_offline_node
     response = client.post(
@@ -2833,3 +2846,150 @@ def test_role_cannot_be_patched_after_creation(client_with_node) -> None:
         f"/api/v1/agents/{agent['id']}", json={"defaultRole": "reviewer"}
     )
     assert response.status_code == 400
+
+
+def test_creation_does_not_place_on_an_online_node_that_lacks_the_runtime(
+    monkeypatch,
+) -> None:
+    """A computer can be made up of several node records (re-provisioning
+    swaps in a new node id, and the stale record doesn't disappear on its
+    own). available_runtimes() unions ready runtimes across all of a
+    computer's nodes, so creation can succeed even though no single online
+    node is ready for the requested runtime. Placement must not be forced
+    onto some other online node just because it happens to be online — that
+    would leave the agent permanently rejected by the daemon's dispatch
+    admission check, which only trusts the node it was actually placed on.
+    """
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                    "displayName": "Alice",
+                },
+            ).status_code
+            == 201
+        )
+
+        # An old, offline node record still reporting claude as ready — the
+        # kind of record left behind when the machine was re-provisioned.
+        offline_node = app.state.registry.register(
+            {
+                "sandboxId": "multi_node_offline",
+                "employeeId": "alice",
+                "workspaceId": "machine-multi",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["claude"],
+                "capabilities": ["thread-workspaces"],
+                "status": "stopped",
+            }
+        )
+        # The current, online node record for the same machine — only ready
+        # for codex.
+        online_node = app.state.registry.register(
+            {
+                "sandboxId": "multi_node_online",
+                "employeeId": "alice",
+                "workspaceId": "machine-multi",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        assert computer_id(offline_node) == computer_id(online_node)
+
+        assert (
+            client.post(
+                "/api/v1/auth/login",
+                json={"username": "alice", "password": "userpass"},
+            ).status_code
+            == 200
+        )
+        response = client.post(
+            "/api/v1/agents",
+            json={
+                "computerId": computer_id(online_node),
+                "executorKind": "claude",
+                "defaultRole": "implementer",
+            },
+        )
+        assert response.status_code == 201, response.text
+        agent = response.json()["agent"]
+
+        placements = app.state.agent_placement_store.list_placements(
+            agent_id=agent["id"]
+        )
+        assert placements == [], (
+            "must not place claude on a node that only reports codex ready"
+        )
+
+
+def test_creation_rejects_a_real_computer_belonging_to_another_employee(
+    monkeypatch,
+) -> None:
+    """A previous version of this check only proved that an unknown
+    computerId 404s. That leaves the actual employee-ownership boundary
+    unverified: it says nothing about whether a computer bob genuinely owns
+    is rejected when alice tries to create an agent on it.
+    """
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        for employee_id in ("alice", "bob"):
+            assert (
+                client.post(
+                    "/api/v1/admin/employees",
+                    json={
+                        "employeeId": employee_id,
+                        "username": employee_id,
+                        "password": "userpass",
+                        "displayName": employee_id.title(),
+                    },
+                ).status_code
+                == 201
+            )
+
+        bob_node = app.state.registry.register(
+            {
+                "sandboxId": "node_bob",
+                "employeeId": "bob",
+                "workspaceId": "machine-bob",
+                "token": "node_token",
+                "workspacePath": "/workspace/bob",
+                "protocolVersion": 1,
+                "supportedAgents": ["claude"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+
+        assert (
+            client.post(
+                "/api/v1/auth/login",
+                json={"username": "alice", "password": "userpass"},
+            ).status_code
+            == 200
+        )
+        response = client.post(
+            "/api/v1/agents",
+            json={
+                "computerId": computer_id(bob_node),
+                "executorKind": "claude",
+                "defaultRole": "implementer",
+            },
+        )
+        assert response.status_code == 404
