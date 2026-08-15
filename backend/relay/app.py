@@ -171,7 +171,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
         )
         if migrated:
             logger.info("Migrated compatibility agents", count=migrated)
-    except Exception as error:  # 迁移失败不应阻断启动
+    except Exception as error:  # noqa: BLE001 - migration failure must not block startup
         logger.warning("Agent computer-id migration deferred", error=str(error))
 
     scheduler = task_scheduler_from_env(

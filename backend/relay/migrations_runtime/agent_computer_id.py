@@ -30,21 +30,31 @@ def migrate_agent_computer_ids(
     for agent in agent_store.list_agents():
         if agent.get("deletedAt") or not agent.get("compatibilityKey"):
             continue
-        agent_computer_id = _computer_id_from_placements(
-            placement_store, agent["id"], registry
-        )
-        if not agent_computer_id:
+        try:
+            agent_computer_id = _computer_id_from_placements(
+                placement_store, agent["id"], registry
+            )
+            if not agent_computer_id:
+                logger.warning(
+                    "Skipping agent migration: no placement to read a computer id from",
+                    agent_id=agent["id"],
+                )
+                continue
+            agent_store.set_birth_certificate(
+                agent["id"],
+                computer_id=agent_computer_id,
+                default_role=agent.get("defaultRole") or DEFAULT_ROLE,
+            )
+            migrated += 1
+        except Exception as error:  # noqa: BLE001 - one bad record must not
+            # abort the loop and wedge every agent after it, forever, on
+            # every future restart. Log and move on to the next agent.
             logger.warning(
-                "Skipping agent migration: no placement to read a computer id from",
-                agent_id=agent["id"],
+                "Skipping agent migration after unexpected error",
+                agent_id=agent.get("id"),
+                error=str(error),
             )
             continue
-        agent_store.set_birth_certificate(
-            agent["id"],
-            computer_id=agent_computer_id,
-            default_role=agent.get("defaultRole") or DEFAULT_ROLE,
-        )
-        migrated += 1
     return migrated
 
 

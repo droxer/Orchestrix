@@ -2235,11 +2235,12 @@ def test_agent_stays_on_roster_when_its_computer_is_gone(
     monkeypatch,
 ) -> None:
     """Explicitly declared agents have no compatibilityKey, so the roster's
-    live-computer filter (`agent_routes.list_agents`) never applies to them —
-    an agent whose computer is unassigned stays visible rather than dropping
-    out. (The old compatibilityKey-gated drop no longer fires for any agent,
-    since only the retired auto-creation path ever set that key; making the
-    roster reflect binding status instead is tracked separately.)"""
+    old live-computer filter (`agent_routes.list_agents`) never applies to
+    them — an agent whose computer is unassigned stays visible rather than
+    dropping out. (The old compatibilityKey-gated drop no longer fires for
+    any agent, since only the retired auto-creation path ever set that key.
+    See test_binding_status_is_reported_over_the_wire_and_survives_computer_loss
+    for the bindingStatus wire contract this roster behavior now carries.)"""
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
@@ -3098,3 +3099,39 @@ def test_creation_rejects_a_real_computer_belonging_to_another_employee(
             },
         )
         assert response.status_code == 404
+
+
+def test_binding_status_is_reported_over_the_wire_and_survives_computer_loss(
+    client_with_node,
+) -> None:
+    """bindingStatus is this branch's headline user-visible field, but until
+    now nothing asserted it actually reaches an HTTP response body (only the
+    pure binding_status() function was unit-tested). This also doubles as
+    the roster-retention check: the agent must stay listed, with its status
+    flipped to computer_gone, once its computer disappears from the registry.
+    """
+    client, node = client_with_node
+    created = client.post(
+        "/api/v1/agents",
+        json={
+            "computerId": node["computerId"],
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+            "displayName": "Ada",
+        },
+    )
+    assert created.status_code == 201, created.text
+    agent_id = created.json()["agent"]["id"]
+
+    before = client.get("/api/v1/agents").json()["agents"]
+    before_by_id = {agent["id"]: agent for agent in before}
+    assert before_by_id[agent_id]["bindingStatus"] == "available"
+
+    # The computer disappears from the registry entirely (crash / re-enroll
+    # under a new id) rather than merely going offline.
+    client.app.state.registry.delete(node["id"])
+
+    after = client.get("/api/v1/agents").json()["agents"]
+    after_by_id = {agent["id"]: agent for agent in after}
+    assert agent_id in after_by_id, "agent must stay on the roster once its computer is gone"
+    assert after_by_id[agent_id]["bindingStatus"] == "computer_gone"

@@ -244,7 +244,8 @@ def test_default_role_must_be_a_known_role(tmp_path) -> None:
 
 
 def test_birth_certificate_fields_cannot_be_patched(tmp_path) -> None:
-    """computerId / executorKind / defaultRole 是出生证明，改它等于换个同事。"""
+    """computerId / executorKind / defaultRole are the birth certificate;
+    changing them is like swapping in a different coworker."""
     from relay.persistence.agent_store import LocalAgentStore
 
     store = LocalAgentStore(tmp_path)

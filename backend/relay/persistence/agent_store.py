@@ -229,7 +229,7 @@ class LocalAgentStore:
             updated |= {
                 "computerId": computer_id,
                 "defaultRole": default_role,
-                "version": current["version"] + 1,
+                "version": int(current.get("version") or 1) + 1,
                 "updatedAt": now_iso(),
             }
             self._append(agent_id, "agent.updated", {"agent": updated})
@@ -532,7 +532,7 @@ class DatabaseAgentStore:
         updated |= {
             "computerId": computer_id,
             "defaultRole": default_role,
-            "version": current["version"] + 1,
+            "version": int(current.get("version") or 1) + 1,
             "updatedAt": now_iso(),
         }
         return self._append(agent_id, "agent.updated", updated, {"agent": updated})
