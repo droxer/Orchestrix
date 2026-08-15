@@ -207,14 +207,17 @@ class LocalAgentStore:
     def set_birth_certificate(
         self, agent_id: str, *, computer_id: str, default_role: str
     ) -> dict[str, Any]:
-        """仅供一次性迁移使用：为存量 agent 补写出生证明并清空兼容身份。
+        """One-time migration use only: backfill a birth certificate onto a
+        legacy agent and clear its compatibility identity.
 
-        正常路径下这些字段在创建时定死、不可修改；存量记录创建时还没有这个
-        概念，只能在迁移里补。不要在别处调用。
+        These fields are fixed at creation and immutable on the normal path;
+        legacy records predate the concept and can only get it via migration.
+        Do not call this from anywhere else.
 
-        清空 compatibilityKey 也必须走这里 —— 不能用 update_agent，因为
-        _updated_agent 对该字段走 _required_string（agent_store.py:828），
-        空串会被判为「必填缺失」而抛 ValueError。
+        Clearing compatibilityKey must go through here too — update_agent
+        won't work, because _updated_agent routes that field through
+        _required_string (agent_store.py:828), which treats an empty string
+        as a missing required value and raises ValueError.
         """
         with self._lock:
             current = self.get_agent(agent_id)

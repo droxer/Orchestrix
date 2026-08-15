@@ -2758,7 +2758,7 @@ def test_agent_role_is_visible_but_not_patchable(monkeypatch) -> None:
 
 
 def test_employee_creates_an_agent_on_their_own_computer(client_with_node) -> None:
-    client, node = client_with_node  # 沿用本文件既有的 fixture 写法
+    client, node = client_with_node  # follows this file's existing fixture pattern
     response = client.post(
         "/api/v1/agents",
         json={
@@ -2782,7 +2782,7 @@ def test_creation_rejects_a_runtime_the_computer_does_not_have(
         "/api/v1/agents",
         json={
             "computerId": node["computerId"],
-            "executorKind": "kimi",  # 该 node 只上报了 claude
+            "executorKind": "kimi",  # this node only reports claude
             "defaultRole": "implementer",
         },
     )
@@ -2819,7 +2819,7 @@ def test_creation_rejects_an_unknown_role(client_with_node) -> None:
 def test_creation_is_allowed_while_the_computer_is_offline(
     client_with_offline_node,
 ) -> None:
-    """员工可以为暂时关机的电脑建 agent；上线后由 sync 补 placement。"""
+    """An employee can create an agent for a computer that's currently offline; sync backfills the placement once it comes online."""
     client, node = client_with_offline_node
     response = client.post(
         "/api/v1/agents",

@@ -1,7 +1,9 @@
-"""把自动生成的 compatibility agent 就地转成显式声明的普通 agent。
+"""Turn auto-generated compatibility agents into declared plain agents, in place.
 
-一次性、幂等。走 store 自身的更新路径，使事件与快照同步演进 —— 不要改成
-Alembic 原生 SQL，agents 的读取取自 snapshot 列，直接改写会绕开写入路径。
+One-time, idempotent. Goes through the store's own update path so events and
+snapshots stay in lockstep — do not switch this to raw Alembic SQL; agent
+reads come from the snapshot column, and a direct rewrite would bypass the
+write path entirely.
 """
 
 from __future__ import annotations
@@ -18,10 +20,11 @@ DEFAULT_ROLE = "implementer"
 def migrate_agent_computer_ids(
     agent_store: Any, placement_store: Any, registry: Any | None = None
 ) -> int:
-    """返回本次迁移的 agent 条数。已迁移过的不再计入。
+    """Return how many agents this run migrated. Already-migrated ones don't count.
 
-    registry 可选，用于给 spec ① 之前创建、因而没有 computerId 的老 placement
-    兜底：拿它的 daemonNodeId 去注册表里换算身份。
+    registry is optional; it's the fallback for legacy placements created
+    before spec ① (and so lacking a computerId) — it lets us derive an
+    identity from the placement's daemonNodeId via the registry instead.
     """
     migrated = 0
     for agent in agent_store.list_agents():
@@ -48,23 +51,29 @@ def migrate_agent_computer_ids(
 def _computer_id_from_placements(
     placement_store: Any, agent_id: str, registry: Any | None
 ) -> str | None:
-    """从 placement 读 computerId。
+    """Read computerId off the agent's placements.
 
-    不解析 compatibilityKey：spec ① 之后 key 的中段是带前缀的身份
-    （形如 alice:device:alice:machine-a:claude），按冒号切分无法无歧义还原。
+    Does not parse compatibilityKey: after spec ①, the middle segment of the
+    key is a prefixed identity (e.g. alice:device:alice:machine-a:claude),
+    and splitting on colons can't recover it unambiguously.
 
-    只信 active placement：`list_placements` 默认排除 removed 的记录，
-    两个 store 的排序键都是 (priority, id)，而 id 是随机 uuid —— 曾换过
-    computer 的 agent 会同时留有一条 active 和至少一条 removed（旧）
-    placement，若不区分 active/removed 直接取「排序后第一条带 computerId
-    的」，会有约一半概率把已废弃的旧 computer 写进不可变的出生证明。
+    Trusts active placements only: `list_placements` excludes removed
+    records by default, and both stores sort by (priority, id), where id is
+    a random uuid — an agent that ever changed computers will have one
+    active placement and at least one removed (stale) one. Taking "the first
+    sorted record with a computerId" without distinguishing active from
+    removed would, about half the time, write a since-retired computer into
+    the agent's immutable birth certificate.
 
-    只有一条 active 都没有时才回落到 include_removed=True，并在其中按
-    createdAt 取最新的一条（不是任意一条）——避免同样的随机排序问题。
+    Only falls back to include_removed=True when there isn't a single active
+    placement, and even then picks the newest by createdAt (never an
+    arbitrary one) — to avoid the same sort-order randomness.
 
-    spec ① 只给**新建**的 placement 写了 computerId，所以生产库里绝大多数
-    存量 placement 没有这个字段 —— 只读它会让迁移在真实数据上几乎全部空转。
-    因此对没有该字段的 placement，用它的 daemonNodeId 去注册表换算身份。
+    spec ① only wrote computerId onto **newly created** placements, so most
+    legacy placements in production lack the field — reading it alone would
+    make this migration a near-total no-op on real data. So for placements
+    missing it, derive an identity from the placement's daemonNodeId via the
+    registry instead.
     """
     active_placements = placement_store.list_placements(agent_id=agent_id)
     computer_id_value = _first_computer_id(active_placements)
