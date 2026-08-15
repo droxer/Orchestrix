@@ -106,7 +106,7 @@
     "archived": "已归档",
     "new_thread": "在“{{project}}”中新建对话",
     "no_threads": "此项目中尚无对话。",
-    "no_projects": "尚无项目或对话。",
+    "no_projects": "尚无项目。",
     "shared_workspace": "项目房间 · 共享工作空间"
   },
   "thread": {

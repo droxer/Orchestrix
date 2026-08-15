@@ -31,7 +31,7 @@ import { useClientMounted } from "./hooks/useClientMounted";
 import { useActiveSession } from "./hooks/useActiveSession";
 import type { WorkspacePageTab } from "./components/AgentWorkspacePage";
 import { chooseSendAction, sendThreadSessionId, suppressActiveSessionDuringPendingSend } from "./lib/sendAction";
-import { matchesThreadQuery, myThreadSessions, pickActiveThreadSession } from "./lib/threads";
+import { matchesThreadQuery, myThreadSessions, pickActiveThreadSession, threadsForDirectory } from "./lib/threads";
 import { shouldTailSessionEvents } from "./lib/sessionEventStream";
 import { useEmployeeProvisioning } from "./hooks/useEmployeeProvisioning";
 import { useEmployeeAgents } from "./hooks/useEmployeeAgents";
@@ -75,7 +75,7 @@ const AgentsPage = lazy(() => import("./components/AgentsPage").then((m) => ({ d
 const TeamsPage = lazy(() => import("./components/TeamsPage").then((m) => ({ default: m.TeamsPage })));
 const ComputerPage = lazy(() => import("./components/ComputerPage").then((m) => ({ default: m.ComputerPage })));
 
-const WORK_ROUTE_SKIP_IDS: Record<Exclude<AppRoute, "main">, string> = {
+const WORK_ROUTE_SKIP_IDS: Record<Exclude<AppRoute, "main" | "projects">, string> = {
   backlog: "backlog-panel",
   routine: "routine-panel",
   agents: "agents-panel",
@@ -489,14 +489,14 @@ export function App() {
     : t("thread.new_thread");
 
   const skipLinkHref = useMemo(() => {
-    if (route === "main") return mobileView === "threads" ? "#thread-panel" : "#chat-panel";
+    if (route === "main" || route === "projects") return mobileView === "threads" ? "#thread-panel" : "#chat-panel";
     if (route === "agents" && agentWorkspaceId) return "#agent-workspace-panel";
     return `#${WORK_ROUTE_SKIP_IDS[route]}`;
   }, [agentWorkspaceId, route, mobileView]);
 
   const awaitingDecision = useMemo(() => isAwaitingFeedbackDecision(activeSession), [activeSession]);
 
-  const spaceVisible = route === "main" && spaceOpen && Boolean(activeSession);
+  const spaceVisible = (route === "main" || route === "projects") && spaceOpen && Boolean(activeSession);
 
   const threadItems = useMemo<ThreadItem[]>(() => {
     const runningBy = new Map(visibleNodes.flatMap((node) => node.activeRuns.map((run) => [run.sessionId, run.agent] as const)));
@@ -510,6 +510,9 @@ export function App() {
     () => threadItems.filter((item) => matchesThreadQuery(item.session, threadQuery)),
     [threadItems, threadQuery],
   );
+  const directoryThreads = useMemo(() => {
+    return threadsForDirectory(filteredThreads, projects, route === "projects" ? "projects" : "threads");
+  }, [filteredThreads, projects, route]);
 
   const refreshWithToken = useCallback(async (tokenOverride?: string) => {
     await refresh(undefined, tokenOverride);
@@ -1266,9 +1269,10 @@ export function App() {
           />
         ) : (
           <ThreadsView
-            filteredThreads={filteredThreads}
-            projects={projects}
-            selectedProjectId={routedProjectId ?? activeSession?.projectId ?? null}
+            directoryMode={route === "projects" ? "projects" : "threads"}
+            filteredThreads={directoryThreads}
+            projects={route === "projects" ? projects : []}
+            selectedProjectId={route === "projects" ? routedProjectId ?? activeSession?.projectId ?? null : null}
             threadQuery={threadQuery}
             setThreadQuery={setThreadQuery}
             activeSession={activeSession}

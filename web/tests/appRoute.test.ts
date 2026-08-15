@@ -16,10 +16,10 @@ describe("app pathname routes", () => {
     assert.deepEqual(parseAppPath("/threads"), { route: "main", mobileView: "threads", sessionId: null });
     assert.deepEqual(parseAppPath("/threads/new"), { route: "main", mobileView: "chat", sessionId: null, composingNew: true });
     assert.deepEqual(parseAppPath("/threads/ses%2F123"), { route: "main", mobileView: "chat", sessionId: "ses/123" });
-    assert.deepEqual(parseAppPath("/projects"), { route: "main", mobileView: "threads", sessionId: null });
-    assert.deepEqual(parseAppPath("/projects/prj%2F123"), { route: "main", mobileView: "threads", sessionId: null, projectId: "prj/123" });
-    assert.deepEqual(parseAppPath("/projects/prj%2F123/new"), { route: "main", mobileView: "chat", sessionId: null, projectId: "prj/123", composingNew: true });
-    assert.deepEqual(parseAppPath("/projects/prj%2F123/threads/ses%2F123"), { route: "main", mobileView: "chat", sessionId: "ses/123", projectId: "prj/123" });
+    assert.deepEqual(parseAppPath("/projects"), { route: "projects", mobileView: "threads", sessionId: null });
+    assert.deepEqual(parseAppPath("/projects/prj%2F123"), { route: "projects", mobileView: "threads", sessionId: null, projectId: "prj/123" });
+    assert.deepEqual(parseAppPath("/projects/prj%2F123/new"), { route: "projects", mobileView: "chat", sessionId: null, projectId: "prj/123", composingNew: true });
+    assert.deepEqual(parseAppPath("/projects/prj%2F123/threads/ses%2F123"), { route: "projects", mobileView: "chat", sessionId: "ses/123", projectId: "prj/123" });
     assert.deepEqual(parseAppPath("/agents/agent%201"), { route: "agents", mobileView: "chat", sessionId: null, agentWorkspaceId: "agent 1" });
     assert.deepEqual(parseAppPath("/teams/team%201"), { route: "teams", mobileView: "chat", sessionId: null, teamWorkspaceId: "team 1" });
 
@@ -40,12 +40,13 @@ describe("app pathname routes", () => {
   it("formats clean paths with encoded entity ids", () => {
     assert.equal(pathForAppState({ route: "main", mobileView: "chat", sessionId: "ses/123" }), "/threads/ses%2F123");
     assert.equal(pathForAppState({ route: "main", mobileView: "chat", sessionId: null, composingNew: true }), "/threads/new");
-    assert.equal(pathForAppState({ route: "main", mobileView: "threads", sessionId: null, projectId: "prj/123" }), "/projects/prj%2F123");
-    assert.equal(pathForAppState({ route: "main", mobileView: "chat", sessionId: null, projectId: "prj/123", composingNew: true }), "/projects/prj%2F123/new");
-    assert.equal(pathForAppState({ route: "main", mobileView: "chat", sessionId: "ses/123", projectId: "prj/123" }), "/projects/prj%2F123/threads/ses%2F123");
+    assert.equal(pathForAppState({ route: "projects", mobileView: "threads", sessionId: null, projectId: "prj/123" }), "/projects/prj%2F123");
+    assert.equal(pathForAppState({ route: "projects", mobileView: "chat", sessionId: null, projectId: "prj/123", composingNew: true }), "/projects/prj%2F123/new");
+    assert.equal(pathForAppState({ route: "projects", mobileView: "chat", sessionId: "ses/123", projectId: "prj/123" }), "/projects/prj%2F123/threads/ses%2F123");
     assert.equal(pathForAppState({ route: "agents", mobileView: "chat", sessionId: null, agentWorkspaceId: "agent 1" }), "/agents/agent%201");
     assert.equal(pathForAppState({ route: "teams", mobileView: "chat", sessionId: null, teamWorkspaceId: "team 1" }), "/teams/team%201");
     assert.equal(hrefForRoute("main", "ses_123"), "/threads/ses_123");
+    assert.equal(hrefForRoute("projects"), "/projects");
     assert.equal(hrefForRoute("backlog"), "/backlog");
     assert.equal(hrefForRoute("routine"), "/routines");
     assert.equal(hrefForRoute("computer"), "/computer");

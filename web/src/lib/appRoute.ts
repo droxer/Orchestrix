@@ -1,6 +1,6 @@
 import type { AppRoute, MobileView } from "./viewTypes.js";
 
-const WORK_PATHS: Record<Exclude<AppRoute, "main">, string> = {
+const WORK_PATHS: Record<Exclude<AppRoute, "main" | "projects">, string> = {
   backlog: "/backlog",
   routine: "/routines",
   agents: "/agents",
@@ -53,16 +53,16 @@ export function parseAppPath(pathname: string, _search = ""): AppLocationState {
     return { route: "main", ...base, sessionId: decodeSegment(second) };
   }
   if (head === "projects" && !second && rest.length === 0) {
-    return { route: "main", mobileView: "threads", sessionId: null };
+    return { route: "projects", mobileView: "threads", sessionId: null };
   }
   if (head === "projects" && second && rest.length === 0) {
-    return { route: "main", mobileView: "threads", sessionId: null, projectId: decodeSegment(second) };
+    return { route: "projects", mobileView: "threads", sessionId: null, projectId: decodeSegment(second) };
   }
   if (head === "projects" && second && rest[0] === "new" && rest.length === 1) {
-    return { route: "main", ...base, projectId: decodeSegment(second), composingNew: true };
+    return { route: "projects", ...base, projectId: decodeSegment(second), composingNew: true };
   }
   if (head === "projects" && second && rest[0] === "threads" && rest[1] && rest.length === 2) {
-    return { route: "main", ...base, projectId: decodeSegment(second), sessionId: decodeSegment(rest[1]) };
+    return { route: "projects", ...base, projectId: decodeSegment(second), sessionId: decodeSegment(rest[1]) };
   }
   if (head === "agents" && second && rest.length === 0) {
     return { route: "agents", ...base, agentWorkspaceId: decodeSegment(second) };
@@ -90,13 +90,14 @@ export function pathForAppState({
   if (login) return "/login";
   if (route === "agents" && agentWorkspaceId) return `/agents/${encodeURIComponent(agentWorkspaceId)}`;
   if (route === "teams" && teamWorkspaceId) return `/teams/${encodeURIComponent(teamWorkspaceId)}`;
-  if (route !== "main") return WORK_PATHS[route];
-  if (projectId) {
+  if (route === "projects") {
+    if (!projectId) return "/projects";
     const projectPath = `/projects/${encodeURIComponent(projectId)}`;
     if (mobileView === "threads") return projectPath;
     if (composingNew) return `${projectPath}/new`;
     return sessionId ? `${projectPath}/threads/${encodeURIComponent(sessionId)}` : projectPath;
   }
+  if (route !== "main") return WORK_PATHS[route];
   if (mobileView === "threads") return "/threads";
   if (composingNew) return "/threads/new";
   return sessionId ? `/threads/${encodeURIComponent(sessionId)}` : "/threads";
@@ -105,7 +106,7 @@ export function pathForAppState({
 export function hrefForRoute(route: AppRoute, sessionId?: string | null): string {
   return pathForAppState({
     route,
-    mobileView: route === "main" && !sessionId ? "threads" : "chat",
+    mobileView: (route === "main" || route === "projects") && !sessionId ? "threads" : "chat",
     sessionId: route === "main" ? sessionId ?? null : null,
   });
 }
@@ -232,7 +233,11 @@ export function syncAppStateToUrl(state: AppLocationState, replace = false): voi
 }
 
 export function syncRouteToUrl(route: AppRoute, replace = false): void {
-  syncAppStateToUrl({ route, mobileView: route === "main" ? "threads" : "chat", sessionId: null }, replace);
+  syncAppStateToUrl({
+    route,
+    mobileView: route === "main" || route === "projects" ? "threads" : "chat",
+    sessionId: null,
+  }, replace);
 }
 
 /** Push an in-app path (search params allowed) and notify route/search listeners. */

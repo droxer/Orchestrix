@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import {
   ActionSearch, NavAdmin, NavAgents, NavBacklog, NavChannels, NavComputer, NavLogout, NavMore, NavPreferences, NavThreads,
   NavTeams,
-  NavRoutine, NavSidebarCollapse, NavSidebarExpand,
+  NavRoutine, NavSidebarCollapse, NavSidebarExpand, WorkspaceFolder,
 } from "./icons";
 import { RelayMark } from "./RelayMark";
 import { commandShortcutLabel } from "../lib/shortcuts";
@@ -224,6 +224,21 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
           >
             <NavThreads size={18} />
             <span className="sidenav-label sr-only">{t("nav.threads")}</span>
+          </a>
+          <a
+            className={`sidenav-btn ${route === "projects" ? "active" : ""}`}
+            data-nav="projects"
+            href={hrefForRoute("projects")}
+            aria-label={t("project.projects")}
+            aria-current={route === "projects" ? "page" : undefined}
+            onClick={(event) => handleRouteClick(event, "projects")}
+            onMouseEnter={(e) => showNavTooltip(t("project.projects"), e.currentTarget)}
+            onMouseLeave={hideNavTooltip}
+            onFocus={(e) => showNavTooltip(t("project.projects"), e.currentTarget)}
+            onBlur={hideNavTooltip}
+          >
+            <WorkspaceFolder size={18} />
+            <span className="sidenav-label sr-only">{t("project.projects")}</span>
           </a>
         </div>
         <div className="sidenav-group sidenav-group--separated" role="group" aria-label={t("nav.workspace")}>

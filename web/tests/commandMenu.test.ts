@@ -5,6 +5,7 @@ import { buildCommands, filterCommands, type CommandItem } from "../src/lib/comm
 
 const LABELS: Record<string, string> = {
   "nav.threads": "Threads",
+  "project.projects": "Projects",
   "nav.backlog": "Backlog",
   "nav.routine": "Routines",
   "nav.agents": "Agents",
@@ -40,7 +41,7 @@ describe("buildCommands", () => {
     const navigate = userCommands.filter((command) => command.group === "navigate");
     assert.deepEqual(
       navigate.map((command) => command.id),
-      ["go:main", "go:backlog", "go:routine", "go:agents", "go:teams", "go:channels", "go:computer"],
+      ["go:main", "go:projects", "go:backlog", "go:routine", "go:agents", "go:teams", "go:channels", "go:computer"],
     );
     for (const command of navigate) {
       assert.match(command.hint ?? "", /^G [A-Z]$/, `${command.id} lost its go-to hint`);

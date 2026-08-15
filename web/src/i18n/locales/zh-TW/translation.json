@@ -106,7 +106,7 @@
     "archived": "已封存",
     "new_thread": "在「{{project}}」中新建對話",
     "no_threads": "此專案中尚無對話。",
-    "no_projects": "尚無專案或對話。",
+    "no_projects": "尚無專案。",
     "shared_workspace": "專案房間 · 共用工作空間"
   },
   "thread": {

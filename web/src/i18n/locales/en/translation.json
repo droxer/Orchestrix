@@ -106,7 +106,7 @@
     "archived": "Archived",
     "new_thread": "New thread in {{project}}",
     "no_threads": "No threads in this project yet.",
-    "no_projects": "No projects or threads yet.",
+    "no_projects": "No projects yet.",
     "shared_workspace": "Project room · shared workspace"
   },
   "thread": {

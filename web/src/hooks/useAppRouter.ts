@@ -42,7 +42,7 @@ export function useAppRouter({
     onSetComposingNewFromPath(Boolean(state.composingNew));
     if (state.composingNew) {
       onClearPendingMessage();
-    } else if (state.route === "main" && state.sessionId) {
+    } else if ((state.route === "main" || state.route === "projects") && state.sessionId) {
       onClearPendingMessage();
       onApplySessionFromPath(state.sessionId);
     }
@@ -80,26 +80,27 @@ export function useAppRouter({
   const navigateToRoute = useCallback((nextRoute: AppRoute) => {
     navigateToAppState({
       route: nextRoute,
-      mobileView: nextRoute === "main" ? "threads" : "chat",
+      mobileView: nextRoute === "main" || nextRoute === "projects" ? "threads" : "chat",
       sessionId: null,
     });
   }, [navigateToAppState]);
 
   const navigateToMobileView = useCallback((nextMobileView: MobileView) => {
+    const threadRoute = locationState.route === "projects" ? "projects" : "main";
     navigateToAppState({
-      route: "main",
+      route: threadRoute,
       mobileView: nextMobileView,
       sessionId: nextMobileView === "chat" ? currentSessionId ?? null : null,
       projectId: locationState.projectId ?? activeSession?.projectId ?? null,
       composingNew: nextMobileView === "chat" && composingNew,
     });
-  }, [activeSession?.projectId, composingNew, currentSessionId, locationState.projectId, navigateToAppState]);
+  }, [activeSession?.projectId, composingNew, currentSessionId, locationState.projectId, locationState.route, navigateToAppState]);
 
   const hrefForSideNavRoute = useCallback((nextRoute: AppRoute) => buildHrefForRoute(nextRoute), []);
 
   const syncThreadUrl = useCallback((sessionId: string | null, replace = false, projectId?: string | null) => {
     const state: AppLocationState = {
-      route: "main",
+      route: projectId ? "projects" : "main",
       mobileView: "chat",
       sessionId,
       projectId: projectId ?? null,
@@ -119,7 +120,7 @@ export function useAppRouter({
 
   const navigateToProject = useCallback((projectId: string | null) => {
     navigateToAppState({
-      route: "main",
+      route: "projects",
       mobileView: "threads",
       sessionId: null,
       projectId,

@@ -16,6 +16,21 @@ export type ProjectThreadBucket = {
   threads: ThreadItem[];
 };
 
+export type ThreadDirectoryMode = "threads" | "projects";
+
+/** Keeps independent conversations and project rooms in separate top-level navigation destinations. */
+export function threadsForDirectory(
+  threads: readonly ThreadItem[],
+  projects: readonly ProjectRecord[],
+  mode: ThreadDirectoryMode,
+): ThreadItem[] {
+  const projectIds = new Set(projects.map((project) => project.id));
+  return threads.filter((thread) => {
+    const projectId = thread.session.projectId;
+    return mode === "projects" ? Boolean(projectId && projectIds.has(projectId)) : !projectId || !projectIds.has(projectId);
+  });
+}
+
 /** Builds the sidebar's Project -> thread hierarchy without hiding empty projects. */
 export function projectThreadBuckets(
   threads: readonly ThreadItem[],

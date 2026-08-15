@@ -25,6 +25,7 @@ import { buildSpaceItems, threadHasMultipleProducers } from "../lib/threadSpace"
 import { ProjectDrawer } from "./ProjectDrawer";
 
 export type ThreadsViewProps = {
+  directoryMode: "threads" | "projects";
   filteredThreads: ThreadItem[];
   projects: ProjectRecord[];
   selectedProjectId: string | null;
@@ -93,6 +94,7 @@ export type ThreadsViewProps = {
 };
 
 export function ThreadsView({
+  directoryMode,
   filteredThreads,
   projects,
   selectedProjectId,
@@ -182,6 +184,7 @@ export function ThreadsView({
   return (
     <>
       <ThreadListPanel
+        directoryMode={directoryMode}
         threads={filteredThreads}
         projects={projects}
         query={threadQuery}

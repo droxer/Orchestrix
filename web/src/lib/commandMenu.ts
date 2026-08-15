@@ -29,6 +29,7 @@ export const COMMAND_GROUPS: readonly CommandGroup[] = ["navigate", "create", "v
 
 const NAV_COMMANDS: readonly { route: AppRoute; labelKey: string; hint: string; keywords: string[] }[] = [
   { route: "main", labelKey: "nav.threads", hint: "G T", keywords: ["threads", "chat", "home"] },
+  { route: "projects", labelKey: "project.projects", hint: "G P", keywords: ["projects", "project rooms"] },
   { route: "backlog", labelKey: "nav.backlog", hint: "G B", keywords: ["backlog", "tasks", "board"] },
   { route: "routine", labelKey: "nav.routine", hint: "G R", keywords: ["routines", "schedule"] },
   { route: "agents", labelKey: "nav.agents", hint: "G A", keywords: ["agents", "workforce"] },

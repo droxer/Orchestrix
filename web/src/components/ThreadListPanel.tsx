@@ -12,6 +12,7 @@ import { SearchInput } from "@/components/ui/search-input";
 // is owner-scoped by the backend, so it only ever shows the current employee's
 // work. “New thread” starts a fresh thread without archiving the rest.
 export function ThreadListPanel({
+  directoryMode,
   threads,
   projects,
   query,
@@ -25,6 +26,7 @@ export function ThreadListPanel({
   onRenameThread,
   onCloseThread,
 }: {
+  directoryMode: "threads" | "projects";
   threads: ThreadItem[];
   projects: ProjectRecord[];
   query: string;
@@ -74,31 +76,34 @@ export function ThreadListPanel({
       <div className="conversation-header">
         <div className="conversation-heading">
           <h1>
-            {t("project.projects")}
+            {directoryMode === "projects" ? t("project.projects") : t("nav.threads")}
             <small className="tnum conversation-heading-count">
-              {threads.length}
+              {directoryMode === "projects" ? hierarchy.projects.length : threads.length}
             </small>
           </h1>
         </div>
         <div className="conversation-header-actions">
-          <Button variant="ghost"
-            type="button"
-            className="conversation-project-btn"
-            aria-label={t("project.create")}
-            title={t("project.create")}
-            onClick={onCreateProject}
-          >
-            <ActionAdd size={16} />
-          </Button>
-          <Button variant="ghost"
-            type="button"
-            className="conversation-new-btn"
-            aria-label={t("thread.new_thread")}
-            title={t("thread.new_thread")}
-            onClick={() => onNewThread(null)}
-          >
-            <ActionCompose size={16} />
-          </Button>
+          {directoryMode === "projects" ? (
+            <Button variant="ghost"
+              type="button"
+              className="conversation-project-btn"
+              aria-label={t("project.create")}
+              title={t("project.create")}
+              onClick={onCreateProject}
+            >
+              <ActionAdd size={16} />
+            </Button>
+          ) : (
+            <Button variant="ghost"
+              type="button"
+              className="conversation-new-btn"
+              aria-label={t("thread.new_thread")}
+              title={t("thread.new_thread")}
+              onClick={() => onNewThread(null)}
+            >
+              <ActionCompose size={16} />
+            </Button>
+          )}
         </div>
       </div>
       <SearchInput
@@ -109,8 +114,11 @@ export function ThreadListPanel({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
-      <section className="conversation-list project-directory" aria-label={t("project.projects")}>
-        {hierarchy.projects.map(({ project, threads: projectThreads }) => (
+      <section
+        className="conversation-list project-directory"
+        aria-label={directoryMode === "projects" ? t("project.projects") : t("nav.threads")}
+      >
+        {directoryMode === "projects" ? hierarchy.projects.map(({ project, threads: projectThreads }) => (
           <section key={project.id} className={`project-folder${selectedProjectId === project.id ? " active" : ""}${project.archivedAt ? " archived" : ""}`}>
             <div className="project-folder-header">
               <button type="button" className="project-folder-select" onClick={() => onSelectProject(project.id)}>
@@ -134,31 +142,14 @@ export function ThreadListPanel({
               {projectThreads.length === 0 ? <p className="project-folder-empty">{t("project.no_threads")}</p> : null}
             </div>
           </section>
-        ))}
-        {hierarchy.unclassified.length > 0 ? (
-          <section className={`project-folder${selectedProjectId === null ? " active" : ""}`}>
-            <div className="project-folder-header">
-              <button type="button" className="project-folder-select" onClick={() => onSelectProject(null)}>
-                <WorkspaceFolder size={15} aria-hidden="true" />
-                <span>{t("project.unclassified")}</span>
-                <span className="project-folder-count tnum">{hierarchy.unclassified.length}</span>
-              </button>
-              <button
-                type="button"
-                className="project-folder-new"
-                aria-label={t("thread.new_thread")}
-                title={t("thread.new_thread")}
-                onClick={() => onNewThread(null)}
-              >
-                <ActionCompose size={14} />
-              </button>
-            </div>
-            <div className="project-folder-threads">{renderThreads(hierarchy.unclassified)}</div>
-          </section>
-        ) : null}
-        {threads.length === 0 && (query.trim() || hierarchy.projects.length === 0) ? (
+        )) : renderThreads(hierarchy.unclassified)}
+        {(directoryMode === "projects" ? hierarchy.projects.length === 0 : threads.length === 0) ? (
           <p className="conversation-empty">
-            {query.trim() ? t("thread.no_matches") : t("project.no_projects")}
+            {query.trim()
+              ? t("thread.no_matches")
+              : directoryMode === "projects"
+                ? t("project.no_projects")
+                : t("thread.no_threads")}
           </p>
         ) : null}
       </section>

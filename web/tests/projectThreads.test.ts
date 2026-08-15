@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { describe, it } from "node:test";
 
-import { projectThreadBuckets, type ThreadItem } from "../src/lib/threads.js";
+import { projectThreadBuckets, threadsForDirectory, type ThreadItem } from "../src/lib/threads.js";
 import type { ProjectRecord, RelaySession } from "../src/types.js";
 
 function project(id: string, name: string, archivedAt?: string): ProjectRecord {
@@ -56,5 +58,30 @@ describe("project thread buckets", () => {
       ["old", ["old-thread"]],
     ]);
     assert.deepEqual(result.unclassified.map((item) => item.session.id), ["legacy", "orphan"]);
+  });
+
+  it("separates independent conversations from project conversations", () => {
+    const projects = [project("alpha", "Alpha")];
+    const threads = [thread("project-thread", "alpha"), thread("independent"), thread("orphan", "deleted")];
+
+    assert.deepEqual(
+      threadsForDirectory(threads, projects, "projects").map((item) => item.session.id),
+      ["project-thread"],
+    );
+    assert.deepEqual(
+      threadsForDirectory(threads, projects, "threads").map((item) => item.session.id),
+      ["independent", "orphan"],
+    );
+  });
+
+  it("exposes independent Threads and Projects as separate sidebar directories", async () => {
+    const sideNavSource = await readFile(resolve("web/src/components/SideNav.tsx"), "utf8");
+
+    assert.match(sideNavSource, /href=\{hrefForRoute\("main"\)\}/);
+    assert.match(sideNavSource, /aria-label=\{t\("nav\.threads"\)\}/);
+    assert.match(sideNavSource, /<span className="sidenav-label sr-only">\{t\("nav\.threads"\)\}<\/span>/);
+    assert.match(sideNavSource, /href=\{hrefForRoute\("projects"\)\}/);
+    assert.match(sideNavSource, /aria-label=\{t\("project\.projects"\)\}/);
+    assert.match(sideNavSource, /<span className="sidenav-label sr-only">\{t\("project\.projects"\)\}<\/span>/);
   });
 });
