@@ -25,6 +25,7 @@ from .api import (
     managed_node_routes,
     node_workspace_routes,
     profile_image_routes,
+    project_routes,
     sandbox_routes,
     session_routes,
     task_routes,
@@ -59,6 +60,7 @@ from .persistence.agent_placement_store import (
 from .persistence.agent_store import DatabaseAgentStore, LocalAgentStore
 from .persistence.org_settings_store import DatabaseOrgSettingsStore
 from .persistence.profile_image_store import LocalProfileImageStore
+from .persistence.project_store import DatabaseProjectStore
 from .persistence.stores import (
     DEFAULT_RELAY_DATA_DIR,
     DatabaseDaemonStore,
@@ -77,7 +79,6 @@ from .services.event_notifier import (
     workspace_response_key,
 )
 from .services.managed_nodes import LocalManagedNodeStore
-from .services.node_agents import sync_node_agents
 from .services.team_membership import reconcile_team_memberships
 from .services.workspace_query import WorkspaceQueryBroker
 from .tasks import TaskScheduler
@@ -128,6 +129,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     managed_node_store = LocalManagedNodeStore(root_dir)
     agent_store = agent_store_from_env(root_dir)
     team_store = team_store_from_env(root_dir)
+    project_store = project_store_from_env(root_dir)
     agent_placement_store = agent_placement_store_from_env(root_dir)
     profile_image_store = LocalProfileImageStore(root_dir)
     org_settings_store = org_settings_store_from_env(root_dir)
@@ -179,6 +181,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
         registry=registry,
         backend=backend,
         team_store=team_store,
+        project_store=project_store,
         managed_node_store=managed_node_store,
         org_settings_store=org_settings_store,
     )
@@ -221,6 +224,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.state.managed_node_store = managed_node_store
     app.state.agent_store = agent_store
     app.state.team_store = team_store
+    app.state.project_store = project_store
     app.state.employee_agent_store = (
         agent_store  # compatibility for migrations still reading the old name
     )
@@ -232,13 +236,6 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.state.notification_bridge = notification_bridge
     app.state.task_scheduler = scheduler
     app.state.control_panel_version = CONTROL_PANEL_VERSION
-
-    # Reconcile managed Computers loaded from durable state. This migrates
-    # daemon-scoped compatibility identities to managedNodeId and collects
-    # orphaned agents left by older supervisor-driven runtime replacement.
-    for node in registry.monitor_nodes():
-        if node.get("managedNodeId") and not node.get("retiredAt"):
-            sync_node_agents(app.state, node)
 
     # Platform health checks run before the app has a database session and must
     # never require auth, so this stays outside the versioned API namespace and
@@ -264,6 +261,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
         auth_routes.router,
         agent_routes.router,
         team_routes.router,
+        project_routes.router,
         agent_workspace_routes.router,
         node_workspace_routes.router,
         admin_routes.router,
@@ -357,6 +355,13 @@ def team_store_from_env(root_dir: Path) -> Any:
     return DatabaseTeamStore(database_url_from_env(setting="RELAY_STORAGE=postgres"))
 
 
+def project_store_from_env(root_dir: Path) -> Any:
+    database_url = database_url_from_env(setting="database-only project storage")
+    return DatabaseProjectStore(
+        database_url, create_schema=database_url.startswith("sqlite")
+    )
+
+
 def agent_placement_store_from_env(root_dir: Path) -> Any:
     if not use_postgres_storage():
         return LocalAgentPlacementStore(root_dir)
@@ -403,6 +408,7 @@ def task_scheduler_from_env(
     registry: DaemonNodeRegistry,
     backend: ServerDaemonNodeBackend,
     team_store: Any,
+    project_store: Any,
     managed_node_store: Any | None = None,
     org_settings_store: Any | None = None,
 ) -> TaskScheduler | None:
@@ -414,6 +420,7 @@ def task_scheduler_from_env(
         registry=registry,
         backend=backend,
         team_store=team_store,
+        project_store=project_store,
         managed_node_store=managed_node_store,
         org_settings_store=org_settings_store,
         interval_seconds=float(

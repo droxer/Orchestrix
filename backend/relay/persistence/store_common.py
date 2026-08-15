@@ -318,6 +318,10 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         session["participantAgentIds"] = []
     if created.get("teamId"):
         session["teamId"] = created["teamId"]
+    if created.get("projectId"):
+        session["projectId"] = created["projectId"]
+    if created.get("workspaceSubpath"):
+        session["workspaceSubpath"] = created["workspaceSubpath"]
     if created.get("daemonNodeId"):
         session["daemonNodeId"] = created["daemonNodeId"]
     if created.get("managedNodeId"):
@@ -545,6 +549,8 @@ def materialize_task_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         task["ownerEmployeeId"] = created["ownerEmployeeId"]
     if created.get("assigneeEmployeeId"):
         task["assigneeEmployeeId"] = created["assigneeEmployeeId"]
+    if created.get("projectId"):
+        task["projectId"] = created["projectId"]
     if created.get("dueDate"):
         task["dueDate"] = created["dueDate"]
     if created.get("sourceRoutineId"):

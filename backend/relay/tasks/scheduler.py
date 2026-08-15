@@ -9,7 +9,12 @@ from typing import Any
 
 from loguru import logger
 
+from ..collaboration.service import (
+    compile_assignment_work_graph,
+    create_round_manifest,
+)
 from ..core.computer_identity import computer_id
+from ..core.ids import new_database_id
 from ..core.models import AgentName
 from ..daemon_registry import node_accepts_run
 from ..persistence.agent_placement_store import create_node_placement
@@ -21,6 +26,10 @@ from ..services.agent_routing import (
     dispatch_reason_code,
     persist_legacy_session_computer_id,
     resolve_agent_assignments,
+)
+from ..services.project_runtime import (
+    ProjectDispatchError,
+    resolve_project_task_assignments,
 )
 from ..services.task_rounds import (
     awaits_continuation,
@@ -97,7 +106,8 @@ def materialize_legacy_agent_assignment(
         (
             item
             for item in placement_store.list_placements(agent_id=agent["id"])
-            if item["daemonNodeId"] == node["id"]
+            if item.get("computerId") == node_computer_id
+            or (not item.get("computerId") and item["daemonNodeId"] == node["id"])
         ),
         None,
     )
@@ -146,6 +156,7 @@ class TaskScheduler:
         registry: Any,
         backend: Any,
         team_store: Any | None = None,
+        project_store: Any | None = None,
         managed_node_store: Any | None = None,
         org_settings_store: Any | None = None,
         interval_seconds: float = 10.0,
@@ -156,6 +167,7 @@ class TaskScheduler:
         self.registry = registry
         self.backend = backend
         self.team_store = team_store
+        self.project_store = project_store
         self.managed_node_store = managed_node_store
         self.org_settings_store = org_settings_store
         self.interval_seconds = interval_seconds
@@ -163,7 +175,7 @@ class TaskScheduler:
         self._today = today
         self._loop_task: asyncio.Task[None] | None = None
         self._tick_lock = asyncio.Lock()
-        # task id → (consecutive failures, monotonic time before which dispatch is skipped)
+        # task id → (consecutive failures, monotonic time before dispatch resumes)
         self._dispatch_backoff: dict[str, tuple[int, float]] = {}
 
     def start(self) -> None:
@@ -213,7 +225,8 @@ class TaskScheduler:
             routine = self._materialize_legacy_assignment(routine) or routine
             agent = valid_agent(routine.get("assignedAgent"))
             if not (
-                (agent and routine.get("assignedAgentId"))
+                routine.get("projectId")
+                or (agent and routine.get("assignedAgentId"))
                 or routine.get("assignedTeamId")
             ):
                 skipped += 1
@@ -255,7 +268,8 @@ class TaskScheduler:
         legacy = [
             task
             for task in dispatchable
-            if valid_agent(task.get("assignedAgent")) and not task.get("assignedAgentId")
+            if valid_agent(task.get("assignedAgent"))
+            and not task.get("assignedAgentId")
             and not task.get("assignedTeamId")
         ]
         for task in legacy:
@@ -270,11 +284,9 @@ class TaskScheduler:
         candidates = [
             task
             for task in dispatchable
-            if (
-                valid_agent(task.get("assignedAgent"))
-                and task.get("assignedAgentId")
-            )
+            if (valid_agent(task.get("assignedAgent")) and task.get("assignedAgentId"))
             or bool(task.get("assignedTeamId"))
+            or bool(task.get("projectId"))
         ]
         candidate_ids = {task["id"] for task in candidates}
         self._dispatch_backoff = {
@@ -292,6 +304,7 @@ class TaskScheduler:
                 skipped += 1
                 continue
             team_id = task.get("assignedTeamId")
+            project_snapshot: dict[str, Any] | None = None
             agent = valid_agent(task.get("assignedAgent"))
             assignments: list[dict[str, Any]]
             # A continuation resumes its own thread, so routing has to respect
@@ -315,7 +328,32 @@ class TaskScheduler:
                         nodes={node["id"]: node for node in daemon_nodes},
                         daemon_store=self.registry.daemon_store,
                     )
-                if team_id:
+                if task.get("projectId"):
+                    if self.project_store is None:
+                        raise ProjectDispatchError("project_store_unavailable")
+                    assignments, project_snapshot = resolve_project_task_assignments(
+                        task,
+                        project_store=self.project_store,
+                        agent_store=self.backend.agent_store,
+                        placement_store=self.backend.agent_placement_store,
+                        daemon_nodes=daemon_nodes,
+                        session_store=self.registry.store,
+                    )
+                    assignments = [
+                        {
+                            **assignment,
+                            "assignmentId": assignment.get("assignmentId")
+                            or new_database_id(),
+                        }
+                        for assignment in assignments
+                    ]
+                    assignments = compile_assignment_work_graph(
+                        assignments,
+                        purpose="accomplish",
+                        team_snapshot=None,
+                    )
+                    agent = assignments[0]["agent"]
+                elif team_id:
                     assignments = resolve_team_task_assignments(
                         task,
                         team_store=self.team_store,
@@ -344,6 +382,18 @@ class TaskScheduler:
                         session_store=self.registry.store,
                     )
                 node = self.registry.get(assignments[0]["daemonNodeId"])
+            except ProjectDispatchError as error:
+                state = "rejected" if error.permanent else "queued"
+                self._record_dispatch_deferred(
+                    task,
+                    error.code,
+                    f"The project cannot execute this task ({error.code}).",
+                    state=state,
+                )
+                if error.permanent:
+                    self.task_store.update_task(task["id"], {"status": "blocked"})
+                skipped += 1
+                continue
             except TeamDispatchError as error:
                 self._record_dispatch_deferred(
                     task,
@@ -386,6 +436,7 @@ class TaskScheduler:
                 node["id"],
                 assignments,
                 team_id=team_id,
+                project_snapshot=project_snapshot,
                 session_id=resume_session_id,
             ):
                 dispatched += 1
@@ -486,11 +537,24 @@ class TaskScheduler:
         assignments: list[dict[str, Any]],
         *,
         team_id: str | None = None,
+        project_snapshot: dict[str, Any] | None = None,
         session_id: str | None = None,
     ) -> bool:
         claim = task.get("dispatchClaim") or {}
         claim_id = claim.get("id")
         try:
+            collaboration = None
+            if project_snapshot:
+                collaboration = {
+                    "manifest": create_round_manifest(
+                        source="task",
+                        purpose="accomplish",
+                        address={"kind": "room"},
+                        assignments=assignments,
+                        team_snapshot=None,
+                        project_snapshot=project_snapshot,
+                    )
+                }
             session = await self.backend.run(
                 node_id,
                 {
@@ -500,6 +564,16 @@ class TaskScheduler:
                     "actorIsAdmin": True,
                     "agentFirst": True,
                     **({"teamId": team_id} if team_id else {}),
+                    **(
+                        {
+                            "projectId": project_snapshot["projectId"],
+                            "workspaceLayout": "project",
+                            "workspaceSubpath": project_snapshot["workspaceSubpath"],
+                        }
+                        if project_snapshot
+                        else {}
+                    ),
+                    **({"collaboration": collaboration} if collaboration else {}),
                     **({"sessionId": session_id} if session_id else {}),
                     **({"idempotencyKey": claim_id} if claim_id else {}),
                 },
@@ -579,7 +653,11 @@ class TaskScheduler:
             for task in self.task_store.list_tasks()
             if task.get("status") == "assigned"
             and not task.get("isRoutine")
-            and (task.get("assignedAgent") or task.get("assignedTeamId"))
+            and (
+                task.get("assignedAgent")
+                or task.get("assignedTeamId")
+                or task.get("projectId")
+            )
         ]
         return sorted(tasks, key=task_claim_sort_key)
 

@@ -182,6 +182,29 @@ class TeamStore(Protocol):
     def delete_team(self, team_id: str) -> dict[str, Any]: ...
 
 
+class ProjectStore(Protocol):
+    def create_project(
+        self, owner_employee_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]: ...
+    def get_project(self, project_id: str) -> dict[str, Any] | None: ...
+    def list_projects(
+        self,
+        owner_employee_id: str | None = None,
+        *,
+        include_archived: bool = False,
+    ) -> list[dict[str, Any]]: ...
+    def update_project(
+        self,
+        project_id: str,
+        patch: dict[str, Any],
+        *,
+        expected_version: int,
+    ) -> dict[str, Any]: ...
+    def archive_project(
+        self, project_id: str, *, expected_version: int
+    ) -> dict[str, Any]: ...
+
+
 class AuthStore(Protocol):
     session_ttl_seconds: int
 

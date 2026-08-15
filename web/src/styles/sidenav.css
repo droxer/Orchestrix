@@ -88,7 +88,7 @@
   min-width: 0;
   flex-direction: column;
   justify-content: center;
-  line-height: 1.1;
+  line-height: var(--leading-display);
 }
 
 .sidenav-nav {
@@ -245,7 +245,7 @@
 
 .sidenav-more-item.active {
   background: var(--action-soft);
-  border-color: color-mix(in srgb, var(--action) 18%, var(--line-1));
+  border-color: var(--line-strong);
 }
 
 .sidenav-more-item:focus-visible {
@@ -410,7 +410,7 @@
   display: none;
   align-items: center;
   gap: var(--sp-1);
-  padding: 1px var(--sp-2);
+  padding: var(--sp-0-5) var(--sp-2);
   border: 1px solid var(--line-1);
   border-radius: var(--r-full);
   background: var(--surface-1);

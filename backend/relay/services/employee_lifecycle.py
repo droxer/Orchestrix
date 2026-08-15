@@ -73,6 +73,14 @@ def soft_delete_employee(ctx: Any, employee_id: str) -> dict[str, Any]:
 
 
 def _cascade(ctx: Any, employee_id: str) -> dict[str, Any]:
+    project_store = getattr(ctx, "project_store", None)
+    if project_store and project_store.list_projects(
+        employee_id, include_archived=True
+    ):
+        # Project ownership is durable product state. Deleting the employee
+        # first would orphan the project and delete the roster agents it still
+        # references, so require an explicit archive before cascading.
+        raise ValueError("employee_has_projects")
     record = ctx.auth_store.soft_delete_employee(employee_id)
     affected_nodes = ctx.registry.unassign_employee_everywhere(employee_id)
 

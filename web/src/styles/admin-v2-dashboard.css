@@ -75,15 +75,16 @@
   font: var(--type-display);
   letter-spacing: var(--type-display-track);
   color: var(--ink-1);
+  font-feature-settings: "tnum" 1;
   font-variant-numeric: tabular-nums;
-  line-height: 1;
+  line-height: var(--leading-none);
 }
 
 .adm-dash-tile--hero .adm-dash-tile-value {
   font-family: var(--font-display);
-  font-size: clamp(2.75rem, 4.4vw, 3.5rem);
+  font-size: var(--fs-hero);
   font-weight: 700;
-  line-height: 1;
+  line-height: var(--leading-none);
   letter-spacing: var(--track-display);
 }
 
@@ -126,7 +127,7 @@
 
 .adm-dash-delta-glyph {
   font-size: var(--fs-1);
-  line-height: 1;
+  line-height: var(--leading-none);
 }
 
 /* ── Layout ──────────────────────────────────────────────────────────
@@ -378,9 +379,10 @@
   font-family: var(--font-display);
   font-size: var(--fs-5);
   font-weight: 700;
-  line-height: 1;
+  line-height: var(--leading-none);
   letter-spacing: var(--track-display);
   color: var(--ink-1);
+  font-feature-settings: "tnum" 1;
   font-variant-numeric: tabular-nums;
 }
 
@@ -408,7 +410,6 @@
   font-size: var(--fs-2);
   color: var(--ink-4);
   letter-spacing: var(--track-caps);
-  font-variant-numeric: tabular-nums;
 }
 
 .adm-dash-top-meta {
@@ -457,6 +458,7 @@
   font-weight: 700;
   letter-spacing: var(--track-display);
   color: var(--ink-1);
+  font-feature-settings: "tnum" 1;
   font-variant-numeric: tabular-nums;
 }
 

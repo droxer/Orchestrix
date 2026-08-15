@@ -51,13 +51,15 @@
   letter-spacing: var(--track-caps);
 }
 
-/* ── View toggle (matches .backlog-view-toggle) ─────────────────────── */
+/* ── View toggle — same segmented-control language as .backlog-view-toggle
+   (line-1 border, gapless segments, surface-0 active fill), but button-sized:
+   control-h-xs with text labels instead of 30×28 icon squares. ─────────── */
 .adm-view-toggle {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-0-5);
+  gap: 0;
   padding: var(--sp-0-5);
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-1);
   flex-shrink: 0;
@@ -80,7 +82,7 @@
 }
 
 .adm-view-toggle-btn:not([data-active="true"]):hover {
-  background: color-mix(in srgb, var(--ink-1) 6%, transparent);
+  background: var(--control-fill-hover);
   color: var(--ink-1);
 }
 

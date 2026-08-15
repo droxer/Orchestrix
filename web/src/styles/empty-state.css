@@ -14,7 +14,7 @@
   font-family: var(--font-display);
   font-size: clamp(160px, 24vw, 320px);
   font-weight: 400;
-  line-height: 1;
+  line-height: var(--leading-none);
   color: color-mix(in srgb, var(--ink-1) 5%, transparent);
   pointer-events: none;
   user-select: none;
@@ -131,8 +131,8 @@ html[data-theme="dark"] .relay-bleed-mark {
 /* Kicker above the avatar; suggestion chips between the blurb and the kbd
    hints (the shared markup renders actions last). */
 .transcript-empty .relay-empty-kicker { order: -2; }
-.transcript-empty .relay-empty-actions { order: 5; margin-top: var(--sp-2); }
-.transcript-empty .relay-empty-hint { order: 6; }
+.transcript-empty .relay-empty-actions { order: 5; margin-top: var(--sp-4); }
+.transcript-empty .relay-empty-hint { order: 6; margin-top: var(--sp-3); }
 
 .transcript-empty-kicker {
   display: inline-flex;
@@ -140,7 +140,8 @@ html[data-theme="dark"] .relay-bleed-mark {
   gap: var(--sp-2);
   color: var(--ink-3);
   font: var(--type-micro);
-  letter-spacing: var(--type-micro-track);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
 }
 
 .transcript-empty .relay-empty-illustration {
@@ -152,10 +153,13 @@ html[data-theme="dark"] .relay-bleed-mark {
   height: 80px;
   border-radius: var(--r-3);
   /* Flat system, one decorative exception: a wide action-tinted halo stands
-     in for a drop shadow so the hero tile reads as the room's focal point. */
+     in for a drop shadow so the hero tile reads as the room's focal point.
+     The hairline at the halo's edge keeps the pool from dissolving into the
+     ambient wash behind it. */
   box-shadow:
     inset 0 0 0 1px var(--line-2),
-    0 0 0 10px color-mix(in srgb, var(--action) 6%, transparent);
+    0 0 0 10px color-mix(in srgb, var(--action) 6%, transparent),
+    0 0 0 11px color-mix(in srgb, var(--action) 12%, transparent);
 }
 
 .transcript-empty .relay-empty-title {
@@ -169,7 +173,9 @@ html[data-theme="dark"] .relay-bleed-mark {
 }
 
 /* Starter prompts — quiet outlined chips that strengthen their edge under
-   the pointer (--line-strong is the hover tier; fills stay flat). */
+   the pointer (--line-strong is the hover tier; fills stay flat). The
+   trailing arrow is the affordance: it surfaces on hover and steps up and
+   out, the same direction the prompt travels into the composer. */
 .transcript-empty-suggestions {
   display: flex;
   flex-wrap: wrap;
@@ -178,6 +184,9 @@ html[data-theme="dark"] .relay-bleed-mark {
 }
 
 .transcript-empty-suggestion {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-4);
   border: 1px solid var(--line-1);
   border-radius: var(--r-full);
@@ -192,10 +201,26 @@ html[data-theme="dark"] .relay-bleed-mark {
     color var(--t-fast) var(--ease);
 }
 
+.transcript-empty-suggestion > svg {
+  color: var(--ink-4);
+  transition:
+    color var(--t-fast) var(--ease),
+    transform var(--t-fast) var(--ease);
+}
+
 .transcript-empty-suggestion:hover {
   border-color: var(--line-strong);
-  background: var(--surface-2);
+  background: var(--control-fill-hover);
   color: var(--ink-1);
+}
+
+.transcript-empty-suggestion:hover > svg {
+  color: var(--ink-2);
+  transform: translate(1px, -1px);
+}
+
+.transcript-empty-suggestion:active {
+  transform: translateY(1px);
 }
 
 .transcript-empty-suggestion:focus-visible {
@@ -214,6 +239,14 @@ html[data-theme="dark"] .relay-bleed-mark {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
+}
+
+/* A quiet middot separates the two keyboard hints; the flex gap supplies
+   the spacing on each side. */
+.transcript-empty-hint + .transcript-empty-hint::before {
+  content: "·";
+  margin-inline-end: var(--sp-4);
+  color: var(--ink-4);
 }
 
 /* The hero earns a staged entrance; every other empty state renders settled. */

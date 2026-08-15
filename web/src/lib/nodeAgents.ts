@@ -30,8 +30,9 @@ export function hostedAgentsByNode(agents: EmployeeAgent[]): Map<string, HostedA
   for (const agent of agents) {
     for (const placement of agent.placements) {
       if (placement.desiredState === "removed") continue;
-      const hosted = byNode.get(placement.daemonNodeId) ?? [];
-      byNode.set(placement.daemonNodeId, [...hosted, { agent, placement }]);
+      const runtimeNodeId = placement.runtimeNodeId || placement.daemonNodeId;
+      const hosted = byNode.get(runtimeNodeId) ?? [];
+      byNode.set(runtimeNodeId, [...hosted, { agent, placement }]);
     }
   }
   return new Map(

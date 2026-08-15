@@ -1,9 +1,9 @@
-"""Admin browsing of a computer's shared workspace through live daemon reads.
+"""Admin browsing of a Computer's workspace storage root through live reads.
 
-The shared workspace is the node workspace root that all agents hosted on the
-computer collaborate in. It only exists on a live daemon that advertises the
-``workspace-read-shared`` capability; there is no snapshot fallback here —
-per-agent artifacts remain the durable record.
+The node root is an administrative storage container for Thread workspaces,
+not a workspace shared across Threads or owned by an Agent. It only exists on
+a live daemon that advertises ``workspace-read-shared``; there is no snapshot
+fallback here — Thread artifacts remain the durable record.
 """
 
 from __future__ import annotations
@@ -88,8 +88,11 @@ async def node_workspace_file(
     )
     _workspace_error(event)
     raw = event.get("contentBase64")
+    is_binary = bool(event.get("isBinary"))
     content = (
-        base64.b64decode(raw).decode("utf-8", errors="replace")
+        None
+        if is_binary
+        else base64.b64decode(raw).decode("utf-8", errors="replace")
         if isinstance(raw, str)
         else None
     )
@@ -99,9 +102,10 @@ async def node_workspace_file(
         "source": "live",
         "path": event.get("path", path),
         "exists": True,
-        "isBinary": bool(event.get("isBinary")),
+        "isBinary": is_binary,
         "bytes": event.get("bytes") or 0,
         "content": content,
+        "contentBase64": raw if is_binary and isinstance(raw, str) else None,
         "truncated": bool(event.get("truncated")),
         "limitBytes": WORKSPACE_FILE_PREVIEW_LIMIT,
         "generatedAt": _timestamp(),

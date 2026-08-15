@@ -40,10 +40,11 @@ describe("composer team targeting", () => {
 describe("composer agent selection", () => {
   it("names the same agents in `@` as in the footer picker", async () => {
     const app = await readFile(resolve("web/src/App.tsx"), "utf8");
-    // Both surfaces read one list — the agents placed on the thread's
-    // computer — so `@` can never offer an agent the thread cannot run.
-    assert.match(app, /mentionCandidates\(selectableLogicalAgents\)/);
+    // Both surfaces read one effective list: ordinary threads use placements;
+    // project rooms narrow that list to the project's fixed roster.
+    assert.match(app, /mentionCandidates\(effectiveSelectableLogicalAgents\)/);
     assert.match(app, /logicalAgents,\s*selectedThreadNodeId/);
+    assert.match(app, /activeProject\.members\.filter/);
   });
 
   it("dispatches a new thread to the agents the draft addresses", async () => {
@@ -52,13 +53,14 @@ describe("composer agent selection", () => {
     assert.match(app, /assignments: newThreadAgentIds!\.map/);
   });
 
-  it("addresses a continued thread to the footer's selected agent", async () => {
+  it("addresses a continued direct thread to the footer's selected agent", async () => {
     const app = await readFile(resolve("web/src/App.tsx"), "utf8");
     assert.match(
       app,
-      /resolveThreadMessageAddress\(\{[\s\S]*?defaultAgentId: pendingTeam \|\| activeSession\?\.teamId[\s\S]*?: activeLogicalAgentId/,
+      /resolveThreadMessageAddress\(\{[\s\S]*?defaultAgentId: activeProject \|\| pendingTeam \|\| activeSession\?\.teamId[\s\S]*?: activeLogicalAgentId/,
     );
     assert.match(app, /addressAgentIds: messageAddress\.addressAgentIds/);
+    assert.match(app, /projectId: activeProject\.id/);
   });
 
   it("includes the resolved responder in continued-thread retry identity", async () => {

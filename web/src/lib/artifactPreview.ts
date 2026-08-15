@@ -1,6 +1,8 @@
 import type { RelayArtifact } from "relay-core";
 import { relayApiPath } from "relay-core/api-url";
 
+import { isHtmlFile, isMarkdownFile } from "./fileKinds.ts";
+
 /** Raw download/streaming URL for an artifact body. */
 export function artifactRawHref(sessionId: string, artifactId: string): string {
   return relayApiPath(`/threads/${encodeURIComponent(sessionId)}/artifacts/${encodeURIComponent(artifactId)}`);
@@ -28,18 +30,6 @@ export type ArtifactRenderMode = "markdown" | "html" | "none";
  *  their own dedicated rendering — Markdown would corrupt them. */
 const MARKDOWN_KINDS: ReadonlySet<RelayArtifact["kind"]> = new Set(["plan", "review", "summary"]);
 
-// Extension sets duplicated from components/CodeView rather than imported:
-// this module is compiled by the NodeNext test build, which cannot pull in a
-// .tsx component. Parity is covered by web/tests/artifactPreview.test.ts.
-const MARKDOWN_EXTENSIONS: ReadonlySet<string> = new Set(["md", "markdown"]);
-const HTML_EXTENSIONS: ReadonlySet<string> = new Set(["html", "htm"]);
-
-function extensionOf(name: string): string {
-  const base = name.slice(name.lastIndexOf("/") + 1);
-  const dot = base.lastIndexOf(".");
-  return dot > 0 ? base.slice(dot + 1).toLowerCase() : "";
-}
-
 /** Best filename for an artifact — the workspace path wins over the display
  *  title, which is free text and need not carry an extension. */
 export function artifactFileName(artifact: RelayArtifact): string {
@@ -59,8 +49,8 @@ export function artifactRenderMode(artifact: RelayArtifact): ArtifactRenderMode 
   // Images and PDFs have no source reading, and binaries have no preview at
   // all — neither earns a switch.
   if (mode !== "text") return "none";
-  const extension = extensionOf(artifactFileName(artifact));
-  if (MARKDOWN_EXTENSIONS.has(extension)) return "markdown";
-  if (HTML_EXTENSIONS.has(extension)) return "html";
+  const name = artifactFileName(artifact);
+  if (isMarkdownFile(name)) return "markdown";
+  if (isHtmlFile(name)) return "html";
   return "none";
 }

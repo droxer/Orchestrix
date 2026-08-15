@@ -101,6 +101,8 @@
           backlog.css, each with a stylelint exemption). These encode *who*,
           not *what is happening*, they are never read as state, and no fixed
           token could express them because the hue is computed from the name.
+          The saturation/lightness, however, are fixed — declared once here so
+          profile-image.css and backlog.css stop hand-copying 70% 55%.
        2. App icons — favicon.svg and both relay-mark.svg carry the accent,
           because a grey chevron on a grey square is invisible at 16px.
 
@@ -111,6 +113,10 @@
      Deliberately no --live-wash companion: a wash is a fill, and this colour
      is never a fill. Tint a ring (see pulse-ring) or an ink, nothing else. */
   --live: #3ee08a;
+
+  /* Identity hue companions — see the --live note above. */
+  --avatar-sat: 70%;
+  --avatar-light: 55%;
 
   /* ----- Pinned registers -----
      Surfaces that must NOT follow the active theme: the pre-auth login
@@ -150,7 +156,13 @@
   /* Spacing — 4px base, plus a micro tier below it. --sp-0-5/--sp-1-5 are
      the *only* sanctioned sub-4px gaps: they bind glyph-tight pairs (dot ↔
      label, icon ↔ text, stacked meta lines) where a full 4px step reads as
-     a separation rather than a pairing. Anything larger uses the 4px scale. */
+     a separation rather than a pairing. Anything larger uses the 4px scale.
+
+     --sp-hairline (1px) is NOT a gap — it is the width of a 1px visual
+     construct expressed as spacing: padding that lets a 1px border/hairline
+     show past a fill, or the 1px channel between segments that reads as a
+     drawn divider. Never use it to separate content. */
+  --sp-hairline: 1px;
   --sp-0-5: 2px;
   --sp-1: 4px;
   --sp-1-5: 6px;
@@ -187,6 +199,11 @@
   --sidenav-w: 72px;
   --sidenav-w-open: 228px;
   --thread-w: 318px;
+  /* Transcript/composer column cap. A layout width, not a reading measure:
+     wide enough that a wide chat pane doesn't leave dead margins on both
+     sides, narrow enough that agent prose still scans. One token so the
+     transcript and composer always cap at the same width. */
+  --thread-measure: 1200px;
   --space-w: 384px;
   --header-h: 64px;
   /* Shared inline gutter for page chrome — route PageHeaders, the thread
@@ -235,11 +252,27 @@
   --fs-title: 1.4286rem;   /* 20px — conversation / pane titles, KPI numerals */
   --fs-5: 1.5714rem; /* 22px */
   --fs-6: 2.2857rem; /* 32px */
+  /* Hero display numeral — the dashboard's single oversized KPI. A clamp,
+     not a rung: it tracks the viewport between 38.5px and 49px and never
+     joins the ladder, because nothing else is allowed at this size. */
+  --fs-hero: clamp(2.75rem, 4.4vw, 3.5rem);
 
-  /* Leading */
+  /* Leading
+     --leading-none: single-line numerals and marks that must not reserve
+     line box height (KPI values, monograms, dots-with-labels).
+     --leading-display: large display text wrapped to two lines.
+     --leading-snug: dense labels/meta that occasionally wrap. */
+  --leading-none: 1;
+  --leading-display: 1.1;
   --leading-tight: 1.15;
+  --leading-snug: 1.35;
   --leading-normal: 1.5;
   --leading-loose: 1.65;
+  /* Long-form prose (transcript answers, document previews). Loose is the
+     list/code rhythm; prose is one step above it because agent answers are
+     long mixed-script paragraphs that are read, not scanned — at 1.65 CJK
+     glyphs sit on each other's shoulders. */
+  --leading-prose: 1.75;
 
   /* Tracking — a monospace display tier needs real negative tracking to stop
      titles reading as spaced-out code, and READING text wants a little of it
@@ -285,6 +318,11 @@
      to sit in peripheral vision without pulling focus. */
   --t-pulse: 1.6s;
   --t-pulse-calm: 2.6s;
+
+  /* --t-ambient: decorative drift (the atelier landing mark) — not liveness,
+     so it stays out of the two-cadence pulse vocabulary. One occupant only;
+     a second ambient loop is a bug. */
+  --t-ambient: 16s;
 
   /* --t-tick: the mechanical loop — a spinner rotating, a caret blinking. Not
      a pulse (those breathe to say "an agent is working"); this is a metronome
@@ -397,6 +435,7 @@ html:lang(zh-TW) {
   --track-caps: 0.02em;
   --leading-normal: 1.7;
   --leading-loose: 1.8;
+  --leading-prose: 1.9;
 }
 
 /* Density escape hatch — data-dense surfaces (admin tables, backlog). */

@@ -136,6 +136,7 @@ def task_creation_events(task_id: str, payload: dict[str, Any]) -> list[dict[str
     for field in (
         "ownerEmployeeId",
         "assigneeEmployeeId",
+        "projectId",
         "dueDate",
         "routineType",
         "routineCadence",
@@ -382,7 +383,11 @@ class LocalTaskStore:
             for task in self.list_tasks()
             if task.get("status") == "assigned"
             and not task.get("isRoutine")
-            and (task.get("assignedAgent") or task.get("assignedTeamId"))
+            and (
+                task.get("assignedAgent")
+                or task.get("assignedTeamId")
+                or task.get("projectId")
+            )
         ]
         ordered = sorted(tasks, key=task_claim_sort_key)
         return ordered[:limit] if limit is not None else ordered
@@ -510,7 +515,9 @@ class LocalTaskStore:
             if not routine_due_for_promotion(routine, today):
                 return None
             agent = routine.get("assignedAgent") or agent_override
-            if not agent and not routine.get("assignedTeamId"):
+            if not agent and not (
+                routine.get("assignedTeamId") or routine.get("projectId")
+            ):
                 return None
             occurrence_events = routine_occurrence_events(routine, agent)
             occurrence = materialize_task_events(occurrence_events)
@@ -698,6 +705,12 @@ class DatabaseTaskStore:
         Column("assigned_agent", Text, nullable=True),
         Column("assigned_agent_id", entity_uuid_type(), nullable=True),
         Column("assigned_team_id", entity_uuid_type(), nullable=True),
+        Column(
+            "project_id",
+            entity_uuid_type(),
+            ForeignKey("projects.id", ondelete="RESTRICT", name="fk_tasks_project"),
+            nullable=True,
+        ),
         Column("owner_employee_id", entity_uuid_type(), nullable=True),
         Column("assignee_employee_id", entity_uuid_type(), nullable=True),
         Column("due_date", Date, nullable=True),
@@ -716,6 +729,7 @@ class DatabaseTaskStore:
         Index("ix_tasks_assigned_agent", "assigned_agent"),
         Index("ix_tasks_assigned_agent_id", "assigned_agent_id"),
         Index("ix_tasks_assigned_team_id", "assigned_team_id"),
+        Index("ix_tasks_project_id", "project_id"),
         Index("ix_tasks_owner_employee_id", "owner_employee_id"),
         Index("ix_tasks_assignee_employee_id", "assignee_employee_id"),
         Index("ix_tasks_owner_updated_at", "owner_employee_id", "updated_at"),
@@ -1086,6 +1100,7 @@ class DatabaseTaskStore:
                 or_(
                     self.tasks.c.assigned_agent.is_not(None),
                     self.tasks.c.assigned_team_id.is_not(None),
+                    self.tasks.c.project_id.is_not(None),
                 )
             )
             .where(self.tasks.c.is_routine.is_(False))
@@ -1276,7 +1291,9 @@ class DatabaseTaskStore:
             if not routine_due_for_promotion(routine, today):
                 return None
             agent = routine.get("assignedAgent") or agent_override
-            if not agent and not routine.get("assignedTeamId"):
+            if not agent and not (
+                routine.get("assignedTeamId") or routine.get("projectId")
+            ):
                 return None
 
             occurrence_events = routine_occurrence_events(routine, agent)
@@ -1605,6 +1622,7 @@ def task_to_row(
         "assigned_agent": task.get("assignedAgent"),
         "assigned_agent_id": task.get("assignedAgentId"),
         "assigned_team_id": task.get("assignedTeamId"),
+        "project_id": task.get("projectId"),
         "owner_employee_id": task.get("ownerEmployeeId"),
         "assignee_employee_id": task.get("assigneeEmployeeId"),
         "due_date": _parse_date(task.get("dueDate")),
@@ -1713,28 +1731,34 @@ def routine_occurrence_events(
                     if routine.get("assigneeEmployeeId")
                     else {}
                 ),
+                **(
+                    {"projectId": routine["projectId"]}
+                    if routine.get("projectId")
+                    else {}
+                ),
             },
         )
     ]
-    events.append(
-        relay_task_event(
-            "task.assigned",
-            occurrence_id,
-            {
-                **({"agent": agent} if agent else {}),
-                **(
-                    {"agentId": routine["assignedAgentId"]}
-                    if routine.get("assignedAgentId")
-                    else {}
-                ),
-                **(
-                    {"teamId": routine["assignedTeamId"]}
-                    if routine.get("assignedTeamId")
-                    else {}
-                ),
-            },
+    if agent or routine.get("assignedTeamId"):
+        events.append(
+            relay_task_event(
+                "task.assigned",
+                occurrence_id,
+                {
+                    **({"agent": agent} if agent else {}),
+                    **(
+                        {"agentId": routine["assignedAgentId"]}
+                        if routine.get("assignedAgentId")
+                        else {}
+                    ),
+                    **(
+                        {"teamId": routine["assignedTeamId"]}
+                        if routine.get("assignedTeamId")
+                        else {}
+                    ),
+                },
+            )
         )
-    )
     events.append(
         relay_task_event("task.status", occurrence_id, {"status": "assigned"})
     )

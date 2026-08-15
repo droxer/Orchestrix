@@ -14,9 +14,8 @@ Implemented in the current vertical slice:
 - admin agent and placement APIs plus employee-visible `GET /agents`;
 - multiple same-executor agents per employee;
 - multiple dedicated managed nodes per employee;
-- distinct compatibility agents and placements materialized from
-  administrator-assigned daemon capabilities or during legacy dispatch,
-  without mutating employee reads;
+- hidden compatibility identities and placements materialized only during
+  legacy dispatch, without mutating employee reads or runtime registration;
 - additive daemon executor-capability registration;
 - `POST /agent-runs` with ownership checks and stable routing errors;
 - placement selection and node-scoped multi-assignment dispatch;
@@ -75,7 +74,7 @@ CLI executor kinds without changing behavior.
   and leased command delivery.
 - [ ] Introduce the internal alias `ExecutorKind = AgentName`; do not rename
   serialized fields yet.
-- [ ] Document that existing `agents` maps and `supportedAgents` are runtime
+- [x] Document that existing `agents` maps and `supportedAgents` are runtime
   capability reports, not durable agent identity.
 - [ ] Add metrics for legacy assignment dispatch, node selection failures, and
   executor readiness failures.
@@ -112,8 +111,8 @@ Create durable employee-owned agents without changing dispatch.
 ### Compatibility materialization
 
 - [x] Add a deterministic compatibility mapping for
-  `(employeeId, daemonNodeId, executorKind) -> agentId` so each registered
-  computer exposes its own compatibility agent.
+  `(employeeId, computerId, executorKind) -> agentId` used only to translate a
+  legacy request; registered computers do not expose compatibility agents.
 - [x] Lazily create compatibility agents for existing employees when an old
   assignment is first resolved.
 - [ ] Provide an idempotent migration command to pre-create compatibility
@@ -170,8 +169,9 @@ compatible.
 
 ### Initial placement policy
 
-- [x] Materialize one compatibility agent and placement for each supported
-  executor on each assigned computer.
+- [x] Keep runtime registration and Computer assignment free of Agent writes;
+  materialize a hidden compatibility identity only when an old request omits
+  `agentId`.
 - [ ] Permit administrators to place different agents from one employee on
   different nodes.
 - [x] Allow one active placement per logical agent; moves atomically supersede
@@ -397,8 +397,8 @@ only after evidence shows it is safe.
   implemented, policy may only reduce the employee's effective authority.
 - [ ] Placement mutation requires administrator authority.
 - [x] Daemon registration cannot self-assign employee ownership. The backend
-  may materialize compatibility agents only from a node ownership assignment
-  already authorized in the control plane.
+  may materialize a hidden compatibility Agent only while translating an old
+  executor-kind request for a Computer already authorized in the control plane.
 - [ ] Agent configuration secrets use server-side references and short-lived
   runtime delivery.
 - [ ] Run audit records preserve effective agent and policy versions.
@@ -408,14 +408,14 @@ only after evidence shows it is safe.
 
 - [ ] Alice owns `Researcher` (Claude), `Builder` (Codex), and `Reviewer`
   (Claude).
-- [ ] The three agents are placed on one runtime node before being assembled
-  into a team.
+- [ ] The three Agents are placed on Agent Runtimes on one Computer before
+  being assembled into a team.
 - [ ] Alice selects agents by name and completes a three-step workflow without
   selecting a node.
-- [ ] One Claude node fails; only its placement becomes unavailable, and the
-  other Claude agent continues working.
-- [ ] A replacement placement resumes future work without changing agent or
-  session identity.
+- [ ] One Computer becomes unavailable; only its placements become offline,
+  and an Agent on another Computer continues working.
+- [ ] Replacing a Computer's Daemon Node resumes future work without changing
+  Agent, Placement, or session identity.
 - [ ] Bob cannot discover or invoke Alice's agents or placements.
 - [ ] An old client using `{agent: "codex"}` still resolves to Alice's
   compatibility agent during the migration window.

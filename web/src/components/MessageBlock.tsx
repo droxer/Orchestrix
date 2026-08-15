@@ -147,9 +147,9 @@ function ArtifactChip({ artifact, sessionId, allArtifacts, onOpenArtifact }: { a
           <span className="artifact-chip-kicker">
             <span className={`artifact-kind-tag is-${artifact.kind}`}>{kindLabel}</span>
             {stat ? (
-              <span className={`artifact-stat tone-${stat.tone}`}>{t(`artifact.stat.${stat.key}`, stat.vars)}</span>
+              <span className={`artifact-stat tnum tone-${stat.tone}`}>{t(`artifact.stat.${stat.key}`, stat.vars)}</span>
             ) : (
-              <span className="artifact-stat tone-neutral">{formatArtifactSize(artifact.bytes, t, locale)}</span>
+              <span className="artifact-stat tnum tone-neutral">{formatArtifactSize(artifact.bytes, t, locale)}</span>
             )}
             <span aria-hidden="true">·</span>
             {createdTime ? <time dateTime={artifact.createdAt}>{createdTime}</time> : null}

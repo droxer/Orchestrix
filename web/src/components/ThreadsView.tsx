@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, type Dispatch, RefObject, SetStateAction } from "react";
+import { useMemo, useState, type Dispatch, RefObject, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionRoute } from "./icons";
 import { RelayMark } from "./RelayMark";
-import type { AgentName, AgentTeam, DaemonNodeMonitorRecord, EmployeeAgent, RelayArtifact, RelaySession } from "../types";
+import type { AgentName, AgentTeam, DaemonNodeMonitorRecord, EmployeeAgent, ProjectRecord, RelayArtifact, RelaySession } from "../types";
 import {
   buildExecutorDisplayNameMap,
   buildLogicalAgentImageMap,
@@ -22,9 +22,13 @@ import { DecisionBar } from "./composer/DecisionBar";
 import { Composer, type ComposerHandle } from "./composer/Composer";
 import { ThreadSpacePanel } from "./space/ThreadSpacePanel";
 import { buildSpaceItems, threadHasMultipleProducers } from "../lib/threadSpace";
+import { ProjectDrawer } from "./ProjectDrawer";
 
 export type ThreadsViewProps = {
+  directoryMode: "threads" | "projects";
   filteredThreads: ThreadItem[];
+  projects: ProjectRecord[];
+  selectedProjectId: string | null;
   threadQuery: string;
   setThreadQuery: Dispatch<SetStateAction<string>>;
   activeSession: RelaySession | undefined;
@@ -35,7 +39,8 @@ export type ThreadsViewProps = {
   composerRef: RefObject<ComposerHandle | null>;
   onTranscriptScroll: () => void;
   onSelectThread: (sessionId: string) => void;
-  onNewThread: () => void;
+  onSelectProject: (projectId: string | null) => void;
+  onNewThread: (projectId?: string | null) => void;
   onRenameThread: (session: RelaySession) => void;
   onCloseThread: (sessionId: string) => void;
   activeAgent: AgentName;
@@ -63,6 +68,8 @@ export type ThreadsViewProps = {
   onBackToThreads: () => void;
   selectedEmployee: string;
   initializingThread: boolean;
+  projectName?: string;
+  projectReadOnly?: boolean;
   runtimeNodes: DaemonNodeMonitorRecord[];
   runtimeNodeId: string | null;
   selectedRuntimeNode: DaemonNodeMonitorRecord | null;
@@ -87,7 +94,10 @@ export type ThreadsViewProps = {
 };
 
 export function ThreadsView({
+  directoryMode,
   filteredThreads,
+  projects,
+  selectedProjectId,
   threadQuery,
   setThreadQuery,
   activeSession,
@@ -98,6 +108,7 @@ export function ThreadsView({
   composerRef,
   onTranscriptScroll,
   onSelectThread,
+  onSelectProject,
   onNewThread,
   onRenameThread,
   onCloseThread,
@@ -126,6 +137,8 @@ export function ThreadsView({
   onBackToThreads,
   selectedEmployee,
   initializingThread,
+  projectName,
+  projectReadOnly,
   runtimeNodes,
   runtimeNodeId,
   selectedRuntimeNode,
@@ -147,6 +160,7 @@ export function ThreadsView({
   running,
 }: ThreadsViewProps) {
   const { t } = useTranslation();
+  const [projectDrawerOpen, setProjectDrawerOpen] = useState(false);
   const agentDisplayNames = useMemo(() => buildExecutorDisplayNameMap(logicalAgents), [logicalAgents]);
   const logicalAgentNames = useMemo(() => buildLogicalAgentNameMap(logicalAgents), [logicalAgents]);
   const logicalAgentImages = useMemo(() => buildLogicalAgentImageMap(logicalAgents), [logicalAgents]);
@@ -170,11 +184,16 @@ export function ThreadsView({
   return (
     <>
       <ThreadListPanel
+        directoryMode={directoryMode}
         threads={filteredThreads}
+        projects={projects}
         query={threadQuery}
         setQuery={setThreadQuery}
         selectedSessionId={activeSession?.id}
+        selectedProjectId={selectedProjectId}
         onSelectThread={onSelectThread}
+        onSelectProject={onSelectProject}
+        onCreateProject={() => setProjectDrawerOpen(true)}
         onNewThread={onNewThread}
         onRenameThread={onRenameThread}
         onCloseThread={onCloseThread}
@@ -269,6 +288,8 @@ export function ThreadsView({
           activeAgentDisplayName={activeAgentDisplayName}
           selectedEmployee={selectedEmployee}
           initializingThread={initializingThread}
+          projectName={projectName}
+          readOnly={projectReadOnly}
           runtimeNodes={runtimeNodes}
           runtimeNodeId={runtimeNodeId}
           selectedRuntimeNode={selectedRuntimeNode}
@@ -294,6 +315,13 @@ export function ThreadsView({
           onResizeActive={onSpaceResizeActive}
         />
       ) : null}
+      <ProjectDrawer
+        open={projectDrawerOpen}
+        agents={logicalAgents}
+        computers={runtimeNodes}
+        onClose={() => setProjectDrawerOpen(false)}
+        onCreated={(project) => onSelectProject(project.id)}
+      />
     </>
   );
 }

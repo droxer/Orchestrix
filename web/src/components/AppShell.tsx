@@ -19,7 +19,7 @@ import type { CurrentUser } from "@/types";
 import { useRelayStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 
-const WORK_ROUTE_LABEL_KEYS: Record<Exclude<AppRoute, "main">, string> = {
+const WORK_ROUTE_LABEL_KEYS: Record<Exclude<AppRoute, "main" | "projects">, string> = {
   backlog: "nav.backlog",
   routine: "nav.routine",
   agents: "nav.agents",
@@ -178,12 +178,14 @@ export function AppShell({
     [isAdmin, t],
   );
 
+  const isThreadRoute = route === "main" || route === "projects";
+  const directoryLabel = route === "projects" ? t("project.projects") : t("nav.threads");
   const mobileRouteTitle = route === "admin"
     ? t(`admin.v2.title_${adminView}`)
-    : route === "main"
-      ? t("nav.threads")
+    : isThreadRoute
+      ? directoryLabel
       : t(WORK_ROUTE_LABEL_KEYS[route]);
-  const isMobileChat = route === "main" && mobileView === "chat";
+  const isMobileChat = isThreadRoute && mobileView === "chat";
 
   return (
     <div
@@ -199,16 +201,16 @@ export function AppShell({
       <a className="skip-link" href={skipLinkHref}>{t("skip_to_content")}</a>
 
       <div
-        className={`mobile-topbar ${route === "main" ? "mobile-topbar--chat" : "mobile-topbar--route"}`}
+        className={`mobile-topbar ${isThreadRoute ? "mobile-topbar--chat" : "mobile-topbar--route"}`}
       >
-        {route === "main" ? (
+        {isThreadRoute ? (
           isMobileChat ? (
             <>
               <Button
                 variant="ghost"
                 type="button"
                 className="mobile-topbar-back"
-                aria-label={t("nav.threads")}
+                aria-label={directoryLabel}
                 onClick={() => onMobileViewChange("threads")}
               >
                 <NavThreads size={16} />
@@ -231,11 +233,11 @@ export function AppShell({
               <Button variant="ghost"
                 type="button"
                 className={mobileView === "threads" ? "active" : ""}
-                aria-label={t("nav.threads")}
+                aria-label={directoryLabel}
                 aria-pressed={mobileView === "threads"}
                 onClick={() => onMobileViewChange("threads")}
               >
-                <NavThreads size={16} /><span>{t("nav.threads")}</span>
+                <NavThreads size={16} /><span>{directoryLabel}</span>
               </Button>
               <Button variant="ghost"
                 type="button"

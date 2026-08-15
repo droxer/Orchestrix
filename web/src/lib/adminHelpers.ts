@@ -314,7 +314,8 @@ export function agentsOnNodes(nodeIds: Iterable<string>, agents: EmployeeAgent[]
     (agent) =>
       !agent.deletedAt &&
       agent.placements.some(
-        (placement) => placement.desiredState !== "removed" && ids.has(placement.daemonNodeId),
+        (placement) => placement.desiredState !== "removed"
+          && ids.has(placement.runtimeNodeId || placement.daemonNodeId),
       ),
   );
 }

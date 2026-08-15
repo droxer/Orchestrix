@@ -213,7 +213,11 @@ function TextSegment({ text, live }: { text: string; live: boolean }) {
   const announcement = useDebouncedStreamingAnnouncement(text, live);
   return (
     <div className={`agent-text ${live ? "is-live" : ""}`}>
-      <div className="agent-prose" aria-hidden={live || undefined}>
+      {/* `md-body` is not optional decoration: every markdown element rule
+          (headings, paragraphs, lists, blockquotes, inline code) in
+          styles/markdown.css is scoped to it. Without it the transcript
+          renders unstyled — headings collapse to body-sized plain text. */}
+      <div className="md-body agent-prose" aria-hidden={live || undefined}>
         <MarkdownContent text={visibleText} live={live} />
       </div>
       {live ? (

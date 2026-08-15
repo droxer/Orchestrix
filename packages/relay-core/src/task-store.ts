@@ -22,6 +22,8 @@ export interface RelayTask {
   status: TaskStatus;
   /** Employee who owns this task; their agent carries it out on their behalf. */
   ownerEmployeeId?: string;
+  /** Project whose conversations and workspace contain this task. */
+  projectId?: string;
   /** Human assignee responsible for the backlog item. */
   assigneeEmployeeId?: string;
   /** Date-only due date in YYYY-MM-DD format. */
@@ -78,6 +80,7 @@ export type RelayTaskEvent =
       description: string;
       priority: TaskPriority;
       ownerEmployeeId?: string;
+      projectId?: string;
       assigneeEmployeeId?: string;
       dueDate?: string;
       isRoutine?: boolean;
@@ -224,6 +227,7 @@ export function materializeTaskEvents(events: RelayTaskEvent[]): RelayTask {
     description: created.description,
     priority: created.priority,
     ...(created.ownerEmployeeId ? { ownerEmployeeId: created.ownerEmployeeId } : {}),
+    ...(created.projectId ? { projectId: created.projectId } : {}),
     ...(created.assigneeEmployeeId ? { assigneeEmployeeId: created.assigneeEmployeeId } : {}),
     ...(created.dueDate ? { dueDate: created.dueDate } : {}),
     status: "backlog",

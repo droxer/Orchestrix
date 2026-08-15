@@ -15,6 +15,7 @@ from ..persistence.protocols import (
     AgentPlacementStore,
     AgentStore,
     ManagedNodeStore,
+    ProjectStore,
     SessionStore,
     TaskStore,
     TeamStore,
@@ -32,6 +33,7 @@ from .agent_routing import (
     dispatch_reason_code,
     resolve_agent_assignments,
 )
+from .project_runtime import ProjectDispatchError, resolve_project_task_assignments
 from .team_dispatch import (
     TEAM_UNAVAILABLE_MESSAGE,
     TeamDispatchError,
@@ -68,9 +70,53 @@ class TaskDispatchContext(Protocol):
     agent_store: AgentStore
     agent_placement_store: AgentPlacementStore
     team_store: TeamStore
+    project_store: ProjectStore
     managed_node_store: ManagedNodeStore
     registry: DaemonNodeRegistry
     backend: ServerDaemonNodeBackend
+
+
+def implicit_group_assignments_for_task(
+    ctx: TaskDispatchContext,
+    task: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Build the legacy unclassified-task roster from ready named agents.
+
+    Historical tasks predate explicit project/team/agent assignments. Keep
+    those rows runnable, but only through agents that already exist and can be
+    resolved on the task owner's Computers; daemon registration must not
+    manufacture compatibility agents.
+    """
+    employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
+    if not employee_id:
+        return []
+
+    selected: list[dict[str, Any]] = []
+    daemon_nodes = ctx.registry.monitor_nodes()
+    for logical_agent in ctx.agent_store.list_agents(
+        supervisor_employee_id=employee_id
+    ):
+        if not logical_agent.get("enabled", True):
+            continue
+        candidate: dict[str, Any] = {
+            "agentId": logical_agent["id"],
+            "agent": logical_agent["executorKind"],
+        }
+        if logical_agent.get("defaultRole"):
+            candidate["role"] = logical_agent["defaultRole"]
+        try:
+            resolve_agent_assignments(
+                [*selected, candidate],
+                employee_id=employee_id,
+                is_admin=True,
+                agent_store=ctx.agent_store,
+                placement_store=ctx.agent_placement_store,
+                daemon_nodes=daemon_nodes,
+            )
+        except AgentRoutingError:
+            continue
+        selected.append(candidate)
+    return selected
 
 
 def _result(
@@ -149,37 +195,6 @@ def _unclaimable_dispatch(task: dict[str, Any], agent: str | None) -> DispatchIn
     }
 
 
-def implicit_group_assignments_for_task(
-    ctx: TaskDispatchContext, task: dict[str, Any]
-) -> list[dict[str, Any]]:
-    employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
-    if not employee_id:
-        return []
-    selected: list[dict[str, Any]] = []
-    daemon_nodes = ctx.registry.monitor_nodes()
-    for agent in ctx.agent_store.list_agents(supervisor_employee_id=employee_id):
-        if not agent.get("enabled", True):
-            continue
-        candidate = {
-            "agentId": agent["id"],
-            "agent": agent["executorKind"],
-            **({"role": agent["defaultRole"]} if agent.get("defaultRole") else {}),
-        }
-        try:
-            resolve_agent_assignments(
-                [*selected, candidate],
-                employee_id=employee_id,
-                is_admin=True,
-                agent_store=ctx.agent_store,
-                placement_store=ctx.agent_placement_store,
-                daemon_nodes=daemon_nodes,
-            )
-        except AgentRoutingError:
-            continue
-        selected.append(candidate)
-    return selected if len(selected) > 1 else []
-
-
 class TaskDispatcher:
     def __init__(
         self,
@@ -196,6 +211,8 @@ class TaskDispatcher:
         self.run_assignments = assignments or []
         self.record_pending = record_pending
         self.team_assignment_resolved = False
+        self.project_assignment_resolved = False
+        self.project_snapshot: dict[str, Any] | None = None
         self.agent: str | None = None
         self.agent_first = False
         self.temporary_group_status = False
@@ -204,6 +221,9 @@ class TaskDispatcher:
     async def start(self) -> DispatchResult | None:
         if not self._dispatchable():
             return None
+        project_result = self._resolve_project_assignments()
+        if project_result:
+            return project_result
         team_result = self._resolve_team_assignments()
         if team_result:
             return team_result
@@ -233,6 +253,41 @@ class TaskDispatcher:
             "backlog",
             "assigned",
         )
+
+    def _resolve_project_assignments(self) -> DispatchResult | None:
+        if not self.task.get("projectId"):
+            return None
+        try:
+            self.run_assignments, self.project_snapshot = (
+                resolve_project_task_assignments(
+                    self.task,
+                    project_store=self.ctx.project_store,
+                    agent_store=self.ctx.agent_store,
+                    placement_store=self.ctx.agent_placement_store,
+                    daemon_nodes=self.ctx.registry.monitor_nodes(),
+                    session_store=self.ctx.session_store,
+                )
+            )
+            self.project_assignment_resolved = True
+            return None
+        except ProjectDispatchError as error:
+            if not self.record_pending:
+                raise
+            if error.permanent:
+                self.task = self.ctx.task_store.update_task(
+                    self.task["id"], {"status": "blocked"}
+                )
+            return _record_result(
+                self.ctx,
+                self.task["id"],
+                "rejected" if error.permanent else "queued",
+                code=error.code,
+                message=f"The project cannot execute this task ({error.code}).",
+            )
+        except AgentRoutingError as error:
+            if not self.record_pending:
+                raise
+            return self._routing_error_result(error)
 
     def _resolve_team_assignments(self) -> DispatchResult | None:
         if not self.task.get("assignedTeamId"):
@@ -320,7 +375,7 @@ class TaskDispatcher:
     def _resolve_node(
         self,
     ) -> tuple[dict[str, Any] | None, DispatchResult | None]:
-        if self.team_assignment_resolved:
+        if self.team_assignment_resolved or self.project_assignment_resolved:
             # Team assignments are already bound to the placements' node. Scanning
             # for a ready node again can hand back a different computer than the
             # one the commands go to, pinning the thread to the wrong workspace.
@@ -492,6 +547,7 @@ class TaskDispatcher:
                     ),
                     assignments=self.run_assignments,
                     team_snapshot=team_snapshot,
+                    project_snapshot=self.project_snapshot,
                 )
             },
         }
@@ -499,6 +555,14 @@ class TaskDispatcher:
             request["agentFirst"] = True
         if self.task.get("assignedTeamId"):
             request["teamId"] = self.task["assignedTeamId"]
+        if self.project_snapshot:
+            request.update(
+                {
+                    "projectId": self.project_snapshot["projectId"],
+                    "workspaceLayout": "project",
+                    "workspaceSubpath": self.project_snapshot["workspaceSubpath"],
+                }
+            )
         if self.claim_id:
             request["idempotencyKey"] = self.claim_id
         if not self.actor["isAdmin"]:

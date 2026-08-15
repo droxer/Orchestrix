@@ -211,9 +211,12 @@
   background: var(--surface-1);
   color: var(--ink-3);
   font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
   letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
-  line-height: 1.35;
+  line-height: var(--leading-snug);
 }
 
 .agent-placement-badge > svg {
@@ -240,7 +243,7 @@
 }
 
 .agent-placement-badge-dot:not(.tone-neutral) {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone, transparent) 16%, transparent);
+  box-shadow: var(--ring-halo);
 }
 
 .agent-placement-badge-name {

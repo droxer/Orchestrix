@@ -18,6 +18,8 @@ type ThreadAgent = {
   id: string;
   placements: ReadonlyArray<{
     daemonNodeId: string;
+    runtimeNodeId?: string;
+    computerId?: string;
     desiredState: string;
   }>;
 };
@@ -103,7 +105,7 @@ export function agentsForThreadNode<T extends ThreadAgent>(
 ): T[] {
   if (!daemonNodeId) return [];
   return agents.filter((agent) => agent.placements.some(
-    (placement) => placement.daemonNodeId === daemonNodeId
+    (placement) => (placement.runtimeNodeId || placement.daemonNodeId) === daemonNodeId
       && placement.desiredState === "active",
   ));
 }
@@ -161,12 +163,13 @@ export function threadRuntimeNodeId(
       if (!run.logicalAgentId) continue;
       const agent = agents.find((item) => item.id === run.logicalAgentId);
       const placement = agent?.placements.find((item) => item.desiredState === "active");
-      if (!placement || placement.daemonNodeId === session.daemonNodeId) continue;
-      const reboundNode = nodes.find((node) => node.id === placement.daemonNodeId);
+      const runtimeNodeId = placement?.runtimeNodeId || placement?.daemonNodeId;
+      if (!placement || !runtimeNodeId || runtimeNodeId === session.daemonNodeId) continue;
+      const reboundNode = nodes.find((node) => node.id === runtimeNodeId);
       if (
         reboundNode?.managedNodeId
         && (!originalNode || originalNode.managedNodeId === reboundNode.managedNodeId)
-      ) return placement.daemonNodeId;
+      ) return runtimeNodeId;
     }
     return session.daemonNodeId;
   }
@@ -179,7 +182,7 @@ export function threadRuntimeNodeId(
     if (!run.logicalAgentId) continue;
     const agent = agents.find((item) => item.id === run.logicalAgentId);
     const placement = agent?.placements.find((item) => item.desiredState === "active");
-    if (placement) return placement.daemonNodeId;
+    if (placement) return placement.runtimeNodeId || placement.daemonNodeId;
   }
   return undefined;
 }

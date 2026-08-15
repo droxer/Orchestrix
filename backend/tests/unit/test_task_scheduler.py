@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import date
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 
 from relay.core.computer_identity import computer_id
 from relay.daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
@@ -13,8 +14,12 @@ from relay.persistence.session_store import LocalSessionStore
 from relay.persistence.task_store import LocalTaskStore
 from relay.persistence.team_store import LocalTeamStore
 from relay.services.managed_nodes import LocalManagedNodeStore
-from relay.tasks import ROUTINE_SKIP_NO_AGENT_MESSAGE, TaskScheduler, next_routine_date
-from relay.tasks.scheduler import materialize_legacy_agent_assignment
+from relay.tasks import (
+    ROUTINE_SKIP_NO_AGENT_MESSAGE,
+    TaskScheduler,
+    materialize_legacy_agent_assignment,
+    next_routine_date,
+)
 
 
 def _logical_backend(
@@ -658,6 +663,69 @@ def test_scheduler_materializes_and_dispatches_legacy_assignment() -> None:
             assert commands[0]["logicalAgentId"] == declared["id"]
 
     asyncio.run(run_flow())
+
+
+def test_legacy_assignment_reuses_placement_after_runtime_replacement() -> None:
+    """A placement is matched by the stable computerId, not the daemon node
+    id, so a declared agent's placement survives a runtime re-registration
+    under a new node id for the same computer — no duplicate is created."""
+    with TemporaryDirectory() as root:
+        agents = LocalEmployeeAgentStore(root)
+        placements = LocalAgentPlacementStore(root)
+        current = [
+            {
+                "id": "runtime_old",
+                "employeeId": "alice",
+                "workspaceId": "machine-1",
+                "status": "ready",
+                "agents": {"codex": "ready"},
+            }
+        ]
+        registry = SimpleNamespace(
+            daemon_store=SimpleNamespace(list_active_runs=list),
+            list_ready=lambda: current,
+            is_live=lambda _node_id: True,
+        )
+        task = {"assigneeEmployeeId": "alice"}
+        declared = agents.create_agent(
+            "alice",
+            {
+                "displayName": "Codex",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": "device:alice:machine-1",
+            },
+        )
+
+        first = materialize_legacy_agent_assignment(
+            task,
+            "codex",
+            registry=registry,
+            agent_store=agents,
+            placement_store=placements,
+        )
+        assert first == {"agent": "codex", "agentId": declared["id"]}
+        [original] = placements.list_placements(agent_id=first["agentId"])
+        current[:] = [
+            {
+                **current[0],
+                "id": "runtime_new",
+            }
+        ]
+
+        second = materialize_legacy_agent_assignment(
+            task,
+            "codex",
+            registry=registry,
+            agent_store=agents,
+            placement_store=placements,
+        )
+
+        assert second["agentId"] == first["agentId"]
+        [preserved] = placements.list_placements(agent_id=first["agentId"])
+        assert preserved["id"] == original["id"]
+        assert preserved["daemonNodeId"] == "runtime_old"
+        assert preserved["computerId"] == "device:alice:machine-1"
 
 
 def test_scheduler_materializes_legacy_routine_before_promotion() -> None:

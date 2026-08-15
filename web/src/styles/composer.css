@@ -9,7 +9,7 @@
   display: grid;
   /* Side padding matters now that the card floats on shadow alone (no
      border): without it, the card touches the panel edges any time the
-     chat panel is narrower than the 960px cap on .composer-input-wrap —
+     chat panel is narrower than the --thread-measure cap on .composer-input-wrap —
      the common case — and the shadow gets clipped instead of reading as
      floating. */
   padding: var(--sp-3) var(--sp-6) max(var(--sp-4), env(safe-area-inset-bottom, 0px));
@@ -56,7 +56,7 @@
 }
 
 .thread-runtime-select:hover:not(:disabled) {
-  background: var(--surface-3);
+  background: var(--control-fill-hover);
 }
 
 .thread-runtime-select-name {
@@ -136,7 +136,7 @@
 }
 
 .thread-runtime-option > svg {
-  margin-top: 1px;
+  margin-top: var(--sp-0-5);
 }
 
 .thread-runtime-option[data-ownership="managed"] > svg {
@@ -146,7 +146,7 @@
 .thread-runtime-option-body {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: var(--sp-0-5);
   min-width: 0;
 }
 
@@ -169,6 +169,9 @@
 .thread-runtime-option-id {
   overflow: hidden;
   font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
   letter-spacing: var(--type-code-track);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -194,7 +197,7 @@
 
 .composer-input-wrap {
   position: relative;
-  width: min(100%, 960px);
+  width: min(100%, var(--thread-measure));
   margin: 0 auto;
   border: 0;
   border-radius: var(--r-3);
@@ -306,6 +309,24 @@
   min-width: 0;
 }
 
+.composer-project-room {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  max-width: 280px;
+  height: var(--control-h-sm);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  color: var(--ink-2);
+  background: var(--surface-2);
+  font: var(--type-label-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Primary assign plate — mirrors conversation-new-btn (36px ink plate). */
 .send-button {
   display: grid;
@@ -320,7 +341,7 @@
   transition:
     background var(--t-fast) var(--ease),
     border-color var(--t-fast) var(--ease),
-    transform 80ms var(--ease),
+    transform var(--t-fast) var(--ease),
     box-shadow var(--t-fast) var(--ease);
 }
 
@@ -330,21 +351,11 @@
 
 .send-button:active:not(:disabled) {
   background: var(--action-hover);
-  transform: translateY(0.5px);
 }
 
 .send-button:focus-visible {
   outline: var(--focus-outline);
   outline-offset: var(--focus-offset);
-}
-
-.send-button:disabled {
-  background: var(--surface-2);
-  border-color: var(--line-1);
-  color: color-mix(in srgb, var(--ink-1) 48%, transparent);
-  cursor: not-allowed;
-  opacity: 1;
-  transform: none;
 }
 
 /* Stop state keeps the same solid plate as send — the send↔stop transition
@@ -373,10 +384,6 @@
 @media (prefers-reduced-motion: reduce) {
   .send-button {
     transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
-  }
-
-  .send-button:active:not(:disabled) {
-    transform: none;
   }
 
   .send-button-icon { animation: none; }
@@ -452,8 +459,8 @@
 .composer-mention-token {
   /* 1px, not more: two mentions are separated by a single space, and a wider
      bleed closes that gap so the pair reads as one plate. */
-  margin-inline: -1px;
-  padding-inline: 1px;
+  margin-inline: calc(-1 * var(--sp-hairline));
+  padding-inline: var(--sp-hairline);
   border-radius: var(--r-1);
   background: color-mix(in srgb, var(--ink-1) 13%, transparent);
   /* A pill split across two lines keeps its full shape on both halves. */

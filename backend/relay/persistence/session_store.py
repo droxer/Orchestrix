@@ -116,6 +116,16 @@ class LocalSessionStore:
                     ),
                     **({"teamId": payload["teamId"]} if payload.get("teamId") else {}),
                     **(
+                        {"projectId": payload["projectId"]}
+                        if payload.get("projectId")
+                        else {}
+                    ),
+                    **(
+                        {"workspaceSubpath": payload["workspaceSubpath"]}
+                        if payload.get("workspaceSubpath")
+                        else {}
+                    ),
+                    **(
                         {"daemonNodeId": payload["daemonNodeId"]}
                         if payload.get("daemonNodeId")
                         else {}
@@ -541,7 +551,7 @@ class LocalSessionStore:
 
 
 class DatabaseSessionStore:
-    REQUIRED_SCHEMA_REVISION = "20260814_0062"
+    REQUIRED_SCHEMA_REVISION = "20260815_0063"
     metadata = shared_metadata
 
     sessions = Table(
@@ -549,6 +559,12 @@ class DatabaseSessionStore:
         metadata,
         database_id_column(),
         Column("workspace_path", Text, nullable=False),
+        Column(
+            "project_id",
+            entity_uuid_type(),
+            ForeignKey("projects.id", ondelete="RESTRICT", name="fk_sessions_project"),
+            nullable=True,
+        ),
         Column("owner_employee_id", entity_uuid_type(), nullable=True),
         Column("title", Text, nullable=True),
         Column("task_goal", Text, nullable=False),
@@ -565,6 +581,7 @@ class DatabaseSessionStore:
         Index("ix_sessions_updated_at", "updated_at"),
         Index("ix_sessions_created_at", "created_at"),
         Index("ix_sessions_owner_employee_id", "owner_employee_id"),
+        Index("ix_sessions_project_id", "project_id"),
         Index("ix_sessions_owner_updated_at", "owner_employee_id", "updated_at"),
         Index("ix_sessions_status", "status"),
     )
@@ -768,6 +785,16 @@ class DatabaseSessionStore:
                         else {}
                     ),
                     **({"teamId": payload["teamId"]} if payload.get("teamId") else {}),
+                    **(
+                        {"projectId": payload["projectId"]}
+                        if payload.get("projectId")
+                        else {}
+                    ),
+                    **(
+                        {"workspaceSubpath": payload["workspaceSubpath"]}
+                        if payload.get("workspaceSubpath")
+                        else {}
+                    ),
                     **(
                         {"daemonNodeId": payload["daemonNodeId"]}
                         if payload.get("daemonNodeId")
@@ -1772,6 +1799,7 @@ def session_to_row(
     return {
         "id": database_id or session["id"],
         "workspace_path": session["workspacePath"],
+        "project_id": session.get("projectId"),
         "owner_employee_id": session.get("ownerEmployeeId"),
         "title": session.get("title"),
         "task_goal": session["taskGoal"],

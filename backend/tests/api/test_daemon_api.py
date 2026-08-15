@@ -10,6 +10,7 @@ from uuid import UUID
 from fastapi.testclient import TestClient
 from relay.app import create_app
 from relay.core.computer_identity import computer_id
+from relay.persistence.agent_placement_store import LocalAgentPlacementStore
 from relay.services.agent_routing import placement_node
 from relay.services.node_agents import sync_node_agents
 from relay.sessions.controller import SessionController
@@ -821,6 +822,94 @@ def test_stopped_managed_runtime_preserves_agent_for_restart(monkeypatch) -> Non
         )
         assert preserved["id"] == placement["id"]
         assert preserved["managedNodeId"] == managed["id"]
+
+
+def test_backend_startup_does_not_reconcile_runtime_capabilities_into_agents(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        original = create_app(root)
+        managed = original.state.managed_node_store.create_node({"employeeId": "alice"})
+        attempt, _credential = original.state.managed_node_store.create_attempt(
+            managed["id"]
+        )
+        runtime, runtime_token = original.state.registry.enroll_managed_node(
+            managed,
+            attempt,
+            {"workspacePath": "/workspace"},
+        )
+        original.state.managed_node_store.complete_enrollment(
+            managed["id"], attempt["id"], runtime["id"]
+        )
+        runtime = original.state.registry.register(
+            {
+                "sandboxId": runtime["id"],
+                "token": runtime_token,
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        legacy = original.state.agent_store.ensure_compatibility_agent(
+            "alice", "codex", runtime["id"]
+        )
+        original.state.agent_placement_store.create_placement(legacy, runtime["id"])
+        old_runtime_id = runtime["id"]
+        original.state.registry.delete(old_runtime_id)
+        replacement_attempt, _credential = (
+            original.state.managed_node_store.create_attempt(managed["id"])
+        )
+        replacement, replacement_token = original.state.registry.enroll_managed_node(
+            original.state.managed_node_store.get_node(managed["id"]),
+            replacement_attempt,
+            {"workspacePath": "/workspace"},
+        )
+        original.state.managed_node_store.complete_enrollment(
+            managed["id"], replacement_attempt["id"], replacement["id"]
+        )
+        replacement = original.state.registry.register(
+            {
+                "sandboxId": replacement["id"],
+                "token": replacement_token,
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+
+        original_list_placements = LocalAgentPlacementStore.list_placements
+
+        def reject_agent_scoped_startup_query(store, *args, **kwargs):
+            if kwargs.get("agent_id") is not None:
+                raise AssertionError("backend startup queried one Agent's placements")
+            return original_list_placements(store, *args, **kwargs)
+
+        with monkeypatch.context() as startup_patch:
+            startup_patch.setattr(
+                LocalAgentPlacementStore,
+                "list_placements",
+                reject_agent_scoped_startup_query,
+            )
+            restarted = create_app(root)
+
+        [current] = [
+            item
+            for item in restarted.state.agent_store.list_agents(
+                supervisor_employee_id="alice"
+            )
+            if item["executorKind"] == "codex"
+        ]
+        assert current["id"] == legacy["id"]
+        assert current["compatibilityKey"] == legacy["compatibilityKey"]
+        assert not current.get("deletedAt")
+        [placement] = restarted.state.agent_placement_store.list_placements(
+            agent_id=legacy["id"]
+        )
+        assert placement["daemonNodeId"] == old_runtime_id
+        assert placement["daemonNodeId"] != replacement["id"]
 
 
 def test_failed_managed_node_is_visible_as_failed(monkeypatch) -> None:

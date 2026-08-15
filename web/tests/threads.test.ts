@@ -87,6 +87,7 @@ describe("web thread helpers", () => {
     const agents = [
       { id: "agent_a", placements: [{ daemonNodeId: "node_a", desiredState: "active" }] },
       { id: "agent_b", placements: [{ daemonNodeId: "node_b", desiredState: "active" }] },
+      { id: "agent_replaced", placements: [{ daemonNodeId: "node_old", runtimeNodeId: "node_a", desiredState: "active" }] },
       { id: "agent_removed", placements: [{ daemonNodeId: "node_a", desiredState: "removed" }] },
     ];
 
@@ -96,7 +97,7 @@ describe("web thread helpers", () => {
     );
     assert.deepEqual(
       agentsForThreadNode(agents, "node_a").map((agent) => agent.id),
-      ["agent_a"],
+      ["agent_a", "agent_replaced"],
     );
     assert.equal(threadRuntimeNodeId(session({ daemonNodeId: "node_a" })), "node_a");
     assert.equal(

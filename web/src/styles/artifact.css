@@ -80,9 +80,6 @@
   white-space: nowrap;
 }
 
-.artifact-stat {
-  font-variant-numeric: tabular-nums;
-}
 .artifact-stat.tone-up {
   color: var(--ok);
 }

@@ -1601,6 +1601,17 @@ def test_existing_thread_resumes_after_managed_runtime_replacement_without_read(
         )
         assert preserved_placement["daemonNodeId"] == old_runtime_id
         assert preserved_placement["computerId"] == f"managed:{managed['id']}"
+        listed_agent = next(
+            item
+            for item in client.get(
+                "/api/v1/admin/agents?supervisorEmployeeId=admin"
+            ).json()["agents"]
+            if item["id"] == agent["id"]
+        )
+        [listed_placement] = listed_agent["placements"]
+        assert listed_placement["status"] == "ready"
+        assert listed_placement["daemonNodeId"] == old_runtime_id
+        assert listed_placement["runtimeNodeId"] == replacement["id"]
 
         response = client.post(
             "/api/v1/agent-runs",
@@ -2054,62 +2065,6 @@ def test_employee_cannot_list_or_dispatch_another_employees_agent(monkeypatch) -
         )
         assert denied.status_code == 409
         assert denied.json()["detail"]["code"] == "agent_forbidden"
-
-
-def test_legacy_run_materializes_compatibility_agent_without_get_side_effects(
-    monkeypatch,
-) -> None:
-    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
-    with TemporaryDirectory() as root:
-        app = create_app(root)
-        client = TestClient(app)
-        _bootstrap_admin(client)
-        assert (
-            client.post(
-                "/api/v1/admin/employees",
-                json={
-                    "employeeId": "alice",
-                    "username": "alice",
-                    "password": "userpass",
-                },
-            ).status_code
-            == 201
-        )
-        app.state.registry.register(
-            {
-                "sandboxId": "node_a",
-                "employeeId": "alice",
-                "token": "node_token",
-                "workspacePath": "/workspace/alice",
-                "protocolVersion": 1,
-                "supportedAgents": ["claude", "codex"],
-                "capabilities": ["thread-workspaces"],
-                "status": "ready",
-            }
-        )
-        assert client.post("/api/v1/auth/logout").status_code == 200
-        assert (
-            client.post(
-                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
-            ).status_code
-            == 200
-        )
-
-        assert client.get("/api/v1/agents").json()["agents"] == []
-        response = client.post(
-            "/api/v1/sandboxes/node_a/runs",
-            json={
-                "taskGoal": "Build it",
-                "assignments": [{"agent": "codex"}],
-            },
-        )
-
-        assert response.status_code == 202
-        [agent] = client.get("/api/v1/agents").json()["agents"]
-        assert agent["executorKind"] == "codex"
-        assert agent["compatibilityKey"] == "alice:node:node_a:codex"
-        assert agent["placements"][0]["daemonNodeId"] == "node_a"
-        assert response.json()["agentRuns"][0]["logicalAgentId"] == agent["id"]
 
 
 def test_legacy_sandbox_run_cannot_move_a_thread_to_another_computer(

@@ -228,6 +228,7 @@ def test_runtime_rebind_preserves_placement_identity(
     assert rebound["id"] == original["id"]
     assert rebound["daemonNodeId"] == "runtime_new"
     assert rebound["managedNodeId"] == "computer_one"
+    assert rebound["computerId"] == "managed:computer_one"
     assert rebound["desiredState"] == "active"
     assert placements.list_placements(agent_id=agent["id"]) == [rebound]
 
@@ -504,6 +505,7 @@ def test_rebinding_to_an_unmanaged_node_clears_the_computer_identity(
 
     assert device["daemonNodeId"] == "device_node"
     assert "managedNodeId" not in device
+    assert "computerId" not in device
     assert placements.get_placement(original["id"]).get("managedNodeId") is None
 
 
@@ -534,6 +536,7 @@ def test_rebind_repairs_a_stale_computer_identity_on_the_same_node(
     repaired = placements.rebind_placement(original["id"], "device_node")
 
     assert repaired.get("managedNodeId") is None
+    assert repaired.get("computerId") is None
 
 
 @pytest.mark.parametrize("store_kind", ["local", "database"])

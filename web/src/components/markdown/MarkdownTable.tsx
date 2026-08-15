@@ -16,8 +16,11 @@ import { useTranslation } from "react-i18next";
  */
 export function MarkdownTable({
   children,
+  // react-markdown passes its internal AST `node` to every component override;
+  // spread onto the DOM it renders as `node="[object Object]"`.
+  node: _node,
   ...rest
-}: { children?: ReactNode } & ComponentPropsWithoutRef<"table">) {
+}: { children?: ReactNode; node?: unknown } & ComponentPropsWithoutRef<"table">) {
   const { t } = useTranslation();
   return (
     <div className="md-table" role="region" aria-label={t("message.table")} tabIndex={0}>

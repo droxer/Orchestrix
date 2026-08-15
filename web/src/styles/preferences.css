@@ -203,12 +203,12 @@
 }
 
 .pref-option-row:hover {
-  background: color-mix(in srgb, var(--ink-1) 5%, transparent);
+  background: var(--control-fill-hover);
 }
 
 .pref-option-row.selected {
   background: color-mix(in srgb, var(--action) 10%, transparent);
-  box-shadow: inset 2px 0 0 var(--action);
+  box-shadow: var(--accent-bar);
 }
 
 .pref-option-row:focus-visible {
@@ -218,7 +218,7 @@
 }
 
 .pref-option-row.selected:focus-visible {
-  box-shadow: inset 2px 0 0 var(--action);
+  box-shadow: var(--accent-bar);
   outline: var(--focus-outline);
   outline-offset: var(--focus-offset);
 }
@@ -240,7 +240,7 @@
   font: var(--type-label-strong);
   font-weight: 400;
   color: var(--ink-3);
-  line-height: 1.3;
+  line-height: var(--leading-snug);
 }
 
 .pref-option-row.selected .pref-option-label {
@@ -319,7 +319,7 @@
   justify-content: center;
   border-radius: var(--r-1);
   border: 1px solid var(--line-1);
-  background: color-mix(in srgb, var(--ink-1) 6%, transparent);
+  background: var(--control-fill);
   font-family: var(--font-mono);
   font-size: var(--fs-1);
   font-weight: 600;

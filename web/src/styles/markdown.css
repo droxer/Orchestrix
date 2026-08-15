@@ -16,26 +16,33 @@
 }
 
 /* Block rhythm. A paragraph gap has to read as bigger than the leading inside
-   the paragraph or the blocks fuse into one grey slab — at 14px/1.65 the line
-   box is ~23px, so an 8px gap is a third of a line and reads as no gap at all.
-   12px is the smallest step that separates. Headings then need a gap clearly
-   larger than that again, or a section start reads as one more bold sentence
-   (h3–h6 share the body size on purpose — see the ladder note below, so the
-   air above them is doing all the work of announcing a new section). */
+   the paragraph or the blocks fuse into one grey slab — at 14px/1.75 the line
+   box is ~24.5px, so a 12px gap is under half a line and reads as no gap at
+   all. 16px is the smallest step that separates (and matches doc-prose).
+   Headings then need a gap clearly larger than that again, or a section start
+   reads as one more bold sentence (h3–h6 share the body size on purpose — see
+   the ladder note below, so the air above them is doing all the work of
+   announcing a new section). */
 .md-body p {
-  margin: 0 0 var(--sp-3);
+  margin: 0 0 var(--sp-4);
 }
 
 .md-body p:last-child {
   margin-bottom: 0;
 }
 
+/* Inline code sits inside prose lines, so its padding must not inflate the
+   line box: 4px of vertical padding at a 24px line height makes every line
+   carrying a code span taller than its neighbours and the rhythm goes
+   ragged. 2px keeps the chip readable without bending the leading. */
 .md-body code {
-  padding: var(--sp-1) var(--sp-2);
+  padding: var(--sp-0-5) var(--sp-1-5);
   border-radius: var(--r-1);
   background: var(--surface-2);
   color: var(--ink-1);
   font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
   letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
   font-weight: 500;
@@ -49,17 +56,30 @@
   font-style: italic;
 }
 
+/* h1/h2 get clearly more air above than a paragraph gap (sp-4) so a section
+   start can't be mistaken for one more block; h3–h6 keep sp-6. */
+.md-body h1,
+.md-body h2 {
+  margin: var(--sp-7) 0 var(--sp-2);
+}
+
+.md-body h3,
+.md-body h4,
+.md-body h5,
+.md-body h6 {
+  margin: var(--sp-6) 0 var(--sp-2);
+}
+
 .md-body h1,
 .md-body h2,
 .md-body h3,
 .md-body h4,
 .md-body h5,
 .md-body h6 {
-  margin: var(--sp-6) 0 var(--sp-2);
   color: var(--ink-1);
   font-family: var(--font-sans);
   font-weight: 600;
-  line-height: 1.3;
+  line-height: var(--leading-snug);
   letter-spacing: var(--track-0);
 }
 
@@ -78,7 +98,7 @@
    (they sat 1px from their neighbours and bought no hierarchy). h3 and below
    now share the body size and separate by weight, which is how the rest of the
    system already distinguishes roles inside one size. */
-.md-body h1 { font-size: var(--fs-heading); } /* 17px */
+.md-body h1 { font-size: var(--fs-heading); font-weight: 700; } /* 17px — the top rung needs weight, not just 2px over h2 */
 .md-body h2 { font-size: var(--fs-4); } /* 15px */
 .md-body h3,
 .md-body h4,
@@ -87,19 +107,24 @@
 
 .md-body ul,
 .md-body ol {
-  margin: 0 0 var(--sp-3);
+  margin: 0 0 var(--sp-4);
   padding-left: 1.4em;
 }
 
 .md-body ul { list-style: disc; }
 .md-body ol { list-style: decimal; }
 
+/* Nested levels step down the marker so depth reads without indentation
+   alone doing all the work. */
+.md-body ul ul { list-style: circle; }
+.md-body ul ul ul { list-style: square; }
+
 /* A list item routinely wraps to two or three lines here (agent prose is not
    short), so items need a gap that survives wrapping — 4px puts the last line
    of one item as close to the next bullet as to its own first line. */
 .md-body li {
   margin-bottom: var(--sp-2);
-  line-height: var(--leading-loose);
+  line-height: var(--leading-prose);
 }
 
 .md-body li:last-child {
@@ -116,7 +141,9 @@
 
 .md-body li > ul,
 .md-body li > ol {
-  margin-top: var(--sp-1);
+  /* Nested lists sit inside an item, so the block's sp-4 bottom gap would
+     double the inter-item spacing here. */
+  margin: var(--sp-1) 0;
 }
 
 /* GFM task lists — the checkbox is the marker; drop the disc so items don't
@@ -140,12 +167,12 @@
   display: block;
   max-width: 100%;
   height: auto;
-  margin: var(--sp-3) 0;
+  margin: var(--sp-4) 0;
   border-radius: var(--r-2);
 }
 
 .md-body blockquote {
-  margin: 0 0 var(--sp-3);
+  margin: 0 0 var(--sp-4);
   padding: var(--sp-1) var(--sp-4);
   border-left: 3px solid var(--line-1);
   color: var(--ink-2);
@@ -154,6 +181,14 @@
 
 .md-body blockquote > :last-child {
   margin-bottom: 0;
+}
+
+/* Han glyphs have no cursive forms — `italic` is synthesized oblique, which
+   reads as a rendering bug rather than a quote. The bar and the muted ink
+   already carry the quotation signal. */
+html:lang(zh-CN) .md-body blockquote,
+html:lang(zh-TW) .md-body blockquote {
+  font-style: normal;
 }
 
 .md-body hr {
@@ -183,6 +218,9 @@
   margin: 0;
   border-collapse: collapse;
   font-size: var(--fs-3);
+  /* Cells are dense data, not prose: inheriting the transcript's prose
+     leading would balloon every wrapped row. */
+  line-height: var(--leading-normal);
 }
 
 /* Cells wrap to several lines in a narrow transcript column, so the row gutter
@@ -212,13 +250,16 @@
 
 .agent-code {
   position: relative;
-  margin: var(--sp-3) 0 0;
+  margin: var(--sp-4) 0;
   padding: var(--sp-3) var(--sp-4);
   border: 1px solid var(--line-2);
   border-radius: var(--r-2);
   background: var(--surface-2);
   color: var(--ink-1);
   font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
   letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
   line-height: var(--leading-loose);
@@ -258,7 +299,7 @@
    makes the clipped edge legible rather than looking like a truncated table. */
 .md-table {
   max-width: 100%;
-  margin: 0 0 var(--sp-3);
+  margin: 0 0 var(--sp-4);
   overflow-x: auto;
   /* --line-1, not --line-2: this edge is where content gets clipped, so the
      frame has to be legible enough to read as a boundary rather than as the
@@ -310,10 +351,14 @@
 }
 
 /* ---- fence ----
-   Wraps the <pre> so the copy control can be positioned against it. */
+   Wraps the <pre> so the copy control can be positioned against it.
+   Blocks in .md-body rhythm carry their gap as margin-bottom, so the fence
+   must too — with only a top margin, a fence followed by a paragraph got a
+   0px gap (sibling margins collapse to the max, and the paragraph's margin is
+   all on its bottom edge). */
 .md-fence {
   position: relative;
-  margin: var(--sp-2) 0 0;
+  margin: 0 0 var(--sp-4);
 }
 
 .md-fence .agent-code {
@@ -371,7 +416,7 @@
    Mermaid output. The SVG carries its own intrinsic size, which can exceed a
    narrow transcript column, so the figure scrolls rather than overflowing. */
 .md-diagram {
-  margin: var(--sp-3) 0;
+  margin: var(--sp-4) 0;
   padding: var(--sp-3);
   border: 1px solid var(--line-2);
   border-radius: var(--r-2);
@@ -425,7 +470,7 @@
 }
 
 .md-body .katex-display {
-  margin: var(--sp-3) 0;
+  margin: var(--sp-4) 0;
   padding-bottom: var(--sp-1);
   overflow-x: auto;
   overflow-y: hidden;
@@ -442,7 +487,7 @@
   color: var(--ink-1);
   font-family: var(--font-sans);
   font-size: var(--fs-4);
-  line-height: var(--leading-loose);
+  line-height: var(--leading-prose);
 }
 
 .doc-prose p,
@@ -476,5 +521,5 @@
 }
 
 .doc-prose li {
-  line-height: var(--leading-loose);
+  line-height: var(--leading-prose);
 }

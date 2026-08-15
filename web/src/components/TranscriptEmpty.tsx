@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { RelayEmptyState } from "./RelayEmptyState";
 import { RelayMark } from "./RelayMark";
+import { ActionPrompt } from "./icons";
 import { sendShortcutLabel } from "../lib/sendShortcut";
 
 type TranscriptEmptyProps = {
@@ -49,7 +50,8 @@ export function TranscriptEmpty({
                 className="transcript-empty-suggestion"
                 onClick={() => onSuggestion(text)}
               >
-                {text}
+                <span>{text}</span>
+                <ActionPrompt width={13} height={13} />
               </button>
             );
           })}

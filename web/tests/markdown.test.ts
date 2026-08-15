@@ -156,6 +156,18 @@ describe("markdown component wiring", () => {
     assert.match(readWeb("src/components/AgentStream.tsx"), /<MarkdownContent text=\{visibleText\} live=\{live\} \/>/);
   });
 
+  it("carries .md-body on the transcript wrapper", () => {
+    // Every element rule in markdown.css is scoped to .md-body. The transcript
+    // uses MarkdownContent directly, so without the class on this wrapper the
+    // rules never match and headings/lists/code render as unstyled plain text.
+    assert.match(readWeb("src/components/AgentStream.tsx"), /className="md-body agent-prose"/);
+  });
+
+  it("keeps react-markdown internals off the DOM table", () => {
+    // The AST `node` prop spreads onto the element as node="[object Object]".
+    assert.match(readWeb("src/components/markdown/MarkdownTable.tsx"), /node: _node/);
+  });
+
   it("renders the space and workspace previews at document scale", () => {
     const artifactBody = readWeb("src/components/artifact/ArtifactBody.tsx");
     assert.equal(artifactBody.match(/variant="document"/g)?.length, 2);

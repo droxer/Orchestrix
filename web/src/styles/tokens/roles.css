@@ -35,6 +35,21 @@
      read the same. The only state allowed above the hover tier. */
   --line-drag: color-mix(in srgb, var(--ink-1) 30%, var(--line-1));
 
+  /* Status-tinted edge — the one strength for a border that carries a status
+     tone (set --tone first via the .tone-* classes, or it falls back to the
+     neutral ink). Was hand-mixed at nine different percentages (18–45%)
+     across the surface sheets; 35% reads against both registers on a 1px
+     hairline. */
+  --tone-line: color-mix(in srgb, var(--tone, var(--ink-1)) 35%, transparent);
+
+  /* Selected-row accent bar — the 2px inset marker down the leading edge of
+     the active item in a list or drawer section. */
+  --accent-bar: inset 2px 0 0 var(--action);
+
+  /* Badge halo — the 3px soft ring that lifts a status badge off a busy
+     row. Reads --tone like --tone-line. */
+  --ring-halo: 0 0 0 3px color-mix(in srgb, var(--tone, var(--action)) 16%, transparent);
+
   /* Interactive control boundary / unchecked track. Unlike structural
      hairlines, this role must remain at least 3:1 against every surface so an
      unfocused field or switch state is still perceivable (WCAG 1.4.11). */

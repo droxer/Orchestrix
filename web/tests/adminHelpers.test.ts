@@ -307,6 +307,21 @@ describe("agentsOnNodes", () => {
     ];
     assert.deepEqual(agentsForEmployee(alice, agents).map((a) => a.id), ["live"]);
   });
+
+  it("associates agents through the Computer's current runtime node", () => {
+    const agents = [
+      agent({
+        id: "replaced-runtime",
+        placements: [placement({
+          id: "p1",
+          daemonNodeId: "runtime-old",
+          runtimeNodeId: "n1",
+        })],
+      }),
+    ];
+
+    assert.deepEqual(agentsForEmployee(alice, agents).map((a) => a.id), ["replaced-runtime"]);
+  });
 });
 
 describe("initialsOf", () => {

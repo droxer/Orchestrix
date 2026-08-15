@@ -142,7 +142,7 @@
   font-size: var(--fs-4);
   font-weight: 600;
   letter-spacing: var(--track-display);
-  line-height: 1.2;
+  line-height: var(--leading-tight);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -339,17 +339,17 @@ button.computer-run-open:hover {
 .computer-runtime-row[data-presence="offline"] .adm-agent-dot,
 .computer-runtime-row[data-presence="disabled"] .adm-agent-dot {
   background: transparent;
-  box-shadow: inset 0 0 0 1.25px var(--ink-4);
+  box-shadow: inset 0 0 0 1.5px var(--ink-4);
 }
 
 .computer-runtime-row[data-presence="offline"].tone-warn .adm-agent-dot {
-  box-shadow: inset 0 0 0 1.25px var(--warn);
+  box-shadow: inset 0 0 0 1.5px var(--warn);
 }
 
 /* A runtime that failed keeps its loud ring: "not available" and "broken"
    are different problems and the reader fixes them differently. */
 .computer-runtime-row[data-presence="offline"].tone-bad .adm-agent-dot {
-  box-shadow: inset 0 0 0 1.25px var(--err);
+  box-shadow: inset 0 0 0 1.5px var(--err);
 }
 
 .computer-card[data-online="false"] .computer-runtime-row {
@@ -376,6 +376,9 @@ button.computer-run-open:hover {
 
 .computer-runtime-version {
   font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
   letter-spacing: var(--type-code-track);
 }
 
@@ -414,9 +417,12 @@ button.computer-run-open:hover {
   display: block;
   min-width: 0;
   font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
   letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
-  line-height: 1.4;
+  line-height: var(--leading-snug);
   overflow-wrap: anywhere;
 }
 

@@ -21,6 +21,7 @@ import type {
   ManagedNodesResponse,
   ManagedNodeRecord,
   CreateSessionInput,
+  CreateProjectInput,
   CreateTaskInput,
   ControlPanelDaemonNodesResponse,
   ControlPanelEmployeesResponse,
@@ -32,6 +33,8 @@ import type {
   EmployeeAgent,
   EmployeeRecord,
   OrgSettingsResponse,
+  ProjectsResponse,
+  ProjectRecord,
   UpdateControlPanelEmployeeInput,
   AgentTeam,
   AgentTeamsResponse,
@@ -592,7 +595,7 @@ export function getWorkspaceBrief(
 }
 
 export function listAgentWorkspaceFiles(
-  input: { agentId: string; threadId?: string; teamId?: string; path?: string; scope?: WorkspaceScope },
+  input: { agentId: string; threadId: string; teamId?: string; path?: string; scope?: WorkspaceScope },
   signal?: AbortSignal,
 ): Promise<AgentWorkspaceFilesResponse> {
   const params = new URLSearchParams();
@@ -605,7 +608,7 @@ export function listAgentWorkspaceFiles(
 }
 
 export function readAgentWorkspaceFile(
-  input: { agentId: string; threadId?: string; teamId?: string; path: string; scope?: WorkspaceScope },
+  input: { agentId: string; threadId: string; teamId?: string; path: string; scope?: WorkspaceScope },
   signal?: AbortSignal,
 ): Promise<AgentWorkspaceFileResponse> {
   const params = new URLSearchParams({ path: input.path });
@@ -635,6 +638,14 @@ export function readNodeWorkspaceFile(
 
 export function listTasks(signal?: AbortSignal): Promise<TasksResponse> {
   return apiJson<TasksResponse>("/tasks?view=summary", { signal });
+}
+
+export function listProjects(signal?: AbortSignal): Promise<ProjectsResponse> {
+  return apiJson<ProjectsResponse>("/projects", { signal });
+}
+
+export function createProject(input: CreateProjectInput): Promise<{ project: ProjectRecord }> {
+  return apiJson<{ project: ProjectRecord }>("/projects", { method: "POST", body: input });
 }
 
 export function createTask(input: CreateTaskInput): Promise<RelayTask> {
@@ -868,6 +879,7 @@ export function runLogicalAgents(input: AgentRunInput): Promise<RelaySession> {
       taskGoal: input.taskGoal,
       ...(input.daemonNodeId ? { daemonNodeId: input.daemonNodeId } : {}),
       ...(input.teamId ? { teamId: input.teamId } : {}),
+      ...(input.projectId ? { projectId: input.projectId } : {}),
       ...(input.assignments ? { assignments: input.assignments } : {}),
       sessionId: input.sessionId,
       ...(input.userMessageId ? { userMessageId: input.userMessageId } : {}),

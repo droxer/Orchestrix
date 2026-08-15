@@ -18,8 +18,8 @@ export function BoardEmpty({
 }) {
   return (
     <div className="backlog-board-empty">
-      <h2 className="backlog-board-empty-title">{title}</h2>
-      <p className="backlog-board-empty-body">{body}</p>
+      <h2 className="relay-empty-title">{title}</h2>
+      <p className="backlog-board-empty-body relay-empty-body">{body}</p>
       {onCreate && createLabel ? (
         <Button size="sm" onClick={onCreate}>
           <ActionCompose size={14} />

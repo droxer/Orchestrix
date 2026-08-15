@@ -710,7 +710,9 @@ def test_task_start_runs_multi_agent_adaptive_pipeline(
         )
 
 
-def test_task_start_without_agent_runs_ready_team_pipeline(monkeypatch) -> None:
+def test_unclassified_task_without_assignment_uses_existing_ready_agents(
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
@@ -735,16 +737,6 @@ def test_task_start_without_agent_runs_ready_team_pipeline(monkeypatch) -> None:
             authorized_node_location="employee-device",
         )
         computer = computer_id(provisioned)
-        for executor_kind in ("claude", "codex"):
-            app.state.agent_store.create_agent(
-                "alice",
-                {
-                    "displayName": executor_kind.title(),
-                    "executorKind": executor_kind,
-                    "defaultRole": "implementer",
-                    "computerId": computer,
-                },
-            )
         registered = client.post(
             "/api/v1/daemon-node-registrations",
             json={
@@ -760,24 +752,29 @@ def test_task_start_without_agent_runs_ready_team_pipeline(monkeypatch) -> None:
             headers={"Authorization": "Bearer ui_token"},
         )
         assert registered.status_code == 200
-        team_agents = {
-            agent["executorKind"]: agent
-            for agent in app.state.agent_store.list_agents(
-                supervisor_employee_id="alice"
-            )
-        }
-        for executor_kind, agent in team_agents.items():
-            team_agents[executor_kind] = app.state.agent_store.update_agent(
-                agent["id"],
-                {"instructions": f"Act as Alice's {executor_kind} teammate."},
-            )
-            [placement] = app.state.agent_placement_store.list_placements(
-                agent_id=agent["id"]
-            )
-            app.state.agent_placement_store.update_placement(
-                placement["id"],
-                {"agentVersion": team_agents[executor_kind]["version"]},
-            )
+        assert app.state.agent_store.list_agents(supervisor_employee_id="alice") == []
+        named = client.post(
+            "/api/v1/admin/agents",
+            json={
+                "supervisorEmployeeId": "alice",
+                "displayName": "Builder",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": computer,
+            },
+        )
+        assert named.status_code == 201, named.text
+        reviewer = client.post(
+            "/api/v1/admin/agents",
+            json={
+                "supervisorEmployeeId": "alice",
+                "displayName": "Reviewer",
+                "executorKind": "claude",
+                "defaultRole": "reviewer",
+                "computerId": computer,
+            },
+        )
+        assert reviewer.status_code == 201, reviewer.text
         created = client.post(
             "/api/v1/tasks",
             json={
@@ -792,10 +789,12 @@ def test_task_start_without_agent_runs_ready_team_pipeline(monkeypatch) -> None:
 
         started = client.post(f"/api/v1/tasks/{created.json()['id']}/runs", json={})
         assert started.status_code == 202
-        session_id = started.json()["session"]["id"]
-        assert started.json()["task"]["linkedSessionIds"] == [session_id]
-        assert started.json()["task"]["status"] == "running"
-        assert "assignedAgent" not in started.json()["task"]
+        session = started.json()["session"]
+        assert session is not None
+        assert started.json()["task"]["linkedSessionIds"] == [session["id"]]
+        # The first participant is admitted immediately; the remaining named
+        # agents are admitted as the coordinated round advances.
+        assert session["participantAgentIds"] == [named.json()["agent"]["id"]]
 
         commands = client.get(
             "/api/v1/daemon-nodes/sbx_alice/commands",
@@ -803,16 +802,7 @@ def test_task_start_without_agent_runs_ready_team_pipeline(monkeypatch) -> None:
         )
         assert commands.status_code == 200
         [first] = commands.json()["commands"]
-        assert first["agent"] == "claude"
-        assert first["logicalAgentId"] == team_agents["claude"]["id"]
-        assert first["state"]["agent_instructions"] == (
-            "Act as Alice's claude teammate."
-        )
-        assert "mode" not in first
-        assert (
-            first["taskGoal"]
-            == "Design checkout recovery\n\nFind the right implementation plan and risks."
-        )
+        assert first["logicalAgentId"] == named.json()["agent"]["id"]
 
         completed_first = client.post(
             "/api/v1/daemon-nodes/sbx_alice/events",
@@ -822,13 +812,13 @@ def test_task_start_without_agent_runs_ready_team_pipeline(monkeypatch) -> None:
                 **({"leaseId": first["leaseId"]} if first.get("leaseId") else {}),
                 "sessionId": first["sessionId"],
                 "runId": first["runId"],
-                "agent": "claude",
+                "agent": first["agent"],
                 "exitCode": 0,
-                "agentLog": "Planner recommends a staged rollout.",
+                "agentLog": "Builder proposes the implementation.",
             },
             headers={"Authorization": "Bearer node_token"},
         )
-        assert completed_first.status_code == 200
+        assert completed_first.status_code == 200, completed_first.text
 
         commands = client.get(
             "/api/v1/daemon-nodes/sbx_alice/commands",
@@ -836,12 +826,7 @@ def test_task_start_without_agent_runs_ready_team_pipeline(monkeypatch) -> None:
         )
         assert commands.status_code == 200
         [second] = commands.json()["commands"]
-        assert second["agent"] == "codex"
-        assert second["logicalAgentId"] == team_agents["codex"]["id"]
-        assert second["state"]["agent_instructions"] == (
-            "Act as Alice's codex teammate."
-        )
-        assert "mode" not in second
+        assert second["logicalAgentId"] == reviewer.json()["agent"]["id"]
         assert "prior_agent_bridge" in second["state"]
 
         completed_second = client.post(
@@ -852,23 +837,42 @@ def test_task_start_without_agent_runs_ready_team_pipeline(monkeypatch) -> None:
                 **({"leaseId": second["leaseId"]} if second.get("leaseId") else {}),
                 "sessionId": second["sessionId"],
                 "runId": second["runId"],
-                "agent": "codex",
+                "agent": second["agent"],
                 "exitCode": 0,
-                "agentLog": "Engineer identifies the implementation steps.",
+                "agentLog": "Reviewer accepts the implementation.",
             },
             headers={"Authorization": "Bearer node_token"},
         )
-        assert completed_second.status_code == 200
+        assert completed_second.status_code == 200, completed_second.text
+        finished = client.get(f"/api/v1/tasks/{created.json()['id']}")
+        assert finished.status_code == 200
+        assert finished.json()["status"] == "done"
 
-        task = client.get(f"/api/v1/tasks/{created.json()['id']}")
-        assert task.status_code == 200
-        assert task.json()["status"] == "done"
-        assert task.json()["linkedSessionIds"] == [session_id]
-        assert "assignedAgent" not in task.json()
-        assert all(
-            item["message"] != "Discussion started."
-            for item in task.json()["activity"]
+        removed = client.delete(
+            f"/api/v1/admin/agents/{reviewer.json()['agent']['id']}"
         )
+        assert removed.status_code == 200, removed.text
+        single = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Run with the one remaining named agent",
+                "ownerEmployeeId": "alice",
+                "assigneeEmployeeId": "alice",
+            },
+        )
+        assert single.status_code == 201, single.text
+        single_started = client.post(
+            f"/api/v1/tasks/{single.json()['id']}/runs", json={}
+        )
+        assert single_started.status_code == 202, single_started.text
+        assert single_started.json()["session"] is not None
+        single_commands = client.get(
+            "/api/v1/daemon-nodes/sbx_alice/commands",
+            headers={"Authorization": "Bearer node_token"},
+        )
+        assert single_commands.status_code == 200
+        [single_command] = single_commands.json()["commands"]
+        assert single_command["logicalAgentId"] == named.json()["agent"]["id"]
 
 
 def test_agent_selected_review_work_uses_normal_task_completion(monkeypatch) -> None:

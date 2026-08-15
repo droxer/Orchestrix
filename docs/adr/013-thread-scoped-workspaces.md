@@ -50,7 +50,9 @@ environment variable.
 
 Agents participating in one thread share its root. A logical agent's private
 directory remains `agents/agent-<encoded-agent-id>/`, now beneath the thread
-root. Generated-file paths remain thread-relative in session artifacts. A
+root. That subdirectory is thread-local runtime state, not an Agent-owned
+workspace, and it never crosses thread boundaries. Generated-file paths remain
+thread-relative in session artifacts. A
 daemon advertises the `thread-workspaces` capability so the backend can resolve
 host paths correctly during rolling upgrades.
 
@@ -90,9 +92,9 @@ workspace layout retain `node-root` compatibility.
 - Local and cloud computers use the same daemon interface despite different
   root ownership.
 - The node workspace browser sees thread directories at its root.
-- Live agent-home reads include a thread ID. Cross-thread agent workspace views
-  use durable artifacts instead of treating the legacy node root as an agent
-  home.
+- Every live or snapshot workspace read includes a thread ID. Durable artifacts
+  may provide an offline view of that Thread, but are never merged into a
+  cross-thread Agent workspace.
 - Existing daemons without `thread-workspaces` may continue genuinely
   historical sessions at the legacy node root. The backend rejects new
   thread-layout runs and never sends those daemons a thread-scoped live-read

@@ -40,6 +40,11 @@ from .helpers import (
     string_field,
     workspace_artifacts,
 )
+from .project_helpers import (
+    ensure_project_node_matches,
+    project_for_owner,
+    project_session_fields,
+)
 
 router = APIRouter()
 
@@ -98,6 +103,10 @@ def session_brief_item(session: dict[str, Any]) -> dict[str, Any]:
         "ownerEmployeeId": session.get("ownerEmployeeId"),
         "ownerAgentId": session.get("ownerAgentId"),
         "teamId": session.get("teamId"),
+        "projectId": session.get("projectId"),
+        "workspaceLayout": session.get("workspaceLayout"),
+        "workspaceSubpath": session.get("workspaceSubpath"),
+        "computerId": session.get("computerId"),
         "currentAgent": session.get("currentAgent"),
         "pendingDecision": session.get("pendingDecision"),
         "archived": session.get("archived", False),
@@ -116,6 +125,7 @@ def task_brief_item(task: dict[str, Any]) -> dict[str, Any]:
         "status": task.get("status"),
         "priority": task.get("priority"),
         "ownerEmployeeId": task.get("ownerEmployeeId"),
+        "projectId": task.get("projectId"),
         "assigneeEmployeeId": task.get("assigneeEmployeeId"),
         "assignedAgent": task.get("assignedAgent"),
         "assignedAgentId": task.get("assignedAgentId"),
@@ -338,22 +348,17 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
     ]
     sessions = ensure_sessions_managed_affinity(ctx, sessions)
     team_session_ids = {session["id"] for session in sessions} if team else set()
-    placement_node_ids: set[str] | None = None
+    placements: list[dict[str, Any]] | None = None
     if agent:
-        placement_node_ids = {
-            placement["daemonNodeId"]
-            for placement in ctx.agent_placement_store.list_placements(
-                agent_id=agent["id"]
-            )
-        }
+        placements = ctx.agent_placement_store.list_placements(agent_id=agent["id"])
     elif team:
-        placement_node_ids = {
-            placement["daemonNodeId"]
+        placements = [
+            placement
             for agent_id in team.get("memberAgentIds", [])
             for placement in ctx.agent_placement_store.list_placements(
                 agent_id=agent_id
             )
-        }
+        ]
     nodes = []
     for node in ctx.registry.monitor_nodes():
         active_node_runs = node.get("activeRuns", [])
@@ -366,10 +371,18 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
             if team
             else False
         )
+        has_placement = placements is not None and any(
+            placement.get("computerId") == resolve_computer_id(node)
+            or (
+                not placement.get("computerId")
+                and placement.get("daemonNodeId") == node["id"]
+            )
+            for placement in placements
+        )
         include_node = (
             node.get("employeeId") == employee_id
-            if placement_node_ids is None
-            else node["id"] in placement_node_ids or has_authorized_run
+            if placements is None
+            else has_placement or has_authorized_run
         )
         if include_node:
             nodes.append(node)
@@ -465,6 +478,13 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
     session_computer_id = None
     task_id = body.get("taskId") if isinstance(body.get("taskId"), str) else None
     task = get_task_for_actor(ctx.task_store, task_id, actor) if task_id else None
+    requested_project_id = string_field(body, "projectId") or None
+    task_project_id = task.get("projectId") if task else None
+    if requested_project_id and task_project_id and requested_project_id != task_project_id:
+        raise HTTPException(400, "thread_project_task_mismatch")
+    project_id = task_project_id or requested_project_id
+    if project_id and "assignments" in body:
+        raise HTTPException(400, "project_assignment_override_unsupported")
     owner = owner_employee_id_for_create(actor, body)
     thread_ownership = {
         "owner_employee_id": owner,
@@ -517,6 +537,15 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
             )
         managed_node_id = node.get("managedNodeId")
         session_computer_id = resolve_computer_id(node)
+    else:
+        node = None
+    project = project_for_owner(ctx, project_id, owner) if project_id and owner else None
+    project_fields: dict[str, Any] = {}
+    if project:
+        ensure_project_node_matches(project, node)
+        project_fields = project_session_fields(ctx, project)
+        workspace_path = project_fields.pop("workspace_path")
+        session_computer_id = project_fields.pop("computer_id")
     controller = SessionController(
         ctx.session_store,
         task_store=ctx.task_store,
@@ -525,6 +554,7 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
         daemon_node_id=daemon_node_id,
         managed_node_id=managed_node_id,
         computer_id=session_computer_id,
+        **project_fields,
         **thread_ownership,
     )
     session = controller.create_session(

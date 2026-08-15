@@ -178,7 +178,7 @@
   max-width: var(--measure-tight);
   color: var(--ink-3);
   font-size: var(--fs-3);
-  line-height: 1.45;
+  line-height: var(--leading-normal);
 }
 
 /* The header is space-between (title ↔ close); the view switch joins the

@@ -6,7 +6,7 @@ export type AgentRole = "implementer" | "reviewer" | "planner" | "tester" | "fix
 export type SessionStatus = "running" | "waiting_for_human" | "completed" | "failed" | "cancelled";
 export type RelayArtifactKind = "plan" | "diff" | "review" | "test_output" | "command_log" | "summary" | "agent_output" | "workspace_file";
 export type HumanDecisionKind = "approve" | "reject" | "cancel" | "rerun" | "handoff" | "mark_done";
-export type WorkspaceLayout = "node-root" | "thread";
+export type WorkspaceLayout = "node-root" | "thread" | "project";
 
 export interface AgentRun {
   id: string;
@@ -133,10 +133,16 @@ export interface RelaySession {
   workspacePath: string;
   /** Missing on historical sessions, which retain the legacy node-root layout. */
   workspaceLayout?: WorkspaceLayout;
+  /** Stable project identity when several threads share one project workspace. */
+  projectId?: string;
+  /** Relative directory below the Computer's configured workspace root. */
+  workspaceSubpath?: string;
   /** Daemon node selected as this thread's immutable runtime boundary. */
   daemonNodeId?: string;
   /** Stable managed Computer identity; survives daemon runtime replacement. */
   managedNodeId?: string;
+  /** Stable Computer identity; daemon node IDs may be replaced. */
+  computerId?: string;
   /** Employee who owns this session; their agent runs the work on their behalf. */
   ownerEmployeeId?: string;
   /** Named Team that originated this session, retained as immutable provenance. */
@@ -176,6 +182,9 @@ export type RelayEvent =
       timestamp: string;
       workspacePath: string;
       workspaceLayout?: WorkspaceLayout;
+      projectId?: string;
+      workspaceSubpath?: string;
+      computerId?: string;
       daemonNodeId?: string;
       managedNodeId?: string;
       ownerEmployeeId?: string;

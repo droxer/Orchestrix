@@ -4,12 +4,12 @@
 
 Accepted for incremental implementation. The first vertical slice is
 implemented: event-sourced employee agents and placements, compatibility
-materialization from existing daemon capabilities, agent-targeted dispatch,
-per-assignment node placement, run audit identity, logical-agent instructions,
+translation for legacy requests, agent-targeted dispatch,
+per-assignment Computer placement, run audit identity, logical-agent instructions,
 employee chat selection, and an admin Agents view.
 
 PostgreSQL-backed agent/placement stores, durable task and routine assignment
-by logical agent, canonical workspace identity, and node-scoped team dispatch
+by logical Agent, stable Computer identity, and Computer-affine team dispatch
 are also implemented. Artifact transfer, placement reconciliation, broader
 named-agent clients, and compatibility retirement remain rollout work.
 
@@ -19,25 +19,27 @@ Implementation is staged in
 ## Summary
 
 Employees should work with named agents. They should not need to understand
-which daemon node currently runs an agent. Nodes advertise runtime capability;
-the control plane places employee-owned agents on compatible nodes and selects
-a healthy placement for every run.
+which replaceable Daemon Node currently serves a Computer. Computers advertise
+Agent Runtime capabilities through their Daemon Nodes; the control plane binds
+employee-owned Agents to a required runtime on a stable Computer and resolves a
+healthy current node for every run.
 
 The current relationship:
 
 ```text
-employee -> daemon node -> supported agent names
+computer -> daemon node -> supported executor names
 ```
 
 becomes:
 
 ```text
-employee -> logical agent -> placement -> daemon node
+employee -> logical agent -> placement -> agent runtime -> computer -> daemon node
 ```
 
 This permits one employee to own several agents, including multiple agents of
-the same executor kind. Independent agents may live on different nodes, while
-agents assembled into one team must share a node.
+the same Agent Runtime kind. Independent Agents may live on different
+Computers, while Agents assembled into one Thread must use runtimes on that
+Thread's Computer.
 
 ## Goals
 
@@ -66,7 +68,7 @@ agents assembled into one team must share a node.
 | Executor kind | Runtime implementation: `claude`, `pi`, `codex`, or `kimi`. This replaces the ambiguous use of agent name for a CLI type. |
 | Logical agent | Employee-owned identity with a name, executor kind, role, instructions, and policy. |
 | Runtime capability | A daemon's report that it can execute an executor kind, including health and capacity. |
-| Placement | Binding that allows one logical agent to execute through one runtime capability on one daemon node. |
+| Placement | Binding that allows one logical agent to execute through one Agent Runtime on one stable Computer. |
 | Placement candidate | A placement that satisfies ownership, health, policy, workspace, and capacity requirements for a run. |
 | Runtime node | The observed daemon node that heartbeats and executes leased commands. |
 | Managed node | Desired infrastructure resource reconciled by the supervisor. |
@@ -82,8 +84,9 @@ registration.
 ### Nodes advertise capabilities; they do not define employees
 
 Daemon registration reports what the runtime can execute. Employee ownership
-is attached to logical agents. A node may host placements for several agents
-and, subject to policy, several employees.
+is attached to logical agents. Registration never creates a logical agent. A
+node may host placements for several agents and, subject to policy, several
+employees.
 
 ### Runs target agents and record placements
 
@@ -93,15 +96,16 @@ This preserves the employee-facing identity and the operational audit trail.
 
 ### Placement is replaceable
 
-Moving an agent to another node must not change its identity or split its
-conversation history. A failed node makes a placement unavailable, not the
-logical agent nonexistent.
+Moving an Agent to another Computer must not change its identity or split its
+conversation history. Replacing a Computer's Daemon Node does not move the
+Agent or recreate its Placement. An unavailable Computer makes a placement
+offline, not the logical agent nonexistent.
 
-### Workspace compatibility is a scheduling constraint
+### Workspace belongs to the thread
 
-Relay must not dispatch an agent to a node that cannot access the session's
-workspace. The first release favors explicit workspace affinity over implicit
-file copying.
+Every thread owns one workspace on its selected Computer. All participating
+agents execute inside that thread workspace; logical agents have no independent
+workspace to move or reuse across threads.
 
 ## Domain model
 
@@ -129,13 +133,16 @@ not unique: an employee may own both `Researcher` and `Reviewer` using Claude.
 
 ### AgentPlacement
 
-`AgentPlacement` binds a logical agent to an observed daemon capability.
+`AgentPlacement` binds a logical Agent and its required Agent Runtime to a
+stable Computer. The current Daemon Node is resolved from `computerId`; its ID
+is runtime/audit metadata, never the durable placement boundary.
 
 | Field | Type | Notes |
 | :- | :- | :- |
 | `id` | string | Stable `placement_...` identity. |
 | `agentId` | string | Logical agent. |
-| `daemonNodeId` | string | Runtime node. |
+| `computerId` | string | Stable Computer identity and durable placement target. |
+| `daemonNodeId` | string | Runtime node observed when the placement was created; audit/legacy fallback only. |
 | `executorKind` | enum | Must equal the logical agent executor kind. |
 | `desiredState` | enum | `active`, `draining`, or `removed`. |
 | `status` | enum | `pending`, `ready`, `busy`, `offline`, `incompatible`, or `failed`. |
@@ -152,8 +159,8 @@ horizontal capacity remain future work.
 
 ### Daemon runtime capability
 
-Daemon registration continues to report executor health, but the protocol
-renames the concept from agent identity to runtime capability:
+Daemon registration continues to report Agent Runtime health. These are
+Computer capabilities, not Agent identities:
 
 ```ts
 interface DaemonExecutorCapability {
@@ -211,7 +218,8 @@ For each assignment, the control plane:
 
 1. Resolves `agentId`, verifies ownership/sharing, and checks that it is enabled.
 2. Loads active placements matching the agent version and executor kind.
-3. Rejects placements whose daemon heartbeat, executor capability, protocol,
+3. Resolves each placement's Computer to its current Daemon Node and rejects it
+   when heartbeat, Agent Runtime capability, protocol,
    or policy is incompatible.
 4. Rejects placements without access to the session workspace.
 5. Rejects placements without run capacity.
@@ -226,17 +234,19 @@ Selection must return structured rejection reasons so the UI can distinguish
 
 ### Multi-agent workflows
 
-The first assignment selects a node. Every later assignment in the same
-multi-agent workflow must have an eligible placement on that node:
+The first assignment selects a Computer and resolves its current Daemon Node.
+Every later assignment in the same multi-agent workflow must have an eligible
+Agent Runtime placement on that Computer and execute in the same Thread
+workspace:
 
 ```text
-Researcher (Claude) @ node-a
-    -> Builder (Codex) @ node-a
-    -> Reviewer (Claude) @ node-a
+Researcher -> Claude Runtime @ Computer A
+    -> Builder -> Codex Runtime @ Computer A
+    -> Reviewer -> Claude Runtime @ Computer A
 ```
 
 The session remains the durable workflow authority. Handoff data is carried by
-session events and artifacts, while the shared node workspace provides the
+session events and artifacts, while the Thread workspace provides the
 collaboration boundary.
 
 ## Workspace policy
@@ -245,12 +255,12 @@ The first release defines three explicit workspace compatibility modes:
 
 | Mode | Behavior |
 | :- | :- |
-| `node-affine` | Session remains on placements attached to the original workspace/node. |
+| `node-affine` | Legacy name: the Thread remains on placements attached to its original Computer. |
 | `shared-path` | Legacy infrastructure metadata for a canonical workspace identity; it does not authorize cross-node collaboration. |
 | `artifact-handoff` | Reserved for a future explicit cross-node protocol; it is not a team scheduling mode. |
 
-All current multi-agent workflows are node-scoped. Workspace identity still
-detects continuity and drift on that node. See
+All current multi-agent workflows are Computer-affine because their workspace
+belongs to one Thread on one Computer. See
 [ADR-011](adr/011-node-scoped-agent-collaboration.md).
 
 ## Managed-node relationship
@@ -325,11 +335,11 @@ presented as employee ownership.
 
 - Existing `AgentName` remains the executor-kind type until a later rename.
 - Existing sessions and tasks without `agentId` remain executable.
-- One compatibility agent is created per
-  `(employeeId, daemonNodeId, executorKind)` observed in assigned daemon
-  capabilities. This preserves the current employee-facing model in which each
-  computer contributes its own agent entries while allowing custom logical
-  agents to move between computers without changing identity.
+- Daemon registration and Computer assignment never create agents.
+- An old request without `agentId` may lazily create a hidden compatibility
+  identity for `(employeeId, computerId, executorKind)`. It exists only to
+  translate that request through the logical-agent pipeline and is not returned
+  in the employee Agent roster.
 - Existing node-level disabled-agent and role-default settings remain enforced
   until equivalent placement/agent policy is materialized.
 - Daemons can upgrade independently because the backend accepts both old
@@ -341,10 +351,11 @@ presented as employee ownership.
 
 - One employee can own multiple logical agents, including two of the same
   executor kind.
-- Those agents can be placed on different daemon nodes.
+- Those Agents can be placed on different Computers.
 - Employees select agents without selecting nodes.
 - Every run records logical agent, placement, runtime node, and executor kind.
-- A node outage makes only its placements unavailable and does not remove
-  logical agents or history.
+- Replacing a Computer's Daemon Node preserves its placements. A Computer
+  outage makes only its placements unavailable and does not remove logical
+  Agents or history.
 - Legacy sessions, clients, and daemons continue to operate during rollout.
 - Cross-node dispatch never occurs without a compatible workspace policy.

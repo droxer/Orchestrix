@@ -133,8 +133,8 @@
   color: var(--ink-1);
   box-shadow: var(--shadow-2);
   font: var(--type-body-sm);
-  line-height: 1.45;
-  animation: overlay-toast-in var(--t-fast) var(--ease) both;
+  line-height: var(--leading-normal);
+  animation: rise var(--t-fast) var(--ease) both;
 }
 
 .dialog-toast-message {
@@ -156,7 +156,7 @@
 }
 
 .dialog-toast-close:hover {
-  background: var(--surface-2);
+  background: var(--control-fill-hover);
   color: var(--ink-1);
 }
 

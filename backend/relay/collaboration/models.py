@@ -51,6 +51,7 @@ class RunIntent:
     raw_assignments: list[dict[str, Any]] | None
     mode: str = "action"
     requested_team_id: str | None = None
+    requested_project_id: str | None = None
     requested_node_id: str | None = None
     idempotency_key: str | None = None
     user_message_id: str | None = None

@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   ArrowRightLeft,
   ArrowUp,
+  ArrowUpRight,
   Bot,
   Check,
   CircleAlert,
@@ -125,6 +126,9 @@ export const ActionCompose = withStandardStroke(SquarePen, "ActionCompose");
 export const ActionCopy = withStandardStroke(Copy, "ActionCopy");
 export const ActionRetry = withStandardStroke(RefreshCw, "ActionRetry");
 export const ActionSend = withStandardStroke(ArrowUp, "ActionSend");
+// Starter-prompt chip affordance — the arrow reads as "drop this into the
+// composer" without reusing the send glyph's meaning.
+export const ActionPrompt = withStandardStroke(ArrowUpRight, "ActionPrompt");
 export const ActionApprove = withStandardStroke(Check, "ActionApprove");
 export const ActionHandoff = withStandardStroke(Forward, "ActionHandoff");
 // Routing a turn to another agent — the two-way arrows read as "pass along",

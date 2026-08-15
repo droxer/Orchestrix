@@ -73,4 +73,15 @@ describe("hostedAgentsByNode", () => {
 
     assert.equal(byNode.size, 0);
   });
+
+  it("groups an agent under the Computer's current runtime node", () => {
+    const replaced = agent({
+      placements: [placement({ daemonNodeId: "runtime_old", runtimeNodeId: "runtime_new" })],
+    });
+
+    const byNode = hostedAgentsByNode([replaced]);
+
+    assert.equal(byNode.has("runtime_old"), false);
+    assert.deepEqual((byNode.get("runtime_new") ?? []).map((item) => item.agent.id), ["agent_1"]);
+  });
 });

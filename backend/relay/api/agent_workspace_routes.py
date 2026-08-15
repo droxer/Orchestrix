@@ -1,4 +1,4 @@
-"""Agent-scoped workspace browsing through live daemon reads or snapshots."""
+"""Thread-scoped workspace browsing through live daemon reads or snapshots."""
 
 from __future__ import annotations
 
@@ -22,7 +22,6 @@ from ..services.workspace_query import WORKSPACE_COMMAND_TIMEOUT_SECONDS
 from .deps import AppContext, AppContextDep
 from .helpers import (
     artifact_index_item,
-    newest_agent_workspace_artifacts,
     request_actor,
     workspace_artifacts,
 )
@@ -48,7 +47,7 @@ def _authorized_agent(
         not actor["isAdmin"]
         and agent_supervisor_employee_id(agent) != actor["employeeId"]
     ):
-        raise HTTPException(403, "Cannot read another employee's agent workspace.")
+        raise HTTPException(403, "Cannot read another employee's thread workspace.")
     return agent
 
 
@@ -73,10 +72,10 @@ def _path(raw: str | None, *, required: bool = False) -> str:
 
 def _thread_session(
     ctx: AppContext, request: Request, agent_id: str, scope: str
-) -> tuple[str | None, dict[str, Any] | None]:
+) -> tuple[str, dict[str, Any]]:
     thread_id = (request.query_params.get("threadId") or "").strip()
     if not thread_id:
-        return None, None
+        raise HTTPException(400, "threadId is required for workspace access.")
     if (
         not THREAD_ID_PATTERN.fullmatch(thread_id)
         or thread_id in (".", "..")
@@ -106,7 +105,23 @@ def _thread_session(
         ):
             raise HTTPException(404, "Team workspace thread not found.")
         team_participates = True
-    participates = (
+    project_participates = False
+    project_id = session.get("projectId")
+    if project_id:
+        project = ctx.project_store.get_project(project_id)
+        actor = request_actor(request, ctx.auth_store)
+        project_participates = bool(
+            project
+            and (
+                actor["isAdmin"]
+                or project.get("ownerEmployeeId") == actor["employeeId"]
+            )
+            and any(
+                member.get("agentId") == agent_id and member.get("enabled", True)
+                for member in project.get("members", [])
+            )
+        )
+    participates = project_participates if project_id else (
         team_participates
         or session.get("ownerAgentId") == agent_id
         or any(
@@ -165,7 +180,8 @@ def _workspace_error(event: dict[str, Any]) -> None:
 def _select_thread_node(
     ctx: AppContext, session: dict[str, Any], scope: str
 ) -> dict[str, Any] | None:
-    if session.get("workspaceLayout") != "thread":
+    workspace_layout = session.get("workspaceLayout")
+    if workspace_layout not in ("thread", "project"):
         return None
     capability = "workspace-read-shared" if scope == "shared" else "workspace-read"
     nodes = ctx.registry.monitor_nodes()
@@ -191,7 +207,12 @@ def _select_thread_node(
         or not node.get("online")
         or node.get("stale")
         or capability not in (node.get("capabilities") or [])
-        or "thread-workspaces" not in (node.get("capabilities") or [])
+        or (
+            "project-workspaces"
+            if workspace_layout == "project"
+            else "thread-workspaces"
+        )
+        not in (node.get("capabilities") or [])
     ):
         return None
     return node
@@ -200,22 +221,22 @@ def _select_thread_node(
 def _scope_command(
     scope: str,
     agent_id: str,
-    thread_id: str | None,
-    workspace_layout: str | None,
+    thread_id: str,
+    workspace_layout: str,
+    workspace_subpath: str | None = None,
 ) -> dict[str, Any]:
     return {
         "agentId": agent_id,
         **({"scope": "shared"} if scope == "shared" else {}),
-        **({"sessionId": thread_id} if thread_id else {}),
-        **({"workspaceLayout": workspace_layout} if workspace_layout else {}),
+        "sessionId": thread_id,
+        "workspaceLayout": workspace_layout,
+        **({"workspaceSubpath": workspace_subpath} if workspace_subpath else {}),
     }
 
 
 def _snapshot_artifacts(
-    ctx: AppContext, agent_id: str, session: dict[str, Any] | None
+    ctx: AppContext, agent_id: str, session: dict[str, Any]
 ) -> list[dict[str, Any]]:
-    if session is None:
-        return newest_agent_workspace_artifacts(ctx.session_store, agent_id)
     return [
         artifact_index_item(session, artifact)
         for artifact in workspace_artifacts(session)
@@ -231,9 +252,7 @@ async def agent_workspace_files(
     scope = _scope(request)
     path = _path(request.query_params.get("path"))
     thread_id, session = _thread_session(ctx, request, agent_id, scope)
-    # Agent homes are thread-scoped. Without an explicit thread, serve the
-    # durable cross-thread artifact view instead of reading the legacy node root.
-    node = _select_thread_node(ctx, session, scope) if session else None
+    node = _select_thread_node(ctx, session, scope)
     if node:
         event = await _dispatch(
             ctx,
@@ -245,7 +264,8 @@ async def agent_workspace_files(
                     scope,
                     agent_id,
                     thread_id,
-                    session.get("workspaceLayout") if session else None,
+                    session.get("workspaceLayout") or "thread",
+                    session.get("workspaceSubpath"),
                 ),
                 "path": path,
             },
@@ -256,7 +276,7 @@ async def agent_workspace_files(
             "scope": scope,
             "source": "live",
             "nodeId": node["id"],
-            **({"threadId": thread_id} if thread_id else {}),
+            "threadId": thread_id,
             "path": event.get("path", path),
             "exists": bool(event.get("exists")),
             "entries": event.get("entries") or [],
@@ -270,6 +290,7 @@ async def agent_workspace_files(
         "agentId": agent_id,
         "scope": scope,
         "source": "snapshot",
+        "threadId": thread_id,
         "path": path,
         "exists": True,
         "entries": snapshot_listing(artifacts, agent_id, path),
@@ -285,7 +306,7 @@ async def agent_workspace_file(
     scope = _scope(request)
     path = _path(request.query_params.get("path"), required=True)
     thread_id, session = _thread_session(ctx, request, agent_id, scope)
-    node = _select_thread_node(ctx, session, scope) if session else None
+    node = _select_thread_node(ctx, session, scope)
     if node:
         event = await _dispatch(
             ctx,
@@ -297,15 +318,21 @@ async def agent_workspace_file(
                     scope,
                     agent_id,
                     thread_id,
-                    session.get("workspaceLayout") if session else None,
+                    session.get("workspaceLayout") or "thread",
+                    session.get("workspaceSubpath"),
                 ),
                 "path": path,
             },
         )
         _workspace_error(event)
         raw = event.get("contentBase64")
+        is_binary = bool(event.get("isBinary"))
+        # Binary files keep their bytes base64-encoded so the client can
+        # preview images and PDFs; text arrives decoded.
         content = (
-            base64.b64decode(raw).decode("utf-8", errors="replace")
+            None
+            if is_binary
+            else base64.b64decode(raw).decode("utf-8", errors="replace")
             if isinstance(raw, str)
             else None
         )
@@ -314,12 +341,13 @@ async def agent_workspace_file(
             "scope": scope,
             "source": "live",
             "nodeId": node["id"],
-            **({"threadId": thread_id} if thread_id else {}),
+            "threadId": thread_id,
             "path": event.get("path", path),
             "exists": True,
-            "isBinary": bool(event.get("isBinary")),
+            "isBinary": is_binary,
             "bytes": event.get("bytes") or 0,
             "content": content,
+            "contentBase64": raw if is_binary and isinstance(raw, str) else None,
             "truncated": bool(event.get("truncated")),
             "limitBytes": WORKSPACE_FILE_PREVIEW_LIMIT,
             "generatedAt": _timestamp(),
@@ -338,6 +366,7 @@ async def agent_workspace_file(
         "agentId": agent_id,
         "scope": scope,
         "source": "snapshot",
+        "threadId": thread_id,
         "exists": True,
         **result,
         "limitBytes": WORKSPACE_FILE_PREVIEW_LIMIT,

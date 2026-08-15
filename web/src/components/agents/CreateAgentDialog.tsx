@@ -7,7 +7,7 @@ import { createAgent, listSandboxes } from "../../api";
 import { computersForEmployee, runtimesForComputer, type NodeLike } from "../../lib/createAgent";
 import { EMPLOYEE_AGENTS_QUERY_KEY } from "../../hooks/useEmployeeAgents";
 import { agentLabel } from "../../lib/plan";
-import { AGENT_ROLE_OPTIONS } from "../../types";
+import { AGENT_NAMES, AGENT_ROLE_OPTIONS } from "../../types";
 import type { AgentName, AgentRole, EmployeeAgent, SandboxRecord } from "../../types";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -101,7 +101,12 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
   const [isBusy, setIsBusy] = useState(false);
 
   const runtimeOptions = useMemo(
-    () => (computerId ? runtimesForComputer(nodeLikes, computerId) : []),
+    (): AgentName[] =>
+      computerId
+        ? runtimesForComputer(nodeLikes, computerId).filter((kind): kind is AgentName =>
+            AGENT_NAMES.includes(kind as AgentName),
+          )
+        : [],
     [nodeLikes, computerId],
   );
 

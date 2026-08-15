@@ -697,15 +697,15 @@ export function ChannelsView({
         <div className="adm-chat-metrics" role="group" aria-label={t("admin.v2.chat_metrics_label")}>
           <span className="adm-chat-metric">
             <span className="adm-chat-metric-label">{t("admin.v2.chat_metric_channels")}</span>
-            <strong className="adm-chat-metric-value">{integrations.length}</strong>
+            <strong className="adm-chat-metric-value tnum">{integrations.length}</strong>
           </span>
           <span className="adm-chat-metric">
             <span className="adm-chat-metric-label">{t("admin.v2.chat_metric_active")}</span>
-            <strong className="adm-chat-metric-value">{activeCount}</strong>
+            <strong className="adm-chat-metric-value tnum">{activeCount}</strong>
           </span>
           <span className="adm-chat-metric">
             <span className="adm-chat-metric-label">{t("admin.v2.chat_metric_links")}</span>
-            <strong className="adm-chat-metric-value">{linkCount}</strong>
+            <strong className="adm-chat-metric-value tnum">{linkCount}</strong>
           </span>
         </div>
         {showToolbarCreate ? (

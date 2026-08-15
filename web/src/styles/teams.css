@@ -271,6 +271,9 @@
   gap: var(--sp-1);
   color: var(--ink-3);
   font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
   font-size: var(--fs-2);
   letter-spacing: var(--type-code-track);
   white-space: nowrap;

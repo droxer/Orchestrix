@@ -14,7 +14,9 @@ here.
 employee (identity and ownership)
   -> agent (product identity and policy)
     -> placement (scheduler decision)
-      -> node (execution infrastructure)
+      -> agent runtime (Claude/Codex/Pi/Kimi capability)
+        -> computer (stable execution host)
+          -> daemon node (replaceable runtime process)
 ```
 
 The arrow is a dependency boundary, not a navigation hierarchy. Only the first
@@ -33,20 +35,24 @@ not be a selector in the employee experience.
 
 An agent is the primary employee-facing object: a durable employee-owned
 identity with a name, executor kind, instructions, and policy. Its ID remains
-stable when an administrator moves it to another node. Administrators may
-create and configure agents; compatibility agents may also be materialized
-from registered node capabilities during migration.
+stable when an administrator moves it to another Computer, and replacing that
+Computer's Daemon Node does not move it at all. Administrators may
+create and configure agents. Runtime capability registration never creates an
+agent. A hidden compatibility identity may be materialized only when translating
+an old executor-kind request during migration.
 
 ### Placement
 
-A placement is an internal scheduling relationship between an agent and a
-compatible node capability. The control plane selects it for every run. It is
-visible only to administrators diagnosing capacity or availability.
+A placement is an internal scheduling relationship between an Agent and its
+required Agent Runtime on a stable Computer. The control plane resolves that
+Computer's current Daemon Node for every run. It is visible only to
+administrators diagnosing capacity or availability.
 
-### Node
+### Computer and Daemon Node
 
-A node is infrastructure. It heartbeats, advertises executor capabilities,
-leases commands, and owns a sandbox. It never defines an employee or an agent.
+A Computer is the stable execution host. Its Daemon Node is replaceable
+infrastructure that heartbeats, advertises Agent Runtime capabilities, leases
+commands, and owns a sandbox. Neither defines an employee or an Agent.
 
 ## Information architecture
 
@@ -54,7 +60,7 @@ Employee navigation:
 
 1. **Threads** — conversations with an agent; every new thread starts with an
    explicit agent.
-2. **Agent workspace** — artifacts and files in the active agent context.
+2. **Thread workspace** — artifacts and files shared by agents in one thread.
 3. **Backlog** — work assigned to agents. Employee ownership is derived from
    the selected agent.
 4. **Routines** — recurring work assigned to agents.
@@ -87,7 +93,8 @@ must say that no agent is configured or no placement is currently available.
 ## API boundaries
 
 Canonical employee APIs use `/api/v1/agents`, `/api/v1/agent-runs`,
-`/api/v1/threads`, and agent-scoped work and workspace resources. Direct
+`/api/v1/threads`, Agent-scoped work resources, and strictly Thread-scoped
+workspace resources. Direct
 `/api/v1/sandboxes/{id}/runs` endpoints are compatibility-only: they are not called by
 the web product, are excluded from new clients, and should be removed after the
 daemon migration.
@@ -119,8 +126,9 @@ agent run request
 1. New writes require logical agent identity.
 2. Legacy executor/sandbox fields may be read for old records but are not shown
    as primary UI or accepted by new employee workflows.
-3. Compatibility materialization must produce explicit agents before an
-   employee can dispatch; the UI must not synthesize infrastructure.
+3. Runtime registration never materializes agents. A legacy request may use a
+   hidden compatibility identity internally, but it never enters the employee
+   agent roster.
 4. Chat clients migrate from executor/sandbox options to named agent options
    before direct sandbox run endpoints are retired.
 5. Tests assert the boundary: deleting an employee disables its agents;

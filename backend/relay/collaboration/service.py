@@ -5,12 +5,19 @@ import json
 from dataclasses import asdict, dataclass, replace
 from typing import Any
 
+from ..core.computer_identity import computer_id
 from ..core.ids import new_database_id, new_relay_id
 from ..services.agent_routing import (
     AgentRoutingError,
     persist_legacy_session_computer_id,
     resolve_agent_assignments,
     resolve_session_daemon_node_id,
+)
+from ..services.project_runtime import (
+    ProjectDispatchError,
+    project_member_assignments,
+    project_runtime_node,
+    project_runtime_snapshot,
 )
 from ..services.team_dispatch import (
     TeamDispatchError,
@@ -44,6 +51,7 @@ class _PreparedRound:
     raw_assignments: list[dict[str, Any]] | None
     mode: str
     requested_team_id: str | None
+    requested_project_id: str | None
     requested_node_id: str | None
     idempotency_key: str | None
     user_message_id: str | None
@@ -140,6 +148,7 @@ class CollaborationConductor:
                 raw_assignments=raw_assignments,
                 mode=purpose_modes[intent.purpose],
                 requested_team_id=None,
+                requested_project_id=None,
                 requested_node_id=None,
                 idempotency_key=intent.idempotency_key or intent.user_message_id,
                 user_message_id=intent.user_message_id,
@@ -156,6 +165,7 @@ class CollaborationConductor:
                 raw_assignments=[{"agentId": intent.target_agent_id, "mode": mode}],
                 mode=mode,
                 requested_team_id=None,
+                requested_project_id=None,
                 requested_node_id=None,
                 idempotency_key=intent.idempotency_key,
                 user_message_id=None,
@@ -183,6 +193,7 @@ class CollaborationConductor:
             raw_assignments=raw_assignments,
             mode=_mode(intent.mode),
             requested_team_id=intent.requested_team_id,
+            requested_project_id=intent.requested_project_id,
             requested_node_id=intent.requested_node_id,
             idempotency_key=intent.idempotency_key,
             user_message_id=intent.user_message_id,
@@ -224,13 +235,65 @@ class CollaborationConductor:
                 status=400,
             )
         team_id = session_team_id or intent.requested_team_id
+        session_project_id = session.get("projectId") if session else None
+        if (
+            session
+            and intent.requested_project_id
+            and intent.requested_project_id != session_project_id
+        ):
+            raise CollaborationError(
+                "project_mismatch",
+                "projectId does not match this thread's project.",
+                status=400,
+            )
+        project_id = session_project_id or intent.requested_project_id
+        if team_id and project_id:
+            raise CollaborationError("project_team_conflict", status=400)
         team_member_ids: set[str] = set()
         team_snapshot: dict[str, Any] | None = None
         team: dict[str, Any] | None = None
         is_recovery = isinstance(intent.decision, dict) and intent.decision.get(
             "kind"
         ) in ("rerun", "handoff")
-        if team_id and not raw_assignments:
+        project: dict[str, Any] | None = None
+        project_snapshot: dict[str, Any] | None = None
+        if project_id:
+            project = self.ctx.project_store.get_project(project_id)
+            if not project or project.get("archivedAt"):
+                raise CollaborationError("project_not_found", status=404)
+            expected_owner = (
+                session.get("ownerEmployeeId") if session else actor["employeeId"]
+            )
+            if project.get("ownerEmployeeId") != expected_owner:
+                raise CollaborationError("project_forbidden", status=403)
+            if not project.get("enabled", True):
+                raise CollaborationError("project_disabled")
+            project_snapshot = project_runtime_snapshot(project)
+            if raw_assignments is not None and (
+                not raw_assignments
+                or any(
+                    not isinstance(item, dict)
+                    or not isinstance(item.get("agentId"), str)
+                    or not item["agentId"].strip()
+                    for item in raw_assignments
+                )
+            ):
+                raise CollaborationError("project_assignment_invalid", status=400)
+            selected_ids = (
+                [item["agentId"].strip() for item in raw_assignments]
+                if raw_assignments is not None
+                else None
+            )
+            try:
+                raw_assignments = project_member_assignments(
+                    project,
+                    mode=intent.mode,
+                    selected_agent_ids=selected_ids,
+                    snapshot=project_snapshot,
+                )
+            except ProjectDispatchError as error:
+                raise CollaborationError(error.code, status=400) from error
+        elif team_id and not raw_assignments:
             team, members = self._team_for_round(team_id, session, actor)
             team_member_ids = {agent["id"] for agent in members}
             team_snapshot = _team_snapshot(team, members)
@@ -292,7 +355,14 @@ class CollaborationConductor:
                 "workspace_unavailable",
                 "This thread already runs on another computer.",
             )
-        required_node_id = session_node_id or intent.requested_node_id
+        project_node = project_runtime_node(project, daemon_nodes) if project else None
+        if project and project_node is None:
+            raise CollaborationError("project_computer_offline")
+        required_node_id = (
+            session_node_id
+            or (project_node or {}).get("id")
+            or intent.requested_node_id
+        )
         if intent.source == "message" and session and required_node_id:
             self._assert_addressed_agents_on_node(
                 raw_assignments,
@@ -328,6 +398,7 @@ class CollaborationConductor:
             address=intent.address,
             assignments=resolved,
             team_snapshot=team_snapshot,
+            project_snapshot=project_snapshot,
             collaboration_id=collaboration_id,
             round_id=round_id,
         )
@@ -349,6 +420,14 @@ class CollaborationConductor:
             parsed["idempotencyKey"] = intent.idempotency_key
         if team_id:
             parsed["teamId"] = team_id
+        if project_snapshot:
+            parsed.update(
+                {
+                    "projectId": project_snapshot["projectId"],
+                    "workspaceLayout": "project",
+                    "workspaceSubpath": project_snapshot["workspaceSubpath"],
+                }
+            )
         if intent.decision:
             parsed["decision"] = _validated_decision(intent.decision, resolved[0])
         dispatched = await self.ctx.backend.run(resolved[0]["daemonNodeId"], parsed)
@@ -379,6 +458,7 @@ class CollaborationConductor:
             return
         nodes_by_id = {node["id"]: node for node in daemon_nodes}
         required_node = nodes_by_id.get(required_node_id) or {}
+        required_computer_id = computer_id(required_node) if required_node else None
         managed_node_id = required_node.get("managedNodeId")
         allowed_node_ids = {required_node_id} | {
             node["id"]
@@ -390,8 +470,14 @@ class CollaborationConductor:
                 agent_id=agent_id
             )
             if any(
-                placement.get("daemonNodeId") in allowed_node_ids
-                and placement.get("desiredState") != "removed"
+                placement.get("desiredState") != "removed"
+                and (
+                    placement.get("computerId") == required_computer_id
+                    or (
+                        not placement.get("computerId")
+                        and placement.get("daemonNodeId") in allowed_node_ids
+                    )
+                )
                 for placement in placements
             ):
                 continue
@@ -503,7 +589,7 @@ class CollaborationConductor:
                 )
             mode = _mode(item.get("mode"))
             role = _role(item.get("role"))
-            coordinator = bool(
+            coordinator = item.get("coordinator") is True or bool(
                 team_snapshot and item["agentId"] == team_snapshot.get("leadAgentId")
             )
             phase = (
@@ -628,6 +714,7 @@ def create_round_manifest(
     address: dict[str, Any],
     assignments: list[dict[str, Any]],
     team_snapshot: dict[str, Any] | None,
+    project_snapshot: dict[str, Any] | None = None,
     collaboration_id: str | None = None,
     round_id: str | None = None,
 ) -> dict[str, Any]:
@@ -676,6 +763,7 @@ def create_round_manifest(
         "strategy": strategy,
         "address": address,
         **({"teamSnapshot": team_snapshot} if team_snapshot else {}),
+        **({"projectSnapshot": project_snapshot} if project_snapshot else {}),
         "assignments": [
             {
                 key: assignment[key]

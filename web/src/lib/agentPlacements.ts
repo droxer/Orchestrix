@@ -30,6 +30,10 @@ export interface PlacementBadgeLabels {
   status: string;
 }
 
+export function placementRuntimeNodeId(placement: AgentPlacement): string {
+  return placement.runtimeNodeId || placement.daemonNodeId;
+}
+
 export function placementBadgeShowsSandbox(
   sandbox: PlacementSandbox,
   requested: boolean,
@@ -53,20 +57,21 @@ export function describeAgentPlacements(
   placements: AgentPlacement[],
 ): AgentPlacementDescription[] {
   let activeIndex = 0;
-  // One computer per row: if an agent ever holds duplicate placements to the
-  // same node, keep the highest-priority one (the sort above runs first).
-  const seenNodes = new Set<string>();
+  // One Computer per row. daemonNodeId is only the runtime observed when the
+  // placement was created and may be replaced without moving the Agent.
+  const seenComputers = new Set<string>();
   return placements
     .filter((placement) => placement.desiredState !== "removed")
     .sort((left, right) => left.priority - right.priority || left.id.localeCompare(right.id))
     .filter((placement) => {
-      if (seenNodes.has(placement.daemonNodeId)) return false;
-      seenNodes.add(placement.daemonNodeId);
+      const computer = placement.computerId || placementRuntimeNodeId(placement);
+      if (seenComputers.has(computer)) return false;
+      seenComputers.add(computer);
       return true;
     })
     .map((placement) => ({
       placement,
-      nodeName: placement.nodeDisplayName || placement.daemonNodeId,
+      nodeName: placement.nodeDisplayName || placementRuntimeNodeId(placement),
       ownership: placement.nodeOwnership === "managed"
         ? "managed"
         : placement.nodeOwnership === "employee-device"

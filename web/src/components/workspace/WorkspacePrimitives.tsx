@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { agentLabel } from "../../lib/plan";
 import { compactDate, compactDueDate } from "../../lib/workspaceFormat";
 import type { WorkspaceBriefResponse, WorkspaceBriefSession, WorkspaceBriefTask } from "../../types";
+import { RelayEmptyState } from "@/components/RelayEmptyState";
 import { Button } from "@/components/ui/button";
 
 /* Shared workspace inspection primitives — the empty/loading/activity
@@ -12,8 +13,10 @@ import { Button } from "@/components/ui/button";
    here so the two surfaces don't drift (they previously each declared their
    own). */
 
-/** Centered empty state: an optional mark tile (any glyph the caller supplies,
- *  or a pulsing dot when `pulse`), a title, and an optional hint. */
+/** Centered empty state on the shared RelayEmptyState language: an optional
+ *  mark tile (any glyph the caller supplies, or a pulsing dot when `pulse`)
+ *  in the relay-empty avatar plate, a title, and an optional hint. The outer
+ *  div is layout + live-announcement only; all visuals come from .relay-empty. */
 export function WorkspaceEmpty({
   title,
   hint,
@@ -35,16 +38,15 @@ export function WorkspaceEmpty({
       aria-live={announce ? "polite" : undefined}
       aria-atomic={announce || undefined}
     >
-      {mark || pulse ? (
-        <span
-          className={`workspace-empty-state-mark${pulse ? " is-pulse" : ""}`}
-          aria-hidden="true"
-        >
-          {mark}
-        </span>
-      ) : null}
-      <p className="workspace-empty-state-title">{title}</p>
-      {hint ? <p className="workspace-empty-state-hint">{hint}</p> : null}
+      <RelayEmptyState
+        title={title}
+        hint={hint}
+        illustration={
+          mark || pulse ? (
+            <span className={`relay-empty-avatar${pulse ? " is-pulse" : ""}`}>{mark}</span>
+          ) : undefined
+        }
+      />
     </div>
   );
 }

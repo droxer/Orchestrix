@@ -135,6 +135,9 @@ class LocalAgentPlacementStore:
     ) -> dict[str, Any]:
         daemon_node_id = _required_daemon_node_id(daemon_node_id)
         managed_node_id = _optional_managed_node_id(managed_node_id)
+        target_computer_id = (
+            f"managed:{managed_node_id}" if managed_node_id is not None else None
+        )
         with self._lock:
             current = self.get_placement(placement_id)
             if not current:
@@ -143,6 +146,7 @@ class LocalAgentPlacementStore:
                 current.get("daemonNodeId") == daemon_node_id
                 and current.get("desiredState") == "active"
                 and current.get("managedNodeId") == managed_node_id
+                and current.get("computerId") == target_computer_id
             ):
                 return current
             conflicts = [
@@ -506,6 +510,9 @@ class DatabaseAgentPlacementStore:
     ) -> dict[str, Any]:
         daemon_node_id = _required_daemon_node_id(daemon_node_id)
         managed_node_id = _optional_managed_node_id(managed_node_id)
+        target_computer_id = (
+            f"managed:{managed_node_id}" if managed_node_id is not None else None
+        )
         with self._lock, store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
@@ -530,6 +537,7 @@ class DatabaseAgentPlacementStore:
                 current.get("daemonNodeId") == daemon_node_id
                 and current.get("desiredState") == "active"
                 and current.get("managedNodeId") == managed_node_id
+                and current.get("computerId") == target_computer_id
             ):
                 return current
             conflict = conn.execute(
@@ -867,8 +875,10 @@ def _rebound_placement(
     }
     if managed_node_id is None:
         updated.pop("managedNodeId", None)
+        updated.pop("computerId", None)
     else:
         updated["managedNodeId"] = managed_node_id
+        updated["computerId"] = f"managed:{managed_node_id}"
     return updated
 
 

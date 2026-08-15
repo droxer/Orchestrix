@@ -6,6 +6,7 @@ import {
   assignTask,
   cancelRun,
   createTask,
+  createProject,
   createTeam,
   deleteSession,
   deleteTask,
@@ -21,8 +22,8 @@ import {
   updateTask,
   updateTeam,
 } from "../api";
-import type { AgentRunInput, CreateTaskInput, RelaySession, RelayTask, RelayTaskSummary, RunInput, TaskMutationInput, TaskRunAssignment, TeamMutationInput, ThreadMessageInput, ThreadRecoveryInput } from "../types";
-import { NODES_QUERY_KEY, RELAY_QUERY_KEY, SESSIONS_QUERY_KEY, TASKS_QUERY_KEY } from "./useRelayData";
+import type { AgentRunInput, CreateProjectInput, CreateTaskInput, RelaySession, RelayTask, RelayTaskSummary, RunInput, TaskMutationInput, TaskRunAssignment, TeamMutationInput, ThreadMessageInput, ThreadRecoveryInput } from "../types";
+import { NODES_QUERY_KEY, PROJECTS_QUERY_KEY, RELAY_QUERY_KEY, SESSIONS_QUERY_KEY, TASKS_QUERY_KEY } from "./useRelayData";
 import { useMutationError } from "./useMutationError";
 import { useDialogs } from "../components/ui/DialogProvider";
 import { TEAMS_QUERY_KEY } from "./useTeams";
@@ -42,6 +43,7 @@ export function useRelayMutations() {
   const invalidateSessions = () => queryClient.invalidateQueries({ queryKey: SESSIONS_QUERY_KEY, exact: true });
   const invalidateTasks = () => queryClient.invalidateQueries({ queryKey: TASKS_QUERY_KEY, exact: true });
   const invalidateNodes = () => queryClient.invalidateQueries({ queryKey: NODES_QUERY_KEY, exact: true });
+  const invalidateProjects = () => queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY, exact: true });
   const invalidateTeams = () => queryClient.invalidateQueries({ queryKey: [TEAMS_QUERY_KEY] });
   const cacheSession = (session: RelaySession) => {
     queryClient.setQueryData<RelaySession[]>(SESSIONS_QUERY_KEY, (current) =>
@@ -240,6 +242,14 @@ export function useRelayMutations() {
     onError: onRelayError("Failed to create team", "errors.save_team"),
   });
 
+  const createProjectMutation = useMutation({
+    mutationFn: (input: CreateProjectInput) => createProject(input),
+    onSuccess: () => {
+      void invalidateProjects();
+    },
+    onError: onRelayError("Failed to create project", "errors.save_project"),
+  });
+
   const updateTeamMutation = useMutation({
     mutationFn: ({ teamId, input }: { teamId: string; input: Partial<TeamMutationInput> }) =>
       updateTeam(teamId, input),
@@ -274,6 +284,7 @@ export function useRelayMutations() {
     assignTaskMutation,
     startTaskMutation,
     createTeamMutation,
+    createProjectMutation,
     updateTeamMutation,
     deleteTeamMutation,
     invalidateRelay,

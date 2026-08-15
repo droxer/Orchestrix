@@ -150,7 +150,7 @@
     /* Eyebrow grammar (type, tracking, caps, color) is canonical in
        atelier.css, shared with .page-header-kicker; mobile only tightens
        the leading. */
-    line-height: 1;
+    line-height: var(--leading-none);
   }
 
   .mobile-topbar-title {
@@ -160,7 +160,7 @@
     white-space: nowrap;
     color: var(--ink-1);
     font: var(--type-label-strong);
-    line-height: 1.2;
+    line-height: var(--leading-tight);
   }
 
   .mobile-topbar .mobile-settings {
@@ -329,7 +329,7 @@
   .sidenav-btn.active {
     color: var(--ink-1);
     background: var(--action-soft);
-    border-color: color-mix(in srgb, var(--action) 18%, var(--line-1));
+    border-color: var(--line-strong);
     box-shadow: none;
   }
 
@@ -379,8 +379,8 @@
     color: inherit;
     font-size: var(--fs-1);
     font-weight: 600;
-    line-height: 1.1;
-    letter-spacing: 0;
+    line-height: var(--leading-display);
+    letter-spacing: var(--track-0);
     text-align: center;
     text-overflow: ellipsis;
     white-space: nowrap;

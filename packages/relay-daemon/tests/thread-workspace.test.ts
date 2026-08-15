@@ -78,3 +78,40 @@ test("thread workspace setup never creates the employee or supervisor configured
     rmSync(parent, { recursive: true, force: true });
   }
 });
+
+test("project workspaces are shared by threads and remain below the configured root", () => {
+  const root = mkdtempSync(join(tmpdir(), "relay-project-workspaces-"));
+  try {
+    const manager = new ThreadWorkspaceManager(root, "none");
+    const first = manager.ensureProject("ses_first", "projects/prj_one");
+    const second = manager.ensureProject("ses_second", "projects/prj_one");
+
+    assert.equal(first.hostPath, join(root, "projects", "prj_one"));
+    assert.equal(second.hostPath, first.hostPath);
+    assert.equal(second.executionPath, first.executionPath);
+    assert.equal(first.sessionId, "ses_first");
+    assert.equal(second.sessionId, "ses_second");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("project workspace paths cannot traverse or escape through a symlink", () => {
+  const root = mkdtempSync(join(tmpdir(), "relay-project-workspace-security-"));
+  const outside = mkdtempSync(join(tmpdir(), "relay-project-workspace-outside-"));
+  try {
+    const manager = new ThreadWorkspaceManager(root, "none");
+    for (const invalid of ["", ".", "..", "../escape", "/absolute", "projects/../../escape", "projects\\escape"] as const) {
+      assert.throws(() => manager.ensureProject("ses_one", invalid), /Invalid project workspace path/);
+    }
+    mkdirSync(join(root, "projects"));
+    symlinkSync(outside, join(root, "projects", "linked"));
+    assert.throws(
+      () => manager.ensureProject("ses_one", "projects/linked"),
+      /symbolic link|escapes the configured root/,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
