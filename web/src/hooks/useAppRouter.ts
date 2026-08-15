@@ -110,8 +110,8 @@ export function useAppRouter({
     syncAppStateToUrl(state, replace);
   }, []);
 
-  const navigateToAgentWorkspace = useCallback((agentId: string) => {
-    navigateToAppState({ route: "agents", mobileView: "chat", sessionId: null, agentWorkspaceId: agentId });
+  const navigateToAgent = useCallback((agentId: string) => {
+    navigateToAppState({ route: "agents", mobileView: "chat", sessionId: null, agentId });
   }, [navigateToAppState]);
 
   const navigateToTeamWorkspace = useCallback((teamId: string | null) => {
@@ -135,7 +135,7 @@ export function useAppRouter({
     route: locationState.route,
     mobileView: locationState.mobileView,
     projectId: locationState.projectId ?? null,
-    agentWorkspaceId: locationState.agentWorkspaceId ?? null,
+    agentId: locationState.agentId ?? null,
     teamWorkspaceId: locationState.teamWorkspaceId ?? null,
     notFound: Boolean(locationState.notFound),
     isLoginPath: Boolean(locationState.login),
@@ -144,7 +144,7 @@ export function useAppRouter({
     navigateToMobileView,
     hrefForSideNavRoute,
     syncThreadUrl,
-    navigateToAgentWorkspace,
+    navigateToAgent,
     navigateToTeamWorkspace,
     navigateToProject,
     navigateToLogin,

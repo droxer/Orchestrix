@@ -20,7 +20,7 @@ describe("app pathname routes", () => {
     assert.deepEqual(parseAppPath("/projects/prj%2F123"), { route: "projects", mobileView: "threads", sessionId: null, projectId: "prj/123" });
     assert.deepEqual(parseAppPath("/projects/prj%2F123/new"), { route: "projects", mobileView: "chat", sessionId: null, projectId: "prj/123", composingNew: true });
     assert.deepEqual(parseAppPath("/projects/prj%2F123/threads/ses%2F123"), { route: "projects", mobileView: "chat", sessionId: "ses/123", projectId: "prj/123" });
-    assert.deepEqual(parseAppPath("/agents/agent%201"), { route: "agents", mobileView: "chat", sessionId: null, agentWorkspaceId: "agent 1" });
+    assert.deepEqual(parseAppPath("/agents/agent%201"), { route: "agents", mobileView: "chat", sessionId: null, agentId: "agent 1" });
     assert.deepEqual(parseAppPath("/teams/team%201"), { route: "teams", mobileView: "chat", sessionId: null, teamWorkspaceId: "team 1" });
 
     const routes = {
@@ -43,7 +43,7 @@ describe("app pathname routes", () => {
     assert.equal(pathForAppState({ route: "projects", mobileView: "threads", sessionId: null, projectId: "prj/123" }), "/projects/prj%2F123");
     assert.equal(pathForAppState({ route: "projects", mobileView: "chat", sessionId: null, projectId: "prj/123", composingNew: true }), "/projects/prj%2F123/new");
     assert.equal(pathForAppState({ route: "projects", mobileView: "chat", sessionId: "ses/123", projectId: "prj/123" }), "/projects/prj%2F123/threads/ses%2F123");
-    assert.equal(pathForAppState({ route: "agents", mobileView: "chat", sessionId: null, agentWorkspaceId: "agent 1" }), "/agents/agent%201");
+    assert.equal(pathForAppState({ route: "agents", mobileView: "chat", sessionId: null, agentId: "agent 1" }), "/agents/agent%201");
     assert.equal(pathForAppState({ route: "teams", mobileView: "chat", sessionId: null, teamWorkspaceId: "team 1" }), "/teams/team%201");
     assert.equal(hrefForRoute("main", "ses_123"), "/threads/ses_123");
     assert.equal(hrefForRoute("projects"), "/projects");
@@ -72,7 +72,7 @@ describe("app pathname routes", () => {
     );
     assert.equal(
       canonicalBrowserUrl("/agents/agent-1", "?q=ops&tab=workspace&scope=shared&path=src&item=file%3Aa.ts"),
-      "/agents/agent-1?tab=workspace&scope=shared&path=src&item=file%3Aa.ts",
+      "/agents/agent-1",
     );
     assert.equal(
       canonicalBrowserUrl("/agents/agent-1", "?tab=profile&scope=shared&path=src&item=file%3Aa.ts"),
@@ -87,6 +87,7 @@ describe("app pathname routes", () => {
       "/teams/team-1?tab=workspace&path=src&item=file%3Aa.ts",
     );
     assert.equal(canonicalBrowserUrl("/agents/agent-1", "?tab=artifacts&item=artifact%3Aold"), "/agents/agent-1");
+    assert.equal(canonicalBrowserUrl("/agents/agent-1", "?tab=activities"), "/agents/agent-1?tab=activities");
     assert.equal(canonicalBrowserUrl("/teams/team-1", "?tab=artifacts&artifact=old"), "/teams/team-1");
     assert.equal(canonicalBrowserUrl("/teams", "?dialog=create&tab=artifacts"), "/teams?dialog=create");
     assert.equal(canonicalBrowserUrl("/backlog", "?q=stale"), "/backlog");

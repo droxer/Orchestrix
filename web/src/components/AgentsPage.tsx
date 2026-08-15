@@ -8,7 +8,7 @@ import { useDialogs } from "@/components/ui/DialogProvider";
 import type { AgentName, CurrentUser, EmployeeAgent, LogicalAgentAvailability } from "../types";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { StatusPill, TonePill } from "./StatusPill";
-import { AgentWorkspacePage, type WorkspacePageTab } from "./AgentWorkspacePage";
+import { AgentDetailPage } from "./AgentDetailPage";
 import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
 import { Badge } from "@/components/ui/badge";
@@ -22,9 +22,9 @@ import { CreateAgentDialog } from "./agents/CreateAgentDialog";
 interface AgentsPageProps {
   currentUser: CurrentUser;
   /** The agent currently inspected in the detail pane, driven by the pathname. */
-  workspaceAgent: EmployeeAgent | null;
+  detailAgent: EmployeeAgent | null;
   isDetailRoute: boolean;
-  onOpenWorkspace: (agent: EmployeeAgent, tab?: WorkspacePageTab) => void;
+  onOpenAgent: (agent: EmployeeAgent) => void;
   onOpenThread: (sessionId: string) => void;
 }
 
@@ -190,9 +190,9 @@ function RosterRow({
 
 export function AgentsPage({
   currentUser,
-  workspaceAgent,
+  detailAgent,
   isDetailRoute,
-  onOpenWorkspace,
+  onOpenAgent,
   onOpenThread,
 }: AgentsPageProps) {
   const { t } = useTranslation();
@@ -243,7 +243,7 @@ export function AgentsPage({
   const loading = isFetching && agents.length === 0;
   const [createOpen, setCreateOpen] = useState(false);
 
-  // The detail pane remounts per agent (key={workspaceAgent.id}), so an
+  // The detail pane remounts per agent (key={detailAgent.id}), so an
   // in-flight profile draft cannot survive a roster switch — hold the
   // selection here until the owner confirms the discard.
   const profileDirtyRef = useRef(false);
@@ -251,7 +251,7 @@ export function AgentsPage({
     profileDirtyRef.current = dirty;
   }, []);
   const handleSelectAgent = useCallback(async (agent: EmployeeAgent) => {
-    if (agent.id === workspaceAgent?.id) return;
+    if (agent.id === detailAgent?.id) return;
     if (profileDirtyRef.current) {
       const ok = await confirm({
         title: t("unsaved.title"),
@@ -263,8 +263,8 @@ export function AgentsPage({
       if (!ok) return;
       profileDirtyRef.current = false;
     }
-    onOpenWorkspace(agent);
-  }, [confirm, onOpenWorkspace, t, workspaceAgent?.id]);
+    onOpenAgent(agent);
+  }, [confirm, detailAgent?.id, onOpenAgent, t]);
 
   return (
     <section
@@ -316,7 +316,7 @@ export function AgentsPage({
               <RosterRow
                 key={agent.id}
                 agent={agent}
-                selected={workspaceAgent?.id === agent.id}
+                selected={detailAgent?.id === agent.id}
                 onSelect={(agent) => void handleSelectAgent(agent)}
               />
             ))}
@@ -325,10 +325,10 @@ export function AgentsPage({
       </div>
 
       <div className="agents-detail">
-        {workspaceAgent ? (
-          <AgentWorkspacePage
-            key={workspaceAgent.id}
-            agent={workspaceAgent}
+        {detailAgent ? (
+          <AgentDetailPage
+            key={detailAgent.id}
+            agent={detailAgent}
             onOpenThread={onOpenThread}
             canEditMeta
             onProfileDirtyChange={handleProfileDirtyChange}
@@ -348,7 +348,7 @@ export function AgentsPage({
           open={createOpen}
           onClose={() => setCreateOpen(false)}
           employeeId={currentUser.employeeId}
-          onCreated={(agent) => onOpenWorkspace(agent)}
+          onCreated={onOpenAgent}
         />
       ) : null}
     </section>

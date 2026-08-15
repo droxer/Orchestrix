@@ -9,7 +9,7 @@ import { RelayEmptyState } from "@/components/RelayEmptyState";
 import { Button } from "@/components/ui/button";
 
 /* Shared workspace inspection primitives — the empty/loading/activity
-   building blocks used by both AgentWorkspacePage and TeamWorkspacePage. Kept
+   building blocks used by both AgentDetailPage and TeamWorkspacePage. Kept
    here so the two surfaces don't drift (they previously each declared their
    own). */
 
