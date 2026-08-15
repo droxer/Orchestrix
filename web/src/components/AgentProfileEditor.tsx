@@ -6,38 +6,49 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ActionEdit } from "./icons";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-interface AgentPersonalityEditorProps {
-  value: string;
-  draft: string;
+interface AgentProfileEditorProps {
+  name: string;
+  nameDraft: string;
+  personality: string;
+  personalityDraft: string;
   editing: boolean;
   editable: boolean;
   saving: boolean;
   onStartEdit: () => void;
-  onDraftChange: (value: string) => void;
+  onNameDraftChange: (value: string) => void;
+  onPersonalityDraftChange: (value: string) => void;
   onCancel: () => void;
   onSave: () => void;
 }
 
-export function AgentPersonalityEditor({
-  value,
-  draft,
+export function AgentProfileEditor({
+  name,
+  nameDraft,
+  personality,
+  personalityDraft,
   editing,
   editable,
   saving,
   onStartEdit,
-  onDraftChange,
+  onNameDraftChange,
+  onPersonalityDraftChange,
   onCancel,
   onSave,
-}: AgentPersonalityEditorProps) {
+}: AgentProfileEditorProps) {
   const { t } = useTranslation();
-  const savedValue = value.trim();
-  const draftValue = draft.trim();
-  const dirty = draftValue !== savedValue;
-  const hasCustomPersonality = savedValue.length > 0;
+  const savedPersonality = personality.trim();
+  const draftPersonality = personalityDraft.trim();
+  const nameChanged = nameDraft.trim() !== name.trim();
+  const personalityChanged = draftPersonality !== savedPersonality;
+  const dirty = nameChanged || personalityChanged;
+  const canSave = dirty && nameDraft.trim().length > 0;
+  const hasCustomPersonality = savedPersonality.length > 0;
   const titleId = useId();
   const helpId = useId();
+  const nameFieldId = useId();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -47,7 +58,7 @@ export function AgentPersonalityEditor({
   }, [editing]);
 
   function useStarter() {
-    onDraftChange(t("agents_page.personality_starter"));
+    onPersonalityDraftChange(t("agents_page.personality_starter"));
   }
 
   return (
@@ -80,50 +91,44 @@ export function AgentPersonalityEditor({
           >
             <ActionEdit size={13} aria-hidden="true" />
             {hasCustomPersonality
-              ? t("agents_page.edit_personality")
-              : t("agents_page.write_personality")}
+              ? t("agents_page.edit_profile")
+              : t("agents_page.write_profile")}
           </Button>
         ) : null}
       </div>
 
       {editing ? (
         <div className="agent-personality-editor">
+          <div className="agent-profile-name-field">
+            <label className="workspace-dossier-field-label" htmlFor={nameFieldId}>
+              {t("admin.v2.agent_name")}
+            </label>
+            <Input
+              id={nameFieldId}
+              name="agent-profile-name"
+              type="text"
+              autoComplete="off"
+              maxLength={64}
+              value={nameDraft}
+              onChange={(event) => onNameDraftChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") onCancel();
+              }}
+              disabled={saving}
+            />
+          </div>
           <div className="agent-personality-editor-guide">
             <p>{t("agents_page.personality_editor_intro")}</p>
             <ol aria-label={t("agents_page.personality_framework")}>
-              <li>
-                <span>01</span>
-                <div>
-                  <strong>{t("agents_page.personality_purpose")}</strong>
-                  <small>{t("agents_page.personality_purpose_help")}</small>
-                </div>
-              </li>
-              <li>
-                <span>02</span>
-                <div>
-                  <strong>{t("agents_page.personality_truths")}</strong>
-                  <small>{t("agents_page.personality_truths_help")}</small>
-                </div>
-              </li>
-              <li>
-                <span>03</span>
-                <div>
-                  <strong>{t("agents_page.personality_voice")}</strong>
-                  <small>{t("agents_page.personality_voice_help")}</small>
-                </div>
-              </li>
-              <li>
-                <span>04</span>
-                <div>
-                  <strong>{t("agents_page.personality_boundaries")}</strong>
-                  <small>{t("agents_page.personality_boundaries_help")}</small>
-                </div>
-              </li>
+              <li><span>01</span><div><strong>{t("agents_page.personality_purpose")}</strong><small>{t("agents_page.personality_purpose_help")}</small></div></li>
+              <li><span>02</span><div><strong>{t("agents_page.personality_truths")}</strong><small>{t("agents_page.personality_truths_help")}</small></div></li>
+              <li><span>03</span><div><strong>{t("agents_page.personality_voice")}</strong><small>{t("agents_page.personality_voice_help")}</small></div></li>
+              <li><span>04</span><div><strong>{t("agents_page.personality_boundaries")}</strong><small>{t("agents_page.personality_boundaries_help")}</small></div></li>
             </ol>
           </div>
           <div className="agent-personality-editor-toolbar">
             <span>{t("agents_page.personality_editor_label")}</span>
-            {!draftValue ? (
+            {!draftPersonality ? (
               <Button variant="ghost" type="button" className="h-auto" onClick={useStarter} disabled={saving}>
                 {t("agents_page.personality_starter_action")}
               </Button>
@@ -138,10 +143,10 @@ export function AgentPersonalityEditor({
             rows={14}
             autoComplete="off"
             spellCheck
-            value={draft}
-            onChange={(event) => onDraftChange(event.target.value)}
+            value={personalityDraft}
+            onChange={(event) => onPersonalityDraftChange(event.target.value)}
             onKeyDown={(event) => {
-              if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && dirty) {
+              if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && canSave) {
                 event.preventDefault();
                 onSave();
               }
@@ -152,37 +157,22 @@ export function AgentPersonalityEditor({
           />
           <div className="agent-personality-editor-foot">
             <span className="agent-personality-count tnum">
-              {t("agents_page.personality_characters", { count: draft.length })}
+              {t("agents_page.personality_characters", { count: personalityDraft.length })}
             </span>
-            <span className="agent-personality-save-hint">
-              {t("agents_page.personality_save_hint")}
-            </span>
+            <span className="agent-personality-save-hint">{t("agents_page.personality_save_hint")}</span>
             <div className="agent-personality-actions">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onCancel}
-                disabled={saving}
-              >
+              <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={saving}>
                 {t("admin.v2.cancel")}
               </Button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={onSave}
-                disabled={!dirty}
-                loading={saving}
-                loadingLabel={t("admin.v2.saving")}
-              >
-                {t("agents_page.save_personality")}
+              <Button type="button" size="sm" onClick={onSave} disabled={!canSave} loading={saving} loadingLabel={t("admin.v2.saving")}>
+                {t("agents_page.save_profile")}
               </Button>
             </div>
           </div>
         </div>
       ) : hasCustomPersonality ? (
         <article className="agent-personality-document">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{savedValue}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{savedPersonality}</ReactMarkdown>
         </article>
       ) : (
         <div className="agent-personality-empty">
