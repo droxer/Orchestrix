@@ -10,7 +10,6 @@ export interface NodeLike {
   workspaceId?: string;
   managedNodeId?: string;
   supportedAgents?: string[];
-  agents?: Record<string, string>;
   disabledAgents?: string[];
 }
 
@@ -43,7 +42,6 @@ export function runtimesForComputer(nodes: NodeLike[], target: string): string[]
   for (const node of nodes) {
     if (computerId(node) !== target) continue;
     for (const kind of node.supportedAgents ?? []) supported.add(kind);
-    for (const kind of Object.keys(node.agents ?? {})) supported.add(kind);
     for (const kind of node.disabledAgents ?? []) disabled.add(kind);
   }
   return [...supported].filter((kind) => !disabled.has(kind));

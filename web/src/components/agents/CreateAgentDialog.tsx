@@ -39,12 +39,9 @@ function computerLabel(sandbox: SandboxWithWorkspace): string {
 }
 
 /** Maps a daemon node onto the identity shape createAgent.ts operates on.
- *  Only `status === "ready"` runtimes are surfaced as supportedAgents — a
- *  node's `agents` map carries every runtime kind with a status, keyed
- *  whether or not it is actually installed, so raw key presence is never a
- *  usable signal (see CLAUDE.md's "recurring key-union bug" note). Passing
- *  `agents` itself through unfiltered would reintroduce that exact bug in
- *  runtimesForComputer's union step, so it is deliberately left out here. */
+ *  `sandbox.agents` is a status-dict keyed by every possible runtime kind
+ *  (ready/failed/unknown), not a list of what's installed, so only
+ *  `status === "ready"` entries are surfaced as supportedAgents. */
 function toNodeLike(sandbox: SandboxWithWorkspace): NodeLike {
   const readyRuntimes = Object.entries(sandbox.agents ?? {})
     .filter(([, status]) => status === "ready")
