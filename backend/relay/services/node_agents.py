@@ -6,7 +6,7 @@ from loguru import logger
 
 from ..core.computer_identity import computer_id
 from ..persistence.agent_placement_store import create_node_placement
-from ..persistence.protocols import AgentPlacementStore, AgentStore, TeamStore
+from ..persistence.protocols import AgentPlacementStore, AgentStore
 
 
 class NodeAgentRegistry(Protocol):
@@ -20,7 +20,6 @@ class NodeAgentContext(Protocol):
     registry: NodeAgentRegistry
     agent_store: AgentStore
     agent_placement_store: AgentPlacementStore
-    team_store: TeamStore
 
 
 def assert_node_agent_runs_drained(ctx: NodeAgentContext, node_id: str) -> None:
@@ -126,7 +125,12 @@ def _missing_agent_table(error: Exception) -> bool:
 
 
 def remove_node_agents(ctx: NodeAgentContext, node_id: str) -> list[str]:
-    """Retire a node's agents under the dispatch lifecycle lock."""
+    """Remove a deleted node's placements, under the dispatch lifecycle lock.
+
+    Does not delete the agents themselves — only the placements pinned to
+    this node. Agents stay on the roster and can only be deleted by the
+    employee who declared them; see `_remove_node_agents_locked`.
+    """
     registry = getattr(ctx, "registry", None)
     dispatch_lock = getattr(registry, "dispatch_lock", None)
     if dispatch_lock:

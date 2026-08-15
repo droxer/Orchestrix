@@ -274,7 +274,6 @@ def _registry_ctx(
     tmp_path: Path,
     nodes: list[dict],
     active_requests: list[dict] | None = None,
-    historical_runtime_ids: set[str] | None = None,
 ):
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
@@ -286,9 +285,6 @@ def _registry_ctx(
             dispatch_lock=None,
             daemon_store=SimpleNamespace(
                 list_active_run_requests=lambda: active_requests or [],
-                historical_managed_runtime_ids=lambda _managed_node_id: (
-                    historical_runtime_ids or set()
-                ),
             ),
         ),
     )
@@ -323,116 +319,6 @@ def test_deleting_a_computer_keeps_its_agents(tmp_path) -> None:
     assert survivor is not None
     assert not survivor.get("deletedAt")
     assert placements.list_placements(agent_id=agent["id"]) == []
-
-
-def test_sync_keeps_agent_while_the_old_node_is_online(tmp_path: Path) -> None:
-    old_node = {
-        "id": "node_old",
-        "employeeId": "alice",
-        "workspacePath": "/home/alice/proj",
-        "online": True,
-    }
-    new_node = {
-        "id": "node_new",
-        "employeeId": "alice",
-        "workspacePath": "/home/alice/proj",
-        "supportedAgents": ["claude"],
-        "agents": {"claude": "ready"},
-        "online": True,
-    }
-    ctx, agents, placements = _registry_ctx(tmp_path, [old_node, new_node])
-    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old")
-    placements.create_placement(stale, "node_old")
-
-    sync_node_agents(ctx, new_node)
-
-    assert not agents.get_agent(stale["id"]).get("deletedAt")
-    assert len(placements.list_placements(daemon_node_id="node_old")) == 1
-
-
-def test_sync_keeps_agent_when_old_node_has_active_work(tmp_path: Path) -> None:
-    old_node = {
-        "id": "node_old",
-        "employeeId": "alice",
-        "workspacePath": "/home/alice/proj",
-        "online": False,
-    }
-    new_node = {
-        "id": "node_new",
-        "employeeId": "alice",
-        "workspacePath": "/home/alice/proj",
-        "supportedAgents": ["claude"],
-        "agents": {"claude": "ready"},
-        "online": True,
-    }
-    ctx, agents, placements = _registry_ctx(
-        tmp_path,
-        [old_node, new_node],
-        active_requests=[{"nodeId": "node_old", "assignments": []}],
-    )
-    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old")
-    placements.create_placement(stale, "node_old")
-
-    sync_node_agents(ctx, new_node)
-
-    assert not agents.get_agent(stale["id"]).get("deletedAt")
-
-
-def test_managed_nodes_share_workspace_path_without_being_the_same_computer(
-    tmp_path: Path,
-) -> None:
-    old_node = {
-        "id": "node_old",
-        "employeeId": "alice",
-        "workspacePath": "/workspace",
-        "managedNodeId": "managed_old",
-        "online": False,
-    }
-    new_node = {
-        "id": "node_new",
-        "employeeId": "alice",
-        "workspacePath": "/workspace",
-        "managedNodeId": "managed_new",
-        "supportedAgents": ["claude"],
-        "agents": {"claude": "ready"},
-        "online": True,
-    }
-    ctx, agents, placements = _registry_ctx(tmp_path, [old_node, new_node])
-    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old")
-    placements.create_placement(stale, "node_old")
-
-    sync_node_agents(ctx, new_node)
-
-    assert not agents.get_agent(stale["id"]).get("deletedAt")
-
-
-def test_sync_keeps_legacy_agent_on_a_different_node(tmp_path: Path) -> None:
-    """A legacy agent placed on a different computer is not a duplicate of the
-    registering node's agent and must survive."""
-    other = {
-        "id": "node_other",
-        "employeeId": "alice",
-        "workspacePath": "/home/alice/other",
-        "online": True,
-    }
-    node = {
-        "id": "node_local",
-        "employeeId": "alice",
-        "workspacePath": "/home/alice/proj",
-        "supportedAgents": ["claude"],
-        "agents": {"claude": "ready"},
-        "online": True,
-    }
-    ctx, agents, placements = _registry_ctx(tmp_path, [other, node])
-    legacy = agents.create_agent(
-        "alice", {"displayName": "Captain America", "executorKind": "claude", "defaultRole": "implementer"}
-    )
-    legacy = agents.update_agent(legacy["id"], {"compatibilityKey": "alice:claude"})
-    placements.create_placement(legacy, "node_other")
-
-    sync_node_agents(ctx, node)
-
-    assert not agents.get_agent(legacy["id"]).get("deletedAt")
 
 
 def test_agent_stays_routable_after_a_new_node_id_without_rebinding(
@@ -481,11 +367,7 @@ def test_reprovisioned_managed_computer_keeps_custom_agent_placement(
     }
     new_node = {**old_node, "id": "runtime_new", "online": True}
     nodes = [old_node]
-    ctx, agents, placements = _registry_ctx(
-        tmp_path,
-        nodes,
-        historical_runtime_ids={"runtime_old", "runtime_new"},
-    )
+    ctx, agents, placements = _registry_ctx(tmp_path, nodes)
     custom = agents.create_agent(
         "alice", {"displayName": "Release Builder", "executorKind": "codex", "defaultRole": "implementer"}
     )
@@ -515,11 +397,7 @@ def test_managed_sync_does_not_retire_agent_from_another_managed_computer(
         "agents": {"codex": "ready"},
         "online": True,
     }
-    ctx, agents, placements = _registry_ctx(
-        tmp_path,
-        [current],
-        historical_runtime_ids={"runtime_current"},
-    )
+    ctx, agents, placements = _registry_ctx(tmp_path, [current])
     other = agents.ensure_compatibility_agent(
         "alice",
         "codex",
