@@ -1282,6 +1282,7 @@
     "create_computer_required": "请选择一台电脑。",
     "create_runtime_label": "运行时",
     "create_runtime_placeholder": "选择运行时",
+    "create_runtime_ready": "可立即使用",
     "create_runtime_empty": "这台电脑没有就绪的运行时。",
     "create_runtime_required": "请选择运行时。",
     "create_role_placeholder": "选择角色",

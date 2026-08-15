@@ -1281,6 +1281,7 @@
     "create_computer_required": "請選擇一台電腦。",
     "create_runtime_label": "執行環境",
     "create_runtime_placeholder": "選擇執行環境",
+    "create_runtime_ready": "可立即使用",
     "create_runtime_empty": "這台電腦沒有就緒的執行環境。",
     "create_runtime_required": "請選擇執行環境。",
     "create_role_placeholder": "選擇角色",

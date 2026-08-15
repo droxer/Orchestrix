@@ -15,6 +15,7 @@ import { EMPLOYEE_AGENTS_QUERY_KEY } from "../../hooks/useEmployeeAgents";
 import { agentLabel } from "../../lib/plan";
 import { AGENT_NAMES, AGENT_ROLE_OPTIONS } from "../../types";
 import type { AgentName, AgentRole, EmployeeAgent, SandboxRecord } from "../../types";
+import { AgentMark } from "../AgentMark";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -261,25 +262,37 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
             labelId={runtimeLabelId}
             wrapper="div"
           >
-            <Select
-              value={executorKind || null}
-              onValueChange={(value) => setExecutorKind((value ?? "") as AgentName)}
-              disabled={isBusy || !computerId || runtimeOptions.length === 0}
+            <div
+              className="create-agent-runtime-picker"
+              role="radiogroup"
+              aria-labelledby={runtimeLabelId}
+              aria-disabled={isBusy || !computerId || runtimeOptions.length === 0}
             >
-              <SelectTrigger className="w-full" aria-labelledby={runtimeLabelId}>
-                <SelectValue placeholder={t("agents_page.create_runtime_placeholder")}>
-                  {(value: string | null) =>
-                    value ? agentLabel(value as AgentName) : t("agents_page.create_runtime_placeholder")}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {runtimeOptions.map((kind) => (
-                  <SelectItem key={kind} value={kind}>
-                    <span translate="no">{agentLabel(kind)}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              {runtimeOptions.map((kind) => {
+                const selected = executorKind === kind;
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    className={`create-agent-runtime-option${selected ? " is-selected" : ""}`}
+                    role="radio"
+                    aria-checked={selected}
+                    aria-label={agentLabel(kind)}
+                    disabled={isBusy}
+                    onClick={() => setExecutorKind(kind)}
+                  >
+                    <span className="create-agent-runtime-mark" aria-hidden="true">
+                      <AgentMark agent={kind} size={22} />
+                    </span>
+                    <span className="create-agent-runtime-option-copy">
+                      <span className="create-agent-runtime-option-name" translate="no">{agentLabel(kind)}</span>
+                      <span className="create-agent-runtime-option-meta">{t("agents_page.create_runtime_ready")}</span>
+                    </span>
+                    <span className="create-agent-runtime-check" aria-hidden="true" />
+                  </button>
+                );
+              })}
+            </div>
             {computerId && runtimeOptions.length === 0 ? (
               <p className="adm-form-hint">{t("agents_page.create_runtime_empty")}</p>
             ) : null}

@@ -1284,6 +1284,7 @@
     "create_computer_required": "Choose a computer.",
     "create_runtime_label": "Runtime",
     "create_runtime_placeholder": "Select a runtime",
+    "create_runtime_ready": "Ready to use",
     "create_runtime_empty": "This computer has no ready runtimes.",
     "create_runtime_required": "Choose a runtime.",
     "create_role_placeholder": "Select a role",

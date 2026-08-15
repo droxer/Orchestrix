@@ -528,6 +528,100 @@
   white-space: nowrap;
 }
 
+.create-agent-runtime-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-2);
+}
+
+.create-agent-runtime-option {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 70px;
+  padding: var(--sp-3);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+  color: var(--ink-1);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease),
+    transform var(--t-fast) var(--ease);
+}
+
+.create-agent-runtime-option:hover:not(:disabled) {
+  border-color: var(--line-3);
+  background: var(--surface-2);
+  transform: translateY(-1px);
+}
+
+.create-agent-runtime-option:focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: 2px;
+}
+
+.create-agent-runtime-option.is-selected {
+  border-color: var(--action);
+  background: color-mix(in srgb, var(--action) 9%, var(--surface-1));
+}
+
+.create-agent-runtime-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.create-agent-runtime-mark {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-1);
+  background: var(--surface-0);
+  color: var(--ink-1);
+}
+
+.create-agent-runtime-option.is-selected .create-agent-runtime-mark {
+  border-color: color-mix(in srgb, var(--action) 45%, var(--line-1));
+  color: var(--action);
+}
+
+.create-agent-runtime-option-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.create-agent-runtime-option-name {
+  overflow: hidden;
+  font: var(--type-label-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.create-agent-runtime-option-meta {
+  color: var(--ink-3);
+  font: var(--type-label);
+}
+
+.create-agent-runtime-check {
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--ink-4);
+  border-radius: 50%;
+}
+
+.create-agent-runtime-option.is-selected .create-agent-runtime-check {
+  border: 3px solid var(--action);
+  background: var(--surface-1);
+}
+
 .adm-provision-preview {
   display: flex;
   align-items: center;
