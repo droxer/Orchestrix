@@ -13,6 +13,7 @@ from ..daemon_registry import (
     sandbox_ui_token_matches,
 )
 from ..persistence.agent_placement_store import create_node_placement
+from ..services.computer_names import present_computer
 from .deps import AppContextDep
 from .helpers import (
     actor_can_access_sandbox,
@@ -24,6 +25,12 @@ from .helpers import (
 )
 
 router = APIRouter()
+
+
+def public_computer_record(
+    ctx: AppContextDep, sandbox: dict[str, Any]
+) -> dict[str, Any]:
+    return present_computer(ctx, public_sandbox_record(sandbox))
 
 
 def require_sandbox_access(
@@ -48,7 +55,7 @@ def sandboxes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     token = bearer_token(request)
     if token:
         allowed = [
-            public_sandbox_record(sandbox)
+            public_computer_record(ctx, sandbox)
             for sandbox in ctx.backend.list()
             if sandbox_ui_token_matches(sandbox, token)
         ]
@@ -57,7 +64,7 @@ def sandboxes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_none(request, ctx.auth_store)
     if actor:
         allowed = [
-            public_sandbox_record(sandbox)
+            public_computer_record(ctx, sandbox)
             for sandbox in ctx.backend.list()
             if actor_can_access_sandbox(actor, sandbox)
         ]
@@ -66,7 +73,7 @@ def sandboxes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
         "sandboxes": [
             {
                 key: value
-                for key, value in public_sandbox_record(sandbox).items()
+                for key, value in public_computer_record(ctx, sandbox).items()
                 if key != "displayName"
             }
             for sandbox in ctx.backend.list()
@@ -104,7 +111,7 @@ async def provision_sandbox(request: Request, ctx: AppContextDep) -> dict[str, A
         logger.info(
             "Sandbox provisioned", sandbox_id=sandbox["id"], employee_id=employee_id
         )
-        return provisioned_sandbox_record(sandbox)
+        return present_computer(ctx, provisioned_sandbox_record(sandbox))
     except PermissionError as error:
         logger.warning(
             "Sandbox provisioning denied", employee_id=employee_id, error=str(error)
@@ -120,7 +127,7 @@ async def get_sandbox(
     if not sandbox:
         raise HTTPException(404, "Sandbox not found.")
     require_sandbox_access(sandbox, request, ctx)
-    return public_sandbox_record(sandbox)
+    return public_computer_record(ctx, sandbox)
 
 
 @router.post("/sandboxes/{sandbox_id}/runs", status_code=202)
