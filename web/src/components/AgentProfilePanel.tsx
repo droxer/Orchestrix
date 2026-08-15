@@ -24,7 +24,8 @@ import { EMPLOYEE_AGENTS_QUERY_KEY } from "../hooks/useEmployeeAgents";
 import { formatRelativeTime, agentAvailabilityTone } from "./admin/helpers";
 import { TonePill } from "./StatusPill";
 import { IdentityMonogram } from "./IdentityMonogram";
-import { AgentPersonalityEditor } from "./AgentPersonalityEditor";
+import { AgentProfileEditor } from "./AgentProfileEditor";
+import { LegacyPersonalityEditor } from "./LegacyPersonalityEditor";
 import { PlacementList } from "./PlacementList";
 import { describeAgentPlacements, placementRuntimeNodeId } from "../lib/agentPlacements";
 import { ProfileImagePicker } from "./ProfileImagePicker";
@@ -77,13 +78,18 @@ export function AgentProfilePanel({
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [editingPersonality, setEditingPersonality] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
   const [personalityDraft, setPersonalityDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingPlacementId, setPendingPlacementId] = useState<string | null>(null);
 
   const dirtyDraft = (renaming && nameDraft.trim() !== agent.displayName.trim())
-    || (editingPersonality && personalityDraft.trim() !== (agent.instructions ?? "").trim());
+    || (editingPersonality && personalityDraft.trim() !== (agent.instructions ?? "").trim())
+    || (editingProfile && (
+      nameDraft.trim() !== agent.displayName.trim()
+      || personalityDraft.trim() !== (agent.instructions ?? "").trim()
+    ));
   const dirtyDraftRef = useRef(false);
   dirtyDraftRef.current = dirtyDraft;
   useUnsavedChangesGuard(dirtyDraft && !saving);
@@ -109,6 +115,7 @@ export function AgentProfilePanel({
     const resetEditingState = () => {
       setRenaming(false);
       setEditingPersonality(false);
+      setEditingProfile(false);
       setError(null);
       setSaving(false);
       setPendingPlacementId(null);
@@ -177,6 +184,39 @@ export function AgentProfilePanel({
     setPersonalityDraft(agent.instructions ?? "");
     setEditingPersonality(true);
     setError(null);
+  }
+
+  function startEditProfile() {
+    setNameDraft(agent.displayName);
+    setPersonalityDraft(agent.instructions ?? "");
+    setEditingProfile(true);
+    setError(null);
+  }
+
+  async function handleProfileSave() {
+    const trimmedName = nameDraft.trim();
+    const trimmedPersonality = personalityDraft.trim();
+    const nameChanged = trimmedName !== agent.displayName.trim();
+    const personalityChanged = trimmedPersonality !== (agent.instructions ?? "").trim();
+    if (!nameChanged && !personalityChanged) {
+      setEditingProfile(false);
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await patchAgent({
+        ...(nameChanged ? { displayName: trimmedName } : {}),
+        ...(personalityChanged ? { instructions: trimmedPersonality } : {}),
+      });
+      if (!result) return;
+      applyAgentUpdate(result.agent);
+      setEditingProfile(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handlePersonalitySave() {
@@ -300,16 +340,19 @@ export function AgentProfilePanel({
     return (
       <div className="workspace-profile-panel workspace-profile-dossier">
         <div className="workspace-dossier-doc">
-          <AgentPersonalityEditor
-            value={agent.instructions ?? ""}
-            draft={personalityDraft}
-            editing={editingPersonality}
+          <AgentProfileEditor
+            name={agent.displayName}
+            nameDraft={nameDraft}
+            personality={agent.instructions ?? ""}
+            personalityDraft={personalityDraft}
+            editing={editingProfile}
             editable={canEditProfile}
             saving={saving}
-            onStartEdit={startEditPersonality}
-            onDraftChange={setPersonalityDraft}
-            onCancel={() => setEditingPersonality(false)}
-            onSave={() => void handlePersonalitySave()}
+            onStartEdit={startEditProfile}
+            onNameDraftChange={setNameDraft}
+            onPersonalityDraftChange={setPersonalityDraft}
+            onCancel={() => setEditingProfile(false)}
+            onSave={() => void handleProfileSave()}
           />
         </div>
 
@@ -330,58 +373,9 @@ export function AgentProfilePanel({
             <span className="workspace-dossier-field-label" id="agent-name-label">
               {t("admin.v2.agent_name")}
             </span>
-            {renaming ? (
-              <div className="workspace-dossier-rename">
-                <Input
-                  name="agent-display-name"
-                  type="text"
-                  aria-label={t("admin.v2.agent_name")}
-                  autoComplete="off"
-                  autoFocus
-                  maxLength={64}
-                  value={nameDraft}
-                  onChange={(event) => setNameDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") void handleRenameSave();
-                    if (event.key === "Escape") setRenaming(false);
-                  }}
-                  disabled={saving}
-                />
-                <div className="workspace-dossier-rename-actions">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setRenaming(false)}
-                    disabled={saving}
-                  >
-                    {t("admin.v2.cancel")}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => void handleRenameSave()}
-                    disabled={saving}
-                  >
-                    {t("admin.v2.save")}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="workspace-dossier-name-row">
-                <span className="workspace-dossier-name-value" translate="no">{agent.displayName}</span>
-                {canEditProfile ? (
-                  <DossierIconButton
-                    ref={renameEditButtonRef}
-                    onClick={startRename}
-                    aria-label={t("admin.v2.edit_agent")}
-                    title={t("admin.v2.edit_agent")}
-                  >
-                    <ActionEdit size={14} aria-hidden="true" />
-                  </DossierIconButton>
-                ) : null}
-              </div>
-            )}
+            <span className="workspace-dossier-field-value" aria-labelledby="agent-name-label" translate="no">
+              {agent.displayName}
+            </span>
           </div>
 
           <div className="workspace-dossier-field">
@@ -412,35 +406,39 @@ export function AgentProfilePanel({
 
         {/* Management lives below the two columns and spans both — it acts on
             the whole record, not on the document or the identity rail. */}
-        {canManage ? (
+        {canEditProfile ? (
           <div className="workspace-dossier-admin">
-            <div className="adm-drawer-section-actions">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void handleToggleEnabled()}
-                disabled={saving}
-              >
-                <ActionToggle size={14} aria-hidden="true" />
-                {agent.enabled ? t("admin.v2.agent_disable_action") : t("admin.v2.agent_enable_action")}
-              </Button>
-            </div>
+            {canManage ? (
+              <>
+                <div className="adm-drawer-section-actions">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void handleToggleEnabled()}
+                    disabled={saving}
+                  >
+                    <ActionToggle size={14} aria-hidden="true" />
+                    {agent.enabled ? t("admin.v2.agent_disable_action") : t("admin.v2.agent_enable_action")}
+                  </Button>
+                </div>
 
-            <div className="adm-drawer-section">
-              <p className="workspace-dossier-section-title">{t("admin.v2.agent_placements_title")}</p>
-              {placementDescriptions.length === 0 ? (
-                <p className="adm-cred-empty">{t("admin.v2.no_runtime_placement")}</p>
-              ) : (
-                <PlacementList
-                  descriptions={placementDescriptions}
-                  canManage
-                  pendingPlacementId={pendingPlacementId}
-                  onRemove={(placement) => void handleRemovePlacement(placement)}
-                  nodeMissingFor={(description) => nodes.length > 0
-                    && !nodes.some((node) => node.id === placementRuntimeNodeId(description.placement))}
-                />
-              )}
-            </div>
+                <div className="adm-drawer-section">
+                  <p className="workspace-dossier-section-title">{t("admin.v2.agent_placements_title")}</p>
+                  {placementDescriptions.length === 0 ? (
+                    <p className="adm-cred-empty">{t("admin.v2.no_runtime_placement")}</p>
+                  ) : (
+                    <PlacementList
+                      descriptions={placementDescriptions}
+                      canManage
+                      pendingPlacementId={pendingPlacementId}
+                      onRemove={(placement) => void handleRemovePlacement(placement)}
+                      nodeMissingFor={(description) => nodes.length > 0
+                        && !nodes.some((node) => node.id === placementRuntimeNodeId(description.placement))}
+                    />
+                  )}
+                </div>
+              </>
+            ) : null}
 
             <div className="adm-drawer-section">
               <p className="workspace-dossier-section-title">{t("admin.v2.danger_zone")}</p>
@@ -524,7 +522,7 @@ export function AgentProfilePanel({
         )}
       </div>
 
-      <AgentPersonalityEditor
+      <LegacyPersonalityEditor
         value={agent.instructions ?? ""}
         draft={personalityDraft}
         editing={editingPersonality}

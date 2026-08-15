@@ -1447,6 +1447,12 @@
   border-top: 1px solid var(--line-2);
 }
 
+.agent-profile-name-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
 .agent-personality-editor-guide {
   padding: var(--sp-4);
   border: 1px solid var(--line-2);
