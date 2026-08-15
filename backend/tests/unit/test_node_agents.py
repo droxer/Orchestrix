@@ -693,3 +693,35 @@ def test_sync_does_not_backfill_across_computers(tmp_path) -> None:
     }
     sync_node_agents(ctx, node)
     assert placements.list_placements(agent_id=agent["id"]) == []
+
+
+def test_sync_only_backfills_runtimes_with_ready_status(tmp_path) -> None:
+    """`node["agents"]` always carries every AGENT_NAMES key regardless of
+    what's actually installed, so `available` must be built from entries
+    whose status is "ready" — not from a raw key union of that dict. This
+    node has no `supportedAgents` at all, so the only way to (incorrectly)
+    consider "codex" available is to fold in every key of `agents`
+    regardless of status."""
+    ctx, agents, placements = _registry_ctx(tmp_path, nodes=[])
+    node = {
+        "id": "node-1",
+        "employeeId": "alice",
+        "workspaceId": "machine-a",
+        "workspacePath": "/w",
+        "agents": {"claude": "ready", "codex": "unknown"},
+        "online": True,
+        "status": "ready",
+    }
+    agent = agents.create_agent(
+        "alice",
+        {
+            "displayName": "Codex Runner",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+            "computerId": computer_id(node),
+        },
+    )
+
+    sync_node_agents(ctx, node)
+
+    assert placements.list_placements(agent_id=agent["id"]) == []
