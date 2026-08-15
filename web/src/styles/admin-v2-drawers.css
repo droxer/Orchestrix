@@ -501,6 +501,33 @@
   color: var(--ink-4);
 }
 
+.create-agent-computer-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-width: 0;
+}
+
+.create-agent-computer-option > svg {
+  color: var(--ink-3);
+}
+
+.create-agent-computer-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.create-agent-computer-kind {
+  color: var(--ink-3);
+  font: var(--type-label);
+  white-space: nowrap;
+}
+
 .adm-provision-preview {
   display: flex;
   align-items: center;

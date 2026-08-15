@@ -4,7 +4,13 @@ import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createAgent, listSandboxes } from "../../api";
-import { computersForEmployee, runtimesForComputer, type NodeLike } from "../../lib/createAgent";
+import {
+  computersForEmployee,
+  computerName,
+  runtimesForComputer,
+  type ComputerOwnership,
+  type NodeLike,
+} from "../../lib/createAgent";
 import { EMPLOYEE_AGENTS_QUERY_KEY } from "../../hooks/useEmployeeAgents";
 import { agentLabel } from "../../lib/plan";
 import { AGENT_NAMES, AGENT_ROLE_OPTIONS } from "../../types";
@@ -13,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Drawer } from "@/components/ui/Drawer";
+import { OWNERSHIP_ICON } from "../AgentPlacementBadge";
 import {
   Select,
   SelectContent,
@@ -35,8 +42,23 @@ interface CreateAgentDialogProps {
  *  core/computer_identity.py's computer_id() on the backend. */
 type SandboxWithWorkspace = SandboxRecord & { workspaceId?: string };
 
-function computerLabel(sandbox: SandboxWithWorkspace): string {
-  return sandbox.displayName?.trim() || sandbox.workspacePath?.trim() || sandbox.id;
+function ComputerOptionLabel({
+  kindLabel,
+  label,
+  ownership,
+}: {
+  kindLabel: string;
+  label: string;
+  ownership: ComputerOwnership;
+}) {
+  const ComputerIcon = OWNERSHIP_ICON[ownership];
+  return (
+    <span className="create-agent-computer-option">
+      <ComputerIcon size={14} aria-hidden="true" />
+      <span className="create-agent-computer-name" translate="no">{label}</span>
+      <span className="create-agent-computer-kind">{kindLabel}</span>
+    </span>
+  );
 }
 
 /** Maps a daemon node onto the identity shape createAgent.ts operates on.
@@ -87,7 +109,8 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
       const primary = sandboxes.find((sandbox) => group.nodes.some((node) => node.id === sandbox.id));
       return {
         computerId: group.computerId,
-        label: primary ? computerLabel(primary) : group.computerId,
+        ownership: group.ownership,
+        label: primary ? computerName(primary) : group.computerId,
       };
     });
   }, [nodeLikes, sandboxes, employeeId]);
@@ -205,14 +228,25 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
                 <SelectValue placeholder={t("agents_page.create_computer_placeholder")}>
                   {(value: string | null) => {
                     const selected = computerOptions.find((option) => option.computerId === value);
-                    return selected ? selected.label : t("agents_page.create_computer_placeholder");
+                    if (!selected) return t("agents_page.create_computer_placeholder");
+                    return (
+                      <ComputerOptionLabel
+                        kindLabel={t(`admin.v2.node_ownership_${selected.ownership}`)}
+                        label={selected.label}
+                        ownership={selected.ownership}
+                      />
+                    );
                   }}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {computerOptions.map((option) => (
                   <SelectItem key={option.computerId} value={option.computerId}>
-                    <span translate="no">{option.label}</span>
+                    <ComputerOptionLabel
+                      kindLabel={t(`admin.v2.node_ownership_${option.ownership}`)}
+                      label={option.label}
+                      ownership={option.ownership}
+                    />
                   </SelectItem>
                 ))}
               </SelectContent>
