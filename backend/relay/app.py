@@ -50,6 +50,7 @@ from .core import deploy_config
 from .core.environment import load_backend_env
 from .core.storage_config import database_url_from_env, use_postgres_storage
 from .daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
+from .migrations_runtime.agent_computer_id import migrate_agent_computer_ids
 from .persistence.agent_placement_store import (
     DatabaseAgentPlacementStore,
     LocalAgentPlacementStore,
@@ -164,6 +165,14 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
         agent_store=agent_store,
         agent_placement_store=agent_placement_store,
     )
+    try:
+        migrated = migrate_agent_computer_ids(
+            agent_store, agent_placement_store, registry
+        )
+        if migrated:
+            logger.info("Migrated compatibility agents", count=migrated)
+    except Exception as error:  # 迁移失败不应阻断启动
+        logger.warning("Agent computer-id migration deferred", error=str(error))
 
     scheduler = task_scheduler_from_env(
         task_store=task_store,

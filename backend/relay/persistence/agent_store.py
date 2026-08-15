@@ -204,6 +204,34 @@ class LocalAgentStore:
             self._append(agent_id, "agent.deleted", {"agent": updated})
             return updated
 
+    def set_birth_certificate(
+        self, agent_id: str, *, computer_id: str, default_role: str
+    ) -> dict[str, Any]:
+        """仅供一次性迁移使用：为存量 agent 补写出生证明并清空兼容身份。
+
+        正常路径下这些字段在创建时定死、不可修改；存量记录创建时还没有这个
+        概念，只能在迁移里补。不要在别处调用。
+
+        清空 compatibilityKey 也必须走这里 —— 不能用 update_agent，因为
+        _updated_agent 对该字段走 _required_string（agent_store.py:828），
+        空串会被判为「必填缺失」而抛 ValueError。
+        """
+        with self._lock:
+            current = self.get_agent(agent_id)
+            if not current:
+                raise KeyError(agent_id)
+            updated = {
+                key: value for key, value in current.items() if key != "compatibilityKey"
+            }
+            updated |= {
+                "computerId": computer_id,
+                "defaultRole": default_role,
+                "version": current["version"] + 1,
+                "updatedAt": now_iso(),
+            }
+            self._append(agent_id, "agent.updated", {"agent": updated})
+            return updated
+
     def events(self, agent_id: str) -> list[dict[str, Any]]:
         return _read_jsonl(self._events_path(agent_id))
 
@@ -473,6 +501,38 @@ class DatabaseAgentStore:
             "updatedAt": timestamp,
         }
         return self._append(agent_id, "agent.deleted", updated, {"agent": updated})
+
+    def set_birth_certificate(
+        self, agent_id: str, *, computer_id: str, default_role: str
+    ) -> dict[str, Any]:
+        """Migration-only: backfill an existing agent's birth certificate and
+        clear its compatibility identity.
+
+        These fields are fixed at creation and unpatchable on the normal
+        path; legacy records predate the concept, so only this migration
+        entry point backfills them. Do not call from anywhere else.
+
+        Clearing compatibilityKey must go through here rather than
+        update_agent, because _updated_agent routes that field through
+        _required_string (agent_store.py:~828), and an empty string there
+        is treated as a missing required field and raises ValueError.
+        `_agent_row` writes `compatibility_key` from `agent.get(...)`, so
+        omitting the key from `updated` writes the column as NULL, freeing
+        it from the `uq_agents_live_compatibility_key` partial unique index.
+        """
+        current = self.get_agent(agent_id)
+        if not current:
+            raise KeyError(agent_id)
+        updated = {
+            key: value for key, value in current.items() if key != "compatibilityKey"
+        }
+        updated |= {
+            "computerId": computer_id,
+            "defaultRole": default_role,
+            "version": current["version"] + 1,
+            "updatedAt": now_iso(),
+        }
+        return self._append(agent_id, "agent.updated", updated, {"agent": updated})
 
     def events(self, agent_id: str) -> list[dict[str, Any]]:
         with store_transaction(self.engine) as conn:
