@@ -13,6 +13,13 @@ export interface NodeLike {
   disabledAgents?: string[];
 }
 
+export type ComputerOwnership = "local" | "managed";
+
+/** A workspace path is execution metadata, never a user-facing Computer name. */
+export function computerName(node: { id: string; displayName?: string }): string {
+  return node.displayName?.trim() || node.id;
+}
+
 /** Mirrors the backend's core/computer_identity.py computer_id() one-to-one. */
 export function computerId(node: NodeLike): string {
   const managed = node.managedNodeId?.trim();
@@ -26,14 +33,18 @@ export function computerId(node: NodeLike): string {
 export function computersForEmployee(
   nodes: NodeLike[],
   employeeId: string,
-): { computerId: string; nodes: NodeLike[] }[] {
+): { computerId: string; ownership: ComputerOwnership; nodes: NodeLike[] }[] {
   const byComputer = new Map<string, NodeLike[]>();
   for (const node of nodes) {
     if (node.employeeId !== employeeId) continue;
     const id = computerId(node);
     byComputer.set(id, [...(byComputer.get(id) ?? []), node]);
   }
-  return [...byComputer].map(([id, group]) => ({ computerId: id, nodes: group }));
+  return [...byComputer].map(([id, group]) => ({
+    computerId: id,
+    ownership: group.some((node) => Boolean(node.managedNodeId?.trim())) ? "managed" : "local",
+    nodes: group,
+  }));
 }
 
 export function runtimesForComputer(nodes: NodeLike[], target: string): string[] {

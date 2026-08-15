@@ -7,8 +7,9 @@ import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import type { AgentName, CurrentUser, EmployeeAgent, LogicalAgentAvailability } from "../types";
 import { AgentStateBadge } from "./AgentStateBadge";
+import { AgentMark } from "./AgentMark";
 import { StatusPill, TonePill } from "./StatusPill";
-import { AgentWorkspacePage, type WorkspacePageTab } from "./AgentWorkspacePage";
+import { AgentDetailPage } from "./AgentDetailPage";
 import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
 import { Badge } from "@/components/ui/badge";
@@ -16,15 +17,16 @@ import { Button } from "@/components/ui/button";
 import { FilterSelect } from "./FiltersBar";
 import { SearchInput } from "@/components/ui/search-input";
 import { describeAgentPlacements } from "../lib/agentPlacements";
+import { agentLabel } from "../lib/plan";
 import { OWNERSHIP_ICON } from "./AgentPlacementBadge";
 import { CreateAgentDialog } from "./agents/CreateAgentDialog";
 
 interface AgentsPageProps {
   currentUser: CurrentUser;
   /** The agent currently inspected in the detail pane, driven by the pathname. */
-  workspaceAgent: EmployeeAgent | null;
+  detailAgent: EmployeeAgent | null;
   isDetailRoute: boolean;
-  onOpenWorkspace: (agent: EmployeeAgent, tab?: WorkspacePageTab) => void;
+  onOpenAgent: (agent: EmployeeAgent) => void;
   onOpenThread: (sessionId: string) => void;
 }
 
@@ -121,11 +123,9 @@ function RosterRow({
   const { t } = useTranslation();
   const placements = activePlacements(agent);
   const placementDescriptions = describeAgentPlacements(placements);
-  // One agent lives on exactly one computer.
-  const computer = placementDescriptions[0] ?? null;
   const ready = agent.enabled && agent.availability === "ready";
-  const ComputerIcon = computer ? OWNERSHIP_ICON[computer.ownership] : null;
-  const computerKindLabel = computer ? t(`admin.v2.node_ownership_${computer.ownership}`) : "";
+  const runtime = agentLabel(agent.executorKind);
+  const computerNames = placementDescriptions.map(({ nodeName }) => nodeName).join(", ");
 
   return (
     <li className="list-virtual">
@@ -155,19 +155,41 @@ function RosterRow({
               <span className="agents-roster-row-name">{agent.displayName}</span>
               {!agent.enabled ? <Badge variant="neutral">{t("agents_page.disabled")}</Badge> : null}
             </span>
-            {/* Name + computer travel together: the roster is the one place
-                every agent's home machine can be scanned side by side. An
-                agent with nowhere to run still says so — that is a defect,
-                not a fact to quiet. */}
+            {/* Runtime + Computers are execution metadata, not an Agent-owned
+                workspace. Keep every active Computer visible in route order. */}
             <span
               className="agents-roster-row-meta"
-              title={computer ? `${computerKindLabel} · ${computer.nodeName}` : undefined}
+              title={placementDescriptions.length
+                ? `${t("agents_page.runtime")}: ${runtime} · ${t("agents_page.computers")}: ${computerNames}`
+                : `${t("agents_page.runtime")}: ${runtime} · ${t("agents_page.no_placements")}`}
             >
-              {computer && ComputerIcon ? (
-                <>
-                  <ComputerIcon size={12} aria-hidden="true" />
-                  <span className="agents-roster-row-computer" translate="no">{computer.nodeName}</span>
-                </>
+              <span className="agents-roster-row-runtime">
+                <span className="sr-only">{t("agents_page.runtime")}: </span>
+                <span className="agents-roster-row-runtime-mark" aria-hidden="true">
+                  <AgentMark agent={agent.executorKind} size={10} />
+                </span>
+                <span className="agents-roster-row-runtime-label" translate="no">{runtime}</span>
+              </span>
+              <span className="agents-roster-row-meta-separator" aria-hidden="true">·</span>
+              {placementDescriptions.length ? (
+                <span className="agents-roster-row-computers">
+                  <span className="sr-only">{t("agents_page.computers")}: </span>
+                  {placementDescriptions.map((description, index) => {
+                    const ComputerIcon = OWNERSHIP_ICON[description.ownership];
+                    return (
+                      <span
+                        key={description.placement.id}
+                        className="agents-roster-row-computer"
+                      >
+                        {index > 0 ? (
+                          <span className="agents-roster-row-computer-separator" aria-hidden="true">,</span>
+                        ) : null}
+                        <ComputerIcon size={12} aria-hidden="true" />
+                        <span translate="no">{description.nodeName}</span>
+                      </span>
+                    );
+                  })}
+                </span>
               ) : (
                 <span>{t("agents_page.no_placements")}</span>
               )}
@@ -190,9 +212,9 @@ function RosterRow({
 
 export function AgentsPage({
   currentUser,
-  workspaceAgent,
+  detailAgent,
   isDetailRoute,
-  onOpenWorkspace,
+  onOpenAgent,
   onOpenThread,
 }: AgentsPageProps) {
   const { t } = useTranslation();
@@ -243,7 +265,7 @@ export function AgentsPage({
   const loading = isFetching && agents.length === 0;
   const [createOpen, setCreateOpen] = useState(false);
 
-  // The detail pane remounts per agent (key={workspaceAgent.id}), so an
+  // The detail pane remounts per agent (key={detailAgent.id}), so an
   // in-flight profile draft cannot survive a roster switch — hold the
   // selection here until the owner confirms the discard.
   const profileDirtyRef = useRef(false);
@@ -251,7 +273,7 @@ export function AgentsPage({
     profileDirtyRef.current = dirty;
   }, []);
   const handleSelectAgent = useCallback(async (agent: EmployeeAgent) => {
-    if (agent.id === workspaceAgent?.id) return;
+    if (agent.id === detailAgent?.id) return;
     if (profileDirtyRef.current) {
       const ok = await confirm({
         title: t("unsaved.title"),
@@ -263,8 +285,8 @@ export function AgentsPage({
       if (!ok) return;
       profileDirtyRef.current = false;
     }
-    onOpenWorkspace(agent);
-  }, [confirm, onOpenWorkspace, t, workspaceAgent?.id]);
+    onOpenAgent(agent);
+  }, [confirm, detailAgent?.id, onOpenAgent, t]);
 
   return (
     <section
@@ -316,7 +338,7 @@ export function AgentsPage({
               <RosterRow
                 key={agent.id}
                 agent={agent}
-                selected={workspaceAgent?.id === agent.id}
+                selected={detailAgent?.id === agent.id}
                 onSelect={(agent) => void handleSelectAgent(agent)}
               />
             ))}
@@ -325,10 +347,10 @@ export function AgentsPage({
       </div>
 
       <div className="agents-detail">
-        {workspaceAgent ? (
-          <AgentWorkspacePage
-            key={workspaceAgent.id}
-            agent={workspaceAgent}
+        {detailAgent ? (
+          <AgentDetailPage
+            key={detailAgent.id}
+            agent={detailAgent}
             onOpenThread={onOpenThread}
             canEditMeta
             onProfileDirtyChange={handleProfileDirtyChange}
@@ -348,7 +370,7 @@ export function AgentsPage({
           open={createOpen}
           onClose={() => setCreateOpen(false)}
           employeeId={currentUser.employeeId}
-          onCreated={(agent) => onOpenWorkspace(agent)}
+          onCreated={onOpenAgent}
         />
       ) : null}
     </section>

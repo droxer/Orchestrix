@@ -17,7 +17,7 @@ import {
 import { agentLabel } from "../lib/plan";
 import type { AgentPlacement, ControlPanelDaemonNodeRecord, EmployeeAgent, EmployeeRecord } from "../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ADMIN_AGENTS_KEY } from "../lib/adminHelpers";
 import { EMPLOYEE_AGENTS_QUERY_KEY } from "../hooks/useEmployeeAgents";
@@ -28,7 +28,6 @@ import { AgentPersonalityEditor } from "./AgentPersonalityEditor";
 import { PlacementList } from "./PlacementList";
 import { describeAgentPlacements, placementRuntimeNodeId } from "../lib/agentPlacements";
 import { ProfileImagePicker } from "./ProfileImagePicker";
-import { pathForAppState } from "../lib/appRoute";
 
 export interface AgentProfilePanelProps {
   agent: EmployeeAgent;
@@ -36,13 +35,11 @@ export interface AgentProfilePanelProps {
   nodes?: ControlPanelDaemonNodeRecord[];
   canManage?: boolean;
   canEditMeta?: boolean;
-  variant?: "admin" | "workspace";
+  variant?: "admin" | "detail";
   onAgentUpdated?: (agent: EmployeeAgent) => void;
   onAgentDeleted?: (agentId: string) => void;
   /** Reports unsaved rename/personality drafts so parents can guard navigation. */
   onDirtyChange?: (dirty: boolean) => void;
-  /** Shown in admin drawer when the caller can navigate to the workspace page. */
-  onOpenWorkspace?: (agent: EmployeeAgent) => void;
 }
 
 function DossierIconButton({
@@ -71,7 +68,6 @@ export function AgentProfilePanel({
   onAgentUpdated,
   onAgentDeleted,
   onDirtyChange,
-  onOpenWorkspace,
 }: AgentProfilePanelProps) {
   const { t } = useTranslation();
   const { confirm } = useDialogs();
@@ -293,9 +289,9 @@ export function AgentProfilePanel({
   const owner = employees.find((employee) => employee.id === agent.employeeId);
   const ownerDisplay = owner ? owner.displayName : `@${agent.employeeId}`;
   const placementDescriptions = describeAgentPlacements(agent.placements);
-  const isWorkspace = variant === "workspace";
+  const isDetail = variant === "detail";
 
-  if (isWorkspace) {
+  if (isDetail) {
     /* The profile tab carries only what you can CHANGE about the record —
        portrait, name, role, instructions. Runtime, computer, availability,
        and id are printed once by the RecordBand above every tab, so
@@ -416,68 +412,48 @@ export function AgentProfilePanel({
 
         {/* Management lives below the two columns and spans both — it acts on
             the whole record, not on the document or the identity rail. */}
-        {canManage || onOpenWorkspace ? (
+        {canManage ? (
           <div className="workspace-dossier-admin">
             <div className="adm-drawer-section-actions">
-              {canManage ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => void handleToggleEnabled()}
-                  disabled={saving}
-                >
-                  <ActionToggle size={14} aria-hidden="true" />
-                  {agent.enabled ? t("admin.v2.agent_disable_action") : t("admin.v2.agent_enable_action")}
-                </Button>
-              ) : null}
-              {onOpenWorkspace ? (
-                <a
-                  data-slot="link-button"
-                  href={pathForAppState({ route: "agents", mobileView: "chat", sessionId: null, agentWorkspaceId: agent.id })}
-                  className={buttonVariants({ variant: "outline" })}
-                  onClick={(event) => {
-                    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
-                    event.preventDefault();
-                    onOpenWorkspace(agent);
-                  }}
-                >
-                  {t("agents_page.open_workspace")}
-                </a>
-              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handleToggleEnabled()}
+                disabled={saving}
+              >
+                <ActionToggle size={14} aria-hidden="true" />
+                {agent.enabled ? t("admin.v2.agent_disable_action") : t("admin.v2.agent_enable_action")}
+              </Button>
             </div>
 
-            {canManage ? (
-              <>
-                <div className="adm-drawer-section">
-                  <p className="workspace-dossier-section-title">{t("admin.v2.agent_placements_title")}</p>
-                  {placementDescriptions.length === 0 ? (
-                    <p className="adm-cred-empty">{t("admin.v2.no_runtime_placement")}</p>
-                  ) : (
-                    <PlacementList
-                      descriptions={placementDescriptions}
-                      canManage={canManage}
-                      pendingPlacementId={pendingPlacementId}
-                      onRemove={(placement) => void handleRemovePlacement(placement)}
-                      nodeMissingFor={(description) => nodes.length > 0
-                        && !nodes.some((node) => node.id === placementRuntimeNodeId(description.placement))}
-                    />
-                  )}
-                </div>
+            <div className="adm-drawer-section">
+              <p className="workspace-dossier-section-title">{t("admin.v2.agent_placements_title")}</p>
+              {placementDescriptions.length === 0 ? (
+                <p className="adm-cred-empty">{t("admin.v2.no_runtime_placement")}</p>
+              ) : (
+                <PlacementList
+                  descriptions={placementDescriptions}
+                  canManage
+                  pendingPlacementId={pendingPlacementId}
+                  onRemove={(placement) => void handleRemovePlacement(placement)}
+                  nodeMissingFor={(description) => nodes.length > 0
+                    && !nodes.some((node) => node.id === placementRuntimeNodeId(description.placement))}
+                />
+              )}
+            </div>
 
-                <div className="adm-drawer-section">
-                  <p className="workspace-dossier-section-title">{t("admin.v2.danger_zone")}</p>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={() => void handleDeleteAgent()}
-                    disabled={saving}
-                  >
-                    <AdminDelete size={14} aria-hidden="true" />
-                    {t("admin.v2.delete_agent")}
-                  </Button>
-                </div>
-              </>
-            ) : null}
+            <div className="adm-drawer-section">
+              <p className="workspace-dossier-section-title">{t("admin.v2.danger_zone")}</p>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => void handleDeleteAgent()}
+                disabled={saving}
+              >
+                <AdminDelete size={14} aria-hidden="true" />
+                {t("admin.v2.delete_agent")}
+              </Button>
+            </div>
           </div>
         ) : null}
       </div>
@@ -587,33 +563,17 @@ export function AgentProfilePanel({
         {t("admin.v2.agent_meta_updated", { time: formatRelativeTime(agent.updatedAt, t) })}
       </p>
 
-      {canManage || onOpenWorkspace ? (
+      {canManage ? (
         <div className="adm-drawer-section-actions">
-          {canManage ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void handleToggleEnabled()}
-              disabled={saving}
-            >
-              <ActionToggle size={14} aria-hidden="true" />
-              {agent.enabled ? t("admin.v2.agent_disable_action") : t("admin.v2.agent_enable_action")}
-            </Button>
-          ) : null}
-          {onOpenWorkspace ? (
-            <a
-              data-slot="link-button"
-              href={pathForAppState({ route: "agents", mobileView: "chat", sessionId: null, agentWorkspaceId: agent.id })}
-              className={buttonVariants({ variant: "outline" })}
-              onClick={(event) => {
-                if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
-                event.preventDefault();
-                onOpenWorkspace(agent);
-              }}
-            >
-              {t("agents_page.open_workspace")}
-            </a>
-          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void handleToggleEnabled()}
+            disabled={saving}
+          >
+            <ActionToggle size={14} aria-hidden="true" />
+            {agent.enabled ? t("admin.v2.agent_disable_action") : t("admin.v2.agent_enable_action")}
+          </Button>
         </div>
       ) : null}
 

@@ -29,7 +29,6 @@ import { useRelayStore } from "./lib/store";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { useClientMounted } from "./hooks/useClientMounted";
 import { useActiveSession } from "./hooks/useActiveSession";
-import type { WorkspacePageTab } from "./components/AgentWorkspacePage";
 import { chooseSendAction, sendThreadSessionId, suppressActiveSessionDuringPendingSend } from "./lib/sendAction";
 import { matchesThreadQuery, myThreadSessions, pickActiveThreadSession, threadsForDirectory } from "./lib/threads";
 import { shouldTailSessionEvents } from "./lib/sessionEventStream";
@@ -343,7 +342,7 @@ export function App() {
     route,
     mobileView,
     projectId: routedProjectId,
-    agentWorkspaceId,
+    agentId,
     teamWorkspaceId,
     notFound,
     isLoginPath,
@@ -351,7 +350,7 @@ export function App() {
     navigateToMobileView,
     hrefForSideNavRoute,
     syncThreadUrl,
-    navigateToAgentWorkspace,
+    navigateToAgent,
     navigateToTeamWorkspace,
     navigateToProject,
     navigateToLogin,
@@ -415,9 +414,9 @@ export function App() {
     setSelectedSessionId,
     syncThreadUrl,
   ]);
-  const workspaceAgent = useMemo(
-    () => logicalAgents.find((agent) => agent.id === agentWorkspaceId) ?? null,
-    [agentWorkspaceId, logicalAgents],
+  const detailAgent = useMemo(
+    () => logicalAgents.find((agent) => agent.id === agentId) ?? null,
+    [agentId, logicalAgents],
   );
 
   useEffect(() => {
@@ -436,13 +435,6 @@ export function App() {
       window.dispatchEvent(new PopStateEvent("popstate"));
     }
   }, [authChecked, isLoginPath, mounted, user]);
-
-  useEffect(() => {
-    const workspaceAgent = logicalAgents.find((agent) => agent.id === agentWorkspaceId);
-    if (!workspaceAgent) return;
-    setActiveLogicalAgentId(workspaceAgent.id);
-    setActiveAgent(workspaceAgent.executorKind);
-  }, [agentWorkspaceId, logicalAgents]);
 
   // Live SSE tail of the open thread; merges new events into the
   // sessions cache so the active thread updates at push latency.
@@ -490,9 +482,9 @@ export function App() {
 
   const skipLinkHref = useMemo(() => {
     if (route === "main" || route === "projects") return mobileView === "threads" ? "#thread-panel" : "#chat-panel";
-    if (route === "agents" && agentWorkspaceId) return "#agent-workspace-panel";
+    if (route === "agents" && agentId) return "#agent-detail-panel";
     return `#${WORK_ROUTE_SKIP_IDS[route]}`;
-  }, [agentWorkspaceId, route, mobileView]);
+  }, [agentId, route, mobileView]);
 
   const awaitingDecision = useMemo(() => isAwaitingFeedbackDecision(activeSession), [activeSession]);
 
@@ -510,9 +502,29 @@ export function App() {
     () => threadItems.filter((item) => matchesThreadQuery(item.session, threadQuery)),
     [threadItems, threadQuery],
   );
+  const directoryProjects = useMemo(() => {
+    if (route !== "projects") return [];
+    const query = threadQuery.trim().toLowerCase();
+    if (!query) return projects;
+    const matchingProjectIds = new Set(
+      projects.filter((project) => project.name.toLowerCase().includes(query)).map((project) => project.id),
+    );
+    return projects.filter((project) => matchingProjectIds.has(project.id) || threadItems.some(
+      (item) => item.session.projectId === project.id && matchesThreadQuery(item.session, threadQuery),
+    ));
+  }, [projects, route, threadItems, threadQuery]);
   const directoryThreads = useMemo(() => {
-    return threadsForDirectory(filteredThreads, projects, route === "projects" ? "projects" : "threads");
-  }, [filteredThreads, projects, route]);
+    if (route !== "projects") return threadsForDirectory(filteredThreads, projects, "threads");
+    const query = threadQuery.trim().toLowerCase();
+    const matchingProjectIds = new Set(
+      projects.filter((project) => project.name.toLowerCase().includes(query)).map((project) => project.id),
+    );
+    const projectFilteredThreads = threadItems.filter((item) => {
+      if (!item.session.projectId || !projects.some((project) => project.id === item.session.projectId)) return false;
+      return !query || matchingProjectIds.has(item.session.projectId) || matchesThreadQuery(item.session, threadQuery);
+    });
+    return projectFilteredThreads;
+  }, [filteredThreads, projects, route, threadItems, threadQuery]);
 
   const refreshWithToken = useCallback(async (tokenOverride?: string) => {
     await refresh(undefined, tokenOverride);
@@ -775,16 +787,8 @@ export function App() {
     navigateToProject(projectId);
   }
 
-  function openAgentWorkspace(agent: EmployeeAgent, tab?: WorkspacePageTab) {
-    setActiveLogicalAgentId(agent.id);
-    setActiveAgent(agent.executorKind);
-    navigateToAgentWorkspace(agent.id);
-    if (typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      if (tab && tab !== "profile") url.searchParams.set("tab", tab);
-      else url.searchParams.delete("tab");
-      window.history.replaceState(window.history.state, "", url);
-    }
+  function openAgentDetail(agent: EmployeeAgent) {
+    navigateToAgent(agent.id);
   }
 
   function openThreadSpace(artifact?: RelayArtifact) {
@@ -1256,9 +1260,9 @@ export function App() {
         ) : route === "agents" ? (
           <AgentsPage
             currentUser={user}
-            workspaceAgent={workspaceAgent}
-            isDetailRoute={agentWorkspaceId !== null}
-            onOpenWorkspace={openAgentWorkspace}
+            detailAgent={detailAgent}
+            isDetailRoute={agentId !== null}
+            onOpenAgent={openAgentDetail}
             onOpenThread={openThread}
           />
         ) : route === "computer" ? (
@@ -1271,7 +1275,7 @@ export function App() {
           <ThreadsView
             directoryMode={route === "projects" ? "projects" : "threads"}
             filteredThreads={directoryThreads}
-            projects={route === "projects" ? projects : []}
+            projects={route === "projects" ? directoryProjects : []}
             selectedProjectId={route === "projects" ? routedProjectId ?? activeSession?.projectId ?? null : null}
             threadQuery={threadQuery}
             setThreadQuery={setThreadQuery}

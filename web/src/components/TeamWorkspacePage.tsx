@@ -24,7 +24,7 @@ import { TeamMark } from "./TeamMark";
 import { TeamMemberOption } from "./TeamMemberOption";
 import { ProfileImage, ProfileImagePicker } from "./ProfileImagePicker";
 import { ActivitiesSkeleton, WorkspaceActivities, WorkspaceEmpty, WorkspaceError } from "./workspace/WorkspacePrimitives";
-import { WorkspaceFilesBrowser } from "./AgentWorkspacePage";
+import { ThreadWorkspaceFiles } from "./ThreadWorkspaceFiles";
 import { RecordBand, type RecordFact } from "./workspace/RecordBand";
 import { StatusPill } from "./StatusPill";
 import { truncateId } from "../lib/adminHelpers";
@@ -594,7 +594,7 @@ export function TeamWorkspacePage({
       ) : pageTab === "workspace" ? (
         <div className="workspace-inspect" role="tabpanel" id="team-page-panel-workspace" aria-labelledby="team-page-tab-workspace">
           {workspaceAgentId ? (
-            <WorkspaceFilesBrowser
+            <ThreadWorkspaceFiles
               agentId={workspaceAgentId}
               teamId={team.id}
               threads={briefQuery.data?.sessions ?? []}

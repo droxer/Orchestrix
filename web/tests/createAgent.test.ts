@@ -1,9 +1,17 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { runtimesForComputer, computersForEmployee } from "../src/lib/createAgent.js";
+import { computerName, runtimesForComputer, computersForEmployee } from "../src/lib/createAgent.js";
 
 describe("create agent options", () => {
+  it("shows the computer name and never substitutes its workspace path", () => {
+    const named = { id: "node-1", displayName: "Build Cloud", workspacePath: "/workspace/build" };
+    const unnamed = { id: "node-2", workspacePath: "/Users/alice/private-project" };
+
+    assert.equal(computerName(named), "Build Cloud");
+    assert.equal(computerName(unnamed), "node-2");
+  });
+
   it("lists each computer once even when it has several runtime nodes", () => {
     const nodes = [
       { id: "n1", employeeId: "alice", workspaceId: "m1", supportedAgents: ["claude"] },
@@ -11,6 +19,21 @@ describe("create agent options", () => {
     ];
     const computers = computersForEmployee(nodes, "alice");
     assert.equal(computers.length, 1);
+  });
+
+  it("offers both local and cloud computers assigned to the employee", () => {
+    const nodes = [
+      { id: "local", employeeId: "alice", workspaceId: "mac", supportedAgents: ["claude"] },
+      { id: "cloud", employeeId: "alice", managedNodeId: "cloud-1", supportedAgents: ["codex"] },
+    ];
+
+    assert.deepEqual(
+      computersForEmployee(nodes, "alice").map(({ computerId, ownership }) => ({ computerId, ownership })),
+      [
+        { computerId: "device:alice:mac", ownership: "local" },
+        { computerId: "managed:cloud-1", ownership: "managed" },
+      ],
+    );
   });
 
   it("unions runtimes across a computer's nodes and drops disabled ones", () => {

@@ -357,7 +357,7 @@ def _new_project(owner_employee_id: str, payload: dict[str, Any]) -> dict[str, A
         ),
         "workspaceLayout": "project",
         "workspaceSubpath": payload.get("workspaceSubpath") or f"projects/{project_id}",
-        "leadAgentId": payload["leadAgentId"],
+        "leadAgentId": payload.get("leadAgentId"),
         "members": list(payload["members"]),
         "enabled": payload.get("enabled") is not False,
         "version": 1,

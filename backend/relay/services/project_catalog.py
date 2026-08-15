@@ -104,9 +104,11 @@ def validate_project_roster(
     target_node_id: str | None,
     agent_store: Any,
     placement_store: Any,
-) -> tuple[list[dict[str, Any]], str]:
-    if not isinstance(raw_members, list) or not raw_members:
+) -> tuple[list[dict[str, Any]], str | None]:
+    if not isinstance(raw_members, list):
         raise ProjectValidationError("project_members_required")
+    if not raw_members:
+        return [], None
     if len(raw_members) > PROJECT_MEMBER_MAX_COUNT:
         raise ProjectValidationError("project_members_too_many")
     members = [_normalize_member(member) for member in raw_members]

@@ -19,7 +19,7 @@ export type AppLocationState = {
   mobileView: MobileView;
   sessionId: string | null;
   projectId?: string | null;
-  agentWorkspaceId?: string | null;
+  agentId?: string | null;
   teamWorkspaceId?: string | null;
   composingNew?: boolean;
   login?: boolean;
@@ -65,7 +65,7 @@ export function parseAppPath(pathname: string, _search = ""): AppLocationState {
     return { route: "projects", ...base, projectId: decodeSegment(second), sessionId: decodeSegment(rest[1]) };
   }
   if (head === "agents" && second && rest.length === 0) {
-    return { route: "agents", ...base, agentWorkspaceId: decodeSegment(second) };
+    return { route: "agents", ...base, agentId: decodeSegment(second) };
   }
   if (head === "teams" && second && rest.length === 0) {
     return { route: "teams", ...base, teamWorkspaceId: decodeSegment(second) };
@@ -80,7 +80,7 @@ export function pathForAppState({
   mobileView,
   sessionId,
   projectId,
-  agentWorkspaceId,
+  agentId,
   teamWorkspaceId,
   composingNew,
   login,
@@ -88,7 +88,7 @@ export function pathForAppState({
 }: AppLocationState): string {
   if (notFound && typeof window !== "undefined") return window.location.pathname;
   if (login) return "/login";
-  if (route === "agents" && agentWorkspaceId) return `/agents/${encodeURIComponent(agentWorkspaceId)}`;
+  if (route === "agents" && agentId) return `/agents/${encodeURIComponent(agentId)}`;
   if (route === "teams" && teamWorkspaceId) return `/teams/${encodeURIComponent(teamWorkspaceId)}`;
   if (route === "projects") {
     if (!projectId) return "/projects";
@@ -111,7 +111,7 @@ export function hrefForRoute(route: AppRoute, sessionId?: string | null): string
   });
 }
 
-const AGENT_TABS = new Set(["profile", "activities", "workspace"]);
+const AGENT_TABS = new Set(["profile", "activities"]);
 const TEAM_TABS = new Set(["profile", "activities", "workspace"]);
 const AGENT_AVAILABILITY = new Set(["ready", "busy", "pending", "offline"]);
 
@@ -155,11 +155,6 @@ export function canonicalSearchForPath(pathname: string, search = ""): string {
     const requestedTab = source.get("tab");
     const tab = requestedTab && AGENT_TABS.has(requestedTab) ? requestedTab : "profile";
     if (tab !== "profile") target.set("tab", tab);
-    if (tab === "workspace") {
-      if (source.get("scope") === "shared") target.set("scope", "shared");
-      copyParam(source, target, "path");
-      copyParam(source, target, "item");
-    }
   } else if (head === "teams" && !entityId) {
     if (source.get("dialog") === "create") target.set("dialog", "create");
   } else if (head === "teams" && entityId && rest.length === 0) {

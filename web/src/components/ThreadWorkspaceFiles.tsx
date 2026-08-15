@@ -1,68 +1,35 @@
 "use client";
 
-import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { getWorkspaceBrief, listAgentWorkspaceFiles, readAgentWorkspaceFile } from "../api";
+import { listAgentWorkspaceFiles, readAgentWorkspaceFile } from "../api";
 import type {
-  EmployeeAgent,
   AgentWorkspaceFileResponse,
   WorkspaceFileEntry,
   AgentWorkspaceFilesResponse,
   WorkspaceBriefSession,
 } from "../types";
-import { agentLabel } from "../lib/plan";
 import { isWorkspaceRetryableError, preferredWorkspaceThreadId, workspaceFilesEmptyState, workspaceHomeStatus } from "../lib/workspaceHome";
 import { ActionRemove, WorkspaceFile, WorkspaceFolder } from "./icons";
-import { AgentMark } from "./AgentMark";
-import { IdentityMonogram } from "./IdentityMonogram";
 import { compactDate } from "../lib/workspaceFormat";
 import {
-  ActivitiesSkeleton,
-  WorkspaceActivities,
   WorkspaceEmpty,
-  WorkspaceError,
   WorkspaceLoading,
 } from "./workspace/WorkspacePrimitives";
-import { PageHeader } from "./PageHeader";
 import { Button } from "@/components/ui/button";
 import { CodeView, imageMimeForFile, isHtmlFile, isMarkdownFile, isPdfFile, isRenderableFile, languageForFile } from "./CodeView";
 import { Markdown } from "./Markdown";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
-import { AgentProfilePanel } from "./AgentProfilePanel";
-import { ProfileImage } from "./ProfileImagePicker";
-import { truncateId } from "../lib/adminHelpers";
-import { describeAgentPlacements } from "../lib/agentPlacements";
-import { AgentPlacementBadge } from "./AgentPlacementBadge";
-import { RecordBand, type RecordFact } from "./workspace/RecordBand";
-import { StatusPill } from "./StatusPill";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-export type WorkspacePageTab = "profile" | "workspace" | "activities";
-
-const PAGE_TABS: readonly WorkspacePageTab[] = ["profile", "workspace", "activities"];
-
-interface AgentWorkspacePageProps {
-  agent: EmployeeAgent;
-  onOpenThread: (sessionId: string) => void;
-  canEditMeta?: boolean;
-  /** Bubbles the profile tab's unsaved-draft state up to the agent switcher. */
-  onProfileDirtyChange?: (dirty: boolean) => void;
-}
 
 type FileSelection = { path: string; name: string };
 
-const parsePageTab = (value: string | null): WorkspacePageTab => {
-  if (value === "files") return "workspace";
-  return PAGE_TABS.includes(value as WorkspacePageTab) ? value as WorkspacePageTab : "profile";
-};
 const parseString = (value: string | null): string => value ?? "";
 
-/** Personal home (default) vs the computer's shared workspace root. */
+/** Agent-private files vs the shared root inside the selected Thread workspace. */
 type WorkspaceFileScope = "personal" | "shared";
 const parseFileScope = (value: string | null): WorkspaceFileScope => value === "shared" ? "shared" : "personal";
-
-const WORKSPACE_BRIEF_POLL_MS = 3000;
 
 function parentPath(path: string): string {
   const parts = path.split("/").filter(Boolean);
@@ -159,7 +126,7 @@ function WorkspacePathBreadcrumb({
   );
 }
 
-export function WorkspaceFilesBrowser({
+export function ThreadWorkspaceFiles({
   agentId,
   teamId,
   threads = [],
@@ -362,205 +329,6 @@ export function WorkspaceFilesBrowser({
         </section>
       ) : null}
     </div>
-  );
-}
-
-export function AgentWorkspacePage({
-  agent,
-  onOpenThread,
-  canEditMeta = false,
-  onProfileDirtyChange,
-}: AgentWorkspacePageProps) {
-  const { t } = useTranslation();
-  const [pageTab, setPageTab] = useUrlSearchState("tab", "profile" as WorkspacePageTab, parsePageTab, (value) => value === "profile" ? null : value, "push");
-
-  const query = useQuery({
-    queryKey: ["agent-workspace-brief", agent.id],
-    refetchInterval: pageTab === "activities" ? WORKSPACE_BRIEF_POLL_MS : false,
-    queryFn: ({ signal }) => getWorkspaceBrief({ agentId: agent.id }, signal),
-    enabled: pageTab !== "profile",
-  });
-  const brief = query.data;
-  const activitiesLoading = pageTab === "activities" && query.isLoading && !brief;
-  const activitiesError = pageTab === "activities" && !brief && query.error
-    ? query.error instanceof Error ? query.error.message : String(query.error)
-    : "";
-  const displayName = agent.displayName;
-
-  function movePageTab(event: KeyboardEvent<HTMLButtonElement>, next: WorkspacePageTab): void {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-    event.preventDefault();
-    const target = event.key === "Home"
-      ? PAGE_TABS[0]
-      : event.key === "End"
-        ? PAGE_TABS[PAGE_TABS.length - 1]
-        : next;
-    setPageTab(target);
-    requestAnimationFrame(() => document.getElementById(`workspace-page-tab-${target}`)?.focus());
-  }
-
-  function pageTabLabel(tab: WorkspacePageTab): string {
-    if (tab === "profile") return t("workspace.tab_profile");
-    if (tab === "workspace") return t("workspace.tab_workspace");
-    return t("workspace.tab_activities");
-  }
-
-  const placementDescriptions = describeAgentPlacements(agent.placements);
-  const primaryPlacement = placementDescriptions.find(
-    ({ placement }) => placement.desiredState === "active",
-  ) ?? placementDescriptions[0];
-
-  function pageTabCount(tab: WorkspacePageTab): number | undefined {
-    if (tab === "activities" && brief) return brief.metrics.sessionCount || undefined;
-    return undefined;
-  }
-
-  /* The band is the record's read-only spine, identical on all three tabs.
-     Everything here used to live somewhere else and disagree with itself:
-     runtime + computer + status were a cramped chip strip in the header,
-     id sat inside a collapsed <details> on the profile tab only.
-     Nothing in a tab panel may print these again. */
-  const bandFacts: RecordFact[] = [
-    {
-      key: "runtime",
-      label: t("admin.v2.agent_runtime"),
-      value: (
-        <span className="record-band-inline" translate="no">
-          <AgentMark agent={agent.executorKind} size={13} />
-          {agentLabel(agent.executorKind)}
-        </span>
-      ),
-    },
-    {
-      key: "computer",
-      label: t("workspace.band_computer"),
-      value: primaryPlacement ? (
-        <AgentPlacementBadge description={primaryPlacement} showSandbox />
-      ) : (
-        <span className="record-band-value--empty">{t("admin.v2.no_runtime_placement")}</span>
-      ),
-    },
-    {
-      key: "availability",
-      label: t("admin.v2.agent_availability_label"),
-      value: <StatusPill value={agent.availability} />,
-    },
-    {
-      key: "id",
-      label: t("workspace.band_id"),
-      value: truncateId(agent.id),
-      technical: true,
-      title: agent.id,
-    },
-  ];
-
-  return (
-    <section
-      id="agent-workspace-panel"
-      className="workspace-page"
-      aria-label={t("workspace.title")}
-      tabIndex={-1}
-    >
-      <PageHeader
-        kicker={t("nav.workforce")}
-        title={(
-          <span className="workspace-header-title">
-            <span className="workspace-header-mark" aria-hidden="true">
-              <ProfileImage
-                src={agent.profileImageUrl}
-                alt=""
-                fallback={<IdentityMonogram name={displayName} size={10} />}
-              />
-            </span>
-            {displayName}
-          </span>
-        )}
-        titleVariant="display"
-        layout="stacked"
-        toolbar={(
-          <div className="workspace-page-tabs" role="tablist" aria-label={t("workspace.sections")}>
-            {PAGE_TABS.map((tab, index) => {
-              const previous = PAGE_TABS[index - 1] ?? PAGE_TABS[PAGE_TABS.length - 1];
-              const next = PAGE_TABS[index + 1] ?? PAGE_TABS[0];
-              const count = pageTabCount(tab);
-              return (
-                <button
-                  key={tab}
-                  type="button"
-                  role="tab"
-                  id={`workspace-page-tab-${tab}`}
-                  aria-selected={pageTab === tab}
-                  aria-controls={pageTab === tab ? `workspace-page-panel-${tab}` : undefined}
-                  tabIndex={pageTab === tab ? 0 : -1}
-                  className={`workspace-page-tab${pageTab === tab ? " is-active" : ""}`}
-                  onClick={() => setPageTab(tab)}
-                  onKeyDown={(event) => movePageTab(event, event.key === "ArrowLeft" ? previous : next)}
-                >
-                  {pageTabLabel(tab)}
-                  {count !== undefined ? <span className="workspace-page-tab-count tnum">{count}</span> : null}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      />
-
-      <RecordBand facts={bandFacts} label={t("workspace.band_label")} />
-
-      {/* One body shell for all three tabs. It carries the container query the
-          profile grid reads: the pane's width depends on whether the roster is
-          showing, so viewport width is not a usable proxy. */}
-      <div className="workspace-body">
-      {pageTab === "profile" ? (
-        <div
-          className="workspace-profile"
-          role="tabpanel"
-          id="workspace-page-panel-profile"
-          aria-labelledby="workspace-page-tab-profile"
-        >
-          <AgentProfilePanel
-            agent={agent}
-            canEditMeta={canEditMeta}
-            variant="workspace"
-            onDirtyChange={onProfileDirtyChange}
-          />
-        </div>
-      ) : pageTab === "activities" ? (
-        activitiesLoading ? (
-          <ActivitiesSkeleton panelId="workspace-page-panel-activities" labelledBy="workspace-page-tab-activities" />
-        ) : activitiesError ? (
-          <WorkspaceError
-            message={activitiesError}
-            eyebrow={t("workspace.load_failed")}
-            onRetry={() => void query.refetch()}
-            panelId="workspace-page-panel-activities"
-            labelledBy="workspace-page-tab-activities"
-          />
-        ) : (
-          <WorkspaceActivities
-            brief={brief}
-            panelId="workspace-page-panel-activities"
-            labelledBy="workspace-page-tab-activities"
-            emptyPulse
-            onOpenThread={onOpenThread}
-          />
-        )
-      ) : pageTab === "workspace" ? (
-        <div
-          className="workspace-inspect"
-          role="tabpanel"
-          id="workspace-page-panel-workspace"
-          aria-labelledby="workspace-page-tab-workspace"
-        >
-          <WorkspaceFilesBrowser
-            agentId={agent.id}
-            threads={brief?.sessions ?? []}
-            emptyMark={<AgentMark agent={agent.executorKind} size={18} />}
-          />
-        </div>
-      ) : null}
-      </div>
-    </section>
   );
 }
 
