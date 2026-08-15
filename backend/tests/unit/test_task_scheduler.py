@@ -4,6 +4,7 @@ import asyncio
 from datetime import date
 from tempfile import TemporaryDirectory
 
+from relay.core.computer_identity import computer_id
 from relay.daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
 from relay.persistence.agent_placement_store import LocalAgentPlacementStore
 from relay.persistence.daemon_store import LocalDaemonStore
@@ -13,6 +14,7 @@ from relay.persistence.task_store import LocalTaskStore
 from relay.persistence.team_store import LocalTeamStore
 from relay.services.managed_nodes import LocalManagedNodeStore
 from relay.tasks import ROUTINE_SKIP_NO_AGENT_MESSAGE, TaskScheduler, next_routine_date
+from relay.tasks.scheduler import materialize_legacy_agent_assignment
 
 
 def _logical_backend(
@@ -597,13 +599,16 @@ def test_scheduler_uses_targeted_task_queue_queries() -> None:
 
 
 def test_scheduler_materializes_and_dispatches_legacy_assignment() -> None:
+    """A legacy `assignedAgent` runtime task resolves to an already-declared
+    agent for that runtime/computer pair; agents are no longer auto-created."""
+
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
             task_store = LocalTaskStore(root)
             registry = DaemonNodeRegistry(
                 LocalSessionStore(root), LocalDaemonStore(root), task_store=task_store
             )
-            registry.register(
+            node = registry.register(
                 {
                     "sandboxId": "sbx_alice",
                     "employeeId": "alice",
@@ -616,7 +621,22 @@ def test_scheduler_materializes_and_dispatches_legacy_assignment() -> None:
                 },
                 "ui_token",
             )
-            backend, _agent = _logical_backend(root, registry, "sbx_alice")
+            agent_store = LocalEmployeeAgentStore(root)
+            placement_store = LocalAgentPlacementStore(root)
+            declared = agent_store.create_agent(
+                "alice",
+                {
+                    "displayName": "Codex",
+                    "executorKind": "codex",
+                    "defaultRole": "implementer",
+                    "computerId": computer_id(node),
+                },
+            )
+            backend = ServerDaemonNodeBackend(
+                registry,
+                employee_agent_store=agent_store,
+                agent_placement_store=placement_store,
+            )
             legacy = task_store.create_task(
                 {
                     "title": "Legacy executor task",
@@ -633,23 +653,24 @@ def test_scheduler_materializes_and_dispatches_legacy_assignment() -> None:
 
             assert result.dispatched == 1
             updated = task_store.get_task(legacy["id"])
-            assert updated["assignedAgentId"]
-            materialized = backend.agent_store.get_agent(updated["assignedAgentId"])
-            assert materialized["compatibilityKey"] == "alice:node:sbx_alice:codex"
+            assert updated["assignedAgentId"] == declared["id"]
             commands = registry.take_commands("sbx_alice", "node_token")
-            assert commands[0]["logicalAgentId"] == materialized["id"]
+            assert commands[0]["logicalAgentId"] == declared["id"]
 
     asyncio.run(run_flow())
 
 
 def test_scheduler_materializes_legacy_routine_before_promotion() -> None:
+    """A declared agent for the routine's runtime/computer pair is required
+    before the routine can be promoted; nothing is auto-created."""
+
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
             task_store = LocalTaskStore(root)
             registry = DaemonNodeRegistry(
                 LocalSessionStore(root), LocalDaemonStore(root), task_store=task_store
             )
-            registry.register(
+            node = registry.register(
                 {
                     "sandboxId": "sbx_alice",
                     "employeeId": "alice",
@@ -662,7 +683,22 @@ def test_scheduler_materializes_legacy_routine_before_promotion() -> None:
                 },
                 "ui_token",
             )
-            backend, _agent = _logical_backend(root, registry, "sbx_alice")
+            agent_store = LocalEmployeeAgentStore(root)
+            placement_store = LocalAgentPlacementStore(root)
+            agent_store.create_agent(
+                "alice",
+                {
+                    "displayName": "Codex",
+                    "executorKind": "codex",
+                    "defaultRole": "implementer",
+                    "computerId": computer_id(node),
+                },
+            )
+            backend = ServerDaemonNodeBackend(
+                registry,
+                employee_agent_store=agent_store,
+                agent_placement_store=placement_store,
+            )
             routine = task_store.create_task(
                 {
                     "title": "Legacy executor routine",
@@ -1221,3 +1257,90 @@ def test_scheduler_stops_a_task_that_never_reports_itself_finished() -> None:
             assert "2-round budget" in stopped["activity"][-1]["message"]
 
     asyncio.run(run_flow())
+
+
+def _legacy_fixture(root: str):
+    """A registered claude computer plus empty agent/placement stores."""
+    session_store = LocalSessionStore(root)
+    task_store = LocalTaskStore(root)
+    registry = DaemonNodeRegistry(
+        session_store, LocalDaemonStore(root), task_store=task_store
+    )
+    registry.register(
+        {
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "workspaceId": "machine-a",
+            "protocolVersion": 1,
+            "supportedAgents": ["claude"],
+            "capabilities": ["thread-workspaces"],
+            "status": "ready",
+        }
+    )
+    return (
+        registry,
+        LocalEmployeeAgentStore(root),
+        LocalAgentPlacementStore(root),
+        {"id": "task-1", "ownerEmployeeId": "alice", "assignments": [{"agent": "claude"}]},
+    )
+
+
+def _declare(agents, display_name: str):
+    return agents.create_agent(
+        "alice",
+        {
+            "displayName": display_name,
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+            "computerId": "device:alice:machine-a",
+        },
+    )
+
+
+def test_legacy_assignment_resolves_to_a_declared_agent() -> None:
+    with TemporaryDirectory() as root:
+        registry, agents, placements, task = _legacy_fixture(root)
+        agent = _declare(agents, "Ada")
+        resolved = materialize_legacy_agent_assignment(
+            task,
+            "claude",
+            registry=registry,
+            agent_store=agents,
+            placement_store=placements,
+        )
+        assert resolved == {"agent": "claude", "agentId": agent["id"]}
+
+
+def test_legacy_assignment_without_a_declared_agent_creates_nothing() -> None:
+    with TemporaryDirectory() as root:
+        registry, agents, placements, task = _legacy_fixture(root)
+        resolved = materialize_legacy_agent_assignment(
+            task,
+            "claude",
+            registry=registry,
+            agent_store=agents,
+            placement_store=placements,
+        )
+        assert resolved is None
+        assert agents.list_agents(supervisor_employee_id="alice") == []
+
+
+def test_legacy_assignment_picks_deterministically_among_candidates() -> None:
+    with TemporaryDirectory() as root:
+        registry, agents, placements, task = _legacy_fixture(root)
+        first = _declare(agents, "Ada")
+        second = _declare(agents, "Grace")
+        expected = min(
+            (first, second), key=lambda agent: (agent["createdAt"], agent["id"])
+        )["id"]
+        for _ in range(3):
+            resolved = materialize_legacy_agent_assignment(
+                task,
+                "claude",
+                registry=registry,
+                agent_store=agents,
+                placement_store=placements,
+            )
+            assert resolved["agentId"] == expected

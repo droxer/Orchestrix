@@ -2620,6 +2620,9 @@ def test_employee_task_writes_require_named_agents_and_preserve_status(
 
 
 def test_manual_start_materializes_a_legacy_task_assignment(monkeypatch) -> None:
+    """A legacy `assignedAgent` runtime task resolves to an already-declared
+    agent for that runtime/computer pair on manual start; nothing is
+    auto-created."""
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
@@ -2636,7 +2639,7 @@ def test_manual_start_materializes_a_legacy_task_assignment(monkeypatch) -> None
             ).status_code
             == 201
         )
-        app.state.registry.register(
+        node = app.state.registry.register(
             {
                 "sandboxId": "node_a",
                 "employeeId": "alice",
@@ -2647,6 +2650,15 @@ def test_manual_start_materializes_a_legacy_task_assignment(monkeypatch) -> None
                 "capabilities": ["thread-workspaces"],
                 "status": "ready",
             }
+        )
+        declared = app.state.agent_store.create_agent(
+            "alice",
+            {
+                "displayName": "Codex",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": computer_id(node),
+            },
         )
         legacy = app.state.task_store.create_task(
             {
@@ -2669,10 +2681,10 @@ def test_manual_start_materializes_a_legacy_task_assignment(monkeypatch) -> None
 
         assert started.status_code == 202
         updated = app.state.task_store.get_task(legacy["id"])
-        agent = app.state.agent_store.get_agent(updated["assignedAgentId"])
-        assert agent["compatibilityKey"] == "alice:node:node_a:codex"
+        assert updated["assignedAgentId"] == declared["id"]
         assert (
-            started.json()["session"]["agentRuns"][0]["logicalAgentId"] == agent["id"]
+            started.json()["session"]["agentRuns"][0]["logicalAgentId"]
+            == declared["id"]
         )
 
 
