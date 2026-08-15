@@ -1239,6 +1239,8 @@
     "meta_updated": "更新",
     "just_now": "刚才",
     "meta_state": "状态",
+    "runtime": "运行时",
+    "computers": "电脑",
     "no_placements": "未部署",
     "placements_ready": "{{ready}} / {{total}} 就绪",
     "enabled": "已启用",

@@ -1241,6 +1241,8 @@
     "meta_updated": "Updated",
     "just_now": "just now",
     "meta_state": "State",
+    "runtime": "Runtime",
+    "computers": "Computers",
     "no_placements": "Not placed",
     "placements_ready": "{{ready}} / {{total}} ready",
     "enabled": "Enabled",

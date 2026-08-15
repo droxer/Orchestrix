@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { FilterSelect } from "./FiltersBar";
 import { SearchInput } from "@/components/ui/search-input";
 import { describeAgentPlacements } from "../lib/agentPlacements";
+import { agentLabel } from "../lib/plan";
 import { OWNERSHIP_ICON } from "./AgentPlacementBadge";
 import { CreateAgentDialog } from "./agents/CreateAgentDialog";
 
@@ -121,11 +122,9 @@ function RosterRow({
   const { t } = useTranslation();
   const placements = activePlacements(agent);
   const placementDescriptions = describeAgentPlacements(placements);
-  // One agent lives on exactly one computer.
-  const computer = placementDescriptions[0] ?? null;
   const ready = agent.enabled && agent.availability === "ready";
-  const ComputerIcon = computer ? OWNERSHIP_ICON[computer.ownership] : null;
-  const computerKindLabel = computer ? t(`admin.v2.node_ownership_${computer.ownership}`) : "";
+  const runtime = agentLabel(agent.executorKind);
+  const computerNames = placementDescriptions.map(({ nodeName }) => nodeName).join(", ");
 
   return (
     <li className="list-virtual">
@@ -155,19 +154,38 @@ function RosterRow({
               <span className="agents-roster-row-name">{agent.displayName}</span>
               {!agent.enabled ? <Badge variant="neutral">{t("agents_page.disabled")}</Badge> : null}
             </span>
-            {/* Name + computer travel together: the roster is the one place
-                every agent's home machine can be scanned side by side. An
-                agent with nowhere to run still says so — that is a defect,
-                not a fact to quiet. */}
+            {/* Runtime + Computers are execution metadata, not an Agent-owned
+                workspace. Keep every active Computer visible in route order. */}
             <span
               className="agents-roster-row-meta"
-              title={computer ? `${computerKindLabel} · ${computer.nodeName}` : undefined}
+              title={placementDescriptions.length
+                ? `${t("agents_page.runtime")}: ${runtime} · ${t("agents_page.computers")}: ${computerNames}`
+                : `${t("agents_page.runtime")}: ${runtime} · ${t("agents_page.no_placements")}`}
             >
-              {computer && ComputerIcon ? (
-                <>
-                  <ComputerIcon size={12} aria-hidden="true" />
-                  <span className="agents-roster-row-computer" translate="no">{computer.nodeName}</span>
-                </>
+              <span className="agents-roster-row-runtime">
+                <span className="sr-only">{t("agents_page.runtime")}: </span>
+                <span translate="no">{runtime}</span>
+              </span>
+              <span className="agents-roster-row-meta-separator" aria-hidden="true">·</span>
+              {placementDescriptions.length ? (
+                <span className="agents-roster-row-computers">
+                  <span className="sr-only">{t("agents_page.computers")}: </span>
+                  {placementDescriptions.map((description, index) => {
+                    const ComputerIcon = OWNERSHIP_ICON[description.ownership];
+                    return (
+                      <span
+                        key={description.placement.id}
+                        className="agents-roster-row-computer"
+                      >
+                        {index > 0 ? (
+                          <span className="agents-roster-row-computer-separator" aria-hidden="true">,</span>
+                        ) : null}
+                        <ComputerIcon size={12} aria-hidden="true" />
+                        <span translate="no">{description.nodeName}</span>
+                      </span>
+                    );
+                  })}
+                </span>
               ) : (
                 <span>{t("agents_page.no_placements")}</span>
               )}

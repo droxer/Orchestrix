@@ -2,7 +2,7 @@
    Agents — split roster + detail console.
    Left rail is a dense, scannable roster (borrowing the workspace pane's
    hairline/mono vocabulary); the right pane hosts the selected agent's
-   workspace inline, so switching agents never leaves the page.
+   profile and activity record, so switching agents never leaves the page.
    ===================================================================== */
 
 .agents-page {
@@ -184,18 +184,50 @@
   white-space: nowrap;
 }
 
+.agents-roster-row-runtime,
+.agents-roster-row-meta-separator {
+  flex: none;
+}
+
+.agents-roster-row-runtime {
+  color: var(--ink-2);
+}
+
+.agents-roster-row-meta-separator {
+  color: var(--ink-4);
+}
+
+.agents-roster-row-computers {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.agents-roster-row-computer {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--sp-1);
+}
+
 /* Ownership glyph — the local/cloud badge. Kind is carried by the icon,
    never a hue, same rule as the placement badge. */
-.agents-roster-row-meta > svg {
+.agents-roster-row-computer > svg {
   flex: none;
   color: var(--ink-3);
 }
 
-.agents-roster-row-computer {
+.agents-roster-row-computer > span:last-child {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.agents-roster-row-computer-separator {
+  margin-left: var(--sp-1-5);
+  color: var(--ink-4);
 }
 
 .agent-placement-badge {

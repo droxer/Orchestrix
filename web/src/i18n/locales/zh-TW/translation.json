@@ -1238,6 +1238,8 @@
     "meta_updated": "更新",
     "just_now": "剛才",
     "meta_state": "狀態",
+    "runtime": "執行環境",
+    "computers": "電腦",
     "no_placements": "未部署",
     "placements_ready": "{{ready}} / {{total}} 就緒",
     "enabled": "已啟用",
