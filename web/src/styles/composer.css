@@ -306,6 +306,24 @@
   min-width: 0;
 }
 
+.composer-project-room {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  max-width: 280px;
+  height: var(--control-h-sm);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  color: var(--ink-2);
+  background: var(--surface-2);
+  font: var(--type-label-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Primary assign plate — mirrors conversation-new-btn (36px ink plate). */
 .send-button {
   display: grid;

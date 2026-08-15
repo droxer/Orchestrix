@@ -54,6 +54,7 @@ from .helpers import (
     workspace_artifact_key,
     workspace_artifacts,
 )
+from .project_helpers import project_for_owner, project_session_fields
 
 router = APIRouter()
 
@@ -102,6 +103,29 @@ def team_for_assignment(
     if not actor["isAdmin"] and team.get("ownerEmployeeId") != actor["employeeId"]:
         raise HTTPException(403, "Team access denied.")
     return team
+
+
+def validate_project_task_assignment(
+    ctx: AppContextDep,
+    task: dict[str, Any],
+    *,
+    assigned_agent_id: str | None,
+    assigned_team_id: str | None,
+) -> None:
+    project_id = task.get("projectId")
+    if not project_id:
+        return
+    if assigned_team_id:
+        raise HTTPException(400, "project_team_assignment_unsupported")
+    if not assigned_agent_id:
+        return
+    project = ctx.project_store.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found.")
+    if assigned_agent_id not in {
+        member.get("agentId") for member in project.get("members", [])
+    }:
+        raise HTTPException(400, "project_agent_not_member")
 
 
 def date_field(body: dict[str, Any], key: str) -> str | None:
@@ -301,6 +325,10 @@ async def create_task(request: Request, ctx: AppContextDep) -> dict[str, Any]:
         raise HTTPException(400, "title is required.")
     owner = owner_employee_id_for_create(actor, body)
     assignee = assignee_employee_id_for_task(actor, body, owner)
+    project_id = string_field(body, "projectId") or None
+    project = project_for_owner(ctx, project_id, owner)
+    if project and "assignments" in body:
+        raise HTTPException(400, "project_assignment_override_unsupported")
     assigned_agent_id = string_field(body, "assignedAgentId") or None
     assigned_team_id = string_field(body, "assignedTeamId") or None
     if assigned_agent_id and assigned_team_id:
@@ -312,6 +340,15 @@ async def create_task(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     )
     if logical_agent:
         assignee = logical_agent["supervisorEmployeeId"]
+    if (
+        project
+        and assigned_agent_id
+        and assigned_agent_id
+        not in {member["agentId"] for member in project.get("members", [])}
+    ):
+        raise HTTPException(400, "project_agent_not_member")
+    if project and assigned_team_id:
+        raise HTTPException(400, "project_team_assignment_unsupported")
     team_for_assignment(
         ctx,
         actor,
@@ -322,16 +359,18 @@ async def create_task(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     status = task_status(body.get("status"))
     if "status" in body and not status:
         raise HTTPException(400, "status is not a recognized task status.")
-    if status == "assigned" and not (assigned_agent_id or assigned_team_id):
+    if status == "assigned" and not (project or assigned_agent_id or assigned_team_id):
         raise HTTPException(400, "assigned status requires an agent or team.")
     routine = routine_fields(body)
     if (
         routine.get("isRoutine")
-        and not (assigned_agent_id or assigned_team_id)
+        and not (project or assigned_agent_id or assigned_team_id)
         and "routineEnabled" not in body
     ):
         routine["routineEnabled"] = False
-    if routine.get("routineEnabled") and not (assigned_agent_id or assigned_team_id):
+    if routine.get("routineEnabled") and not (
+        project or assigned_agent_id or assigned_team_id
+    ):
         raise HTTPException(400, "An enabled routine requires an agent or team.")
     creates_thread = body.get("createSession") is True or isinstance(
         body.get("assignments"), list
@@ -356,6 +395,7 @@ async def create_task(request: Request, ctx: AppContextDep) -> dict[str, Any]:
             "priority": task_priority(body.get("priority")) or "normal",
             "ownerEmployeeId": owner,
             "assigneeEmployeeId": assignee,
+            **({"projectId": project["id"]} if project else {}),
             "dueDate": date_field(body, "dueDate"),
             "status": status,
             **(
@@ -376,7 +416,10 @@ async def create_task(request: Request, ctx: AppContextDep) -> dict[str, Any]:
             "Task assigned", task_id=task["id"], agent=agent, agent_id=assigned_agent_id
         )
     if creates_thread:
-        workspace_path = string_field(body, "workspacePath") or "/workspace"
+        project_fields = project_session_fields(ctx, project) if project else {}
+        workspace_path = project_fields.pop(
+            "workspace_path", string_field(body, "workspacePath") or "/workspace"
+        )
         try:
             thread_ownership = task_thread_ownership(
                 task, team_store=ctx.team_store, agent_store=ctx.agent_store
@@ -394,6 +437,7 @@ async def create_task(request: Request, ctx: AppContextDep) -> dict[str, Any]:
             task_store=ctx.task_store,
             task_id=task["id"],
             workspace_path=workspace_path,
+            **project_fields,
             **thread_ownership,
         )
         session = controller.create_session(
@@ -452,6 +496,12 @@ async def update_task(
     )
     if assigned_agent_id and assigned_team_id:
         raise HTTPException(400, "task_agent_and_team_conflict")
+    validate_project_task_assignment(
+        ctx,
+        current,
+        assigned_agent_id=assigned_agent_id,
+        assigned_team_id=assigned_team_id,
+    )
     if "assignedAgent" in body:
         raise HTTPException(400, "assignedAgent is read-only; use assignedAgentId.")
     assignee_changed = bool(assignee and assignee != current.get("assigneeEmployeeId"))
@@ -549,13 +599,15 @@ async def update_task(
         ctx.session_store, current
     ):
         raise HTTPException(409, "task_execution_active")
-    if next_is_routine and next_routine_enabled and not (next_agent_id or next_team_id):
+    if next_is_routine and next_routine_enabled and not (
+        current.get("projectId") or next_agent_id or next_team_id
+    ):
         raise HTTPException(400, "An enabled routine requires an agent or team.")
     assignment_clear_requested = assignment_changed and not (
         next_agent_id or next_team_id
     )
     if (status or current.get("status")) == "assigned" and not (
-        next_agent_id or next_team_id
+        current.get("projectId") or next_agent_id or next_team_id
     ):
         if assignment_clear_requested:
             status = "backlog"
@@ -637,6 +689,12 @@ async def assign_task(
     )
     if assigned_agent_id and assigned_team_id:
         raise HTTPException(400, "task_agent_and_team_conflict")
+    validate_project_task_assignment(
+        ctx,
+        current,
+        assigned_agent_id=assigned_agent_id,
+        assigned_team_id=assigned_team_id,
+    )
     if assigned_team_id:
         team_for_assignment(
             ctx,
@@ -790,14 +848,12 @@ async def start_task(
                 "agent": task["assignedAgent"],
             }
         ]
+    if not assignments and not task.get("assignedTeamId") and not task.get("projectId"):
+        assignments = implicit_group_assignments_for_task(ctx, task)
     agent = valid_agent(task.get("assignedAgent"))
     if not agent and assignments:
         agent = assignments[0]["agent"]
-    if not agent and not assignments and not task.get("assignedTeamId"):
-        assignments = implicit_group_assignments_for_task(ctx, task)
-    if assignments:
-        agent = assignments[0]["agent"]
-    if not agent and not task.get("assignedTeamId"):
+    if not agent and not task.get("assignedTeamId") and not task.get("projectId"):
         updated = ctx.task_store.record_dispatch_outcome(
             task_id,
             "rejected",
@@ -814,7 +870,11 @@ async def start_task(
             },
         }
     if task.get("isRoutine"):
-        if not (task.get("assignedAgentId") or task.get("assignedTeamId")):
+        if not (
+            task.get("projectId")
+            or task.get("assignedAgentId")
+            or task.get("assignedTeamId")
+        ):
             updated = ctx.task_store.record_dispatch_outcome(
                 task_id,
                 "rejected",

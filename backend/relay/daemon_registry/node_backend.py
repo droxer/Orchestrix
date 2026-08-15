@@ -610,6 +610,15 @@ class ServerDaemonNodeBackend:
         team_id = request.get("teamId")
         if not isinstance(team_id, str) or not team_id:
             team_id = None
+        project_id = request.get("projectId")
+        if not isinstance(project_id, str) or not project_id:
+            project_id = None
+        workspace_layout = request.get("workspaceLayout")
+        if workspace_layout not in ("thread", "project"):
+            workspace_layout = None
+        workspace_subpath = request.get("workspaceSubpath")
+        if not isinstance(workspace_subpath, str) or not workspace_subpath:
+            workspace_subpath = None
         return SessionController(
             self.registry.store,
             task_store=self.registry.task_store,
@@ -618,6 +627,9 @@ class ServerDaemonNodeBackend:
             owner_employee_id=owner_employee_id,
             owner_agent_id=owner_agent_id,
             team_id=team_id,
+            project_id=project_id,
+            workspace_layout=workspace_layout,
+            workspace_subpath=workspace_subpath,
             daemon_node_id=sandbox_id,
             managed_node_id=sandbox.get("managedNodeId"),
             computer_id=computer_id(sandbox),

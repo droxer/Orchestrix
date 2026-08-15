@@ -27,7 +27,7 @@ import { TonePill } from "./StatusPill";
 import { IdentityMonogram } from "./IdentityMonogram";
 import { AgentPersonalityEditor } from "./AgentPersonalityEditor";
 import { PlacementList } from "./PlacementList";
-import { describeAgentPlacements } from "../lib/agentPlacements";
+import { describeAgentPlacements, placementRuntimeNodeId } from "../lib/agentPlacements";
 import { ProfileImagePicker } from "./ProfileImagePicker";
 import { pathForAppState } from "../lib/appRoute";
 
@@ -284,10 +284,11 @@ export function AgentProfilePanel({
   }
 
   async function handleRemovePlacement(placement: AgentPlacement) {
-    const node = nodes.find((item) => item.id === placement.daemonNodeId);
+    const runtimeNodeId = placementRuntimeNodeId(placement);
+    const node = nodes.find((item) => item.id === runtimeNodeId);
     const ok = await confirm({
       title: t("admin.v2.remove_placement_confirm", {
-        node: node?.displayName || placement.nodeDisplayName || placement.daemonNodeId,
+        node: node?.displayName || placement.nodeDisplayName || runtimeNodeId,
       }),
       message: t("admin.v2.remove_placement_message"),
       confirmLabel: t("admin.v2.remove_placement"),
@@ -491,7 +492,7 @@ export function AgentProfilePanel({
                       pendingPlacementId={pendingPlacementId}
                       onRemove={(placement) => void handleRemovePlacement(placement)}
                       nodeMissingFor={(description) => nodes.length > 0
-                        && !nodes.some((node) => node.id === description.placement.daemonNodeId)}
+                        && !nodes.some((node) => node.id === placementRuntimeNodeId(description.placement))}
                     />
                   )}
                 </div>
@@ -664,7 +665,7 @@ export function AgentProfilePanel({
             pendingPlacementId={pendingPlacementId}
             onRemove={(placement) => void handleRemovePlacement(placement)}
             nodeMissingFor={(description) => nodes.length > 0
-              && !nodes.some((node) => node.id === description.placement.daemonNodeId)}
+              && !nodes.some((node) => node.id === placementRuntimeNodeId(description.placement))}
           />
         )}
       </div>

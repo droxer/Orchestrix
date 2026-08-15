@@ -196,17 +196,21 @@ def _resolve_legacy_assignment(
     assignment: dict[str, Any],
 ) -> dict[str, Any]:
     node = ctx.registry.get(sandbox_id)
+    node_computer_id = computer_id(node or {"id": sandbox_id})
     agent = ctx.agent_store.ensure_compatibility_agent(
         employee_id,
         assignment["agent"],
         sandbox_id,
-        computer_id=computer_id(node or {"id": sandbox_id}),
+        computer_id=node_computer_id,
     )
     placement = next(
         (
             item
             for item in ctx.agent_placement_store.list_placements(agent_id=agent["id"])
-            if item["daemonNodeId"] == sandbox_id
+            if item.get("computerId") == node_computer_id
+            or (
+                not item.get("computerId") and item["daemonNodeId"] == sandbox_id
+            )
         ),
         None,
     )

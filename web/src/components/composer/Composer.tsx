@@ -2,7 +2,7 @@ import { forwardRef, memo, useEffect, useImperativeHandle, useMemo, useRef, useS
 import { useTranslation } from "react-i18next";
 import type { AgentTeam, DaemonNodeMonitorRecord, EmployeeAgent } from "../../types";
 import { sendShortcutLabel } from "../../lib/sendShortcut";
-import { ActionSend, ComposerStop } from "../icons";
+import { ActionSend, ComposerStop, WorkspaceFolder } from "../icons";
 import { AgentSelect } from "./AgentSelect";
 import { useComposer } from "../../hooks/useComposer";
 import { useMentionAutocomplete } from "../../hooks/useMentionAutocomplete";
@@ -37,6 +37,10 @@ const ComposerView = forwardRef<ComposerHandle, {
   activeAgentDisplayName: string;
   selectedEmployee: string;
   initializingThread: boolean;
+  /** A project room owns its Computer and roster, so neither is editable here. */
+  projectName?: string;
+  /** Archived or disabled projects remain readable but cannot start another round. */
+  readOnly?: boolean;
   runtimeNodes: DaemonNodeMonitorRecord[];
   runtimeNodeId: string | null;
   /** The picked computer resolved against the whole fleet, not just the
@@ -51,7 +55,7 @@ const ComposerView = forwardRef<ComposerHandle, {
   mentionCandidates?: MentionCandidate[];
   onSend: () => void;
   onCancelRun: () => void;
-}>(function Composer({ logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, teams, activeTeamId, onTeamPicked, teamLocked, activeAgentDisplayName, selectedEmployee, initializingThread, runtimeNodes, runtimeNodeId, selectedRuntimeNode, activeRuntimeNode, onRuntimeNodeChange, running, mentionCandidates = [], onSend, onCancelRun }, ref) {
+}>(function Composer({ logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, teams, activeTeamId, onTeamPicked, teamLocked, activeAgentDisplayName, selectedEmployee, initializingThread, projectName, readOnly = false, runtimeNodes, runtimeNodeId, selectedRuntimeNode, activeRuntimeNode, onRuntimeNodeChange, running, mentionCandidates = [], onSend, onCancelRun }, ref) {
   const { t } = useTranslation();
   const composer = useComposer();
   const {
@@ -107,7 +111,7 @@ const ComposerView = forwardRef<ComposerHandle, {
   // button can't double-fire while the dispatch is still being validated.
   const [sendPending, setSendPending] = useState(false);
   const triggerSend = () => {
-    if (running || sendPending) return;
+    if (running || sendPending || readOnly) return;
     // The send button is disabled on a mention that resolves to nobody, but the
     // keyboard shortcut bypasses the button — and a blocked draft sent anyway
     // would address the whole room instead of the agent the author named.
@@ -155,6 +159,7 @@ const ComposerView = forwardRef<ComposerHandle, {
                 ? t("composer.aria_label", { employee: selectedEmployee, agent: activeAgentDisplayName })
                 : t("composer.aria_label_no_employee", { agent: activeAgentDisplayName })}
               autoComplete="off"
+              disabled={readOnly}
               // While `@` is open the textarea drives the list from the
               // keyboard, so a screen reader has to hear the moving highlight.
               role={mentions.matches.length > 0 ? "combobox" : undefined}
@@ -196,7 +201,12 @@ const ComposerView = forwardRef<ComposerHandle, {
             <div className="composer-footer-left">
               {/* A new thread picks its computer; a started one keeps a
                   compact readout beside the agent controls. */}
-              {initializingThread ? (
+              {projectName ? (
+                <span className="composer-project-room" title={t("project.shared_workspace")}>
+                  <WorkspaceFolder size={14} aria-hidden="true" />
+                  {projectName}
+                </span>
+              ) : initializingThread ? (
                 <ThreadRuntimeSelect
                   nodes={runtimeNodes}
                   value={runtimeNodeId}
@@ -206,16 +216,18 @@ const ComposerView = forwardRef<ComposerHandle, {
               ) : activeRuntimeNode ? (
                 <ThreadRuntimeReadout node={activeRuntimeNode} />
               ) : null}
-              <AgentSelect
-                logicalAgents={logicalAgents}
-                activeLogicalAgentId={addressedLogicalAgentId ?? activeLogicalAgentId}
-                onLogicalAgentPicked={pickLogicalAgent}
-                teams={teams}
-                activeTeamId={activeTeamId}
-                onTeamPicked={pickTeam}
-                teamLocked={teamLocked}
-                teamOptionsEnabled={initializingThread}
-              />
+              {!projectName ? (
+                <AgentSelect
+                  logicalAgents={logicalAgents}
+                  activeLogicalAgentId={addressedLogicalAgentId ?? activeLogicalAgentId}
+                  onLogicalAgentPicked={pickLogicalAgent}
+                  teams={teams}
+                  activeTeamId={activeTeamId}
+                  onTeamPicked={pickTeam}
+                  teamLocked={teamLocked}
+                  teamOptionsEnabled={initializingThread}
+                />
+              ) : null}
             </div>
             <div className="composer-footer-right">
               {/* One mounted element for send↔stop so keyboard focus survives
@@ -225,9 +237,10 @@ const ComposerView = forwardRef<ComposerHandle, {
                 className={running ? "send-button send-button-cancel" : "send-button"}
                 disabled={!running && (
                   sendPending
+                  || readOnly
                   || !composerText.trim()
                   || parsed.blocked
-                  || (initializingThread && !runtimeNodeId)
+                  || (initializingThread && !projectName && !runtimeNodeId)
                 )}
                 onClick={running ? onCancelRun : undefined}
                 aria-busy={sendPending || undefined}

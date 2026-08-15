@@ -1,9 +1,9 @@
-"""Admin browsing of a computer's shared workspace through live daemon reads.
+"""Admin browsing of a Computer's workspace storage root through live reads.
 
-The shared workspace is the node workspace root that all agents hosted on the
-computer collaborate in. It only exists on a live daemon that advertises the
-``workspace-read-shared`` capability; there is no snapshot fallback here —
-per-agent artifacts remain the durable record.
+The node root is an administrative storage container for Thread workspaces,
+not a workspace shared across Threads or owned by an Agent. It only exists on
+a live daemon that advertises ``workspace-read-shared``; there is no snapshot
+fallback here — Thread artifacts remain the durable record.
 """
 
 from __future__ import annotations

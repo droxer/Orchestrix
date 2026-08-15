@@ -184,7 +184,7 @@ export function App() {
   const recoveryOperationIdsRef = useRef(new Map<string, string>());
 
   const selectedEmployeeToken = tokens[selectedEmployee];
-  const { sandboxes, nodes, sessions, tasks, isRefreshing, refresh, setSandboxes } = useRelayData(selectedEmployeeToken, Boolean(user));
+  const { sandboxes, nodes, sessions, tasks, projects, isRefreshing, refresh, setSandboxes } = useRelayData(selectedEmployeeToken, Boolean(user));
   const { localNodes, refreshLocalDaemonNodes } = useLocalDaemonNodes(
     hydrated && user?.role === "admin" && canUseLocalControlPanel(),
   );
@@ -293,10 +293,6 @@ export function App() {
   // `@` names exactly the agents the footer picker offers: the ones placed on
   // the thread's computer. One list keeps the two selections in sync — the
   // agent a mention addresses is always one the composer could have picked.
-  const threadMentionCandidates = useMemo(
-    () => mentionCandidates(selectableLogicalAgents),
-    [selectableLogicalAgents],
-  );
   // The room, in join order. Ids the roster names but the agent list does not
   // know (deleted, or another employee's) are dropped rather than rendered as
   // a nameless chip.
@@ -346,6 +342,7 @@ export function App() {
   const {
     route,
     mobileView,
+    projectId: routedProjectId,
     agentWorkspaceId,
     teamWorkspaceId,
     notFound,
@@ -356,6 +353,7 @@ export function App() {
     syncThreadUrl,
     navigateToAgentWorkspace,
     navigateToTeamWorkspace,
+    navigateToProject,
     navigateToLogin,
   } = useAppRouter({
     composingNew,
@@ -366,6 +364,57 @@ export function App() {
     onSetComposingNewFromPath: setComposingNewFromPath,
     onClearPendingMessage: clearPendingMessage,
   });
+  const activeProject = useMemo(() => {
+    const id = routedProjectId ?? activeSession?.projectId;
+    return id ? projects.find((project) => project.id === id) ?? null : null;
+  }, [activeSession?.projectId, projects, routedProjectId]);
+  const projectDispatchDisabled = Boolean(
+    activeProject && (activeProject.archivedAt || !activeProject.enabled),
+  );
+  const effectiveSelectableLogicalAgents = useMemo(() => {
+    if (!activeProject) return selectableLogicalAgents;
+    const agentsById = new Map(logicalAgents.map((agent) => [agent.id, agent]));
+    const orderedMembers = [
+      ...activeProject.members.filter((member) => member.agentId === activeProject.leadAgentId),
+      ...activeProject.members.filter((member) => member.agentId !== activeProject.leadAgentId),
+    ];
+    return orderedMembers.flatMap((member) => {
+      const agent = agentsById.get(member.agentId);
+      return member.enabled && agent && !agent.deletedAt ? [agent] : [];
+    });
+  }, [activeProject, logicalAgents, selectableLogicalAgents]);
+  const threadMentionCandidates = useMemo(
+    () => mentionCandidates(effectiveSelectableLogicalAgents),
+    [effectiveSelectableLogicalAgents],
+  );
+  const requiresRuntimeSelection = initializingThread && !activeProject;
+  useEffect(() => {
+    if (!routedProjectId || !activeProject || composingNew || activeSession?.projectId === routedProjectId) return;
+    const firstProjectThread = myThreads.find((session) => session.projectId === routedProjectId);
+    setPendingUserMessage(null);
+    setPendingThreadTeamId(null);
+    if (firstProjectThread) {
+      setSelectedSessionId(firstProjectThread.id);
+      setActiveSessionId(firstProjectThread.id);
+      syncThreadUrl(firstProjectThread.id, true, routedProjectId);
+      return;
+    }
+    setSelectedSessionId(undefined);
+    setActiveSessionId(null);
+    setComposingNew(!activeProject.archivedAt && activeProject.enabled);
+    if (!activeProject.archivedAt && activeProject.enabled) {
+      syncThreadUrl(null, true, routedProjectId);
+    }
+  }, [
+    activeProject,
+    activeSession?.projectId,
+    composingNew,
+    myThreads,
+    routedProjectId,
+    setActiveSessionId,
+    setSelectedSessionId,
+    syncThreadUrl,
+  ]);
   const workspaceAgent = useMemo(
     () => logicalAgents.find((agent) => agent.id === agentWorkspaceId) ?? null,
     [agentWorkspaceId, logicalAgents],
@@ -546,17 +595,17 @@ export function App() {
     }
   }, [selectedEmployee, hydrated]);
   useEffect(() => {
-    if (selectableLogicalAgents.length === 0) {
+    if (effectiveSelectableLogicalAgents.length === 0) {
       setActiveLogicalAgentId(null);
       return;
     }
-    const selected = preferredRoutableAgent(selectableLogicalAgents, activeLogicalAgentId);
+    const selected = preferredRoutableAgent(effectiveSelectableLogicalAgents, activeLogicalAgentId);
     setActiveLogicalAgentId(selected?.id ?? null);
     if (selected) setActiveAgent(selected.executorKind);
-    if (!selectableLogicalAgents.some((agent) => agent.id === handoffAgentId && isEmployeeAgentRoutable(agent))) {
-      setHandoffAgentId(selectableLogicalAgents.find(isEmployeeAgentRoutable)?.id ?? "");
+    if (!effectiveSelectableLogicalAgents.some((agent) => agent.id === handoffAgentId && isEmployeeAgentRoutable(agent))) {
+      setHandoffAgentId(effectiveSelectableLogicalAgents.find(isEmployeeAgentRoutable)?.id ?? "");
     }
-  }, [activeLogicalAgentId, handoffAgentId, selectableLogicalAgents]);
+  }, [activeLogicalAgentId, effectiveSelectableLogicalAgents, handoffAgentId]);
   useEffect(() => {
     if ((route === "admin" || route === "channels") && user && user.role !== "admin") {
       navigateToRoute("main");
@@ -693,15 +742,16 @@ export function App() {
   }
 
   function openThread(sessionId: string, replace = false) {
+    const session = myThreads.find((candidate) => candidate.id === sessionId);
     setComposingNew(false);
     setPendingUserMessage(null);
     setPendingThreadTeamId(null);
     setSelectedSessionId(sessionId);
     setActiveSessionId(sessionId);
-    syncThreadUrl(sessionId, replace);
+    syncThreadUrl(sessionId, replace, session?.projectId);
   }
 
-  function startNewThread() {
+  function startNewThread(projectId: string | null = null) {
     setComposingNew(true);
     setPendingUserMessage(null);
     setSelectedSessionId(undefined);
@@ -711,7 +761,15 @@ export function App() {
     setNewThreadNodeId((current) => resolveNewThreadComputer(current, threadComputers, assignableComputers));
     composerRef.current?.clear();
     atBottomRef.current = true;
-    syncThreadUrl(null);
+    syncThreadUrl(null, false, projectId);
+  }
+
+  function selectProject(projectId: string | null) {
+    setComposingNew(false);
+    setPendingUserMessage(null);
+    setSelectedSessionId(undefined);
+    setActiveSessionId(null);
+    navigateToProject(projectId);
   }
 
   function openAgentWorkspace(agent: EmployeeAgent, tab?: WorkspacePageTab) {
@@ -796,7 +854,8 @@ export function App() {
     if (!raw) return;
     if (!selectedEmployee) return;
     if (threadRunning) return;
-    if (initializingThread && !selectedThreadNodeId) {
+    if (projectDispatchDisabled) return;
+    if (requiresRuntimeSelection && !selectedThreadNodeId) {
       reportMutationError("Computer required", null, t("errors.thread_computer_required"));
       return;
     }
@@ -818,7 +877,7 @@ export function App() {
     const messageAddress = resolveThreadMessageAddress({
       text: raw,
       candidates: threadMentionCandidates,
-      defaultAgentId: pendingTeam || activeSession?.teamId
+      defaultAgentId: activeProject || pendingTeam || activeSession?.teamId
         ? undefined
         : activeLogicalAgentId,
     });
@@ -835,7 +894,7 @@ export function App() {
     // Participant availability is a creation concern. Continued threads send
     // semantic intent to the conductor, which resolves the room against live
     // membership and placement state on the server.
-    if (!sessionId && !pendingTeam) {
+    if (!sessionId && !pendingTeam && !activeProject) {
       newThreadAgentIds = messageAddress.addressAgentIds;
     }
     // Echo the turn immediately. For a continued session we mint the message id
@@ -866,7 +925,7 @@ export function App() {
     // its own path. The bare /threads route parses as neither, which reset
     // composingNew and rendered the new turn inside the previously active
     // thread until the create resolved and snapped the view back.
-    syncThreadUrl(sendThreadSessionId(action), true);
+    syncThreadUrl(sendThreadSessionId(action), true, activeProject?.id);
     setPendingUserMessage({ id: userMessageId, text: goal });
     setIsRunning(true);
     composerRef.current?.clear();
@@ -883,8 +942,11 @@ export function App() {
           })
         : await runLogicalAgentsMutation.mutateAsync({
             taskGoal: goal,
-            ...(selectedThreadNodeId ? { daemonNodeId: selectedThreadNodeId } : {}),
-            ...(pendingTeam
+            ...(activeProject ? { projectId: activeProject.id } : {}),
+            ...(!activeProject && selectedThreadNodeId ? { daemonNodeId: selectedThreadNodeId } : {}),
+            ...(activeProject
+              ? {}
+              : pendingTeam
               ? { teamId: pendingTeam.id }
               : {
                   assignments: newThreadAgentIds!.map((agentId) => ({ agentId })),
@@ -894,7 +956,7 @@ export function App() {
       setActiveSessionId(done.id);
       setSelectedSessionId(done.id);
       setComposingNew(false);
-      syncThreadUrl(done.id, true);
+      syncThreadUrl(done.id, true, done.projectId ?? activeProject?.id);
       if (messageOperationKey) {
         messageOperationIdsRef.current.delete(messageOperationKey);
       }
@@ -926,7 +988,7 @@ export function App() {
         reason: t("cancel.reason"),
       });
       setSelectedSessionId(session.id);
-      syncThreadUrl(session.id, true);
+      syncThreadUrl(session.id, true, session.projectId ?? activeSession.projectId);
     } catch {
       // mutation onError surfaces a toast.
     }
@@ -963,9 +1025,9 @@ export function App() {
         const assignment = rerunAssignmentForSession(activeSession, activeAgent);
         // The last run's own agent first; its executor kind is only a fallback
         // for legacy runs that recorded no logical agent.
-        const logicalAgent = selectableLogicalAgents.find(
+        const logicalAgent = effectiveSelectableLogicalAgents.find(
           (agent) => agent.id === assignment.agentId && isEmployeeAgentRoutable(agent),
-        ) ?? selectableLogicalAgents.find(
+        ) ?? effectiveSelectableLogicalAgents.find(
           (agent) => agent.executorKind === assignment.agent && isEmployeeAgentRoutable(agent),
         );
         if (!logicalAgent) {
@@ -992,7 +1054,7 @@ export function App() {
         });
         recoveryOperationIdsRef.current.delete(recoveryKey);
         setSelectedSessionId(done.id);
-        syncThreadUrl(done.id, true);
+        syncThreadUrl(done.id, true, done.projectId ?? activeSession.projectId);
       } catch (error) {
         reportMutationError(
           "Failed to rerun assignment",
@@ -1011,7 +1073,7 @@ export function App() {
         token: selectedToken,
       });
       setSelectedSessionId(session.id);
-      syncThreadUrl(session.id, true);
+      syncThreadUrl(session.id, true, session.projectId ?? activeSession.projectId);
     } catch {
       // mutation onError surfaces a toast.
     }
@@ -1025,9 +1087,9 @@ export function App() {
     try {
       // Retry means "this agent again", so prefer the turn's own logical agent;
       // the executor-kind lookup is only for turns that carry no agent id.
-      const logicalAgent = selectableLogicalAgents.find(
+      const logicalAgent = effectiveSelectableLogicalAgents.find(
         (candidate) => candidate.id === agentId && isEmployeeAgentRoutable(candidate),
-      ) ?? selectableLogicalAgents.find(
+      ) ?? effectiveSelectableLogicalAgents.find(
         (candidate) => candidate.executorKind === agent && isEmployeeAgentRoutable(candidate),
       );
       if (!logicalAgent) {
@@ -1050,7 +1112,7 @@ export function App() {
       });
       recoveryOperationIdsRef.current.delete(recoveryKey);
       setSelectedSessionId(done.id);
-      syncThreadUrl(done.id, true);
+      syncThreadUrl(done.id, true, done.projectId ?? activeSession.projectId);
     } catch (error) {
       reportMutationError(
         "Failed to retry agent response",
@@ -1066,7 +1128,7 @@ export function App() {
     if (!activeSession) return;
     if (!selectedEmployee) return;
     if (threadRunning) return;
-    const logicalAgent = selectableLogicalAgents.find(
+    const logicalAgent = effectiveSelectableLogicalAgents.find(
       (agent) => agent.id === handoffAgentId && isEmployeeAgentRoutable(agent),
     );
     if (!logicalAgent) {
@@ -1088,7 +1150,7 @@ export function App() {
       });
       recoveryOperationIdsRef.current.delete(recoveryKey);
       setSelectedSessionId(done.id); setHandoffNote(""); setHandoffOpen(false); setActiveAgent(logicalAgent.executorKind); setActiveLogicalAgentId(logicalAgent.id);
-      syncThreadUrl(done.id, true);
+      syncThreadUrl(done.id, true, done.projectId ?? activeSession.projectId);
     } catch (error) {
       reportMutationError(
         "Failed to send handoff",
@@ -1205,6 +1267,8 @@ export function App() {
         ) : (
           <ThreadsView
             filteredThreads={filteredThreads}
+            projects={projects}
+            selectedProjectId={routedProjectId ?? activeSession?.projectId ?? null}
             threadQuery={threadQuery}
             setThreadQuery={setThreadQuery}
             activeSession={activeSession}
@@ -1215,16 +1279,17 @@ export function App() {
             composerRef={composerRef}
             onTranscriptScroll={handleTranscriptScroll}
             onSelectThread={openThread}
+            onSelectProject={selectProject}
             onNewThread={startNewThread}
             onRenameThread={(session) => void renameThread(session)}
             onCloseThread={(id) => void deleteThread(id)}
             activeAgent={activeAgent}
             logicalAgents={logicalAgents}
-            selectableLogicalAgents={selectableLogicalAgents}
+            selectableLogicalAgents={effectiveSelectableLogicalAgents}
             activeLogicalAgentId={activeLogicalAgentId}
             onLogicalAgentPicked={handleLogicalAgentPicked}
             composerTeams={composerTeams}
-            activeTeamId={activeSession?.teamId ?? (initializingThread ? pendingThreadTeamId : null)}
+            activeTeamId={activeProject ? null : activeSession?.teamId ?? (requiresRuntimeSelection ? pendingThreadTeamId : null)}
             onTeamPicked={handleTeamPicked}
             teamLocked={Boolean(activeSession?.teamId)}
             artifactCount={visibleArtifacts.length}
@@ -1242,7 +1307,9 @@ export function App() {
             onToggleThreadList={() => setThreadListHidden((hidden) => !hidden)}
             onBackToThreads={() => navigateToMobileView("threads")}
             selectedEmployee={selectedEmployee}
-            initializingThread={initializingThread}
+            initializingThread={requiresRuntimeSelection}
+            projectName={activeProject?.name}
+            projectReadOnly={projectDispatchDisabled}
             runtimeNodes={threadComputers}
             runtimeNodeId={selectedThreadNodeId}
             selectedRuntimeNode={stableSelectedThreadComputer}

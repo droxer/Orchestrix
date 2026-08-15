@@ -1,5 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import UUID
 
 import pytest
 from relay.persistence.agent_placement_store import (
@@ -54,6 +55,34 @@ def test_managed_agent_sync_tolerates_missing_placement_table(
     sync_node_agents(ctx, node)
 
     assert agents.list_agents(supervisor_employee_id="alice") == []
+
+
+def test_managed_agent_sync_uses_uuid_safe_placement_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    ctx = SimpleNamespace(agent_store=agents, agent_placement_store=placements)
+    node = {
+        "id": "runtime_alice",
+        "managedNodeId": "computer_alice",
+        "employeeId": "alice",
+        "supportedAgents": ["codex"],
+        "agents": {"codex": "ready"},
+    }
+    original_list_placements = placements.list_placements
+
+    def postgres_typed_list_placements(*args, **kwargs):
+        agent_id = kwargs.get("agent_id")
+        if agent_id is not None:
+            UUID(agent_id)
+        return original_list_placements(*args, **kwargs)
+
+    monkeypatch.setattr(placements, "list_placements", postgres_typed_list_placements)
+
+    sync_node_agents(ctx, node)
+
+    assert len(agents.list_agents(supervisor_employee_id="alice")) == 1
 
 
 def test_each_computer_gets_its_own_compatibility_agents(tmp_path: Path) -> None:
@@ -216,11 +245,10 @@ def test_removing_node_agents_updates_team_membership(tmp_path: Path) -> None:
     assert updated["memberAgentIds"] == [survivor["id"]]
 
 
-def test_removing_node_retires_custom_logical_agent_with_no_other_computer(
+def test_removing_node_preserves_custom_logical_agent_without_placement(
     tmp_path: Path,
 ) -> None:
-    """One agent = one computer: deleting the computer orphans every agent on
-    it — custom agents included — so they must leave the roster too."""
+    """Computer lifecycle changes placement availability, not Agent identity."""
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     ctx = SimpleNamespace(
@@ -234,8 +262,8 @@ def test_removing_node_retires_custom_logical_agent_with_no_other_computer(
 
     removed = remove_node_agents(ctx, "node_doomed")
 
-    assert removed == [custom["id"]]
-    assert agents.get_agent(custom["id"]).get("deletedAt")
+    assert removed == []
+    assert not agents.get_agent(custom["id"]).get("deletedAt")
     assert placements.get_placement(placement["id"])["desiredState"] == "removed"
 
 

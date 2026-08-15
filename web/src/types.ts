@@ -72,6 +72,10 @@ export interface SessionSummary {
   ownerEmployeeId?: string;
   ownerAgentId?: string;
   teamId?: string;
+  projectId?: string;
+  workspaceLayout?: "node-root" | "thread" | "project";
+  workspaceSubpath?: string;
+  computerId?: string;
   currentAgent?: AgentName;
   pendingDecision?: RelaySession["pendingDecision"];
   archived?: boolean;
@@ -184,7 +188,7 @@ export interface WorkspaceFileEntry {
 
 export type AgentWorkspaceSource = "live" | "snapshot";
 
-/** Personal agent home vs a thread or computer shared workspace root. */
+/** Agent-private subdirectory vs shared root inside the same Thread workspace. */
 export type WorkspaceScope = "agent-home" | "shared";
 
 export interface AgentWorkspaceFilesResponse {
@@ -192,7 +196,7 @@ export interface AgentWorkspaceFilesResponse {
   scope?: WorkspaceScope;
   source: AgentWorkspaceSource;
   nodeId?: string;
-  threadId?: string;
+  threadId: string;
   path: string;
   exists: boolean;
   entries: WorkspaceFileEntry[];
@@ -204,7 +208,7 @@ export interface AgentWorkspaceFileResponse {
   scope?: WorkspaceScope;
   source: AgentWorkspaceSource;
   nodeId?: string;
-  threadId?: string;
+  threadId: string;
   path: string;
   exists: boolean;
   isBinary: boolean;
@@ -241,6 +245,48 @@ export interface NodeWorkspaceFileResponse {
 
 export interface TasksResponse {
   tasks: RelayTaskSummary[];
+}
+
+export interface ProjectMember {
+  agentId: string;
+  role: AgentRole;
+  functionTitle: string;
+  responsibilities: string;
+  instructions?: string;
+  enabled: boolean;
+}
+
+export interface ProjectRecord {
+  id: string;
+  ownerEmployeeId: string;
+  name: string;
+  computerId: string;
+  workspaceLayout: "project";
+  workspaceSubpath: string;
+  leadAgentId: string;
+  members: ProjectMember[];
+  enabled: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt?: string;
+}
+
+export interface ProjectsResponse {
+  projects: ProjectRecord[];
+}
+
+export interface CreateProjectInput {
+  name: string;
+  daemonNodeId: string;
+  leadAgentId: string;
+  members: Array<{
+    agentId: string;
+    role: AgentRole;
+    functionTitle: string;
+    responsibilities: string;
+    instructions?: string;
+  }>;
 }
 
 export interface SandboxesResponse {
@@ -431,7 +477,12 @@ export interface AgentPlacement {
   id: string;
   agentId: string;
   employeeId: string;
+  /** Runtime node observed when the placement was created (audit only). */
   daemonNodeId: string;
+  /** Current runtime node resolved through the placement's stable Computer. */
+  runtimeNodeId?: string;
+  /** Stable Computer identity; runtime node IDs may be replaced. */
+  computerId?: string;
   managedNodeId?: string;
   nodeDisplayName?: string;
   nodeOwnership?: "managed" | "employee-device" | "unknown";
@@ -526,6 +577,8 @@ export interface AgentRunInput {
   /** Team a brand-new thread belongs to; the backend expands it to the
    *  roster (lead first) and stamps the session with the team id. */
   teamId?: string;
+  /** Project a brand-new thread belongs to; the backend expands its roster. */
+  projectId?: string;
   /** Absent means "this thread's participants" — the whole team for a team thread. */
   assignments?: Array<{
     agentId: string;

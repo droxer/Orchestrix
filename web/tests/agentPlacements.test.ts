@@ -16,6 +16,8 @@ function placement(input: Partial<AgentPlacement> & Pick<AgentPlacement, "id" | 
     agentId: input.agentId ?? "agent_alice",
     employeeId: input.employeeId ?? "alice",
     daemonNodeId: input.daemonNodeId,
+    runtimeNodeId: input.runtimeNodeId,
+    computerId: input.computerId,
     executorKind: input.executorKind ?? "codex",
     desiredState: input.desiredState ?? "active",
     status: input.status ?? "ready",
@@ -148,6 +150,21 @@ describe("describeAgentPlacements", () => {
       ["placement_preferred", "preferred"],
       ["placement_other", "alternate"],
     ]);
+  });
+
+  it("uses the current runtime while keeping the placement's original node for audit", () => {
+    const [result] = describeAgentPlacements([
+      placement({
+        id: "placement_replaced_runtime",
+        daemonNodeId: "runtime_old",
+        runtimeNodeId: "runtime_new",
+        computerId: "device:alice:machine-1",
+        priority: 100,
+      }),
+    ]);
+
+    assert.equal(result.nodeName, "runtime_new");
+    assert.equal(result.placement.daemonNodeId, "runtime_old");
   });
 });
 

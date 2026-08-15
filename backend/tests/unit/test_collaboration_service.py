@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from relay.collaboration.models import MessageIntent
 from relay.collaboration.service import (
     CollaborationConductor,
@@ -5,6 +7,40 @@ from relay.collaboration.service import (
     _scoped_idempotency_key,
     create_round_manifest,
 )
+
+
+def test_addressed_agent_placement_follows_replacement_runtime_on_same_computer() -> (
+    None
+):
+    placement = {
+        "id": "placement_1",
+        "agentId": "agent_1",
+        "daemonNodeId": "runtime_old",
+        "computerId": "device:alice:machine-1",
+        "desiredState": "active",
+    }
+    ctx = SimpleNamespace(
+        agent_placement_store=SimpleNamespace(
+            list_placements=lambda **_kwargs: [placement]
+        ),
+        agent_store=SimpleNamespace(
+            get_agent=lambda _agent_id: {"displayName": "Builder"}
+        ),
+    )
+    conductor = CollaborationConductor(ctx)
+
+    conductor._assert_addressed_agents_on_node(
+        [{"agentId": "agent_1"}],
+        [],
+        "runtime_new",
+        [
+            {
+                "id": "runtime_new",
+                "employeeId": "alice",
+                "workspaceId": "machine-1",
+            }
+        ],
+    )
 
 
 def test_round_manifest_names_its_versioned_protocol_contract() -> None:

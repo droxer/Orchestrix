@@ -9,6 +9,7 @@ from uuid import UUID
 
 from fastapi.testclient import TestClient
 from relay.app import create_app
+from relay.persistence.agent_placement_store import LocalAgentPlacementStore
 from relay.services.node_agents import sync_node_agents
 from relay.sessions.controller import SessionController
 
@@ -414,7 +415,9 @@ def test_admin_can_recover_deleted_managed_node(monkeypatch) -> None:
         assert missing.status_code == 404
 
 
-def test_recovered_managed_node_can_register_replacement_agents(monkeypatch) -> None:
+def test_recovered_managed_node_registers_runtime_without_creating_agents(
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
@@ -483,9 +486,7 @@ def test_recovered_managed_node_can_register_replacement_agents(monkeypatch) -> 
             )
             if agent["executorKind"] == "claude"
         ]
-        assert [agent["compatibilityKey"] for agent in live_claude] == [
-            f"alice:managed:{managed['id']}:claude"
-        ]
+        assert live_claude == []
 
 
 def test_recovered_managed_node_conflicts_with_replacement_policy_slot(
@@ -801,7 +802,9 @@ def test_stopped_managed_runtime_preserves_agent_for_restart(monkeypatch) -> Non
         assert preserved["managedNodeId"] == managed["id"]
 
 
-def test_backend_startup_retires_superseded_managed_agent_identity(monkeypatch) -> None:
+def test_backend_startup_does_not_reconcile_runtime_capabilities_into_agents(
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         original = create_app(root)
@@ -855,24 +858,36 @@ def test_backend_startup_retires_superseded_managed_agent_identity(monkeypatch) 
             }
         )
 
-        restarted = create_app(root)
+        original_list_placements = LocalAgentPlacementStore.list_placements
 
-        current = next(
+        def reject_agent_scoped_startup_query(store, *args, **kwargs):
+            if kwargs.get("agent_id") is not None:
+                raise AssertionError("backend startup queried one Agent's placements")
+            return original_list_placements(store, *args, **kwargs)
+
+        with monkeypatch.context() as startup_patch:
+            startup_patch.setattr(
+                LocalAgentPlacementStore,
+                "list_placements",
+                reject_agent_scoped_startup_query,
+            )
+            restarted = create_app(root)
+
+        [current] = [
             item
             for item in restarted.state.agent_store.list_agents(
                 supervisor_employee_id="alice"
             )
             if item["executorKind"] == "codex"
-        )
-        assert current["id"] != legacy["id"]
-        assert current["compatibilityKey"] == f"alice:managed:{managed['id']}:codex"
-        assert restarted.state.agent_store.get_agent(legacy["id"]).get("deletedAt")
+        ]
+        assert current["id"] == legacy["id"]
+        assert current["compatibilityKey"] == legacy["compatibilityKey"]
+        assert not current.get("deletedAt")
         [placement] = restarted.state.agent_placement_store.list_placements(
-            agent_id=current["id"]
+            agent_id=legacy["id"]
         )
-        assert placement["daemonNodeId"] == replacement["id"]
-        assert placement["daemonNodeId"] != old_runtime_id
-        assert placement["computerId"] == f"managed:{managed['id']}"
+        assert placement["daemonNodeId"] == old_runtime_id
+        assert placement["daemonNodeId"] != replacement["id"]
 
 
 def test_failed_managed_node_is_visible_as_failed(monkeypatch) -> None:

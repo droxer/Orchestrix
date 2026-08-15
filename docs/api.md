@@ -12,6 +12,10 @@ documentation locations, and UI metadata from the backend's shared constants.
 /threads
 /threads/new
 /threads/{threadId}
+/projects
+/projects/{projectId}
+/projects/{projectId}/new
+/projects/{projectId}/threads/{threadId}
 /backlog
 /routines
 /agents
@@ -39,6 +43,7 @@ route. `/` is replaced with `/threads`.
 | `/api/v1/threads` | Session-backed threads, events, artifacts, decisions, handoffs |
 | `/api/v1/tasks` | Backlog and routine resources, assignment, pickups, runs |
 | `/api/v1/agents`, `/api/v1/teams` | Current-user agents and teams |
+| `/api/v1/projects` | Computer-bound project rosters and shared-workspace rooms |
 | `/api/v1/sandboxes`, `/api/v1/daemon-nodes` | Execution-plane observations and commands |
 | `/api/v1/artifacts`, `/api/v1/workspace` | Generated artifacts and workspace reads |
 | `/api/v1/admin` | Administrative users, employees, fleet, agents, teams, and integrations |
@@ -78,6 +83,46 @@ or `review`; omitting `addressAgentId` addresses the current room. Recovery
 `kind` is `rerun` or `handoff`. The backend resolves membership, executor,
 placement, and immutable round assignments; clients do not send those transport
 details.
+
+## Projects
+
+`GET /api/v1/projects` returns the current employee's active and archived
+projects so historical project threads keep their original grouping. Creating a
+project binds an immutable stable Computer identity and creates one shared
+workspace subpath for every task conversation in that project:
+
+```text
+POST /api/v1/projects
+{
+  "name": "Relay GA",
+  "daemonNodeId": "computer-node-id",
+  "leadAgentId": "agent-id",
+  "members": [{
+    "agentId": "agent-id",
+    "role": "planner",
+    "functionTitle": "Technical lead",
+    "responsibilities": "Plan and accept delivery",
+    "instructions": "Optional project-only instructions"
+  }]
+}
+
+GET    /api/v1/projects/{id}
+PATCH  /api/v1/projects/{id}     { expectedVersion, name?, leadAgentId?, members?, enabled? }
+DELETE /api/v1/projects/{id}?expectedVersion={version}
+```
+
+The selected Computer must advertise `project-workspaces`; every enabled member
+must be an enabled agent with an active placement on that Computer. A project
+has at most 32 members. Names and function titles are limited to 120
+characters, responsibilities to 4,000 characters, and optional project
+instructions to 8,000 characters. Updates use optimistic versions; stale writes
+return `project_version_conflict`. Duplicate live names return
+`project_name_taken`. Archiving is a soft delete: it disables future dispatch
+while preserving tasks, threads, events, and workspace files.
+
+Task/thread creation accepts `projectId`. Project dispatch rejects Computer,
+team, or non-member overrides; the backend resolves the fixed roster and the
+current daemon instance for the project's stable Computer identity.
 
 Daemon runtimes renew their backend-advertised liveness lease independently of
 command polling:

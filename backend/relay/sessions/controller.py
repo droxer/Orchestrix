@@ -55,6 +55,9 @@ class SessionController:
         owner_employee_id: str | None = None,
         owner_agent_id: str | None = None,
         team_id: str | None = None,
+        project_id: str | None = None,
+        workspace_layout: str | None = None,
+        workspace_subpath: str | None = None,
         daemon_node_id: str | None = None,
         managed_node_id: str | None = None,
         computer_id: str | None = None,
@@ -66,6 +69,9 @@ class SessionController:
         self.owner_employee_id = owner_employee_id
         self.owner_agent_id = owner_agent_id
         self.team_id = team_id
+        self.project_id = project_id
+        self.workspace_layout = workspace_layout
+        self.workspace_subpath = workspace_subpath
         self.daemon_node_id = daemon_node_id
         self.managed_node_id = managed_node_id
         self.computer_id = computer_id
@@ -91,6 +97,17 @@ class SessionController:
                     {"ownerAgentId": self.owner_agent_id} if self.owner_agent_id else {}
                 ),
                 **({"teamId": self.team_id} if self.team_id else {}),
+                **({"projectId": self.project_id} if self.project_id else {}),
+                **(
+                    {"workspaceLayout": self.workspace_layout}
+                    if self.workspace_layout
+                    else {}
+                ),
+                **(
+                    {"workspaceSubpath": self.workspace_subpath}
+                    if self.workspace_subpath
+                    else {}
+                ),
                 **(
                     {"daemonNodeId": self.daemon_node_id} if self.daemon_node_id else {}
                 ),

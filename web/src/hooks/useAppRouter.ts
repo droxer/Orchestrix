@@ -90,17 +90,19 @@ export function useAppRouter({
       route: "main",
       mobileView: nextMobileView,
       sessionId: nextMobileView === "chat" ? currentSessionId ?? null : null,
+      projectId: locationState.projectId ?? activeSession?.projectId ?? null,
       composingNew: nextMobileView === "chat" && composingNew,
     });
-  }, [composingNew, currentSessionId, navigateToAppState]);
+  }, [activeSession?.projectId, composingNew, currentSessionId, locationState.projectId, navigateToAppState]);
 
   const hrefForSideNavRoute = useCallback((nextRoute: AppRoute) => buildHrefForRoute(nextRoute), []);
 
-  const syncThreadUrl = useCallback((sessionId: string | null, replace = false) => {
+  const syncThreadUrl = useCallback((sessionId: string | null, replace = false, projectId?: string | null) => {
     const state: AppLocationState = {
       route: "main",
       mobileView: "chat",
       sessionId,
+      projectId: projectId ?? null,
       composingNew: sessionId === null,
     };
     setLocationState(state);
@@ -115,6 +117,15 @@ export function useAppRouter({
     navigateToAppState({ route: "teams", mobileView: "chat", sessionId: null, teamWorkspaceId: teamId });
   }, [navigateToAppState]);
 
+  const navigateToProject = useCallback((projectId: string | null) => {
+    navigateToAppState({
+      route: "main",
+      mobileView: "threads",
+      sessionId: null,
+      projectId,
+    });
+  }, [navigateToAppState]);
+
   const navigateToLogin = useCallback((replace = false) => {
     navigateToAppState({ route: "main", mobileView: "chat", sessionId: null, login: true }, replace);
   }, [navigateToAppState]);
@@ -122,6 +133,7 @@ export function useAppRouter({
   return {
     route: locationState.route,
     mobileView: locationState.mobileView,
+    projectId: locationState.projectId ?? null,
     agentWorkspaceId: locationState.agentWorkspaceId ?? null,
     teamWorkspaceId: locationState.teamWorkspaceId ?? null,
     notFound: Boolean(locationState.notFound),
@@ -133,6 +145,7 @@ export function useAppRouter({
     syncThreadUrl,
     navigateToAgentWorkspace,
     navigateToTeamWorkspace,
+    navigateToProject,
     navigateToLogin,
   };
 }

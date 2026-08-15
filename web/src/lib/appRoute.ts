@@ -18,6 +18,7 @@ export type AppLocationState = {
   route: AppRoute;
   mobileView: MobileView;
   sessionId: string | null;
+  projectId?: string | null;
   agentWorkspaceId?: string | null;
   teamWorkspaceId?: string | null;
   composingNew?: boolean;
@@ -51,6 +52,18 @@ export function parseAppPath(pathname: string, _search = ""): AppLocationState {
   if (head === "threads" && second && rest.length === 0) {
     return { route: "main", ...base, sessionId: decodeSegment(second) };
   }
+  if (head === "projects" && !second && rest.length === 0) {
+    return { route: "main", mobileView: "threads", sessionId: null };
+  }
+  if (head === "projects" && second && rest.length === 0) {
+    return { route: "main", mobileView: "threads", sessionId: null, projectId: decodeSegment(second) };
+  }
+  if (head === "projects" && second && rest[0] === "new" && rest.length === 1) {
+    return { route: "main", ...base, projectId: decodeSegment(second), composingNew: true };
+  }
+  if (head === "projects" && second && rest[0] === "threads" && rest[1] && rest.length === 2) {
+    return { route: "main", ...base, projectId: decodeSegment(second), sessionId: decodeSegment(rest[1]) };
+  }
   if (head === "agents" && second && rest.length === 0) {
     return { route: "agents", ...base, agentWorkspaceId: decodeSegment(second) };
   }
@@ -66,6 +79,7 @@ export function pathForAppState({
   route,
   mobileView,
   sessionId,
+  projectId,
   agentWorkspaceId,
   teamWorkspaceId,
   composingNew,
@@ -77,6 +91,12 @@ export function pathForAppState({
   if (route === "agents" && agentWorkspaceId) return `/agents/${encodeURIComponent(agentWorkspaceId)}`;
   if (route === "teams" && teamWorkspaceId) return `/teams/${encodeURIComponent(teamWorkspaceId)}`;
   if (route !== "main") return WORK_PATHS[route];
+  if (projectId) {
+    const projectPath = `/projects/${encodeURIComponent(projectId)}`;
+    if (mobileView === "threads") return projectPath;
+    if (composingNew) return `${projectPath}/new`;
+    return sessionId ? `${projectPath}/threads/${encodeURIComponent(sessionId)}` : projectPath;
+  }
   if (mobileView === "threads") return "/threads";
   if (composingNew) return "/threads/new";
   return sessionId ? `/threads/${encodeURIComponent(sessionId)}` : "/threads";
@@ -108,7 +128,10 @@ export function canonicalSearchForPath(pathname: string, search = ""): string {
   if (head === "login" && !entityId) {
     const rawReturnTo = source.get("returnTo");
     if (rawReturnTo) target.set("returnTo", validatedReturnTo(rawReturnTo));
-  } else if (head === "threads" && entityId !== "new" && rest.length === 0) {
+  } else if (
+    (head === "threads" && entityId !== "new" && rest.length === 0)
+    || (head === "projects" && Boolean(entityId) && rest[0] === "threads" && Boolean(rest[1]) && rest.length === 2)
+  ) {
     // The thread space panel is URL-driven (?space=1&artifact=<id>) so an open
     // panel survives reload and can be shared. The selection only means
     // something while the panel is open.

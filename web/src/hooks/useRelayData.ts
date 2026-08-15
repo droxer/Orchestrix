@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
-import { listDaemonNodes, listSandboxes, listSessionSummaries, listTasks } from "../api";
-import type { DaemonNodeMonitorRecord, RelaySession, RelayTaskSummary, SandboxRecord } from "../types";
+import { listDaemonNodes, listProjects, listSandboxes, listSessionSummaries, listTasks } from "../api";
+import type { DaemonNodeMonitorRecord, ProjectRecord, RelaySession, RelayTaskSummary, SandboxRecord } from "../types";
 import { mergeSessionSummaries } from "../lib/sessionPollMerge";
 import { RELAY_POLL_INTERVALS_MS } from "../lib/relayPolling";
 
@@ -14,12 +14,15 @@ const NODES_KEY = NODES_QUERY_KEY;
 const SESSIONS_KEY = ["relay", "sessions"] as const;
 export const SESSIONS_QUERY_KEY = SESSIONS_KEY;
 const TASKS_KEY = ["relay", "tasks"] as const;
+export const PROJECTS_QUERY_KEY = ["relay", "projects"] as const;
+const PROJECTS_KEY = PROJECTS_QUERY_KEY;
 export const TASKS_QUERY_KEY = TASKS_KEY;
 type RelayDataResult = {
   sandboxes: SandboxRecord[];
   nodes: DaemonNodeMonitorRecord[];
   sessions: RelaySession[];
   tasks: RelayTaskSummary[];
+  projects: ProjectRecord[];
   isRefreshing: boolean;
   refresh: (signal?: AbortSignal, tokenOverride?: string) => Promise<void>;
   setSandboxes: Dispatch<SetStateAction<SandboxRecord[]>>;
@@ -92,14 +95,22 @@ export function useRelayData(
         queryFn: async ({ signal }: { signal: AbortSignal }): Promise<RelayTaskSummary[]> =>
           (await listTasks(signal)).tasks ?? [],
       },
+      {
+        queryKey: PROJECTS_KEY,
+        enabled,
+        refetchInterval: RELAY_POLL_INTERVALS_MS.tasks,
+        queryFn: async ({ signal }: { signal: AbortSignal }): Promise<ProjectRecord[]> =>
+          (await listProjects(signal)).projects ?? [],
+      },
     ],
   });
 
-  const [sandboxesQuery, nodesQuery, sessionsQuery, tasksQuery] = results;
+  const [sandboxesQuery, nodesQuery, sessionsQuery, tasksQuery, projectsQuery] = results;
   const sandboxes = sandboxesQuery.data ?? [];
   const nodes = nodesQuery.data ?? [];
   const sessions = sessionsQuery.data ?? [];
   const tasks = tasksQuery.data ?? [];
+  const projects = projectsQuery.data ?? [];
 
   // When disabled (e.g. logged out) drop cached rows so the UI clears at once,
   // matching the previous reset-to-empty behavior.
@@ -109,6 +120,7 @@ export function useRelayData(
       queryClient.setQueryData(NODES_KEY, []);
       queryClient.setQueryData(SESSIONS_KEY, []);
       queryClient.setQueryData(TASKS_KEY, []);
+      queryClient.setQueryData(PROJECTS_KEY, []);
     }
   }, [enabled, queryClient]);
 
@@ -168,6 +180,7 @@ export function useRelayData(
     nodes,
     sessions,
     tasks,
+    projects,
     isRefreshing: manualRefreshPending,
     refresh,
     setSandboxes,

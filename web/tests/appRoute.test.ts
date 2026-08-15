@@ -16,6 +16,10 @@ describe("app pathname routes", () => {
     assert.deepEqual(parseAppPath("/threads"), { route: "main", mobileView: "threads", sessionId: null });
     assert.deepEqual(parseAppPath("/threads/new"), { route: "main", mobileView: "chat", sessionId: null, composingNew: true });
     assert.deepEqual(parseAppPath("/threads/ses%2F123"), { route: "main", mobileView: "chat", sessionId: "ses/123" });
+    assert.deepEqual(parseAppPath("/projects"), { route: "main", mobileView: "threads", sessionId: null });
+    assert.deepEqual(parseAppPath("/projects/prj%2F123"), { route: "main", mobileView: "threads", sessionId: null, projectId: "prj/123" });
+    assert.deepEqual(parseAppPath("/projects/prj%2F123/new"), { route: "main", mobileView: "chat", sessionId: null, projectId: "prj/123", composingNew: true });
+    assert.deepEqual(parseAppPath("/projects/prj%2F123/threads/ses%2F123"), { route: "main", mobileView: "chat", sessionId: "ses/123", projectId: "prj/123" });
     assert.deepEqual(parseAppPath("/agents/agent%201"), { route: "agents", mobileView: "chat", sessionId: null, agentWorkspaceId: "agent 1" });
     assert.deepEqual(parseAppPath("/teams/team%201"), { route: "teams", mobileView: "chat", sessionId: null, teamWorkspaceId: "team 1" });
 
@@ -36,6 +40,9 @@ describe("app pathname routes", () => {
   it("formats clean paths with encoded entity ids", () => {
     assert.equal(pathForAppState({ route: "main", mobileView: "chat", sessionId: "ses/123" }), "/threads/ses%2F123");
     assert.equal(pathForAppState({ route: "main", mobileView: "chat", sessionId: null, composingNew: true }), "/threads/new");
+    assert.equal(pathForAppState({ route: "main", mobileView: "threads", sessionId: null, projectId: "prj/123" }), "/projects/prj%2F123");
+    assert.equal(pathForAppState({ route: "main", mobileView: "chat", sessionId: null, projectId: "prj/123", composingNew: true }), "/projects/prj%2F123/new");
+    assert.equal(pathForAppState({ route: "main", mobileView: "chat", sessionId: "ses/123", projectId: "prj/123" }), "/projects/prj%2F123/threads/ses%2F123");
     assert.equal(pathForAppState({ route: "agents", mobileView: "chat", sessionId: null, agentWorkspaceId: "agent 1" }), "/agents/agent%201");
     assert.equal(pathForAppState({ route: "teams", mobileView: "chat", sessionId: null, teamWorkspaceId: "team 1" }), "/teams/team%201");
     assert.equal(hrefForRoute("main", "ses_123"), "/threads/ses_123");
@@ -96,6 +103,10 @@ describe("app pathname routes", () => {
     assert.equal(canonicalBrowserUrl("/threads/ses-1", "?space=0"), "/threads/ses-1");
     // Composing a new thread has no output, and the collection has no panel.
     assert.equal(canonicalBrowserUrl("/threads/new", "?space=1"), "/threads/new");
+    assert.equal(
+      canonicalBrowserUrl("/projects/prj-1/threads/ses-1", "?space=1&artifact=art-9"),
+      "/projects/prj-1/threads/ses-1?space=1&artifact=art-9",
+    );
     // The bare list path still shows a thread on desktop, so it owns the
     // panel params too — otherwise the toggle writes them and the canonical
     // URL drops them again, and the button does nothing.
@@ -112,6 +123,7 @@ describe("app pathname routes", () => {
     assert.equal(pathKeepsThreadSpaceParams("/threads/ses-1"), true);
     assert.equal(pathKeepsThreadSpaceParams("/threads"), true);
     assert.equal(pathKeepsThreadSpaceParams("/threads/new"), false);
+    assert.equal(pathKeepsThreadSpaceParams("/projects/prj-1/threads/ses-1"), true);
     assert.equal(pathKeepsThreadSpaceParams("/backlog"), false);
   });
 

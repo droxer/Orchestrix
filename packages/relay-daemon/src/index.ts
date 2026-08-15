@@ -54,6 +54,7 @@ import {
   GUEST_WORKSPACE,
   agentHomePath,
   DAEMON_CAPABILITY_GENERATED_FILES,
+  DAEMON_CAPABILITY_PROJECT_WORKSPACES,
   DAEMON_CAPABILITY_ROUND_RESULT,
   DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
   DAEMON_CAPABILITY_THREAD_WORKSPACES,
@@ -65,6 +66,7 @@ import {
 import { workspaceCommandEvent } from "./workspace-read.js";
 import { ThreadWorkspaceManager } from "./thread-workspace.js";
 import { OutputEventBuffer, type BufferedOutput } from "./output-event-buffer.js";
+import { WorkspaceRunGate } from "./workspace-run-gate.js";
 
 export type DaemonSandboxMode = DaemonNodeSandboxMode;
 const DEFAULT_DAEMON_SANDBOX_MODE: DaemonSandboxMode = "boxlite";
@@ -205,6 +207,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     await verifyBoxlitePrerequisites(sandboxId);
   }
   const threadWorkspaces = new ThreadWorkspaceManager(workspacePath, environment.sandboxMode);
+  const workspaceRunGate = new WorkspaceRunGate(threadWorkspaces.rootPath);
   let health: DaemonHealthState | undefined;
   const setHealth = (next: DaemonHealthState, fields: DaemonLogFields = {}): void => {
     if (health === next) return;
@@ -256,6 +259,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
       DAEMON_CAPABILITY_WORKSPACE_READ_SHARED,
       DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
       DAEMON_CAPABILITY_THREAD_WORKSPACES,
+      DAEMON_CAPABILITY_PROJECT_WORKSPACES,
       DAEMON_CAPABILITY_ROUND_RESULT,
     ],
     agentHealth,
@@ -484,8 +488,11 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
           logger.info("command received", commandLogFields(sandboxId, command));
           setHealth("busy", commandLogFields(sandboxId, command));
           const controller = new AbortController();
+          const projectWorkspaceKey = command.workspaceLayout === "project"
+            ? threadWorkspaces.resolveProject(command.sessionId, requiredProjectSubpath(command)).hostPath
+            : undefined;
           const promise = Promise.resolve().then(() =>
-            executeCommand(
+            workspaceRunGate.run(projectWorkspaceKey, controller.signal, () => executeCommand(
               backendUrl,
               sandboxId,
               token,
@@ -497,7 +504,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
               environment,
               controller.signal,
               cancellationTerminalEventSignal,
-            ),
+            )),
           ).catch(async (error: unknown) => {
             const message = error instanceof Error ? error.message : String(error);
             logger.error("command failed before completion", { ...commandLogFields(sandboxId, command), error: message });
@@ -551,7 +558,9 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
           const commandWorkspacePath = command.sessionId
             ? (command.workspaceLayout === "thread"
                 ? threadWorkspaces.resolve(command.sessionId)
-                : threadWorkspaces.nodeRoot(command.sessionId)).hostPath
+                : command.workspaceLayout === "project"
+                  ? threadWorkspaces.resolveProject(command.sessionId, requiredProjectSubpath(command))
+                  : threadWorkspaces.nodeRoot(command.sessionId)).hostPath
             : workspacePath;
           const event = workspaceCommandEvent(commandWorkspacePath, command);
           await postJsonWithRetry(fetchFn, relayApiUrl(backendUrl, `/daemon-nodes/${encodeURIComponent(sandboxId)}/events`), event, token, runtimeSignal).catch((error: unknown) => {
@@ -748,6 +757,13 @@ function checkWorkspace(workspacePath: string): void {
   accessSync(workspacePath, constants.R_OK | constants.W_OK);
 }
 
+function requiredProjectSubpath(command: { workspaceSubpath?: string }): string {
+  if (!command.workspaceSubpath) {
+    throw new Error("Project workspace command is missing workspaceSubpath.");
+  }
+  return command.workspaceSubpath;
+}
+
 async function executeCommand(
   backendUrl: string,
   sandboxId: string,
@@ -771,7 +787,9 @@ async function executeCommand(
   }
   const threadWorkspace = command.workspaceLayout === "thread"
     ? threadWorkspaces.ensure(command.sessionId)
-    : threadWorkspaces.nodeRoot(command.sessionId);
+    : command.workspaceLayout === "project"
+      ? threadWorkspaces.ensureProject(command.sessionId, requiredProjectSubpath(command))
+      : threadWorkspaces.nodeRoot(command.sessionId);
   await environment.ensureAgentReady(command.agent, signal);
   if (signal?.aborted) {
     await postRunCancelled(fetchFn, eventUrl, command, token, signal.reason, cancellationTerminalEventSignal?.()).catch((error: unknown) => {

@@ -9,7 +9,9 @@ from ..collaboration.models import RunIntent
 from ..collaboration.service import CollaborationConductor, CollaborationError
 from ..persistence.agent_placement_store import create_node_placement, placement_status
 from ..security.auth import require_admin_session
+from ..services.agent_routing import placement_node
 from ..services.computer_names import computer_display_name
+from ..services.project_catalog import agent_has_active_project
 from ..services.team_membership import remove_agent_from_teams
 from .deps import AppContextDep
 from .helpers import (
@@ -31,34 +33,15 @@ AGENT_META_FIELDS = frozenset({"displayName", "instructions", "defaultRole"})
 async def list_agents(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor(request, ctx.auth_store)
     agents = ctx.agent_store.list_agents(supervisor_employee_id=actor["employeeId"])
-    live_node_ids = {node["id"] for node in ctx.registry.monitor_nodes()}
     views = [
         _agent_with_placements(ctx, agent)
         for agent in agents
-        if agent.get("enabled", True)
+        if agent.get("enabled", True) and not agent.get("compatibilityKey")
     ]
-
-    def _on_live_computer(view: dict[str, Any]) -> bool:
-        return any(
-            placement.get("daemonNodeId") in live_node_ids
-            for placement in view["placements"]
-        )
-
-    # A compatibility agent belongs to exactly one computer. Once that computer
-    # is gone — unassigned/deleted (placement removed) or no longer registered
-    # (an active placement left dangling at a node that vanished) — the agent is
-    # stale and must drop out of the roster and the chat header instead of
-    # lingering as a struck-through, computer-less entry that inflates the count.
-    # An offline-but-registered node still counts as live, so its agent stays
-    # (shown disabled). Custom agents (no compatibilityKey) may legitimately have
-    # no placement, so they always stay.
-    return {
-        "agents": [
-            view
-            for view in views
-            if not view.get("compatibilityKey") or _on_live_computer(view)
-        ]
-    }
+    # Compatibility agents translate old executor-kind assignments into the
+    # logical-agent pipeline. They are an internal migration bridge, not
+    # employee-facing Agent identities derived from runtime capabilities.
+    return {"agents": views}
 
 
 @router.patch("/agents/{agent_id}")
@@ -167,6 +150,12 @@ async def delete_control_panel_agent(
             409,
             "Agent has active work. Wait for its runs to finish before deleting it.",
         )
+    if agent_has_active_project(ctx.project_store, agent_id):
+        raise HTTPException(
+            409,
+            "Agent belongs to an active project. Remove it from the project "
+            "before deleting it.",
+        )
     try:
         deleted = ctx.agent_store.delete_agent(agent_id)
         ctx.profile_image_store.delete("agents", agent_id)
@@ -265,6 +254,9 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
                 requested_team_id=string_field(body, "teamId")
                 or string_field(body, "team_id")
                 or None,
+                requested_project_id=string_field(body, "projectId")
+                or string_field(body, "project_id")
+                or None,
                 requested_node_id=string_field(body, "daemonNodeId")
                 or string_field(body, "daemon_node_id")
                 or None,
@@ -357,16 +349,15 @@ def _agent_with_placements(ctx: AppContextDep, agent: dict[str, Any]) -> dict[st
 
 
 def _placement_view(ctx: AppContextDep, placement: dict[str, Any]) -> dict[str, Any]:
-    node = next(
-        (
-            item
-            for item in ctx.registry.monitor_nodes()
-            if item["id"] == placement["daemonNodeId"]
-        ),
-        None,
+    nodes = {item["id"]: item for item in ctx.registry.monitor_nodes()}
+    node = placement_node(placement, nodes)
+    view = placement_status(
+        placement, ctx.agent_store.get_agent(placement["agentId"]), node
     )
-    agent = ctx.agent_store.get_agent(placement["agentId"])
-    view = placement_status(placement, agent, node)
+    view = {
+        **view,
+        **({"runtimeNodeId": node["id"]} if node else {}),
+    }
     if not node:
         return {**view, "nodeOwnership": "unknown"}
     return {

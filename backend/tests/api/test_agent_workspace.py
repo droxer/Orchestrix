@@ -42,7 +42,7 @@ def _home_path(agent_id: str, relative: str) -> str:
     return f"agents/agent-{encoded}/{relative}"
 
 
-def test_agent_workspace_uses_artifact_snapshot_without_live_placement(
+def test_thread_workspace_uses_its_artifact_snapshot_without_live_placement(
     monkeypatch, tmp_path
 ):
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
@@ -72,24 +72,36 @@ def test_agent_workspace_uses_artifact_snapshot_without_live_placement(
         b"hello",
     )
 
-    listing = client.get(f"/api/v1/agents/{agent['id']}/workspace/files")
+    assert (
+        client.get(f"/api/v1/agents/{agent['id']}/workspace/files").status_code == 400
+    )
+    listing = client.get(
+        f"/api/v1/agents/{agent['id']}/workspace/files?threadId={session['id']}"
+    )
     assert listing.status_code == 200, listing.text
     assert listing.json()["source"] == "snapshot"
+    assert listing.json()["threadId"] == session["id"]
     assert [(entry["name"], entry["kind"]) for entry in listing.json()["entries"]] == [
         ("report.md", "file")
     ]
-    file = client.get(f"/api/v1/agents/{agent['id']}/workspace/file?path=report.md")
+    file = client.get(
+        f"/api/v1/agents/{agent['id']}/workspace/file"
+        f"?threadId={session['id']}&path=report.md"
+    )
     assert file.status_code == 200
+    assert file.json()["threadId"] == session["id"]
     assert file.json()["content"] == "hello"
     assert (
         client.get(
-            f"/api/v1/agents/{agent['id']}/workspace/file?path=../report.md"
+            f"/api/v1/agents/{agent['id']}/workspace/file"
+            f"?threadId={session['id']}&path=../report.md"
         ).status_code
         == 400
     )
     assert (
         client.get(
-            f"/api/v1/agents/{agent['id']}/workspace/file?path=missing.md"
+            f"/api/v1/agents/{agent['id']}/workspace/file"
+            f"?threadId={session['id']}&path=missing.md"
         ).status_code
         == 404
     )
@@ -396,6 +408,118 @@ def test_team_shared_scope_allows_a_current_member_before_its_first_run(
     assert denied.status_code == 404
 
 
+def test_project_member_reads_shared_project_workspace_before_first_run(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    app = create_app(tmp_path)
+    client = TestClient(app)
+    _bootstrap(client)
+    lead = _agent(client)
+    member_response = client.post(
+        "/api/v1/admin/agents",
+        json={
+            "supervisorEmployeeId": "alice",
+            "displayName": "Project reviewer",
+            "executorKind": "claude",
+        },
+    )
+    member = member_response.json()["agent"]
+    outsider_response = client.post(
+        "/api/v1/admin/agents",
+        json={
+            "supervisorEmployeeId": "alice",
+            "displayName": "Project outsider",
+            "executorKind": "pi",
+        },
+    )
+    outsider = outsider_response.json()["agent"]
+    project = app.state.project_store.create_project(
+        "alice",
+        {
+            "name": "Project room",
+            "computerId": "node:node_1",
+            "leadAgentId": lead["id"],
+            "members": [
+                {
+                    "agentId": lead["id"],
+                    "role": "implementer",
+                    "functionTitle": "Lead",
+                    "responsibilities": "Own delivery",
+                    "enabled": True,
+                },
+                {
+                    "agentId": member["id"],
+                    "role": "reviewer",
+                    "functionTitle": "Reviewer",
+                    "responsibilities": "Review changes",
+                    "enabled": True,
+                },
+            ],
+        },
+    )
+    session = app.state.session_store.create_session(
+        {
+            "workspacePath": "/workspace",
+            "workspaceLayout": "project",
+            "workspaceSubpath": project["workspaceSubpath"],
+            "projectId": project["id"],
+            "computerId": project["computerId"],
+            "ownerEmployeeId": "alice",
+            # A stale/legacy owner must not grant a non-roster agent access to
+            # a project workspace.
+            "ownerAgentId": outsider["id"],
+            "daemonNodeId": "node_1",
+            "taskGoal": "shared project files",
+        }
+    )
+    app.state.registry.register(
+        {
+            "sandboxId": "node_1",
+            "employeeId": "alice",
+            "token": "node_token",
+            "protocolVersion": 1,
+            "supportedAgents": ["claude", "codex"],
+            "capabilities": ["workspace-read-shared", "project-workspaces"],
+            "status": "ready",
+        }
+    )
+
+    async def listing(_ctx, node, command):
+        assert node["id"] == "node_1"
+        assert command["workspaceLayout"] == "project"
+        assert command["workspaceSubpath"] == project["workspaceSubpath"]
+        assert command["scope"] == "shared"
+        return {
+            "type": "workspace.listing",
+            "path": "",
+            "exists": True,
+            "entries": [],
+        }
+
+    monkeypatch.setattr("relay.api.agent_workspace_routes._dispatch", listing)
+    response = client.get(
+        f"/api/v1/agents/{member['id']}/workspace/files"
+        f"?scope=shared&threadId={session['id']}"
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["source"] == "live"
+
+    denied = client.get(
+        f"/api/v1/agents/{outsider['id']}/workspace/files"
+        f"?scope=shared&threadId={session['id']}"
+    )
+    assert denied.status_code == 404
+
+    app.state.project_store.archive_project(project["id"], expected_version=1)
+    historical = client.get(
+        f"/api/v1/agents/{member['id']}/workspace/files"
+        f"?scope=shared&threadId={session['id']}"
+    )
+    assert historical.status_code == 200, historical.text
+
+
 def test_thread_workspace_read_rejects_legacy_daemon(monkeypatch, tmp_path):
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     app = create_app(tmp_path)
@@ -445,9 +569,20 @@ def test_shared_scope_has_no_snapshot_fallback(monkeypatch, tmp_path):
     client = TestClient(app)
     _bootstrap(client)
     agent = _agent(client)
+    session = app.state.session_store.create_session(
+        {
+            "workspacePath": "/workspace",
+            "ownerEmployeeId": "alice",
+            "ownerAgentId": agent["id"],
+            "taskGoal": "shared files",
+        }
+    )
+    shared_query = f"scope=shared&threadId={session['id']}"
 
     # No live node at all: shared scope must not fall back to snapshots.
-    response = client.get(f"/api/v1/agents/{agent['id']}/workspace/files?scope=shared")
+    response = client.get(
+        f"/api/v1/agents/{agent['id']}/workspace/files?{shared_query}"
+    )
     assert response.status_code == 503
     assert response.json()["detail"] == {"reason": "placement-unavailable"}
 
@@ -464,7 +599,9 @@ def test_shared_scope_has_no_snapshot_fallback(monkeypatch, tmp_path):
         }
     )
     app.state.agent_placement_store.create_placement(agent, "node_1", {})
-    response = client.get(f"/api/v1/agents/{agent['id']}/workspace/files?scope=shared")
+    response = client.get(
+        f"/api/v1/agents/{agent['id']}/workspace/files?{shared_query}"
+    )
     assert response.status_code == 503
     assert response.json()["detail"] == {"reason": "placement-unavailable"}
 
@@ -634,3 +771,48 @@ def test_agent_workspace_brief_uses_authorized_placements_for_employee(
         == 200
     )
     assert bob.get(f"/api/v1/workspace/brief?agentId={agent['id']}").status_code == 403
+
+
+def test_agent_workspace_brief_follows_current_runtime_for_computer(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    app = create_app(tmp_path)
+    client = TestClient(app)
+    _bootstrap(client)
+    agent = _agent(client)
+    app.state.registry.register(
+        {
+            "sandboxId": "runtime_old",
+            "employeeId": "alice",
+            "workspaceId": "machine-1",
+            "token": "old_token",
+            "nodeLocation": "employee-device",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }
+    )
+    placed = client.post(
+        f"/api/v1/admin/agents/{agent['id']}/placements",
+        json={"daemonNodeId": "runtime_old"},
+    )
+    assert placed.status_code == 201, placed.text
+    app.state.registry.delete("runtime_old")
+    app.state.registry.register(
+        {
+            "sandboxId": "runtime_new",
+            "employeeId": "alice",
+            "workspaceId": "machine-1",
+            "token": "new_token",
+            "nodeLocation": "employee-device",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }
+    )
+
+    response = client.get(f"/api/v1/workspace/brief?agentId={agent['id']}")
+
+    assert response.status_code == 200, response.text
+    assert [node["id"] for node in response.json()["nodes"]] == ["runtime_new"]

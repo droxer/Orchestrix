@@ -2,9 +2,9 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * Per-agent runs share one node workspace mount; this namespaces each
- * agent's files under agents/<agentId>/ so concurrent agents on the same
- * node don't collide, without changing the BoxLite mount/VM lifecycle.
+ * Agents participating in one Thread share its workspace. This namespaces
+ * each Agent's private state under that Thread's agents/<agentId>/ directory;
+ * it is not an Agent-owned workspace and never spans Threads.
  */
 export function agentWorkspaceSubpath(agentId: string): string {
   return join("agents", `agent-${Buffer.from(agentId).toString("base64url")}`);

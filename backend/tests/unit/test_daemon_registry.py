@@ -612,6 +612,54 @@ def test_first_dispatch_refuses_to_downgrade_thread_layout_for_old_daemon() -> N
     asyncio.run(run_flow())
 
 
+def test_project_dispatch_carries_shared_workspace_subpath() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            registry = DaemonNodeRegistry(session_store, LocalDaemonStore(root))
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register(
+                {
+                    "sandboxId": "sbx_alice",
+                    "employeeId": "alice",
+                    "token": "node_token",
+                    "workspacePath": "/workspace/alice",
+                    "workspaceId": "machine-a",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "capabilities": ["thread-workspaces", "project-workspaces"],
+                    "status": "ready",
+                },
+                "ui_token",
+            )
+            session = session_store.create_session(
+                {
+                    "workspacePath": "/workspace/alice",
+                    "workspaceLayout": "project",
+                    "workspaceSubpath": "projects/prj_one",
+                    "projectId": "prj_one",
+                    "computerId": "device:alice:machine-a",
+                    "ownerEmployeeId": "alice",
+                    "taskGoal": "share project state",
+                }
+            )
+
+            await backend.run(
+                "sbx_alice",
+                {
+                    "sessionId": session["id"],
+                    "taskGoal": "share project state",
+                    "assignments": [{"agent": "codex"}],
+                },
+            )
+
+            [command] = registry.take_commands("sbx_alice", "node_token")
+            assert command["workspaceLayout"] == "project"
+            assert command["workspaceSubpath"] == "projects/prj_one"
+
+    asyncio.run(run_flow())
+
+
 def test_command_poll_cannot_observe_run_before_request_links_command() -> None:
     class PausingDaemonStore(DatabaseDaemonStore):
         def __init__(self, database_url: str):

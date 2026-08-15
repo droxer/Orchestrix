@@ -1,4 +1,4 @@
-import type { AgentName, RelaySession } from "../types.js";
+import type { AgentName, ProjectRecord, RelaySession } from "../types.js";
 
 // A thread is one owner-scoped session. The row binds to the session
 // itself (not an employee), so the logged-in employee can hold several in
@@ -10,6 +10,33 @@ export type ThreadItem = {
   /** The computer this thread is pinned to is unreachable. */
   nodeOffline?: boolean;
 };
+
+export type ProjectThreadBucket = {
+  project: ProjectRecord;
+  threads: ThreadItem[];
+};
+
+/** Builds the sidebar's Project -> thread hierarchy without hiding empty projects. */
+export function projectThreadBuckets(
+  threads: readonly ThreadItem[],
+  projects: readonly ProjectRecord[],
+): { projects: ProjectThreadBucket[]; unclassified: ThreadItem[] } {
+  const orderedProjects = projects
+    .slice()
+    .sort((a, b) => Number(Boolean(a.archivedAt)) - Number(Boolean(b.archivedAt))
+      || a.name.localeCompare(b.name));
+  const byProject = new Map(orderedProjects.map((project) => [project.id, [] as ThreadItem[]]));
+  const unclassified: ThreadItem[] = [];
+  for (const thread of threads) {
+    const bucket = thread.session.projectId ? byProject.get(thread.session.projectId) : undefined;
+    if (bucket) bucket.push(thread);
+    else unclassified.push(thread);
+  }
+  return {
+    projects: orderedProjects.map((project) => ({ project, threads: byProject.get(project.id) ?? [] })),
+    unclassified,
+  };
+}
 
 /** Deletion is safe only after both the session snapshot and daemon report no active run. */
 export function canDeleteThread(item: ThreadItem): boolean {

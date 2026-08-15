@@ -195,22 +195,21 @@ export function WorkspaceFilesBrowser({
     queryKey: ["agent-workspace", agentId, teamId, selectedThreadId, fileScope, filePath, refreshVersion],
     queryFn: ({ signal }) => listAgentWorkspaceFiles({
       agentId,
-      threadId: selectedThreadId || undefined,
+      threadId: selectedThreadId!,
       teamId,
       path: filePath,
       scope: fileScope === "shared" ? "shared" : undefined,
     }, signal),
-    enabled: Boolean(agentId && (fileScope !== "shared" || selectedThreadId)),
+    enabled: Boolean(agentId && selectedThreadId),
   });
   const contentQuery = useQuery({
     queryKey: ["agent-workspace-file", agentId, teamId, selectedThreadId, fileScope, selectedPath, refreshVersion],
-    // Mirrors the listing's gate exactly. It used to require a thread in every
-    // scope, so an agent with no threads could browse its personal home but got
-    // a permanently blank preview on every file it opened.
-    enabled: Boolean(agentId && selectedPath && (fileScope !== "shared" || selectedThreadId)),
+    // Mirrors the listing's gate exactly: every workspace and private agent
+    // subdirectory belongs to one Thread.
+    enabled: Boolean(agentId && selectedThreadId && selectedPath),
     queryFn: ({ signal }) => readAgentWorkspaceFile({
       agentId,
-      threadId: selectedThreadId,
+      threadId: selectedThreadId!,
       teamId,
       path: selectedPath,
       scope: fileScope === "shared" ? "shared" : undefined,
@@ -256,9 +255,8 @@ export function WorkspaceFilesBrowser({
         <div className="workspace-tabpanel-files">
           {/* One toolbar, not four stacked strips. Scope, location, thread, and
               source are what you need before opening a file, so they share one
-              line. The thread picker stays in BOTH scopes: it is what selects
-              the live computer, and without it even a personal home falls back
-              to the snapshot view — which the source chip beside it reports. */}
+              line. The thread picker stays in BOTH scopes because the shared
+              root and every Agent-private subdirectory belong to that Thread. */}
           <div className="workspace-files-bar">
             {!fixedScope ? (
               <span className="workspace-scope-options" role="radiogroup" aria-label={t("workspace.scope_label")}>

@@ -63,6 +63,12 @@ html[data-theme="dark"] .thread-panel {
   border-color: var(--line-2);
 }
 
+.conversation-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
 .conversation-search {
   grid-template-columns: auto minmax(0, 1fr) auto;
   background: var(--surface-2);
@@ -78,6 +84,112 @@ html[data-theme="dark"] .thread-panel {
   gap: var(--sp-0-5);
   padding: var(--sp-1) var(--sp-2) var(--sp-4);
   border-top: 0;
+}
+
+.project-directory {
+  gap: var(--sp-3);
+}
+
+.project-folder {
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-2);
+}
+
+.project-folder.active {
+  border-color: var(--line-2);
+  background: color-mix(in srgb, var(--action) 4%, transparent);
+}
+
+.project-folder-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: 36px;
+}
+
+.project-folder-select,
+.project-folder-new {
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.project-folder-select {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  flex: 1;
+  padding: var(--sp-2) var(--sp-3);
+  text-align: left;
+  font: var(--type-label-strong);
+}
+
+.project-folder-select > span:not(.project-folder-count) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-folder-count {
+  margin-left: auto;
+  color: var(--ink-4);
+  font: var(--type-label);
+}
+
+.project-folder-new {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-right: var(--sp-1);
+  border-radius: var(--r-2);
+  opacity: 0;
+}
+
+.project-folder:hover .project-folder-new,
+.project-folder:focus-within .project-folder-new {
+  opacity: 1;
+}
+
+.project-folder-new:hover {
+  color: var(--ink-1);
+  background: var(--surface-2);
+}
+
+.project-folder-threads {
+  margin-left: var(--sp-3);
+  padding-left: var(--sp-2);
+  border-left: 1px solid var(--line-1);
+}
+
+.project-folder-threads .conversation-group-label {
+  padding-left: var(--sp-3);
+}
+
+.project-folder-empty {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  color: var(--ink-4);
+  font: var(--type-label);
+}
+
+.project-member-card {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+}
+
+.project-member-card h3 {
+  margin: 0;
+  color: var(--ink-1);
+  font: var(--type-label-strong);
 }
 
 .conversation-row {

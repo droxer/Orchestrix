@@ -6,8 +6,16 @@ from loguru import logger
 
 from ..core.computer_identity import computer_id
 from ..persistence.agent_placement_store import create_node_placement
-from ..persistence.protocols import AgentPlacementStore, AgentStore, TeamStore
+from ..persistence.protocols import (
+    AgentPlacementStore,
+    AgentStore,
+    ProjectStore,
+    TeamStore,
+)
+from .project_catalog import agent_has_active_project
 from .team_membership import remove_agent_from_teams
+
+_PLACEMENT_SCHEMA_PROBE_AGENT_ID = "00000000-0000-0000-0000-000000000000"
 
 
 class NodeAgentRegistry(Protocol):
@@ -22,6 +30,7 @@ class NodeAgentContext(Protocol):
     agent_store: AgentStore
     agent_placement_store: AgentPlacementStore
     team_store: TeamStore
+    project_store: ProjectStore
 
 
 def assert_node_agent_runs_drained(ctx: NodeAgentContext, node_id: str) -> None:
@@ -38,16 +47,17 @@ def assert_node_agent_runs_drained(ctx: NodeAgentContext, node_id: str) -> None:
         for request in daemon_store.list_active_run_requests()
     ):
         raise ValueError(
-            "Daemon node has active agent work. Wait for its runs to finish before deleting it."
+            "Daemon node has active agent work. Wait for its runs to finish before "
+            "deleting it."
         )
 
 
 def employee_is_live(ctx: NodeAgentContext, employee_id: str) -> bool:
     """Whether the employee exists and has not been soft-deleted.
 
-    `employees.deleted_at` only filters listings, so without this check a node
-    that keeps registering re-materializes compatibility agents for an employee
-    whose agents were just deleted.
+    `employees.deleted_at` only filters listings, so without this check an
+    explicit legacy materialization could recreate a compatibility identity for
+    an employee whose agents were just deleted.
 
     `auth_store` is not part of NodeAgentContext, so it is read defensively —
     test doubles and reduced contexts may not carry one.
@@ -67,7 +77,12 @@ def employee_is_live(ctx: NodeAgentContext, employee_id: str) -> bool:
 
 
 def sync_node_agents(ctx: NodeAgentContext, node: dict[str, Any]) -> None:
-    """Materialize stable compatibility agents for legacy node capabilities."""
+    """Explicitly materialize legacy compatibility identities.
+
+    Runtime registration never calls this helper: executor capabilities do not
+    define Logical Agents. It remains only for migration/cleanup coverage while
+    old executor-kind requests are supported.
+    """
     employee_id = node.get("employeeId")
     if not employee_id:
         return
@@ -139,7 +154,7 @@ def _missing_agent_table(error: Exception) -> bool:
 
 def _assert_placement_store_ready(store: AgentPlacementStore) -> None:
     """Probe placement schema availability without scanning live placements."""
-    store.list_placements(agent_id="__relay_schema_probe__")
+    store.list_placements(agent_id=_PLACEMENT_SCHEMA_PROBE_AGENT_ID)
 
 
 def _managed_runtime_ids(ctx: NodeAgentContext, managed_node_id: str) -> set[str]:
@@ -314,6 +329,10 @@ def _retire_compatibility_agent(
             )
     if ctx.agent_placement_store.list_placements(agent_id=agent["id"]):
         return False
+    if getattr(ctx, "project_store", None) and agent_has_active_project(
+        ctx.project_store, agent["id"]
+    ):
+        return False
     ctx.agent_store.delete_agent(agent["id"])
     if getattr(ctx, "team_store", None):
         remove_agent_from_teams(ctx.team_store, agent["id"], employee_id)
@@ -345,14 +364,12 @@ def remove_node_agents(ctx: NodeAgentContext, node_id: str) -> list[str]:
 
 
 def _remove_node_agents_locked(ctx: NodeAgentContext, node_id: str) -> list[str]:
-    """Delete agents and placements bound to a deleted computer.
+    """Remove placements bound to a deleted Computer.
 
-    An agent lives on exactly one computer (one agent = one computer) and its
-    home does not migrate, so deleting the computer must retire every agent
-    placed on it — compatibility and custom alike — otherwise they linger in
-    the roster with no computer to run on. Agents that still hold an active
-    placement elsewhere survive. Removed placements are still swept so an
-    agent whose node was unassigned first is cleaned up as well.
+    Logical Agents are control-plane identities built on runtime capabilities;
+    losing a Computer makes an explicit Agent unplaced, not deleted. Only
+    compatibility agents created as an internal bridge for legacy executor-kind
+    requests are retired when their last placement disappears.
     """
     assert_node_agent_runs_drained(ctx, node_id)
     removed_agents: list[str] = []
@@ -381,7 +398,16 @@ def _remove_node_agents_locked(ctx: NodeAgentContext, node_id: str) -> list[str]
         seen.add(agent_id)
         agent = ctx.agent_store.get_agent(agent_id)
         active_elsewhere = ctx.agent_placement_store.list_placements(agent_id=agent_id)
-        if agent and not agent.get("deletedAt") and not active_elsewhere:
+        if (
+            agent
+            and agent.get("compatibilityKey")
+            and not agent.get("deletedAt")
+            and not active_elsewhere
+            and not (
+                getattr(ctx, "project_store", None)
+                and agent_has_active_project(ctx.project_store, agent_id)
+            )
+        ):
             ctx.agent_store.delete_agent(agent_id)
             if getattr(ctx, "team_store", None):
                 remove_agent_from_teams(

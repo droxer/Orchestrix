@@ -172,7 +172,7 @@ def test_unprovisioned_daemon_registration_cannot_mint_logical_agents(
         )
 
 
-def test_control_plane_provisioned_node_materializes_compatibility_agents(
+def test_control_plane_provisioned_node_does_not_materialize_runtime_as_agent(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
@@ -214,7 +214,7 @@ def test_control_plane_provisioned_node_materializes_compatibility_agents(
 
         assert registered.status_code == 200
         agents = client.get("/api/v1/admin/agents?employeeId=alice").json()["agents"]
-        assert any(agent["executorKind"] == "codex" for agent in agents)
+        assert agents == []
 
 
 def test_agent_policies_are_rejected_until_runtime_enforcement_exists(
@@ -1382,6 +1382,17 @@ def test_existing_thread_resumes_after_managed_runtime_replacement_without_read(
         )
         assert preserved_placement["daemonNodeId"] == old_runtime_id
         assert preserved_placement["computerId"] == f"managed:{managed['id']}"
+        listed_agent = next(
+            item
+            for item in client.get(
+                "/api/v1/admin/agents?supervisorEmployeeId=admin"
+            ).json()["agents"]
+            if item["id"] == agent["id"]
+        )
+        [listed_placement] = listed_agent["placements"]
+        assert listed_placement["status"] == "ready"
+        assert listed_placement["daemonNodeId"] == old_runtime_id
+        assert listed_placement["runtimeNodeId"] == replacement["id"]
 
         response = client.post(
             "/api/v1/agent-runs",
@@ -1805,7 +1816,7 @@ def test_employee_cannot_list_or_dispatch_another_employees_agent(monkeypatch) -
         assert denied.json()["detail"]["code"] == "agent_forbidden"
 
 
-def test_legacy_run_materializes_compatibility_agent_without_get_side_effects(
+def test_legacy_run_uses_hidden_compatibility_agent_without_roster_side_effects(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
@@ -1854,10 +1865,20 @@ def test_legacy_run_materializes_compatibility_agent_without_get_side_effects(
         )
 
         assert response.status_code == 202
-        [agent] = client.get("/api/v1/agents").json()["agents"]
+        assert client.get("/api/v1/agents").json()["agents"] == []
+        [agent] = [
+            item
+            for item in app.state.agent_store.list_agents(
+                supervisor_employee_id="alice"
+            )
+            if item.get("compatibilityKey")
+        ]
         assert agent["executorKind"] == "codex"
         assert agent["compatibilityKey"] == "alice:node:node_a:codex"
-        assert agent["placements"][0]["daemonNodeId"] == "node_a"
+        [placement] = app.state.agent_placement_store.list_placements(
+            agent_id=agent["id"]
+        )
+        assert placement["daemonNodeId"] == "node_a"
         assert response.json()["agentRuns"][0]["logicalAgentId"] == agent["id"]
 
 
@@ -1975,12 +1996,19 @@ def test_legacy_run_reuses_compatibility_agent_after_device_reregistration(
             )
             assert response.status_code == 202
 
-        agents = client.get("/api/v1/agents").json()["agents"]
+        assert client.get("/api/v1/agents").json()["agents"] == []
+        agents = [
+            item
+            for item in app.state.agent_store.list_agents(
+                supervisor_employee_id="alice"
+            )
+            if item.get("compatibilityKey")
+        ]
         assert len(agents) == 1
         assert agents[0]["compatibilityKey"] == "alice:device:alice:machine-a:codex"
 
 
-def test_compatibility_agent_drops_from_roster_when_its_computer_is_gone(
+def test_compatibility_agent_stays_hidden_when_its_computer_is_unassigned(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
@@ -2043,8 +2071,7 @@ def test_compatibility_agent_drops_from_roster_when_its_computer_is_gone(
 
         before = client.get("/api/v1/agents").json()["agents"]
         names = {agent["displayName"] for agent in before}
-        assert "Freelancer" in names
-        assert "Codex" in names
+        assert names == {"Freelancer"}
 
         # Unassigning the computer retires the placement; the per-computer agent
         # must leave the roster while the placement-less custom agent remains.
@@ -2072,7 +2099,7 @@ def test_compatibility_agent_drops_from_roster_when_its_computer_is_gone(
         assert {agent["displayName"] for agent in after} == {"Freelancer"}
 
 
-def test_compatibility_agent_drops_when_its_computer_is_deregistered(
+def test_compatibility_agent_never_enters_roster_when_computer_is_deregistered(
     monkeypatch,
 ) -> None:
     """A placement left dangling at a node that vanished from the registry must
@@ -2124,10 +2151,7 @@ def test_compatibility_agent_drops_when_its_computer_is_deregistered(
             ).status_code
             == 200
         )
-        assert any(
-            agent["displayName"] == "Codex"
-            for agent in client.get("/api/v1/agents").json()["agents"]
-        )
+        assert client.get("/api/v1/agents").json()["agents"] == []
 
         # The computer vanishes from the registry (crash / re-enroll under a new
         # id) WITHOUT the placement being retired — the exact stale state seen in

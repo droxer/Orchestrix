@@ -59,7 +59,7 @@ export const DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS: readonly number[] = [2, 1]
  * in its run.completed event, so the backend never has to walk the workspace
  * itself (which only works when they share a filesystem).
  */
-export type DaemonNodeCapability = "generated-files" | "workspace-read" | "workspace-read-shared" | "structured-agent-events" | "thread-workspaces" | "round-result";
+export type DaemonNodeCapability = "generated-files" | "workspace-read" | "workspace-read-shared" | "structured-agent-events" | "thread-workspaces" | "project-workspaces" | "round-result";
 export const DAEMON_CAPABILITY_GENERATED_FILES: DaemonNodeCapability = "generated-files";
 /** The daemon can serve agent-home file listings and reads via workspace commands. */
 export const DAEMON_CAPABILITY_WORKSPACE_READ: DaemonNodeCapability = "workspace-read";
@@ -69,6 +69,8 @@ export const DAEMON_CAPABILITY_WORKSPACE_READ_SHARED: DaemonNodeCapability = "wo
 export const DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS: DaemonNodeCapability = "structured-agent-events";
 /** The daemon executes each thread below its configured node workspace root. */
 export const DAEMON_CAPABILITY_THREAD_WORKSPACES: DaemonNodeCapability = "thread-workspaces";
+/** The daemon can map multiple threads onto one validated project directory. */
+export const DAEMON_CAPABILITY_PROJECT_WORKSPACES: DaemonNodeCapability = "project-workspaces";
 /**
  * The daemon reads the control file a run leaves at `.relay/round-result.json`
  * and reports it as `roundResult`, so the control plane learns whether the work
@@ -169,6 +171,8 @@ export interface DaemonNodeRunCommand {
   workspacePath?: string;
   /** Missing means node-root for compatibility with commands from older backends. */
   workspaceLayout?: DaemonWorkspaceLayout;
+  /** Required when workspaceLayout is project. */
+  workspaceSubpath?: string;
   state?: AgentState;
 }
 
@@ -194,9 +198,10 @@ export interface DaemonWorkspaceEntry {
 }
 
 /**
- * Which base directory a workspace command reads: an agent's personal home
- * ("agent-home", the default) or the node's shared workspace root ("shared",
- * only sent to daemons advertising the workspace-read-shared capability).
+ * Which directory inside one Thread workspace a command reads: an Agent's
+ * private subdirectory ("agent-home", the default) or the Thread's shared root
+ * ("shared"). When sessionId is omitted for admin diagnostics only, "shared"
+ * refers to the Computer's storage root containing Thread directories.
  */
 export type DaemonWorkspaceScope = "agent-home" | "shared";
 
@@ -209,6 +214,7 @@ export interface DaemonWorkspaceListCommand {
   /** Thread workspace to read. Omitted only for node-root administration. */
   sessionId?: string;
   workspaceLayout?: DaemonWorkspaceLayout;
+  workspaceSubpath?: string;
   scope?: DaemonWorkspaceScope;
   /** Required for agent-home scope; optional for shared scope. */
   agentId?: string;
@@ -224,6 +230,7 @@ export interface DaemonWorkspaceReadCommand {
   /** Thread workspace to read. Omitted only for node-root administration. */
   sessionId?: string;
   workspaceLayout?: DaemonWorkspaceLayout;
+  workspaceSubpath?: string;
   scope?: DaemonWorkspaceScope;
   /** Required for agent-home scope; optional for shared scope. */
   agentId?: string;

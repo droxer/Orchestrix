@@ -1,5 +1,5 @@
 import { accessSync, constants, lstatSync, mkdirSync, realpathSync, statSync } from "node:fs";
-import { posix, resolve, sep } from "node:path";
+import { isAbsolute, posix, resolve, sep } from "node:path";
 
 import { GUEST_WORKSPACE, type DaemonNodeSandboxMode } from "relay-core";
 
@@ -66,6 +66,30 @@ export class ThreadWorkspaceManager {
     return this.resolve(sessionId);
   }
 
+  resolveProject(sessionId: string, workspaceSubpath: string): ThreadWorkspace {
+    validateThreadId(sessionId);
+    const segments = validateProjectSubpath(workspaceSubpath);
+    const hostPath = resolve(this.rootPath, ...segments);
+    if (!hostPath.startsWith(this.rootPath + sep)) {
+      throw new Error(`Invalid project workspace path ${JSON.stringify(workspaceSubpath)}.`);
+    }
+    rejectSymlinkComponents(this.rootPath, segments);
+    assertContainedRealPath(this.rootPath, hostPath, "Project workspace");
+    return {
+      sessionId,
+      hostPath,
+      executionPath: this.sandboxMode === "boxlite"
+        ? posix.join(GUEST_WORKSPACE, ...segments)
+        : hostPath,
+    };
+  }
+
+  ensureProject(sessionId: string, workspaceSubpath: string): ThreadWorkspace {
+    const workspace = this.resolveProject(sessionId, workspaceSubpath);
+    mkdirSync(workspace.hostPath, { recursive: true });
+    return this.resolveProject(sessionId, workspaceSubpath);
+  }
+
   /** Existing sessions created before thread directories keep their node-root cwd. */
   nodeRoot(sessionId: string): ThreadWorkspace {
     return {
@@ -88,6 +112,30 @@ function validateThreadId(sessionId: string): void {
   }
 }
 
+function validateProjectSubpath(workspaceSubpath: string): string[] {
+  if (
+    typeof workspaceSubpath !== "string"
+    || workspaceSubpath.length === 0
+    || workspaceSubpath.includes("\\")
+    || isAbsolute(workspaceSubpath)
+  ) {
+    throw new Error(`Invalid project workspace path ${JSON.stringify(workspaceSubpath)}.`);
+  }
+  const segments = workspaceSubpath.split("/");
+  if (
+    segments.some((segment) =>
+      !THREAD_ID_PATTERN.test(segment)
+      || segment === "."
+      || segment === ".."
+      || segment.endsWith(".")
+      || WINDOWS_RESERVED_NAME.test(segment)
+    )
+  ) {
+    throw new Error(`Invalid project workspace path ${JSON.stringify(workspaceSubpath)}.`);
+  }
+  return segments;
+}
+
 function assertWorkspaceRoot(rootPath: string): void {
   const info = statSync(rootPath);
   if (!info.isDirectory()) {
@@ -100,6 +148,33 @@ function rejectSymbolicLink(path: string): void {
   try {
     if (lstatSync(path).isSymbolicLink()) {
       throw new Error(`Thread workspace must not be a symbolic link: ${path}.`);
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+}
+
+function rejectSymlinkComponents(rootPath: string, segments: string[]): void {
+  let current = rootPath;
+  for (const segment of segments) {
+    current = resolve(current, segment);
+    try {
+      if (lstatSync(current).isSymbolicLink()) {
+        throw new Error(`Project workspace must not contain a symbolic link: ${current}.`);
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+      throw error;
+    }
+  }
+}
+
+function assertContainedRealPath(rootPath: string, targetPath: string, label: string): void {
+  const realRoot = realpathSync(rootPath);
+  try {
+    const realTarget = realpathSync(targetPath);
+    if (realTarget !== realRoot && !realTarget.startsWith(realRoot + sep)) {
+      throw new Error(`${label} escapes the configured root.`);
     }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;

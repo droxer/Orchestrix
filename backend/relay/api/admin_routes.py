@@ -27,7 +27,6 @@ from ..services.employee_lifecycle import (
 from ..services.node_agents import (
     assert_node_agent_runs_drained,
     remove_node_agents,
-    sync_node_agents,
 )
 from ..services.team_membership import remove_agent_from_teams
 from .deps import AppContextDep
@@ -362,7 +361,6 @@ async def create_employee(request: Request, ctx: AppContextDep) -> dict[str, Any
     if node_id:
         try:
             assigned_node = ctx.registry.assign_employee(node_id, employee["id"])
-            sync_node_agents(ctx, assigned_node)
         except KeyError as error:
             raise HTTPException(404, "Daemon node not found.") from error
         except ValueError as error:
@@ -388,7 +386,6 @@ async def assign_control_panel_daemon_node(node_id: str, request: Request, ctx: 
         raise HTTPException(404, "Employee not found.")
     try:
         assigned_node = ctx.registry.assign_employee(node_id, employee_id)
-        sync_node_agents(ctx, assigned_node)
     except KeyError as error:
         raise HTTPException(404, "Daemon node not found.") from error
     except ValueError as error:

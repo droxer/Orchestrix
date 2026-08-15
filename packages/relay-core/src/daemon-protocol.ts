@@ -1,5 +1,10 @@
 import type { AgentName } from "./state.js";
-import type { DaemonAgentAdapter, DaemonAgentInventory, DaemonNodeSandboxMode } from "./daemon-node-protocol.js";
+import type {
+  DaemonAgentAdapter,
+  DaemonAgentInventory,
+  DaemonNodeCapability,
+  DaemonNodeSandboxMode,
+} from "./daemon-node-protocol.js";
 import type { AgentRole } from "./session-store.js";
 
 export type SandboxStatus = "provisioning" | "ready" | "busy" | "running" | "stopped" | "failed";
@@ -11,6 +16,7 @@ export interface SandboxRecord {
   employeeId?: string;
   workspacePath?: string;
   sandboxMode?: DaemonNodeSandboxMode;
+  capabilities?: DaemonNodeCapability[];
   nodeLocation?: DaemonNodeLocation;
   managedNodeId?: string;
   provisioningAttemptId?: string;

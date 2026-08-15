@@ -14,17 +14,27 @@ The execution-plane runtime registered for one computer.
 _Avoid_: Sandbox, agent
 
 **Logical Agent**:
-An employee-owned agent identity whose configuration is independent of the
-computer that executes it.
+The durable employee-owned identity built on an Agent Runtime through a
+Placement. Its configuration is independent of the computer that executes it,
+and it does not own a workspace.
 _Avoid_: Executor, CLI
 
+**Agent Runtime**:
+A capability on a Computer that can execute one implementation such as Claude,
+Codex, Pi, or Kimi. `Logical Agent.executorKind` selects the required runtime.
+A runtime is not an Agent and never creates one by registering.
+_Avoid_: Default Agent, Agent identity
+
 **Placement**:
-The active binding of one logical agent to one daemon node.
+The active binding of one Logical Agent to one Agent Runtime on one stable
+Computer. The current Daemon Node is resolved at dispatch time and may be
+replaced without moving or recreating the Agent or Placement.
 _Avoid_: Assignment, deployment
 
 **Node-scoped Team**:
-A lead and member agents whose active placements all reference the same daemon
-node. An unplaced agent or an agent on another node is not eligible to join.
+A lead and member Agents whose active placements all reference Agent Runtimes
+on the Thread's Computer. An unplaced Agent or an Agent on another Computer is
+not eligible to join.
 _Avoid_: Cross-node team, shared-path team
 
 **Thread Runtime**:
@@ -33,8 +43,12 @@ on the thread, cannot change after the thread starts, and bounds every agent
 eligible to participate in that thread.
 _Avoid_: Per-turn computer, movable thread
 
-**Workspace Identity**:
-A stable identity used to detect workspace continuity or drift for a daemon
-node and its sessions. Matching workspace identities do not establish agent
-co-location.
-_Avoid_: Team scope, collaboration scope
+**Thread Workspace**:
+The only writable work context. Every Agent participating in one Thread shares
+that Thread's workspace; no Agent workspace survives or spans Threads.
+_Avoid_: Agent Workspace, shared Computer workspace
+
+**Node Workspace Root**:
+Storage configured on a Computer that contains Thread Workspaces. It is not a
+workspace, identity, or scheduling boundary by itself.
+_Avoid_: Workspace, Agent home

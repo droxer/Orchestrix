@@ -188,6 +188,7 @@ DAEMON_CAPABILITY_WORKSPACE_READ = "workspace-read"
 DAEMON_CAPABILITY_WORKSPACE_READ_SHARED = "workspace-read-shared"
 DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS = "structured-agent-events"
 DAEMON_CAPABILITY_THREAD_WORKSPACES = "thread-workspaces"
+DAEMON_CAPABILITY_PROJECT_WORKSPACES = "project-workspaces"
 DAEMON_CAPABILITY_ROUND_RESULT = "round-result"
 DAEMON_NODE_CAPABILITIES = frozenset(
     {
@@ -196,6 +197,7 @@ DAEMON_NODE_CAPABILITIES = frozenset(
         DAEMON_CAPABILITY_WORKSPACE_READ_SHARED,
         DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
         DAEMON_CAPABILITY_THREAD_WORKSPACES,
+        DAEMON_CAPABILITY_PROJECT_WORKSPACES,
         DAEMON_CAPABILITY_ROUND_RESULT,
     }
 )
@@ -2547,6 +2549,22 @@ class DaemonNodeRegistry:
                 "The thread requires a daemon with thread-workspaces support.",
             )
             return run_request
+        if workspace_layout == "project":
+            if DAEMON_CAPABILITY_PROJECT_WORKSPACES not in (
+                sandbox.get("capabilities") or []
+            ):
+                self._fail_run_request(
+                    run_request,
+                    "The project requires a daemon with project-workspaces support.",
+                )
+                return run_request
+            workspace_subpath = session_snapshot.get("workspaceSubpath")
+            if not isinstance(workspace_subpath, str) or not workspace_subpath:
+                self._fail_run_request(
+                    run_request,
+                    "The project thread is missing its workspaceSubpath.",
+                )
+                return run_request
         bridge = compute_prior_agent_bridge(
             session_snapshot, assignment["executorKind"], self.store
         )
@@ -2619,6 +2637,11 @@ class DaemonNodeRegistry:
             "phase": state["team_phase"],
             "assignmentId": assignment["assignmentId"],
             "workspaceLayout": workspace_layout,
+            **(
+                {"workspaceSubpath": session_snapshot["workspaceSubpath"]}
+                if workspace_layout == "project"
+                else {}
+            ),
             **({"role": role} if role else {}),
             **(
                 {"logicalAgentId": assignment["agentId"]}
