@@ -166,9 +166,9 @@ export function ProjectDrawer({
         <Field label={t("project.name")}>
           <Input ref={nameRef} data-modal-initial-focus maxLength={120} value={name} onChange={(event) => setName(event.target.value)} />
         </Field>
-        <Field label={t("project.computer")}>
+        <Field label={t("project.computer")} hint={projectComputers.length === 0 ? t("project.no_computers") : t("project.choose_computer_hint")}>
           <Select value={computerId} onValueChange={selectComputer}>
-            <SelectTrigger className="w-full"><SelectValue placeholder={t("project.choose_computer")} /></SelectTrigger>
+            <SelectTrigger className="w-full" disabled={projectComputers.length === 0}><SelectValue placeholder={t("project.choose_computer")} /></SelectTrigger>
             <SelectContent>
               {projectComputers.map((computer) => (
                 <SelectItem key={computer.id} value={computer.id}>
@@ -180,25 +180,30 @@ export function ProjectDrawer({
         </Field>
         <fieldset className="team-member-fieldset">
           <legend>{t("project.members")}</legend>
-          <div className="team-member-options">
-            {availableAgents.map((agent) => {
-              const selected = members.some((member) => member.agentId === agent.id);
-              return (
-                <label key={agent.id} className="team-member-option">
-                  <Checkbox
-                    checked={selected}
-                    onCheckedChange={() => toggleMember(agent)}
-                    aria-label={agent.displayName}
-                  />
-                  <span className="team-member-option-main">
-                    <span className="team-member-option-name">{agent.displayName}</span>
-                    <span className="team-member-option-meta">{agent.executorKind}</span>
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-          {computerId && availableAgents.length === 0 ? <small>{t("project.no_agents_on_computer")}</small> : null}
+          {availableAgents.length > 0 ? (
+            <div className="team-member-options">
+              {availableAgents.map((agent) => {
+                const selected = members.some((member) => member.agentId === agent.id);
+                return (
+                  <label key={agent.id} className="team-member-option">
+                    <Checkbox
+                      checked={selected}
+                      onCheckedChange={() => toggleMember(agent)}
+                      aria-label={agent.displayName}
+                    />
+                    <span className="team-member-option-main">
+                      <span className="team-member-option-name">{agent.displayName}</span>
+                      <span className="team-member-option-meta">{agent.executorKind}</span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="project-empty-hint">
+              {computerId ? t("project.no_agents_on_computer") : t("project.choose_computer_hint")}
+            </p>
+          )}
         </fieldset>
         {members.length ? (
           <Field label={t("project.lead")}>

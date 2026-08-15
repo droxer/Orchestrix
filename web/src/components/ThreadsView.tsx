@@ -187,6 +187,7 @@ export function ThreadsView({
         directoryMode={directoryMode}
         threads={filteredThreads}
         projects={projects}
+        computers={runtimeNodes}
         query={threadQuery}
         setQuery={setThreadQuery}
         selectedSessionId={activeSession?.id}

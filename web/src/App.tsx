@@ -502,9 +502,29 @@ export function App() {
     () => threadItems.filter((item) => matchesThreadQuery(item.session, threadQuery)),
     [threadItems, threadQuery],
   );
+  const directoryProjects = useMemo(() => {
+    if (route !== "projects") return [];
+    const query = threadQuery.trim().toLowerCase();
+    if (!query) return projects;
+    const matchingProjectIds = new Set(
+      projects.filter((project) => project.name.toLowerCase().includes(query)).map((project) => project.id),
+    );
+    return projects.filter((project) => matchingProjectIds.has(project.id) || threadItems.some(
+      (item) => item.session.projectId === project.id && matchesThreadQuery(item.session, threadQuery),
+    ));
+  }, [projects, route, threadItems, threadQuery]);
   const directoryThreads = useMemo(() => {
-    return threadsForDirectory(filteredThreads, projects, route === "projects" ? "projects" : "threads");
-  }, [filteredThreads, projects, route]);
+    if (route !== "projects") return threadsForDirectory(filteredThreads, projects, "threads");
+    const query = threadQuery.trim().toLowerCase();
+    const matchingProjectIds = new Set(
+      projects.filter((project) => project.name.toLowerCase().includes(query)).map((project) => project.id),
+    );
+    const projectFilteredThreads = threadItems.filter((item) => {
+      if (!item.session.projectId || !projects.some((project) => project.id === item.session.projectId)) return false;
+      return !query || matchingProjectIds.has(item.session.projectId) || matchesThreadQuery(item.session, threadQuery);
+    });
+    return projectFilteredThreads;
+  }, [filteredThreads, projects, route, threadItems, threadQuery]);
 
   const refreshWithToken = useCallback(async (tokenOverride?: string) => {
     await refresh(undefined, tokenOverride);
@@ -1255,7 +1275,7 @@ export function App() {
           <ThreadsView
             directoryMode={route === "projects" ? "projects" : "threads"}
             filteredThreads={directoryThreads}
-            projects={route === "projects" ? projects : []}
+            projects={route === "projects" ? directoryProjects : []}
             selectedProjectId={route === "projects" ? routedProjectId ?? activeSession?.projectId ?? null : null}
             threadQuery={threadQuery}
             setThreadQuery={setThreadQuery}
