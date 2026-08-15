@@ -5,8 +5,10 @@ from datetime import date
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
+
 from relay.api import task_routes
 from relay.app import create_app
+from relay.core.computer_identity import computer_id
 from relay.services.task_dispatch import active_routine_occurrence
 
 
@@ -50,6 +52,36 @@ def _create_agent(
     executor_kind: str = "codex",
     node_id: str | None = None,
 ) -> dict:
+    if node_id:
+        # node_id names a node the caller already registered (usually
+        # through the real registration route) — reuse its identity.
+        node = client.app.state.registry.get(node_id)
+        assert node is not None, f"node {node_id} must be registered first"
+        target_computer_id = computer_id(node)
+    else:
+        # No explicit node: give this employee's test computer a stable,
+        # offline identity so creation succeeds without auto-placing the
+        # agent. Tests relying on "no ready node yet" behavior depend on
+        # this staying offline (status "stopped").
+        offline_node_id = f"offline_node_{employee_id}"
+        existing = client.app.state.registry.get(offline_node_id)
+        node = client.app.state.registry.register(
+            {
+                "sandboxId": offline_node_id,
+                "employeeId": employee_id,
+                "workspaceId": f"machine-{employee_id}",
+                "token": "node_token",
+                "workspacePath": f"/workspace/{employee_id}",
+                "protocolVersion": 1,
+                "supportedAgents": sorted(
+                    set((existing or {}).get("supportedAgents") or [])
+                    | {executor_kind}
+                ),
+                "capabilities": ["thread-workspaces"],
+                "status": "stopped",
+            }
+        )
+        target_computer_id = computer_id(node)
     response = client.post(
         "/api/v1/admin/agents",
         json={
@@ -57,11 +89,15 @@ def _create_agent(
             "displayName": f"{executor_kind.title()} Task Agent",
             "executorKind": executor_kind,
             "defaultRole": "implementer",
+            "computerId": target_computer_id,
         },
     )
     assert response.status_code == 201
     agent = response.json()["agent"]
-    if node_id:
+    already_placed = client.app.state.agent_placement_store.list_placements(
+        agent_id=agent["id"]
+    )
+    if node_id and not already_placed:
         placement = client.post(
             f"/api/v1/admin/agents/{agent['id']}/placements",
             json={"daemonNodeId": node_id},
@@ -281,14 +317,7 @@ def test_routine_cadence_change_and_reenable_recalculate_next_run(monkeypatch) -
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
         _create_user(client, "alice", employee_id="alice")
-        agent = client.post(
-            "/api/v1/admin/agents",
-            json={
-                "supervisorEmployeeId": "alice",
-                "displayName": "Scheduler",
-                "executorKind": "codex", "defaultRole": "implementer",
-            },
-        ).json()["agent"]
+        agent = _create_agent(client, "alice")
         created = client.post(
             "/api/v1/tasks",
             json={
@@ -394,20 +423,12 @@ def test_assigned_backlog_waits_for_scheduler_and_start_can_dispatch_manually(
         )
         assert registered.status_code == 200
 
-        agent = client.post(
-            "/api/v1/admin/agents",
-            json={
-                "supervisorEmployeeId": "alice",
-                "displayName": "Builder",
-                "executorKind": "codex", "defaultRole": "implementer",
-            },
-        ).json()["agent"]
+        agent = _create_agent(client, "alice", node_id="sbx_alice")
         assert (
-            client.post(
-                f"/api/v1/admin/agents/{agent['id']}/placements",
-                json={"daemonNodeId": "sbx_alice"},
-            ).status_code
-            == 201
+            client.app.state.agent_placement_store.list_placements(
+                agent_id=agent["id"]
+            )
+            != []
         )
 
         created = client.post(
@@ -982,21 +1003,7 @@ def test_scheduler_dispatches_assigned_backlog_task(monkeypatch) -> None:
             headers={"Authorization": "Bearer ui_token"},
         )
         assert registered.status_code == 200
-        agent = client.post(
-            "/api/v1/admin/agents",
-            json={
-                "supervisorEmployeeId": "alice",
-                "displayName": "Scheduled Builder",
-                "executorKind": "codex", "defaultRole": "implementer",
-            },
-        ).json()["agent"]
-        assert (
-            client.post(
-                f"/api/v1/admin/agents/{agent['id']}/placements",
-                json={"daemonNodeId": "sbx_alice"},
-            ).status_code
-            == 201
-        )
+        agent = _create_agent(client, "alice", node_id="sbx_alice")
 
         created = client.post(
             "/api/v1/tasks",
@@ -1058,21 +1065,7 @@ def test_routine_start_dispatches_occurrence_not_definition(monkeypatch) -> None
             headers={"Authorization": "Bearer ui_token"},
         )
         assert registered.status_code == 200
-        agent = client.post(
-            "/api/v1/admin/agents",
-            json={
-                "supervisorEmployeeId": "alice",
-                "displayName": "Routine Builder",
-                "executorKind": "codex", "defaultRole": "implementer",
-            },
-        ).json()["agent"]
-        assert (
-            client.post(
-                f"/api/v1/admin/agents/{agent['id']}/placements",
-                json={"daemonNodeId": "sbx_alice"},
-            ).status_code
-            == 201
-        )
+        agent = _create_agent(client, "alice", node_id="sbx_alice")
 
         created = client.post(
             "/api/v1/tasks",

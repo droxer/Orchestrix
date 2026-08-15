@@ -9,6 +9,7 @@ from ..collaboration.models import RunIntent
 from ..collaboration.service import CollaborationConductor, CollaborationError
 from ..persistence.agent_placement_store import create_node_placement, placement_status
 from ..security.auth import require_admin_session
+from ..services.agent_creation import AgentCreationError, create_agent_for_employee
 from ..services.computer_names import computer_display_name
 from ..services.team_membership import remove_agent_from_teams
 from .deps import AppContextDep
@@ -21,10 +22,9 @@ from .helpers import (
 router = APIRouter()
 
 
-# What an agent's own supervisor may change. The role belongs here with the
-# personality: both describe how their agent works, and the supervisor is the
-# person who knows what job it should do on their team.
-AGENT_META_FIELDS = frozenset({"displayName", "instructions", "defaultRole"})
+# 员工可以随时调整自己 agent 的人格；出生证明（computerId / executorKind /
+# defaultRole）创建时定死 —— 改 role 等于换一个同事，应当新建而非修改。
+AGENT_META_FIELDS = frozenset({"displayName", "instructions"})
 
 
 @router.get("/agents")
@@ -59,6 +59,21 @@ async def list_agents(request: Request, ctx: AppContextDep) -> dict[str, Any]:
             if not view.get("compatibilityKey") or _on_live_computer(view)
         ]
     }
+
+
+@router.post("/agents", status_code=201)
+async def create_agent(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    actor = request_actor(request, ctx.auth_store)
+    body = await json_body(request)
+    try:
+        agent = create_agent_for_employee(ctx, actor["employeeId"], body)
+    except AgentCreationError as error:
+        raise HTTPException(error.status, str(error)) from error
+    except ValueError as error:
+        raise HTTPException(
+            409 if "already has" in str(error) else 400, str(error)
+        ) from error
+    return {"agent": _agent_with_placements(ctx, agent)}
 
 
 @router.patch("/agents/{agent_id}")
@@ -117,11 +132,14 @@ async def create_control_panel_agent(
     if not _employee_exists(ctx.auth_store, employee_id):
         raise HTTPException(404, "Employee not found.")
     try:
-        return {"agent": ctx.agent_store.create_agent(employee_id, body)}
+        agent = create_agent_for_employee(ctx, employee_id, body)
+    except AgentCreationError as error:
+        raise HTTPException(error.status, str(error)) from error
     except ValueError as error:
         raise HTTPException(
             409 if "already has" in str(error) else 400, str(error)
         ) from error
+    return {"agent": agent}
 
 
 @router.get("/admin/agents/{agent_id}")

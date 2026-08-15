@@ -7,8 +7,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
+
 from relay.api import task_routes
 from relay.app import create_app
+from relay.core.computer_identity import computer_id
 
 
 def _bootstrap(client: TestClient) -> None:
@@ -45,6 +47,30 @@ def _agent(
     place: bool = True,
     role: str = "implementer",
 ) -> dict:
+    # Give this employee's test computer a stable identity so agent creation
+    # can find it. A pre-existing node (registered by the test itself, or by
+    # an earlier _agent() call for the same employee) keeps its status and
+    # gains this executor in its supported set; otherwise a fresh offline node
+    # is registered so creation succeeds without silently auto-placing the
+    # agent (that would make the placement below a duplicate).
+    node_id = f"test_node_{employee_id}"
+    existing_node = client.app.state.registry.get(node_id)
+    node = client.app.state.registry.register(
+        {
+            "sandboxId": node_id,
+            "employeeId": employee_id,
+            "workspaceId": f"machine-{employee_id}",
+            "token": "node_token",
+            "workspacePath": f"/workspace/{employee_id}",
+            "protocolVersion": 1,
+            "supportedAgents": sorted(
+                set((existing_node or {}).get("supportedAgents") or [])
+                | {executor}
+            ),
+            "capabilities": ["thread-workspaces"],
+            "status": (existing_node or {}).get("status", "stopped"),
+        }
+    )
     response = client.post(
         "/api/v1/admin/agents",
         json={
@@ -52,14 +78,16 @@ def _agent(
             "displayName": name,
             "executorKind": executor,
             "defaultRole": role,
+            "computerId": computer_id(node),
         },
     )
     assert response.status_code == 201
     agent = response.json()["agent"]
-    if place:
-        client.app.state.agent_placement_store.create_placement(
-            agent, f"test_node_{employee_id}"
-        )
+    already_placed = client.app.state.agent_placement_store.list_placements(
+        agent_id=agent["id"]
+    )
+    if place and not already_placed:
+        client.app.state.agent_placement_store.create_placement(agent, node_id)
     return agent
 
 
@@ -811,7 +839,24 @@ def test_unroutable_team_start_requests_capacity_and_queues_scheduler_retry(
         client = TestClient(app)
         _bootstrap(client)
         _employee(client, "alice")
-        lead = _agent(client, "alice", "Lead", "codex")
+        # This test exercises the legacy phantom-placement attach path
+        # (_attach_never_run_agent_to_managed_capacity in
+        # relay/services/agent_routing.py): an agent with a placement that
+        # has no computerId and points at a node that was never actually
+        # registered, representing pre-Task-3 data or anything created by
+        # writing directly to the store. computerId is optional at the
+        # store layer (Task 1) — only the POST /admin/agents API layer
+        # (create_agent_for_employee) requires one — so this fixture goes
+        # straight to the store to construct that state, bypassing the API.
+        lead = app.state.agent_store.create_agent(
+            "alice",
+            {
+                "displayName": "Lead",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+            },
+        )
+        app.state.agent_placement_store.create_placement(lead, "test_node_alice")
         team = client.post(
             "/api/v1/admin/teams",
             json={

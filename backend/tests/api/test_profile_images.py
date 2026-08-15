@@ -4,7 +4,9 @@ import base64
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
+
 from relay.app import create_app
+from relay.core.computer_identity import computer_id
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\nrelay-profile"
 PNG_DATA_URL = "data:image/png;base64," + base64.b64encode(PNG_BYTES).decode("ascii")
@@ -35,6 +37,37 @@ def employee(client: TestClient, employee_id: str) -> None:
     )
 
 
+def _agent(client: TestClient, employee_id: str) -> dict:
+    # An offline birth-certificate computer: enough to mint a computerId
+    # without auto-placing the agent, so callers that manually place it
+    # afterward don't hit a duplicate-placement conflict.
+    node = client.app.state.registry.register(
+        {
+            "sandboxId": f"test_node_{employee_id}",
+            "employeeId": employee_id,
+            "workspaceId": f"machine-{employee_id}",
+            "token": "node_token",
+            "workspacePath": f"/workspace/{employee_id}",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "capabilities": ["thread-workspaces"],
+            "status": "stopped",
+        }
+    )
+    response = client.post(
+        "/api/v1/admin/agents",
+        json={
+            "supervisorEmployeeId": employee_id,
+            "displayName": "Builder",
+            "executorKind": "codex",
+            "defaultRole": "implementer",
+            "computerId": computer_id(node),
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()["agent"]
+
+
 def test_employee_updates_and_removes_agent_and_team_profile_images(
     monkeypatch,
 ) -> None:
@@ -43,15 +76,7 @@ def test_employee_updates_and_removes_agent_and_team_profile_images(
         client = TestClient(create_app(root))
         bootstrap(client)
         employee(client, "alice")
-        agent = client.post(
-            "/api/v1/admin/agents",
-            json={
-                "supervisorEmployeeId": "alice",
-                "displayName": "Builder",
-                "executorKind": "codex",
-                "defaultRole": "implementer",
-            },
-        ).json()["agent"]
+        agent = _agent(client, "alice")
         client.app.state.agent_placement_store.create_placement(
             agent, "test_node_alice"
         )
@@ -109,15 +134,7 @@ def test_employee_cannot_update_another_employees_profile_image(monkeypatch) -> 
         bootstrap(client)
         employee(client, "alice")
         employee(client, "bob")
-        agent = client.post(
-            "/api/v1/admin/agents",
-            json={
-                "supervisorEmployeeId": "bob",
-                "displayName": "Builder",
-                "executorKind": "codex",
-                "defaultRole": "implementer",
-            },
-        ).json()["agent"]
+        agent = _agent(client, "bob")
         assert client.post("/api/v1/auth/logout").status_code == 200
         assert (
             client.post(
@@ -139,15 +156,7 @@ def test_profile_image_endpoint_rejects_unsupported_data(monkeypatch) -> None:
         client = TestClient(create_app(root))
         bootstrap(client)
         employee(client, "alice")
-        agent = client.post(
-            "/api/v1/admin/agents",
-            json={
-                "supervisorEmployeeId": "alice",
-                "displayName": "Builder",
-                "executorKind": "codex",
-                "defaultRole": "implementer",
-            },
-        ).json()["agent"]
+        agent = _agent(client, "alice")
 
         response = client.put(
             f"/profile-images/agents/{agent['id']}",

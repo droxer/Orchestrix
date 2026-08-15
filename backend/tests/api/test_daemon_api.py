@@ -8,7 +8,9 @@ from typing import Any
 from uuid import UUID
 
 from fastapi.testclient import TestClient
+
 from relay.app import create_app
+from relay.core.computer_identity import computer_id
 from relay.services.node_agents import sync_node_agents
 from relay.sessions.controller import SessionController
 
@@ -3593,18 +3595,38 @@ def test_admin_can_soft_delete_employee_and_unassign_nodes(monkeypatch) -> None:
         )
         assert provision.status_code == 201
         node_id = provision.json()["node"]["id"]
+        # Mark the node ready with the codex runtime directly on the
+        # registry (bypassing the HTTP registration route, which also runs
+        # sync_node_agents and would materialize unrelated compatibility
+        # agents for every executor kind — out of scope here). A
+        # provisioned-but-never-registered node has no known runtimes yet,
+        # so creation needs this before it can succeed.
+        app.state.registry.update_status(
+            node_id, {"status": "ready", "agents": {"codex": "ready"}}
+        )
         agent = client.post(
             "/api/v1/admin/agents",
             json={
                 "supervisorEmployeeId": "alice",
                 "displayName": "Builder",
-                "executorKind": "codex", "defaultRole": "implementer",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": computer_id(app.state.registry.get(node_id)),
             },
         ).json()["agent"]
-        placement = client.post(
-            f"/api/v1/admin/agents/{agent['id']}/placements",
-            json={"daemonNodeId": node_id},
-        ).json()["placement"]
+        # The node is now live, so creation already auto-placed the agent —
+        # only fall back to an explicit placement call if it did not.
+        auto_placed = app.state.agent_placement_store.list_placements(
+            agent_id=agent["id"]
+        )
+        placement = (
+            auto_placed[0]
+            if auto_placed
+            else client.post(
+                f"/api/v1/admin/agents/{agent['id']}/placements",
+                json={"daemonNodeId": node_id},
+            ).json()["placement"]
+        )
         team = client.post(
             "/api/v1/admin/teams",
             json={

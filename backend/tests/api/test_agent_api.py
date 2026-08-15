@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from tempfile import TemporaryDirectory
 
 import pytest
 from fastapi.testclient import TestClient
 from relay.app import create_app
+from relay.core.computer_identity import computer_id
 from relay.persistence.store_common import _write_json
 from relay.services.node_agents import sync_node_agents
 from relay.sessions.controller import SessionController
@@ -16,6 +18,116 @@ def _bootstrap_admin(client: TestClient) -> None:
         json={"token": "admin_token", "username": "admin", "password": "secret123"},
     )
     assert response.status_code == 200
+
+
+def _register_alice_client(
+    monkeypatch: pytest.MonkeyPatch, *, node_status: str
+) -> Iterator[tuple[TestClient, dict[str, object]]]:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                    "displayName": "Alice",
+                },
+            ).status_code
+            == 201
+        )
+        node = app.state.registry.register(
+            {
+                "sandboxId": "node_alice",
+                "employeeId": "alice",
+                "workspaceId": "machine-alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "nodeLocation": "employee-device",
+                "protocolVersion": 1,
+                "supportedAgents": ["claude"],
+                "capabilities": ["thread-workspaces"],
+                "status": node_status,
+            }
+        )
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login",
+                json={"username": "alice", "password": "userpass"},
+            ).status_code
+            == 200
+        )
+        yield client, {**node, "computerId": computer_id(node)}
+
+
+@pytest.fixture
+def client_with_node(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[tuple[TestClient, dict[str, object]]]:
+    yield from _register_alice_client(monkeypatch, node_status="ready")
+
+
+@pytest.fixture
+def client_with_offline_node(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[tuple[TestClient, dict[str, object]]]:
+    yield from _register_alice_client(monkeypatch, node_status="stopped")
+
+
+def _birth_computer_id(
+    client: TestClient,
+    employee_id: str,
+    executor_kind: str,
+    *,
+    status: str = "stopped",
+) -> str:
+    """Register (or extend) this employee's offline test computer and return
+    its computerId. Offline by default so creation succeeds without
+    auto-placing the agent — callers that need a live node pass
+    status="ready" explicitly.
+    """
+    node_id = f"admin_test_node_{employee_id}"
+    existing = client.app.state.registry.get(node_id)
+    node = client.app.state.registry.register(
+        {
+            "sandboxId": node_id,
+            "employeeId": employee_id,
+            "workspaceId": f"machine-{employee_id}",
+            "token": "node_token",
+            "workspacePath": f"/workspace/{employee_id}",
+            "protocolVersion": 1,
+            "supportedAgents": sorted(
+                set((existing or {}).get("supportedAgents") or []) | {executor_kind}
+            ),
+            "capabilities": ["thread-workspaces"],
+            "status": status,
+        }
+    )
+    return computer_id(node)
+
+
+def _place_if_needed(
+    client: TestClient, agent_id: str, node_id: str, extra: dict | None = None
+) -> dict:
+    """Place `agent_id` on `node_id`, unless creation already auto-placed it
+    on a live computer (which would make a second POST a 409 conflict).
+    """
+    placements = client.app.state.agent_placement_store.list_placements(
+        agent_id=agent_id
+    )
+    if placements:
+        return placements[0]
+    response = client.post(
+        f"/api/v1/admin/agents/{agent_id}/placements",
+        json={"daemonNodeId": node_id, **(extra or {})},
+    )
+    assert response.status_code == 201
+    return response.json()["placement"]
 
 
 def test_admin_manages_agents_and_employee_lists_own_agents(
@@ -35,6 +147,7 @@ def test_admin_manages_agents_and_employee_lists_own_agents(
             },
         )
         assert employee.status_code == 201
+        computer_id_alice = _birth_computer_id(client, "alice", "claude")
 
         researcher = client.post(
             "/api/v1/admin/agents",
@@ -43,6 +156,7 @@ def test_admin_manages_agents_and_employee_lists_own_agents(
                 "displayName": "Researcher",
                 "executorKind": "claude",
                 "defaultRole": "planner",
+                "computerId": computer_id_alice,
             },
         )
         reviewer = client.post(
@@ -52,6 +166,7 @@ def test_admin_manages_agents_and_employee_lists_own_agents(
                 "displayName": "Reviewer",
                 "executorKind": "claude",
                 "defaultRole": "reviewer",
+                "computerId": computer_id_alice,
             },
         )
         assert researcher.status_code == reviewer.status_code == 201
@@ -236,6 +351,7 @@ def test_agent_policies_are_rejected_until_runtime_enforcement_exists(
             ).status_code
             == 201
         )
+        computer_id_alice = _birth_computer_id(client, "alice", "codex")
 
         rejected_create = client.post(
             "/api/v1/admin/agents",
@@ -245,6 +361,7 @@ def test_agent_policies_are_rejected_until_runtime_enforcement_exists(
                 "executorKind": "codex",
                 "defaultRole": "implementer",
                 "toolPolicy": {"allowedTools": ["read"]},
+                "computerId": computer_id_alice,
             },
         )
         assert rejected_create.status_code == 400
@@ -257,6 +374,7 @@ def test_agent_policies_are_rejected_until_runtime_enforcement_exists(
                 "displayName": "Builder",
                 "executorKind": "codex",
                 "defaultRole": "implementer",
+                "computerId": computer_id_alice,
             },
         ).json()["agent"]
         rejected_update = client.patch(
@@ -346,6 +464,7 @@ def test_employee_updates_own_agent_meta(monkeypatch) -> None:
                 "displayName": "Researcher",
                 "executorKind": "claude",
                 "defaultRole": "planner",
+                "computerId": _birth_computer_id(client, "alice", "claude"),
             },
         ).json()["agent"]
 
@@ -436,34 +555,28 @@ def test_admin_places_agents_on_different_runtime_nodes(monkeypatch) -> None:
                 }
             )
 
-        researcher = client.post(
+        client.post(
             "/api/v1/admin/agents",
             json={
                 "supervisorEmployeeId": "alice",
                 "displayName": "Researcher",
                 "executorKind": "claude",
                 "defaultRole": "implementer",
+                "computerId": "node:node_a",
             },
-        ).json()["agent"]
-        builder = client.post(
+        )
+        client.post(
             "/api/v1/admin/agents",
             json={
                 "supervisorEmployeeId": "alice",
                 "displayName": "Builder",
                 "executorKind": "codex",
                 "defaultRole": "implementer",
+                "computerId": "node:node_b",
             },
-        ).json()["agent"]
-        first = client.post(
-            f"/api/v1/admin/agents/{researcher['id']}/placements",
-            json={"daemonNodeId": "node_a"},
         )
-        second = client.post(
-            f"/api/v1/admin/agents/{builder['id']}/placements",
-            json={"daemonNodeId": "node_b"},
-        )
-
-        assert first.status_code == second.status_code == 201
+        # Both computers are live, so creation already auto-placed each
+        # agent on its one matching node.
         agents = client.get("/api/v1/admin/agents?employeeId=alice").json()["agents"]
         assert {agent["availability"] for agent in agents} == {"ready"}
         assert {agent["placements"][0]["daemonNodeId"] for agent in agents} == {
@@ -550,6 +663,9 @@ def test_agent_placements_describe_managed_and_local_runtime_nodes(monkeypatch) 
                 "displayName": "Managed Builder",
                 "executorKind": "codex",
                 "defaultRole": "implementer",
+                "computerId": computer_id(
+                    app.state.registry.get(enrolled["sandboxId"])
+                ),
             },
         ).json()["agent"]
         local_agent = client.post(
@@ -559,22 +675,36 @@ def test_agent_placements_describe_managed_and_local_runtime_nodes(monkeypatch) 
                 "displayName": "Local Builder",
                 "executorKind": "codex",
                 "defaultRole": "implementer",
+                "computerId": computer_id(app.state.registry.get(local_node_id)),
             },
         ).json()["agent"]
-        assert (
-            client.post(
-                f"/api/v1/admin/agents/{managed_agent['id']}/placements",
-                json={"daemonNodeId": enrolled["sandboxId"], "priority": 100},
-            ).status_code
-            == 201
-        )
-        assert (
-            client.post(
-                f"/api/v1/admin/agents/{local_agent['id']}/placements",
-                json={"daemonNodeId": local_node_id, "priority": 200},
-            ).status_code
-            == 201
-        )
+
+        # Both computers were already live, so creation auto-placed each
+        # agent; set the priority this test cares about on that placement
+        # instead of creating a second (and now conflicting) one.
+        def _set_priority(agent_id: str, node_id: str, priority: int) -> None:
+            placements = client.app.state.agent_placement_store.list_placements(
+                agent_id=agent_id
+            )
+            if placements:
+                assert (
+                    client.patch(
+                        f"/api/v1/admin/agent-placements/{placements[0]['id']}",
+                        json={"priority": priority},
+                    ).status_code
+                    == 200
+                )
+            else:
+                assert (
+                    client.post(
+                        f"/api/v1/admin/agents/{agent_id}/placements",
+                        json={"daemonNodeId": node_id, "priority": priority},
+                    ).status_code
+                    == 201
+                )
+
+        _set_priority(managed_agent["id"], enrolled["sandboxId"], 100)
+        _set_priority(local_agent["id"], local_node_id, 200)
         assert (
             client.patch(
                 f"/api/v1/daemon-nodes/{local_node_id}",
@@ -636,14 +766,10 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
                 "displayName": "Builder",
                 "executorKind": "codex",
                 "defaultRole": "implementer",
+                "computerId": "node:node_a",
             },
         ).json()["agent"]
-        placement_response = client.post(
-            f"/api/v1/admin/agents/{agent['id']}/placements",
-            json={"daemonNodeId": "node_a"},
-        )
-        assert placement_response.status_code == 201
-        placement = placement_response.json()["placement"]
+        placement = _place_if_needed(client, agent["id"], "node_a")
 
         assert client.post("/api/v1/auth/logout").status_code == 200
         assert (
@@ -1801,9 +1927,10 @@ def test_employee_cannot_list_or_dispatch_another_employees_agent(monkeypatch) -
                 ).status_code
                 == 201
             )
-        app.state.registry.register(
+        node = app.state.registry.register(
             {
                 "sandboxId": "shared_node",
+                "employeeId": "alice",
                 "token": "node_token",
                 "workspacePath": "/workspace/shared",
                 "protocolVersion": 1,
@@ -1819,15 +1946,10 @@ def test_employee_cannot_list_or_dispatch_another_employees_agent(monkeypatch) -
                 "displayName": "Builder",
                 "executorKind": "codex",
                 "defaultRole": "implementer",
+                "computerId": computer_id(node),
             },
         ).json()["agent"]
-        assert (
-            client.post(
-                f"/api/v1/admin/agents/{agent['id']}/placements",
-                json={"daemonNodeId": "shared_node"},
-            ).status_code
-            == 201
-        )
+        _place_if_needed(client, agent["id"], "shared_node")
 
         assert client.post("/api/v1/auth/logout").status_code == 200
         assert (
@@ -2051,6 +2173,7 @@ def test_compatibility_agent_drops_from_roster_when_its_computer_is_gone(
                 "displayName": "Freelancer",
                 "executorKind": "claude",
                 "defaultRole": "implementer",
+                "computerId": _birth_computer_id(client, "alice", "claude"),
             },
         )
         app.state.registry.register(
@@ -2218,6 +2341,7 @@ def test_task_persists_and_dispatches_a_logical_agent_assignment(monkeypatch) ->
                 "displayName": "Earlier Builder",
                 "executorKind": "codex",
                 "defaultRole": "implementer",
+                "computerId": "node:node_a",
             },
         ).json()["agent"]
         agent = client.post(
@@ -2227,22 +2351,11 @@ def test_task_persists_and_dispatches_a_logical_agent_assignment(monkeypatch) ->
                 "displayName": "Selected Builder",
                 "executorKind": "codex",
                 "defaultRole": "implementer",
+                "computerId": "node:node_a",
             },
         ).json()["agent"]
-        assert (
-            client.post(
-                f"/api/v1/admin/agents/{decoy_agent['id']}/placements",
-                json={"daemonNodeId": "node_a"},
-            ).status_code
-            == 201
-        )
-        assert (
-            client.post(
-                f"/api/v1/admin/agents/{agent['id']}/placements",
-                json={"daemonNodeId": "node_a"},
-            ).status_code
-            == 201
-        )
+        _place_if_needed(client, decoy_agent["id"], "node_a")
+        _place_if_needed(client, agent["id"], "node_a")
         assert client.post("/api/v1/auth/logout").status_code == 200
         assert (
             client.post(
@@ -2302,6 +2415,7 @@ def test_task_owner_cannot_be_reassigned_to_another_employees_agent(
                     "displayName": "Builder",
                     "executorKind": "codex",
                     "defaultRole": "implementer",
+                    "computerId": _birth_computer_id(client, employee_id, "codex"),
                 },
             ).json()["agent"]
 
@@ -2355,6 +2469,7 @@ def test_employee_task_writes_require_named_agents_and_preserve_status(
                 "displayName": "Builder",
                 "executorKind": "codex",
                 "defaultRole": "implementer",
+                "computerId": _birth_computer_id(client, "alice", "codex"),
             },
         ).json()["agent"]
         assert client.post("/api/v1/auth/logout").status_code == 200
@@ -2502,15 +2617,10 @@ def test_failed_agent_first_run_finalizes_instead_of_wedging(monkeypatch) -> Non
                 "displayName": "Elon Musk",
                 "executorKind": "codex",
                 "defaultRole": "implementer",
+                "computerId": "node:node_a",
             },
         ).json()["agent"]
-        assert (
-            client.post(
-                f"/api/v1/admin/agents/{agent['id']}/placements",
-                json={"daemonNodeId": "node_a"},
-            ).status_code
-            == 201
-        )
+        _place_if_needed(client, agent["id"], "node_a")
 
         run = client.post(
             "/api/v1/agent-runs",
@@ -2584,6 +2694,7 @@ def test_agent_role_is_visible_but_not_patchable(monkeypatch) -> None:
                 "displayName": "Reviewer",
                 "executorKind": "claude",
                 "defaultRole": "reviewer",
+                "computerId": _birth_computer_id(client, "alice", "claude"),
             },
         ).json()["agent"]
 
@@ -2635,3 +2746,90 @@ def test_agent_role_is_visible_but_not_patchable(monkeypatch) -> None:
             ]
             == "reviewer"
         )
+
+
+def test_employee_creates_an_agent_on_their_own_computer(client_with_node) -> None:
+    client, node = client_with_node          # 沿用本文件既有的 fixture 写法
+    response = client.post(
+        "/api/v1/agents",
+        json={
+            "computerId": node["computerId"],
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+            "displayName": "Ada",
+        },
+    )
+    assert response.status_code == 201
+    agent = response.json()["agent"]
+    assert agent["computerId"] == node["computerId"]
+    assert agent["defaultRole"] == "implementer"
+
+
+def test_creation_rejects_a_runtime_the_computer_does_not_have(client_with_node) -> None:
+    client, node = client_with_node
+    response = client.post(
+        "/api/v1/agents",
+        json={
+            "computerId": node["computerId"],
+            "executorKind": "kimi",       # 该 node 只上报了 claude
+            "defaultRole": "implementer",
+        },
+    )
+    assert response.status_code == 400
+    assert "runtime" in response.json()["detail"].lower()
+
+
+def test_creation_rejects_another_employees_computer(client_with_node) -> None:
+    client, _ = client_with_node
+    response = client.post(
+        "/api/v1/agents",
+        json={
+            "computerId": "device:bob:machine-z",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
+    )
+    assert response.status_code == 404
+
+
+def test_creation_rejects_an_unknown_role(client_with_node) -> None:
+    client, node = client_with_node
+    response = client.post(
+        "/api/v1/agents",
+        json={
+            "computerId": node["computerId"],
+            "executorKind": "claude",
+            "defaultRole": "chief-of-staff",
+        },
+    )
+    assert response.status_code == 400
+
+
+def test_creation_is_allowed_while_the_computer_is_offline(client_with_offline_node) -> None:
+    """员工可以为暂时关机的电脑建 agent；上线后由 sync 补 placement。"""
+    client, node = client_with_offline_node
+    response = client.post(
+        "/api/v1/agents",
+        json={
+            "computerId": node["computerId"],
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
+    )
+    assert response.status_code == 201
+
+
+def test_role_cannot_be_patched_after_creation(client_with_node) -> None:
+    client, node = client_with_node
+    agent = client.post(
+        "/api/v1/agents",
+        json={
+            "computerId": node["computerId"],
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
+    ).json()["agent"]
+    response = client.patch(
+        f"/api/v1/agents/{agent['id']}", json={"defaultRole": "reviewer"}
+    )
+    assert response.status_code == 400
