@@ -3400,6 +3400,10 @@ def test_employee_renames_managed_computer_through_runtime_identity(
             == "Relay Cloud"
         )
         assert (
+            alice_client.get("/api/v1/sandboxes").json()["sandboxes"][0]["displayName"]
+            == "Relay Cloud"
+        )
+        assert (
             admin_client.get("/api/v1/admin/daemon-nodes").json()["nodes"][0][
                 "displayName"
             ]
