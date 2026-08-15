@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import "../styles.css";
 
+import { InlineScript } from "../components/InlineScript";
 import { Providers } from "./providers";
 
 // Phosphor typography: one mono family carries both the display tier and
@@ -91,11 +92,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <head>
         {/* Resolve the saved theme before first paint, then derive browser
             chrome from the same canvas token as the rendered page. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: themeScript,
-          }}
-        />
+        <InlineScript html={themeScript} />
       </head>
       <body>
         <Providers>{children}</Providers>
