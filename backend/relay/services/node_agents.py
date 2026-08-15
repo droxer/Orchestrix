@@ -7,7 +7,6 @@ from loguru import logger
 from ..core.computer_identity import computer_id
 from ..persistence.agent_placement_store import create_node_placement
 from ..persistence.protocols import AgentPlacementStore, AgentStore, TeamStore
-from .team_membership import remove_agent_from_teams
 
 
 class NodeAgentRegistry(Protocol):
@@ -137,17 +136,14 @@ def remove_node_agents(ctx: NodeAgentContext, node_id: str) -> list[str]:
 
 
 def _remove_node_agents_locked(ctx: NodeAgentContext, node_id: str) -> list[str]:
-    """Delete agents and placements bound to a deleted computer.
+    """Remove placements on a deleted computer, but keep the agent itself.
 
-    An agent lives on exactly one computer (one agent = one computer) and its
-    home does not migrate, so deleting the computer must retire every agent
-    placed on it — compatibility and custom alike — otherwise they linger in
-    the roster with no computer to run on. Agents that still hold an active
-    placement elsewhere survive. Removed placements are still swept so an
-    agent whose node was unassigned first is cleaned up as well.
+    Agents are declared explicitly by employees and can only be deleted by
+    employees. Once the computer is gone, binding_status marks the agent
+    computer_gone and it stays on the roster — the system never erases it.
     """
     assert_node_agent_runs_drained(ctx, node_id)
-    removed_agents: list[str] = []
+    orphaned_agents: list[str] = []
     seen: set[str] = set()
     try:
         placements = ctx.agent_placement_store.list_placements(
@@ -160,7 +156,7 @@ def _remove_node_agents_locked(ctx: NodeAgentContext, node_id: str) -> list[str]
                 node_id=node_id,
                 error=str(error),
             )
-            return removed_agents
+            return orphaned_agents
         raise
     for placement in placements:
         if placement.get("desiredState") != "removed":
@@ -174,10 +170,5 @@ def _remove_node_agents_locked(ctx: NodeAgentContext, node_id: str) -> list[str]
         agent = ctx.agent_store.get_agent(agent_id)
         active_elsewhere = ctx.agent_placement_store.list_placements(agent_id=agent_id)
         if agent and not agent.get("deletedAt") and not active_elsewhere:
-            ctx.agent_store.delete_agent(agent_id)
-            if getattr(ctx, "team_store", None):
-                remove_agent_from_teams(
-                    ctx.team_store, agent_id, agent["supervisorEmployeeId"]
-                )
-            removed_agents.append(agent_id)
-    return removed_agents
+            orphaned_agents.append(agent_id)
+    return orphaned_agents

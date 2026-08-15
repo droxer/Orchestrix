@@ -144,10 +144,13 @@ async def delete_managed_node(
             if node:
                 _fence_active_runtime(ctx, node)
                 daemon_node_id = node.get("activeDaemonNodeId")
-                removed_agents = (
+                # These agents are not deleted — remove_node_agents only strips
+                # their placement on this computer. They stay on the roster,
+                # flagged computer_gone by binding_status.
+                orphaned_agents = (
                     remove_node_agents(ctx, daemon_node_id) if daemon_node_id else []
                 )
-                return {"node": node, "removedAgents": removed_agents}
+                return {"node": node, "orphanedAgents": orphaned_agents}
             orphaned_runtime_ids = [
                 runtime["id"]
                 for runtime in ctx.registry.control_panel_nodes()

@@ -9,6 +9,7 @@ from ..collaboration.models import RunIntent
 from ..collaboration.service import CollaborationConductor, CollaborationError
 from ..persistence.agent_placement_store import create_node_placement, placement_status
 from ..security.auth import require_admin_session
+from ..services.agent_binding import binding_status
 from ..services.agent_creation import AgentCreationError, create_agent_for_employee
 from ..services.computer_names import computer_display_name
 from ..services.team_membership import remove_agent_from_teams
@@ -33,32 +34,18 @@ AGENT_META_FIELDS = frozenset({"displayName", "instructions"})
 async def list_agents(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor(request, ctx.auth_store)
     agents = ctx.agent_store.list_agents(supervisor_employee_id=actor["employeeId"])
-    live_node_ids = {node["id"] for node in ctx.registry.monitor_nodes()}
-    views = [
-        _agent_with_placements(ctx, agent)
-        for agent in agents
-        if agent.get("enabled", True)
-    ]
-
-    def _on_live_computer(view: dict[str, Any]) -> bool:
-        return any(
-            placement.get("daemonNodeId") in live_node_ids
-            for placement in view["placements"]
-        )
-
-    # A compatibility agent belongs to exactly one computer. Once that computer
-    # is gone — unassigned/deleted (placement removed) or no longer registered
-    # (an active placement left dangling at a node that vanished) — the agent is
-    # stale and must drop out of the roster and the chat header instead of
-    # lingering as a struck-through, computer-less entry that inflates the count.
-    # An offline-but-registered node still counts as live, so its agent stays
-    # (shown disabled). Custom agents (no compatibilityKey) may legitimately have
-    # no placement, so they always stay.
+    nodes = ctx.registry.monitor_nodes()
+    # An agent an employee explicitly created always stays on the roster.
+    # If its computer or runtime is gone, flag it — let the employee decide
+    # whether to delete it. The system doesn't make that call for them.
     return {
         "agents": [
-            view
-            for view in views
-            if not view.get("compatibilityKey") or _on_live_computer(view)
+            {
+                **_agent_with_placements(ctx, agent),
+                "bindingStatus": binding_status(agent, nodes),
+            }
+            for agent in agents
+            if agent.get("enabled", True)
         ]
     }
 
@@ -152,7 +139,12 @@ async def get_control_panel_agent(
     agent = ctx.agent_store.get_agent(agent_id)
     if not agent:
         raise HTTPException(404, "Agent not found.")
-    return {"agent": _agent_with_placements(ctx, agent)}
+    return {
+        "agent": {
+            **_agent_with_placements(ctx, agent),
+            "bindingStatus": binding_status(agent, ctx.registry.monitor_nodes()),
+        }
+    }
 
 
 @router.patch("/admin/agents/{agent_id}")

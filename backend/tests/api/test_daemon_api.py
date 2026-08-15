@@ -416,10 +416,11 @@ def test_admin_can_recover_deleted_managed_node(monkeypatch) -> None:
         assert missing.status_code == 404
 
 
-def test_recovered_managed_node_can_register_replacement_agents(monkeypatch) -> None:
-    """Deleting the managed node retires every agent placed on it (one agent
-    = one computer), so after recovery the employee must declare a fresh
-    agent for it — recovery does not resurrect the old one."""
+def test_recovered_managed_node_reattaches_the_original_agent(monkeypatch) -> None:
+    """Deleting the managed node only removes its placement — the agent
+    itself was declared explicitly by the employee and is never erased by the
+    system. After recovery, re-registering backfills a placement for that
+    same agent; no fresh agent declaration is needed."""
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
@@ -462,8 +463,12 @@ def test_recovered_managed_node_can_register_replacement_agents(monkeypatch) -> 
         deleted = client.delete(f"/api/v1/admin/managed-nodes/{managed['id']}")
         assert deleted.status_code == 202, deleted.text
         app.state.managed_node_store.update_node(managed["id"], {"phase": "deleted"})
-        # Deleting the computer retired the original agent along with it.
-        assert app.state.agent_store.get_agent(original["id"]).get("deletedAt")
+        # Deleting the computer only removed the original agent's placement.
+        assert not app.state.agent_store.get_agent(original["id"]).get("deletedAt")
+        assert (
+            app.state.agent_placement_store.list_placements(agent_id=original["id"])
+            == []
+        )
         recovered = client.post(f"/api/v1/admin/managed-nodes/{managed['id']}/recover")
         assert recovered.status_code == 202, recovered.text
 
@@ -492,30 +497,10 @@ def test_recovered_managed_node_can_register_replacement_agents(monkeypatch) -> 
         )
         assert re_registered.status_code == 200, re_registered.text
 
-        # Re-registering the recovered computer does not, by itself, bring
-        # any agent back — the employee has to declare one for it.
-        assert [
-            item
-            for item in app.state.agent_store.list_agents(
-                supervisor_employee_id="alice"
-            )
-            if item["executorKind"] == "claude"
-        ] == []
-
-        replacement_agent = app.state.agent_store.create_agent(
-            "alice",
-            {
-                "displayName": "Claude",
-                "executorKind": "claude",
-                "defaultRole": "implementer",
-                "computerId": f"managed:{managed['id']}",
-            },
-        )
-        assert replacement_agent["id"] != original["id"]
-        sync_node_agents(app.state, app.state.registry.get(replacement["id"]))
-
+        # Re-registering the recovered computer backfills a placement for the
+        # same declared agent — no new agent is required.
         [placement] = app.state.agent_placement_store.list_placements(
-            agent_id=replacement_agent["id"]
+            agent_id=original["id"]
         )
         nodes = {node["id"]: node for node in app.state.registry.monitor_nodes()}
         assert placement_node(placement, nodes)["id"] == replacement["id"]

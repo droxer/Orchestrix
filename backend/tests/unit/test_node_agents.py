@@ -38,7 +38,11 @@ def test_managed_agent_sync_tolerates_missing_agent_table(
     assert placements.list_placements(daemon_node_id="runtime_alice") == []
 
 
-def test_deleting_a_computer_removes_only_its_agents(tmp_path: Path) -> None:
+def test_deleting_a_computer_removes_only_its_placements(tmp_path: Path) -> None:
+    """Losing its computer never deletes the agent — only the placement on
+    that computer. The agent stays on the roster (binding_status flags it
+    computer_gone), so `remove_node_agents` still reports which agents were
+    left without any active placement anywhere."""
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     ctx = SimpleNamespace(agent_store=agents, agent_placement_store=placements)
@@ -84,11 +88,17 @@ def test_deleting_a_computer_removes_only_its_agents(tmp_path: Path) -> None:
     sync_node_agents(ctx, keep)
     sync_node_agents(ctx, doomed)
 
-    removed = remove_node_agents(ctx, "node_doomed")
+    orphaned = remove_node_agents(ctx, "node_doomed")
 
-    assert set(removed) == {doomed_claude["id"], doomed_codex["id"]}
+    assert set(orphaned) == {doomed_claude["id"], doomed_codex["id"]}
     survivors = agents.list_agents(supervisor_employee_id="alice")
-    assert [agent["id"] for agent in survivors] == [keep_agent["id"]]
+    assert {agent["id"] for agent in survivors} == {
+        keep_agent["id"],
+        doomed_claude["id"],
+        doomed_codex["id"],
+    }
+    assert not agents.get_agent(doomed_claude["id"]).get("deletedAt")
+    assert not agents.get_agent(doomed_codex["id"]).get("deletedAt")
     assert placements.list_placements(daemon_node_id="node_doomed") == []
     # The surviving computer's agent and placement are untouched.
     assert len(placements.list_placements(daemon_node_id="node_keep")) == 1
@@ -118,13 +128,17 @@ def test_removing_agents_sweeps_already_unassigned_node(tmp_path: Path) -> None:
     (placement,) = placements.list_placements(daemon_node_id="node_solo")
     placements.update_placement(placement["id"], {"desiredState": "removed"})
 
-    removed = remove_node_agents(ctx, "node_solo")
+    orphaned = remove_node_agents(ctx, "node_solo")
 
-    assert removed == [agent["id"]]
-    assert agents.list_agents(supervisor_employee_id="alice") == []
+    assert orphaned == [agent["id"]]
+    survivors = agents.list_agents(supervisor_employee_id="alice")
+    assert [survivor["id"] for survivor in survivors] == [agent["id"]]
+    assert not agents.get_agent(agent["id"]).get("deletedAt")
 
 
-def test_removing_node_agents_updates_team_membership(tmp_path: Path) -> None:
+def test_removing_node_agents_leaves_team_membership_untouched(tmp_path: Path) -> None:
+    """The agent is not deleted when its computer goes away, so team
+    membership — which only reacts to actual agent deletion — is unaffected."""
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     teams = LocalTeamStore(tmp_path)
@@ -163,15 +177,18 @@ def test_removing_node_agents_updates_team_membership(tmp_path: Path) -> None:
     remove_node_agents(ctx, "node_doomed")
 
     updated = teams.get_team(team["id"])
-    assert updated["leadAgentId"] == survivor["id"]
-    assert updated["memberAgentIds"] == [survivor["id"]]
+    assert updated["leadAgentId"] == doomed["id"]
+    assert updated["memberAgentIds"] == [doomed["id"], survivor["id"]]
+    assert not agents.get_agent(doomed["id"]).get("deletedAt")
 
 
-def test_removing_node_retires_custom_logical_agent_with_no_other_computer(
+def test_removing_node_keeps_custom_logical_agent_with_no_other_computer(
     tmp_path: Path,
 ) -> None:
-    """One agent = one computer: deleting the computer orphans every agent on
-    it — custom agents included — so they must leave the roster too."""
+    """One agent = one computer: deleting the computer removes the agent's
+    only placement — custom agents included — but the agent itself, declared
+    explicitly by an employee, stays on the roster (binding_status flags it
+    computer_gone)."""
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     ctx = SimpleNamespace(
@@ -183,10 +200,10 @@ def test_removing_node_retires_custom_logical_agent_with_no_other_computer(
     )
     placement = placements.create_placement(custom, "node_doomed")
 
-    removed = remove_node_agents(ctx, "node_doomed")
+    orphaned = remove_node_agents(ctx, "node_doomed")
 
-    assert removed == [custom["id"]]
-    assert agents.get_agent(custom["id"]).get("deletedAt")
+    assert orphaned == [custom["id"]]
+    assert not agents.get_agent(custom["id"]).get("deletedAt")
     assert placements.get_placement(placement["id"])["desiredState"] == "removed"
 
 
@@ -276,6 +293,36 @@ def _registry_ctx(
         ),
     )
     return ctx, agents, placements
+
+
+def test_deleting_a_computer_keeps_its_agents(tmp_path) -> None:
+    """An agent an employee declared can only be deleted by that employee; losing its computer just marks it unavailable."""
+    ctx, agents, placements = _registry_ctx(tmp_path, nodes=[])
+    agent = agents.create_agent(
+        "alice",
+        {
+            "displayName": "Ada",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+            "computerId": "device:alice:machine-a",
+        },
+    )
+    node = {
+        "id": "node-1",
+        "employeeId": "alice",
+        "workspaceId": "machine-a",
+        "supportedAgents": ["claude"],
+        "workspacePath": "/w",
+        "online": True,
+        "status": "ready",
+    }
+    sync_node_agents(ctx, node)
+    remove_node_agents(ctx, "node-1")
+
+    survivor = agents.get_agent(agent["id"])
+    assert survivor is not None
+    assert not survivor.get("deletedAt")
+    assert placements.list_placements(agent_id=agent["id"]) == []
 
 
 def test_sync_keeps_agent_while_the_old_node_is_online(tmp_path: Path) -> None:
