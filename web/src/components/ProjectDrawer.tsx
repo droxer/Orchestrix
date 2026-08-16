@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useRelayMutations } from "../hooks/useRelayMutations";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
@@ -14,7 +14,6 @@ import {
   type ProjectRecord,
 } from "../types";
 import { AgentMark } from "./AgentMark";
-import { AdminDelete } from "./icons";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useDialogs } from "@/components/ui/DialogProvider";
@@ -32,6 +31,9 @@ type MemberDraft = {
   instructions: string;
   enabled: boolean;
 };
+
+/** Backend roster cap — keeps the roster counter and the toggle guard in sync. */
+const MAX_PROJECT_MEMBERS = 32;
 
 function projectDraftKey(
   name: string,
@@ -57,7 +59,6 @@ export function ProjectDrawer({
   onClose: () => void;
   onSaved: (project: ProjectRecord) => void;
 }) {
-  const maxProjectMembers = 32;
   const { t } = useTranslation();
   const { confirm } = useDialogs();
   const { createProjectMutation, updateProjectMutation, archiveProjectMutation } = useRelayMutations();
@@ -65,8 +66,14 @@ export function ProjectDrawer({
   const [computerId, setComputerId] = useState("");
   const [members, setMembers] = useState<MemberDraft[]>([]);
   const [leadAgentId, setLeadAgentId] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [computerError, setComputerError] = useState<string | null>(null);
+  const [rosterError, setRosterError] = useState<string | null>(null);
+  const [briefError, setBriefError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
+  const computerLabelId = useId();
+  const leadLabelId = useId();
+  const roleLabelIdPrefix = useId();
   const initializedKeyRef = useRef<string | null>(null);
   const initialDraftKeyRef = useRef(projectDraftKey("", "", [], ""));
   const projectComputers = useMemo(
@@ -79,6 +86,13 @@ export function ProjectDrawer({
       : ""
   ), [computers, project]);
   const selectedComputerId = project ? projectRuntimeNodeId : computerId;
+  const selectedComputer = useMemo(
+    () => computers.find((computer) => computer.id === selectedComputerId) ?? null,
+    [computers, selectedComputerId],
+  );
+  const selectedComputerLabel = selectedComputer
+    ? selectedComputer.displayName || selectedComputer.id
+    : project?.computerId ?? "";
   const availableAgents = useMemo(
     () => agentsForThreadNode(agents.filter((agent) => !agent.deletedAt), selectedComputerId),
     [agents, selectedComputerId],
@@ -110,7 +124,10 @@ export function ProjectDrawer({
     setComputerId(projectRuntimeNodeId);
     setMembers(draftMembers);
     setLeadAgentId(project.leadAgentId ?? "");
-    setError(null);
+    setNameError(null);
+    setComputerError(null);
+    setRosterError(null);
+    setBriefError(null);
     initialDraftKeyRef.current = projectDraftKey(
       project.name,
       projectRuntimeNodeId,
@@ -127,7 +144,10 @@ export function ProjectDrawer({
     setComputerId("");
     setMembers([]);
     setLeadAgentId("");
-    setError(null);
+    setNameError(null);
+    setComputerError(null);
+    setRosterError(null);
+    setBriefError(null);
   }
 
   async function requestClose() {
@@ -139,14 +159,16 @@ export function ProjectDrawer({
     setComputerId(value ?? "");
     setMembers([]);
     setLeadAgentId("");
-    setError(null);
+    setComputerError(null);
+    setRosterError(null);
+    setBriefError(null);
   }
 
   function toggleMember(agent: EmployeeAgent) {
     setMembers((current) => {
       const selected = current.some((member) => member.agentId === agent.id);
-      if (!selected && current.length >= maxProjectMembers) {
-        setError(t("project.members_too_many", { count: maxProjectMembers }));
+      if (!selected && current.length >= MAX_PROJECT_MEMBERS) {
+        setRosterError(t("project.members_too_many", { count: MAX_PROJECT_MEMBERS }));
         return current;
       }
       const next = selected
@@ -166,33 +188,34 @@ export function ProjectDrawer({
       if (!selected && !leadAgentId) setLeadAgentId(agent.id);
       return next;
     });
-    setError(null);
+    setRosterError(null);
+    setBriefError(null);
   }
 
   function updateMember(agentId: string, patch: Partial<MemberDraft>) {
     setMembers((current) => current.map((member) => (
       member.agentId === agentId ? { ...member, ...patch } : member
     )));
-    setError(null);
+    setBriefError(null);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!name.trim()) {
-      setError(t("project.name_required"));
+      setNameError(t("project.name_required"));
       nameRef.current?.focus();
       return;
     }
     if (!selectedComputerId) {
-      setError(t("project.computer_required"));
+      setComputerError(t("project.computer_required"));
       return;
     }
     if (members.length && !leadAgentId) {
-      setError(t("project.members_required"));
+      setBriefError(t("project.members_required"));
       return;
     }
     if (members.some((member) => !member.functionTitle.trim() || !member.responsibilities.trim())) {
-      setError(t("project.member_fields_required"));
+      setBriefError(t("project.member_fields_required"));
       return;
     }
     const roster = members.map((member) => ({
@@ -271,22 +294,59 @@ export function ProjectDrawer({
         <section className="project-setup-section project-setup-basics" aria-labelledby="project-setup-basics-title">
           <div className="project-setup-section-heading"><span className="project-setup-eyebrow">{t("project.setup_identity")}</span><h2 id="project-setup-basics-title">{t("project.setup_identity_title")}</h2></div>
           <div className="project-setup-basics-grid">
-            <Field label={t("project.name")}>
-              <Input ref={nameRef} data-modal-initial-focus className="project-name-input" maxLength={120} placeholder={t("project.setup_name_placeholder")} value={name} onChange={(event) => setName(event.target.value)} />
+            <Field label={t("project.name")} error={nameError ?? undefined} errorId="project-name-error">
+              <Input
+                ref={nameRef}
+                data-modal-initial-focus
+                className="project-name-input"
+                maxLength={120}
+                placeholder={t("project.setup_name_placeholder")}
+                value={name}
+                onChange={(event) => {
+                  setName(event.target.value);
+                  setNameError(null);
+                }}
+                aria-invalid={Boolean(nameError) || undefined}
+                aria-describedby={nameError ? "project-name-error" : undefined}
+              />
             </Field>
-            <Field label={t("project.computer")} hint={projectComputers.length === 0 ? t("project.no_computers") : t("project.setup_computer_hint")}>
-              <Select value={selectedComputerId} onValueChange={selectComputer}>
-                <SelectTrigger className="w-full project-computer-select" disabled={Boolean(project) || projectComputers.length === 0}><SelectValue placeholder={t("project.choose_computer")} /></SelectTrigger>
-                <SelectContent>
-                  {projectComputers.map((computer) => <SelectItem key={computer.id} value={computer.id}>{computer.displayName || computer.id}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            <Field
+              label={t("project.computer")}
+              labelId={computerLabelId}
+              wrapper="div"
+              hint={project ? undefined : projectComputers.length === 0 ? t("project.no_computers") : t("project.setup_computer_hint")}
+              error={computerError ?? undefined}
+              errorId="project-computer-error"
+            >
+              {project ? (
+                <p className="project-computer-static" translate="no">{selectedComputerLabel}</p>
+              ) : (
+                <Select value={computerId} onValueChange={selectComputer}>
+                  <SelectTrigger
+                    className="w-full project-computer-select"
+                    disabled={projectComputers.length === 0}
+                    aria-labelledby={computerLabelId}
+                    aria-invalid={Boolean(computerError) || undefined}
+                    aria-describedby={computerError ? "project-computer-error" : undefined}
+                  >
+                    <SelectValue placeholder={t("project.choose_computer")}>
+                      {(value: string | null) => {
+                        const selected = projectComputers.find((computer) => computer.id === value);
+                        return selected ? selected.displayName || selected.id : t("project.choose_computer");
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projectComputers.map((computer) => <SelectItem key={computer.id} value={computer.id}>{computer.displayName || computer.id}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
             </Field>
           </div>
         </section>
 
         <section className="project-setup-section" aria-labelledby="project-setup-roster-title">
-          <div className="project-setup-section-heading project-setup-roster-heading"><div><span className="project-setup-eyebrow">{t("project.setup_roster")}</span><h2 id="project-setup-roster-title">{t("project.setup_roster_title")}</h2></div><span className="project-setup-count">{members.length.toString().padStart(2, "0")} / 32 {t("project.setup_selected")}</span></div>
+          <div className="project-setup-section-heading project-setup-roster-heading"><div><span className="project-setup-eyebrow">{t("project.setup_roster")}</span><h2 id="project-setup-roster-title">{t("project.setup_roster_title")}</h2></div><span className="project-setup-count">{members.length} / {MAX_PROJECT_MEMBERS} {t("project.setup_selected")}</span></div>
           {availableAgents.length > 0 ? (
             <div className="project-setup-agent-grid">
               {availableAgents.map((agent) => {
@@ -296,31 +356,39 @@ export function ProjectDrawer({
                     <Checkbox checked={selected} onCheckedChange={() => toggleMember(agent)} aria-label={agent.displayName} />
                     <span className="project-agent-mark"><AgentMark agent={agent.executorKind} size={18} /></span>
                     <span className="project-agent-copy"><strong>{agent.displayName}</strong><small>{agent.executorKind} · {agent.availability}</small></span>
-                    <span className="project-agent-check" aria-hidden="true">{selected ? "✓" : "+"}</span>
                   </label>
                 );
               })}
             </div>
           ) : <p className="project-empty-hint">{selectedComputerId ? t("project.no_agents_on_computer") : t("project.choose_computer_hint")}</p>}
+          {rosterError ? <p className="text-sm text-danger" role="alert">{rosterError}</p> : null}
         </section>
 
         {members.length ? (
           <section className="project-setup-section project-setup-briefs" aria-labelledby="project-setup-briefs-title">
             <div className="project-setup-section-heading"><span className="project-setup-eyebrow">{t("project.setup_briefs")}</span><h2 id="project-setup-briefs-title">{t("project.setup_briefs_title")}</h2></div>
-            <Field label={t("project.lead")} hint={t("project.setup_lead_hint")}>
+            <Field label={t("project.lead")} labelId={leadLabelId} wrapper="div" hint={t("project.setup_lead_hint")}>
               <Select value={leadAgentId} onValueChange={(value) => setLeadAgentId(value ?? "")}>
-                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full" aria-labelledby={leadLabelId}>
+                  <SelectValue>
+                    {(value: string | null) => agents.find((candidate) => candidate.id === value)?.displayName ?? value ?? ""}
+                  </SelectValue>
+                </SelectTrigger>
                 <SelectContent>{members.map((member) => { const agent = agents.find((candidate) => candidate.id === member.agentId); return <SelectItem key={member.agentId} value={member.agentId}>{agent?.displayName ?? member.agentId}</SelectItem>; })}</SelectContent>
               </Select>
             </Field>
+            {briefError ? <p className="text-sm text-danger" role="alert">{briefError}</p> : null}
             <div className="project-member-brief-grid">{members.map((member, index) => {
               const agent = agents.find((candidate) => candidate.id === member.agentId);
+              const roleLabelId = `${roleLabelIdPrefix}-${member.agentId}`;
               return (
                 <section key={member.agentId} className="project-member-card">
                   <div className="project-member-card-heading"><span className="project-member-index">{String(index + 1).padStart(2, "0")}</span><div><h3>{agent?.displayName ?? member.agentId}</h3><small>{agent?.executorKind}</small></div></div>
-                  <Field label={t("project.role")}>
+                  <Field label={t("project.role")} labelId={roleLabelId} wrapper="div">
                     <Select value={member.role} onValueChange={(value) => updateMember(member.agentId, { role: value as AgentRole })}>
-                      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="w-full" aria-labelledby={roleLabelId}>
+                        <SelectValue>{(value: AgentRole) => t(`project.roles.${value}`)}</SelectValue>
+                      </SelectTrigger>
                       <SelectContent>{AGENT_ROLE_OPTIONS.map((role) => <SelectItem key={role} value={role}>{t(`project.roles.${role}`)}</SelectItem>)}</SelectContent>
                     </Select>
                   </Field>
@@ -332,14 +400,17 @@ export function ProjectDrawer({
             })}</div>
           </section>
         ) : null}
-        {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
+        {project ? (
+          <div className="adm-drawer-section">
+            <p className="adm-drawer-section-title">{t("admin.v2.danger_zone")}</p>
+            <div className="adm-drawer-section-actions">
+              <Button type="button" variant="destructive" onClick={() => void archive()} loading={archiveProjectMutation.isPending} loadingLabel={t("project.archiving")} disabled={updateProjectMutation.isPending}>
+                {t("project.archive")}
+              </Button>
+            </div>
+          </div>
+        ) : null}
         <div className="project-setup-actions adm-form-actions">
-          {project ? (
-            <Button size="cta" type="button" variant="destructive" onClick={() => void archive()} loading={archiveProjectMutation.isPending} loadingLabel={t("project.archiving")} disabled={updateProjectMutation.isPending}>
-              <AdminDelete size={14} aria-hidden="true" />
-              {t("project.archive")}
-            </Button>
-          ) : null}
           <span className="project-setup-action-note">{members.length ? t("project.setup_members_ready", { count: members.length }) : t("project.setup_members_empty")}</span>
           <Button size="cta" type="button" variant="ghost" onClick={() => void requestClose()} disabled={busy}>{t("dialog.cancel")}</Button>
           <Button size="cta" type="submit" loading={createProjectMutation.isPending || updateProjectMutation.isPending}>{t(project ? "project.save" : "project.create")}</Button>
