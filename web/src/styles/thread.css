@@ -234,7 +234,7 @@
   padding: var(--sp-4);
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
-  background: var(--surface-1);
+  background: color-mix(in srgb, var(--surface-2) 58%, var(--surface-1));
 }
 
 .project-member-card h3 {
@@ -302,12 +302,21 @@
 }
 .project-name-input { min-height: 48px; font-size: 1.05rem; }
 .project-computer-select { min-height: 48px; }
+/* Edit mode: the computer is immutable, so it renders as text, not a dead select. */
+.project-computer-static {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  margin: 0;
+  color: var(--ink-1);
+  font: var(--type-body);
+}
 
 .project-setup-agent-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
 .project-agent-option {
   position: relative;
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr);
   align-items: center;
   gap: var(--sp-3);
   min-height: 68px;
@@ -318,18 +327,16 @@
   transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
 }
 .project-agent-option:hover { border-color: var(--line-strong); transform: translateY(-1px); }
+/* The real checkbox stays visible — focus lands on it, so the card echoes the ring. */
+.project-agent-option:focus-within { outline: var(--focus-outline); outline-offset: var(--focus-offset); }
 .project-agent-option.is-selected { border-color: var(--action); background: color-mix(in srgb, var(--action-soft) 70%, var(--surface-1)); }
-.project-agent-option [data-slot="checkbox"] { position: absolute; opacity: 0; pointer-events: none; }
 .project-agent-mark { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--line-1); background: var(--surface-2); color: var(--action); }
 .project-agent-copy { display: grid; min-width: 0; gap: var(--sp-1); }
 .project-agent-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--type-label-strong); }
 .project-agent-copy small { color: var(--ink-3); font: var(--type-label); text-transform: capitalize; }
-.project-agent-check { color: var(--ink-3); font: 700 1.1rem var(--font-mono); }
-.project-agent-option.is-selected .project-agent-check { color: var(--action); }
 
 .project-setup-briefs { gap: var(--sp-5); }
 .project-member-brief-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
-.project-member-card { gap: var(--sp-3); padding: var(--sp-4); background: color-mix(in srgb, var(--surface-2) 58%, var(--surface-1)); }
 .project-member-card-heading { display: flex; align-items: center; gap: var(--sp-3); padding-bottom: var(--sp-2); border-bottom: 1px solid var(--line-1); }
 .project-member-card-heading h3 { font-size: 1rem; }
 .project-member-card-heading small { color: var(--ink-3); font: var(--type-label); text-transform: capitalize; }
