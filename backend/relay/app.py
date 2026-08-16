@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI
@@ -122,7 +122,7 @@ class ServerTimingMiddleware:
 class CookieRequestGuardMiddleware:
     """Reject cross-site mutations that carry a browser session cookie."""
 
-    _unsafe_methods = {"POST", "PUT", "PATCH", "DELETE"}
+    _unsafe_methods: ClassVar[set[str]] = {"POST", "PUT", "PATCH", "DELETE"}
 
     def __init__(self, app: ASGIApp) -> None:
         self.app = app

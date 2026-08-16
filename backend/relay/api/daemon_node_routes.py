@@ -506,7 +506,7 @@ async def register_daemon_node(request: Request, ctx: AppContextDep) -> dict[str
             error=str(error),
         )
         raise HTTPException(401, str(error))
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - API boundary logs and normalizes registry failures.
         logger.warning(
             "Daemon node registration failed",
             sandbox_id=body.get("sandboxId"),
@@ -658,7 +658,7 @@ async def daemon_events(
         raise HTTPException(401, str(error))
     except KeyError as error:
         raise HTTPException(404, str(error))
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - API boundary logs and normalizes event-store failures.
         logger.warning(
             "Daemon node event rejected", sandbox_id=sandbox_id, error=str(error)
         )

@@ -71,7 +71,7 @@ def token_usage_field(value: dict[str, Any], key: str = "tokenUsage") -> dict[st
     if raw is None:
         return None
     if not isinstance(raw, dict):
-        raise ValueError("tokenUsage must be an object.")
+        raise ValueError("tokenUsage must be an object.")  # noqa: TRY004 - request validation uses ValueError.
     usage = {
         "input": token_count_field(raw, "input"),
         "output": token_count_field(raw, "output"),

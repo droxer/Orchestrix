@@ -36,10 +36,10 @@ from ..persistence.store_common import (
     create_all_tables,
     database_id_column,
     entity_uuid_type,
-    metadata as shared_metadata,
     shared_engine,
     store_transaction,
 )
+from ..persistence.store_common import metadata as shared_metadata
 
 DEFAULT_SESSION_TTL_SECONDS = 7 * 24 * 60 * 60  # 1 week
 USER_COOKIE_NAME = "relay_session"

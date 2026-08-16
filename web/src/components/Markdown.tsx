@@ -6,7 +6,7 @@ import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 
-import { fenceLanguage, type MarkdownVariant } from "../lib/markdown";
+import { fenceLanguage, normalizeOverEscapedQuotes, type MarkdownVariant } from "../lib/markdown";
 import { MarkdownModeProvider } from "./markdown/context";
 import { MarkdownFence } from "./markdown/MarkdownFence";
 import { MarkdownTable } from "./markdown/MarkdownTable";
@@ -50,7 +50,7 @@ const MARKDOWN_COMPONENTS: Components = {
     const code = isValidElement<CodeProps>(children)
       ? (children as ReactElement<CodeProps>)
       : null;
-    const text = nodeText(code?.props.children).replace(/\n$/, "");
+    const text = normalizeOverEscapedQuotes(nodeText(code?.props.children).replace(/\n$/, ""));
     return <MarkdownFence code={text} language={fenceLanguage(code?.props.className)} />;
   },
   // A GFM table is the one block that cannot be made to fit a narrow column by

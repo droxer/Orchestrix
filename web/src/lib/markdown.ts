@@ -65,3 +65,29 @@ export function mermaidConfig(dark: boolean) {
 export function diagramElementId(seq: number): string {
   return `relay-mermaid-${seq}`;
 }
+
+/** Minimum escaped-quote pairs before {@link normalizeOverEscapedQuotes} acts —
+ * high enough that a single legitimate `\"` inside otherwise normal code
+ * can't trigger it. */
+const OVER_ESCAPED_QUOTE_MIN_COUNT = 4;
+
+/**
+ * Best-effort repair for a fence whose text arrived with every `"` backslash-
+ * escaped — the signature an agent leaves behind when it echoes a JSON-
+ * encoded string (e.g. a tool result's `content` field) straight into its
+ * reply instead of the decoded value. Real newlines survive that failure
+ * mode (only the quote escaping leaks through), so this targets `\"` alone
+ * rather than attempting a general JSON-string unescape.
+ *
+ * Deliberately conservative: fires only when *every* quote in the block is
+ * escaped, and there are enough of them that ordinary code containing one
+ * genuine `\"` is left untouched. A block that mixes escaped and bare quotes
+ * is real code with a real escape in it, not this bug, and is returned as-is.
+ */
+export function normalizeOverEscapedQuotes(code: string): string {
+  const quoteCount = (code.match(/"/g) ?? []).length;
+  if (quoteCount < OVER_ESCAPED_QUOTE_MIN_COUNT) return code;
+  const escapedQuoteCount = (code.match(/\\"/g) ?? []).length;
+  if (escapedQuoteCount !== quoteCount) return code;
+  return code.replace(/\\"/g, '"');
+}

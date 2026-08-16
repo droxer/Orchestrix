@@ -15,6 +15,7 @@ import {
   isDiagramFence,
   shouldRenderDiagram,
   mermaidConfig,
+  normalizeOverEscapedQuotes,
 } from "../src/lib/markdown.js";
 
 const readWeb = (rel: string) => readFileSync(`web/${rel}`, "utf8");
@@ -73,6 +74,40 @@ describe("markdown fence decisions", () => {
     assert.equal(mermaidConfig(true).theme, "dark");
     assert.equal(mermaidConfig(false).theme, "default");
     assert.equal(mermaidConfig(true).startOnLoad, false);
+  });
+});
+
+describe("normalizeOverEscapedQuotes", () => {
+  it("strips the backslash when every quote in the fence is escaped", () => {
+    const escaped = [
+      "def test_context_compression():",
+      '    \\"\\"\\"测试上下文压缩\\"\\"\\"',
+      "    manager = ContextManager(compression_threshold=3)",
+      '    manager.init(\\"test\\")',
+    ].join("\n");
+    const fixed = normalizeOverEscapedQuotes(escaped);
+    assert.doesNotMatch(fixed, /\\"/);
+    assert.match(fixed, /"""测试上下文压缩"""/);
+    assert.match(fixed, /manager\.init\("test"\)/);
+    // Real newlines were never escaped, so line structure is untouched.
+    assert.equal(fixed.split("\n").length, escaped.split("\n").length);
+  });
+
+  it("leaves code with a mix of escaped and bare quotes alone", () => {
+    // A block that has both bare and escaped quotes is real code with a real
+    // escape in it, not the whole-block artifact this heuristic targets.
+    const code = 'print("hi")\nregex = "a\\"b"\nother = "c\\"d"\nlast = "e\\"f"';
+    assert.equal(normalizeOverEscapedQuotes(code), code);
+  });
+
+  it("does nothing below the minimum escaped-quote count", () => {
+    const code = 'x = "a\\"b"'; // one escaped quote pair only
+    assert.equal(normalizeOverEscapedQuotes(code), code);
+  });
+
+  it("is a no-op for code with no quotes at all", () => {
+    const code = "for i in range(10):\n    print(i)";
+    assert.equal(normalizeOverEscapedQuotes(code), code);
   });
 });
 
