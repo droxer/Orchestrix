@@ -46,7 +46,8 @@
     "team_unavailable": "The agent team is not currently available.",
     "team_lead_not_member": "The team lead must be one of its members.",
     "task_agent_and_team_conflict": "Choose either an agent or a team, not both.",
-    "save_project": "Couldn't save the project. Check its Computer and agent roles, then try again."
+    "save_project": "Couldn't save the project. Check its Computer and agent roles, then try again.",
+    "archive_project": "Couldn't archive the project. Refresh it and try again."
   },
   "skip_to_thread": "Skip to thread",
   "skip_to_content": "Skip to content",
@@ -79,6 +80,13 @@
   "project": {
     "projects": "Projects",
     "create": "Create project",
+    "edit": "Project settings",
+    "save": "Save project",
+    "archive": "Archive project",
+    "archiving": "Archiving…",
+    "edit_subtitle": "Update the project lead and agent roster. Its Computer and workspace stay fixed.",
+    "archive_confirm_title": "Archive {{project}}?",
+    "archive_confirm_message": "Existing conversations and files stay available, but the project can no longer run new work.",
     "drawer_subtitle": "Bind one Computer and define every agent's project role.",
     "name": "Project name",
     "name_required": "Enter a project name.",

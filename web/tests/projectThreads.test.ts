@@ -84,4 +84,14 @@ describe("project thread buckets", () => {
     assert.match(sideNavSource, /aria-label=\{t\("project\.projects"\)\}/);
     assert.match(sideNavSource, /<span className="sidenav-label sr-only">\{t\("project\.projects"\)\}<\/span>/);
   });
+
+  it("exposes project settings from every active project folder", async () => {
+    const panelSource = await readFile(resolve("web/src/components/ThreadListPanel.tsx"), "utf8");
+    const drawerSource = await readFile(resolve("web/src/components/ProjectDrawer.tsx"), "utf8");
+
+    assert.match(panelSource, /onEditProject\(project\)/);
+    assert.match(panelSource, /aria-label=\{t\("project\.edit"\)\}/);
+    assert.match(drawerSource, /updateProjectMutation\.mutateAsync/);
+    assert.match(drawerSource, /archiveProjectMutation\.mutateAsync/);
+  });
 });

@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
   assignTask,
+  archiveProject,
   cancelRun,
   createTask,
   createProject,
@@ -20,9 +21,10 @@ import {
   startTask,
   submitThreadMessage,
   updateTask,
+  updateProject,
   updateTeam,
 } from "../api";
-import type { AgentRunInput, CreateProjectInput, CreateTaskInput, RelaySession, RelayTask, RelayTaskSummary, RunInput, TaskMutationInput, TaskRunAssignment, TeamMutationInput, ThreadMessageInput, ThreadRecoveryInput } from "../types";
+import type { AgentRunInput, CreateProjectInput, CreateTaskInput, RelaySession, RelayTask, RelayTaskSummary, RunInput, TaskMutationInput, TaskRunAssignment, TeamMutationInput, ThreadMessageInput, ThreadRecoveryInput, UpdateProjectInput } from "../types";
 import { NODES_QUERY_KEY, PROJECTS_QUERY_KEY, RELAY_QUERY_KEY, SESSIONS_QUERY_KEY, TASKS_QUERY_KEY } from "./useRelayData";
 import { useMutationError } from "./useMutationError";
 import { useDialogs } from "../components/ui/DialogProvider";
@@ -250,6 +252,26 @@ export function useRelayMutations() {
     onError: onRelayError("Failed to create project", "errors.save_project"),
   });
 
+  const updateProjectMutation = useMutation({
+    mutationFn: ({ projectId, input }: { projectId: string; input: UpdateProjectInput }) =>
+      updateProject(projectId, input),
+    onSuccess: () => {
+      void invalidateProjects();
+    },
+    onError: onRelayError("Failed to update project", "errors.save_project"),
+  });
+
+  const archiveProjectMutation = useMutation({
+    mutationFn: ({ projectId, expectedVersion }: { projectId: string; expectedVersion: number }) =>
+      archiveProject(projectId, expectedVersion),
+    onSuccess: () => {
+      void invalidateProjects();
+      void invalidateSessions();
+      void invalidateTasks();
+    },
+    onError: onRelayError("Failed to archive project", "errors.archive_project"),
+  });
+
   const updateTeamMutation = useMutation({
     mutationFn: ({ teamId, input }: { teamId: string; input: Partial<TeamMutationInput> }) =>
       updateTeam(teamId, input),
@@ -285,6 +307,8 @@ export function useRelayMutations() {
     startTaskMutation,
     createTeamMutation,
     createProjectMutation,
+    updateProjectMutation,
+    archiveProjectMutation,
     updateTeamMutation,
     deleteTeamMutation,
     invalidateRelay,

@@ -3,6 +3,7 @@ import { afterEach, describe, it } from "node:test";
 
 import {
   apiJson,
+  archiveProject,
   archiveSession,
   assignControlPanelDaemonNode,
   assignTask,
@@ -26,6 +27,7 @@ import {
   updateAgentProfileImage,
   updateComputerDisplayName,
   updateOwnEmployeeAgent,
+  updateProject,
   updateUserPreferences,
 } from "../src/api.js";
 
@@ -533,6 +535,77 @@ describe("apiJson", () => {
     assert.equal(result.content, "hello world\n");
     assert.equal(result.isBinary, false);
     assert.equal(requestedUrl, "/api/v1/agents/agent_1/workspace/file?path=src%2Fapp.tsx&threadId=ses_1");
+  });
+});
+
+describe("project mutations", () => {
+  it("updates project settings with optimistic versioning", async () => {
+    const calls: Array<{ url: string; method: string; body: unknown }> = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      calls.push({
+        url: String(url),
+        method: String(init?.method),
+        body: JSON.parse(String(init?.body ?? "{}")),
+      });
+      return new Response(JSON.stringify({ project: { id: "project/1" } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      await updateProject("project/1", {
+        expectedVersion: 3,
+        name: "Relay GA",
+        leadAgentId: "agent-1",
+        members: [{
+          agentId: "agent-1",
+          role: "planner",
+          functionTitle: "Lead",
+          responsibilities: "Ship",
+        }],
+      });
+    } finally {
+      globalThis.fetch = original;
+    }
+
+    assert.deepEqual(calls, [{
+      url: "/api/v1/projects/project%2F1",
+      method: "PATCH",
+      body: {
+        expectedVersion: 3,
+        name: "Relay GA",
+        leadAgentId: "agent-1",
+        members: [{
+          agentId: "agent-1",
+          role: "planner",
+          functionTitle: "Lead",
+          responsibilities: "Ship",
+        }],
+      },
+    }]);
+  });
+
+  it("archives the exact project version", async () => {
+    const calls: Array<{ url: string; method: string }> = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), method: String(init?.method) });
+      return new Response(JSON.stringify({ project: { id: "project/1" } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      await archiveProject("project/1", 4);
+    } finally {
+      globalThis.fetch = original;
+    }
+
+    assert.deepEqual(calls, [{
+      url: "/api/v1/projects/project%2F1?expectedVersion=4",
+      method: "DELETE",
+    }]);
   });
 });
 

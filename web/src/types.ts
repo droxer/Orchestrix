@@ -290,7 +290,16 @@ export interface CreateProjectInput {
     functionTitle: string;
     responsibilities: string;
     instructions?: string;
+    enabled?: boolean;
   }>;
+}
+
+export interface UpdateProjectInput {
+  expectedVersion: number;
+  name?: string;
+  leadAgentId?: string;
+  members?: CreateProjectInput["members"];
+  enabled?: boolean;
 }
 
 export interface SandboxesResponse {

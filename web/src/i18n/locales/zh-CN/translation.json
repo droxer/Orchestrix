@@ -46,7 +46,8 @@
     "team_unavailable": "智能体团队当前不可用。",
     "team_lead_not_member": "团队负责人必须是团队成员。",
     "task_agent_and_team_conflict": "智能体和团队只能选择一个。",
-    "save_project": "无法保存项目。请检查项目电脑与智能体角色后重试。"
+    "save_project": "无法保存项目。请检查项目电脑与智能体角色后重试。",
+    "archive_project": "无法归档项目。请刷新后重试。"
   },
   "skip_to_thread": "跳至对话",
   "skip_to_content": "跳至内容",
@@ -79,6 +80,13 @@
   "project": {
     "projects": "项目",
     "create": "创建项目",
+    "edit": "项目设置",
+    "save": "保存项目",
+    "archive": "归档项目",
+    "archiving": "正在归档…",
+    "edit_subtitle": "更新项目负责人和智能体名单；项目电脑与工作空间保持不变。",
+    "archive_confirm_title": "归档“{{project}}”？",
+    "archive_confirm_message": "已有对话和文件会保留，但项目将无法继续运行新工作。",
     "drawer_subtitle": "绑定一台电脑，并定义每个智能体在项目中的角色。",
     "name": "项目名称",
     "name_required": "请输入项目名称。",

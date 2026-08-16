@@ -52,3 +52,23 @@ _Avoid_: Agent Workspace, shared Computer workspace
 Storage configured on a Computer that contains Thread Workspaces. It is not a
 workspace, identity, or scheduling boundary by itself.
 _Avoid_: Workspace, Agent home
+
+**Project**:
+An employee-owned collaboration boundary with one persistent workspace, an
+ordered roster of Project Agents, and any number of Project Conversations.
+_Avoid_: Folder, Team
+
+**Project Agent**:
+A Logical Agent enlisted in a Project with a project-specific role, function,
+and responsibilities. A Project Agent is not a human Project Member.
+_Avoid_: Project Member, collaborator
+
+**Project Conversation**:
+A Thread that belongs to one Project and therefore shares that Project's
+persistent workspace and Project Agent roster.
+_Avoid_: Project, room
+
+**Project Owner**:
+The employee who owns and can currently access a Project. Human collaborator
+membership is a separate future authorization concept, not the Project Agent roster.
+_Avoid_: Project Agent, lead Agent
