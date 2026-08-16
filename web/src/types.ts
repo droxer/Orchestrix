@@ -116,6 +116,7 @@ export interface TaskDeletionResponse {
 
 export interface WorkspaceBriefSession {
   id: string;
+  projectId?: string;
   title?: string;
   taskGoal?: string;
   status?: RelaySession["status"];
@@ -136,6 +137,7 @@ export interface WorkspaceBriefSession {
 
 export interface WorkspaceBriefTask {
   id: string;
+  projectId?: string;
   title?: string;
   status?: TaskStatus;
   priority?: TaskPriority;

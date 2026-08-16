@@ -5,13 +5,19 @@ import {
   orderedProjectMembers,
   parseProjectPageTab,
   projectActivitiesState,
+  scopeProjectActivities,
   projectMemberState,
   projectPageActions,
   projectPageTabForKey,
   resolveProjectOverviewState,
   showThreadChrome,
 } from "../src/lib/projectPage.js";
-import type { EmployeeAgent, ProjectMember, ProjectRecord } from "../src/types.js";
+import type {
+  EmployeeAgent,
+  ProjectMember,
+  ProjectRecord,
+  WorkspaceBriefResponse,
+} from "../src/types.js";
 
 const member = (agentId: string, enabled = true): ProjectMember => ({
   agentId,
@@ -127,5 +133,88 @@ describe("project page behavior", () => {
     assert.equal(projectActivitiesState({ isLoading: false, hasData: false, hasError: false }), "error");
     assert.equal(projectActivitiesState({ isLoading: false, hasData: false, hasError: true }), "error");
     assert.equal(projectActivitiesState({ isLoading: false, hasData: true, hasError: false }), "ready");
+  });
+
+  it("shows only activity that belongs to the current project", () => {
+    const brief = {
+      employeeId: "employee-1",
+      projectId: "project-1",
+      nodes: [],
+      activeRuns: [
+        {
+          commandId: "command-1",
+          sessionId: "session-1",
+          runId: "run-1",
+          agent: "codex",
+          taskGoal: "Current project run",
+          startedAt: "2026-08-16T00:00:00Z",
+        },
+        {
+          commandId: "command-2",
+          sessionId: "session-2",
+          runId: "run-2",
+          agent: "codex",
+          taskGoal: "Other project run",
+          startedAt: "2026-08-16T00:00:00Z",
+        },
+      ],
+      sessions: [
+        {
+          id: "session-1",
+          projectId: "project-1",
+          taskGoal: "Current project thread",
+          artifactCount: 0,
+          runCount: 1,
+        },
+        {
+          id: "session-2",
+          projectId: "project-2",
+          taskGoal: "Other project thread",
+          artifactCount: 0,
+          runCount: 1,
+        },
+        {
+          id: "session-unscoped",
+          taskGoal: "Unscoped thread",
+          artifactCount: 0,
+          runCount: 0,
+        },
+      ],
+      tasks: [
+        {
+          id: "task-1",
+          projectId: "project-1",
+          title: "Current project task",
+          isRoutine: false,
+          routineEnabled: false,
+          linkedSessionIds: [],
+        },
+        {
+          id: "task-2",
+          projectId: "project-2",
+          title: "Other project task",
+          isRoutine: false,
+          routineEnabled: false,
+          linkedSessionIds: [],
+        },
+      ],
+      artifacts: [],
+      metrics: {
+        nodeCount: 0,
+        activeRunCount: 2,
+        sessionCount: 3,
+        activeSessionCount: 2,
+        taskCount: 2,
+        activeTaskCount: 2,
+        artifactCount: 0,
+      },
+      generatedAt: "2026-08-16T00:00:00Z",
+    } satisfies WorkspaceBriefResponse;
+
+    const scoped = scopeProjectActivities(brief, "project-1");
+
+    assert.deepEqual(scoped.sessions.map((session) => session.id), ["session-1"]);
+    assert.deepEqual(scoped.tasks.map((task) => task.id), ["task-1"]);
+    assert.deepEqual(scoped.activeRuns.map((run) => run.runId), ["run-1"]);
   });
 });

@@ -1,4 +1,9 @@
-import type { EmployeeAgent, ProjectMember, ProjectRecord } from "../types.js";
+import type {
+  EmployeeAgent,
+  ProjectMember,
+  ProjectRecord,
+  WorkspaceBriefResponse,
+} from "../types.js";
 
 export type ProjectPageTab = "profile" | "workspace" | "activities";
 export type ProjectCollectionStatus = "loading" | "error" | "ready";
@@ -83,4 +88,19 @@ export function projectActivitiesState({
   if (isLoading && !hasData) return "loading";
   if (hasError || !hasData) return "error";
   return "ready";
+}
+
+export function scopeProjectActivities(
+  brief: WorkspaceBriefResponse,
+  projectId: string,
+): WorkspaceBriefResponse {
+  const sessions = brief.sessions.filter((session) => session.projectId === projectId);
+  const sessionIds = new Set(sessions.map((session) => session.id));
+
+  return {
+    ...brief,
+    activeRuns: brief.activeRuns.filter((run) => sessionIds.has(run.sessionId)),
+    sessions,
+    tasks: brief.tasks.filter((task) => task.projectId === projectId),
+  };
 }

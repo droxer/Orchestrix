@@ -14,6 +14,7 @@ import {
   projectMemberState,
   projectPageActions,
   projectPageTabForKey,
+  scopeProjectActivities,
   PROJECT_PAGE_TABS,
   type ProjectPageTab,
 } from "../lib/projectPage";
@@ -229,10 +230,13 @@ export function ProjectWorkspacePage({
     : briefQuery.error
       ? String(briefQuery.error)
       : "";
+  const scopedBrief = briefQuery.data
+    ? scopeProjectActivities(briefQuery.data, project.id)
+    : undefined;
   const actions = projectPageActions(project);
   const activitiesState = projectActivitiesState({
     isLoading: briefQuery.isLoading,
-    hasData: Boolean(briefQuery.data),
+    hasData: Boolean(scopedBrief),
     hasError: Boolean(error),
   });
 
@@ -295,8 +299,8 @@ export function ProjectWorkspacePage({
                   : tab === "workspace"
                     ? t("workspace.tab_workspace")
                     : t("workspace.tab_activities")}
-                {tab === "activities" && briefQuery.data?.metrics.sessionCount ? (
-                  <span className="workspace-page-tab-count tnum">{briefQuery.data.metrics.sessionCount}</span>
+                {tab === "activities" && scopedBrief?.sessions.length ? (
+                  <span className="workspace-page-tab-count tnum">{scopedBrief.sessions.length}</span>
                 ) : null}
               </button>
             ))}
@@ -314,7 +318,7 @@ export function ProjectWorkspacePage({
           </div>
         ) : activitiesState === "loading" ? (
           <ActivitiesSkeleton panelId="project-page-panel-activities" labelledBy="project-page-tab-activities" />
-        ) : activitiesState === "error" || !briefQuery.data ? (
+        ) : activitiesState === "error" || !scopedBrief ? (
           <WorkspaceError
             message={error || t("workspace.load_failed")}
             onRetry={() => void briefQuery.refetch()}
@@ -323,7 +327,7 @@ export function ProjectWorkspacePage({
           />
         ) : (
           <WorkspaceActivities
-            brief={briefQuery.data}
+            brief={scopedBrief}
             panelId="project-page-panel-activities"
             labelledBy="project-page-tab-activities"
             emptyMark={<ProjectMark />}
