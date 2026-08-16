@@ -4,8 +4,11 @@
 // components are out of reach there.
 
 // Map a file extension to a highlight.js language id (display label doubles as
-// the grammar hint via the aliases in lib/syntax).
-const LANGUAGE_BY_EXTENSION: Record<string, string> = {
+// the grammar hint via the aliases in lib/syntax). Exported so tests can
+// verify every value here actually resolves through lib/syntax's registry —
+// the two tables are maintained independently and nothing else catches drift
+// if one changes without the other.
+export const LANGUAGE_BY_EXTENSION: Record<string, string> = {
   ts: "typescript",
   tsx: "tsx",
   js: "javascript",

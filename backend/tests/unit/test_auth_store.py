@@ -1,11 +1,28 @@
 from __future__ import annotations
 
+import json
 import os
+import stat
 import time
 from tempfile import TemporaryDirectory
 
-from relay.security.auth import DatabaseUserAuthStore, hash_session_token
+from relay.security.auth import DatabaseUserAuthStore, UserAuthStore, hash_session_token
 from sqlalchemy import create_engine, text
+
+
+def test_local_auth_store_hashes_session_tokens_and_restricts_files() -> None:
+    with TemporaryDirectory() as root:
+        store = UserAuthStore(root)
+        user = store.create_user("alice", "secret123")
+        session = store.create_session(user["id"])
+
+        persisted = json.loads(store.sessions_path.read_text(encoding="utf-8"))
+        assert persisted[0]["tokenHash"] == hash_session_token(session["token"])
+        assert "token" not in persisted[0]
+        assert store.get_session_by_token(session["token"])["userId"] == user["id"]
+        assert stat.S_IMODE(store.auth_dir.stat().st_mode) == 0o700
+        assert stat.S_IMODE(store.users_path.stat().st_mode) == 0o600
+        assert stat.S_IMODE(store.sessions_path.stat().st_mode) == 0o600
 
 
 def test_database_auth_store_preserves_utc_timestamps_outside_utc() -> None:

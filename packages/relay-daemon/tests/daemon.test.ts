@@ -2073,6 +2073,23 @@ test("generated-file diff detects changed files and skips excluded directories",
   assert.deepEqual(diffGeneratedFiles(workspace, snapshotGeneratedFiles(workspace)), []);
 });
 
+test("generated-file scan never uploads likely credentials or opaque archives", async (t: TestContext) => {
+  const { mkdtempSync, rmSync, writeFileSync: writeFile } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join: joinPath } = await import("node:path");
+  const { diffGeneratedFiles } = await import("../src/generated-files.js");
+  const workspace = mkdtempSync(joinPath(tmpdir(), "relay-generated-secrets-"));
+  t.after(() => rmSync(workspace, { recursive: true, force: true }));
+
+  writeFile(joinPath(workspace, "credentials.json"), '{"token":"tok_super_secret"}');
+  writeFile(joinPath(workspace, "report.txt"), "OPENAI_API_KEY=sk-secret-value");
+  writeFile(joinPath(workspace, "bundle.zip"), "opaque archive");
+  writeFile(joinPath(workspace, "safe-report.txt"), "No secrets here.\n");
+
+  const changed = diffGeneratedFiles(workspace, {});
+  assert.deepEqual(changed.map((file) => file.relativePath), ["safe-report.txt"]);
+});
+
 test("generated-file scan reports text documents at an agent home root and output dir", async (t: TestContext) => {
   const { mkdtempSync, mkdirSync: makeDir, rmSync, writeFileSync: writeFile } = await import("node:fs");
   const { tmpdir } = await import("node:os");

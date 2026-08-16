@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, type CSSProperties, type KeyboardEvent } from "react";
+import { useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { getWorkspaceBrief } from "../api";
@@ -15,14 +15,16 @@ import {
   projectPageActions,
   projectPageTabForKey,
   scopeProjectActivities,
+  MAX_PROJECT_MEMBERS,
   PROJECT_PAGE_TABS,
   type ProjectPageTab,
 } from "../lib/projectPage";
 import { truncateId, formatRelativeTime } from "../lib/adminHelpers";
 import type { DaemonNodeMonitorRecord, EmployeeAgent, ProjectMember, ProjectRecord } from "../types";
 import { AgentStateBadge } from "./AgentStateBadge";
-import { ActionCompose, ActionEdit, NavBack, WorkspaceFolder } from "./icons";
+import { ActionAdd, ActionCompose, ActionEdit, NavBack, WorkspaceFolder } from "./icons";
 import { PageHeader } from "./PageHeader";
+import { ProjectMemberEditor } from "./ProjectMemberEditor";
 import { ProjectWorkspaceFiles } from "./ThreadWorkspaceFiles";
 import {
   ActivitiesSkeleton,
@@ -49,23 +51,29 @@ function ProjectMemberLane({
   agent,
   index,
   lead,
+  onEdit,
 }: {
   member: ProjectMember;
   agent?: EmployeeAgent;
   index: number;
   lead: boolean;
+  onEdit?: () => void;
 }) {
   const { t } = useTranslation();
   const { available, enabled, availability } = projectMemberState(member, agent);
   const name = agent?.displayName || t("project.member_unavailable");
+  const functionTitle = member.functionTitle.trim();
+  /* The title only earns its own words when it says something the name does
+     not — otherwise the lane would print the same fact twice. */
+  const showFunctionTitle = functionTitle.length > 0 && functionTitle !== name.trim();
 
   return (
     <article
-      className={`project-member-lane${lead ? " is-lead" : ""}${available ? "" : " is-missing"}`}
+      className={`project-member-tile${lead ? " is-lead" : ""}${available ? "" : " is-missing"}`}
       style={{ "--project-member-index": index } as CSSProperties}
     >
-      <header className="project-member-lane-head">
-        <span className="project-member-lane-index tnum">{String(index + 1).padStart(2, "0")}</span>
+      <header className="project-member-tile-head">
+        <span className="project-member-tile-index tnum">{String(index + 1).padStart(2, "0")}</span>
         <AgentStateBadge
           agent={agent?.executorKind}
           ready={enabled && availability === "ready"}
@@ -73,32 +81,50 @@ function ProjectMemberLane({
           imageUrl={agent?.profileImageUrl}
           name={name}
         />
-        <span className="project-member-lane-identity">
-          <strong>{name}</strong>
-          <span>
-            {agent ? agentLabel(agent.executorKind) : member.agentId}
+        <span className="project-member-tile-identity">
+          <span className="project-member-tile-name">
+            <strong>{name}</strong>
+            {lead ? <Badge variant="info">{t("project.lead_badge")}</Badge> : null}
+            {!member.enabled ? <Badge variant="neutral">{t("project.member_disabled")}</Badge> : null}
+            {!available ? <Badge variant="warning">{t("project.member_missing")}</Badge> : null}
           </span>
-        </span>
-        <span className="project-member-lane-badges">
-          {lead ? <Badge variant="info">{t("project.lead_badge")}</Badge> : null}
-          {!member.enabled ? <Badge variant="neutral">{t("project.member_disabled")}</Badge> : null}
-          {!available ? <Badge variant="warning">{t("project.member_missing")}</Badge> : null}
+          <span className="project-member-tile-meta">
+            {agent ? agentLabel(agent.executorKind) : member.agentId}
+            {" · "}
+            {t(`project.roles.${member.role}`)}
+          </span>
         </span>
       </header>
 
-      <div className="project-member-lane-brief">
-        <div className="project-member-lane-role">
-          <span>{t(`project.roles.${member.role}`)}</span>
-          <strong>{member.functionTitle}</strong>
-        </div>
-        <p>{member.responsibilities}</p>
+      <div className="project-member-tile-body">
+        <p className="project-member-tile-responsibilities">
+          {showFunctionTitle ? (
+            <>
+              <strong>{functionTitle}</strong>
+              {" — "}
+            </>
+          ) : null}
+          {member.responsibilities}
+        </p>
         {member.instructions ? (
-          <div className="project-member-lane-instructions">
+          <div className="project-member-tile-instructions">
             <span>{t("project.instructions_short")}</span>
             <p>{member.instructions}</p>
           </div>
         ) : null}
       </div>
+
+      {onEdit ? (
+        <Button variant="ghost"
+          type="button"
+          className="project-member-tile-edit"
+          aria-label={t("project.member_edit_name", { name })}
+          title={t("project.member_edit_name", { name })}
+          onClick={onEdit}
+        >
+          <ActionEdit size={13} aria-hidden="true" />
+        </Button>
+      ) : null}
     </article>
   );
 }
@@ -106,9 +132,13 @@ function ProjectMemberLane({
 function ProjectProfile({
   project,
   agents,
+  onAddMember,
+  onEditMember,
 }: {
   project: ProjectRecord;
   agents: EmployeeAgent[];
+  onAddMember?: () => void;
+  onEditMember?: (member: ProjectMember) => void;
 }) {
   const { t } = useTranslation();
   const agentsById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent])), [agents]);
@@ -121,16 +151,8 @@ function ProjectProfile({
       id="project-page-panel-profile"
       aria-labelledby="project-page-tab-profile"
     >
-      <div className="project-profile-intro">
-        <div>
-          <span className="project-profile-eyebrow">{t("project.profile_eyebrow")}</span>
-          <h2>{t("project.profile_title")}</h2>
-        </div>
-        <p>{t("project.profile_body")}</p>
-      </div>
-
       {members.length ? (
-        <div className="project-member-lanes">
+        <div className="project-member-tiles">
           {members.map((member, index) => (
             <ProjectMemberLane
               key={member.agentId}
@@ -138,15 +160,32 @@ function ProjectProfile({
               agent={agentsById.get(member.agentId)}
               index={index}
               lead={member.agentId === project.leadAgentId}
+              onEdit={onEditMember ? () => onEditMember(member) : undefined}
             />
           ))}
+          {onAddMember && members.length < MAX_PROJECT_MEMBERS ? (
+            <button type="button" className="project-member-tile-add" onClick={onAddMember}>
+              <ActionAdd size={16} aria-hidden="true" />
+              <span>{t("project.member_add")}</span>
+            </button>
+          ) : null}
         </div>
       ) : (
-        <WorkspaceEmpty
-          title={t("project.profile_empty")}
-          hint={t("project.profile_empty_hint")}
-          mark={<ProjectMark />}
-        />
+        <div className="project-profile-empty">
+          <WorkspaceEmpty
+            title={t("project.profile_empty")}
+            hint={t("project.profile_empty_hint")}
+            mark={<ProjectMark />}
+          />
+          {onAddMember ? (
+            <div className="project-profile-empty-action">
+              <Button type="button" variant="outline" size="sm" onClick={onAddMember}>
+                <ActionAdd size={14} aria-hidden="true" />
+                {t("project.member_add")}
+              </Button>
+            </div>
+          ) : null}
+        </div>
       )}
     </div>
   );
@@ -170,6 +209,7 @@ export function ProjectWorkspacePage({
   onBack: () => void;
 }) {
   const { t } = useTranslation();
+  const [memberEditor, setMemberEditor] = useState<{ member: ProjectMember | null } | null>(null);
   const [pageTab, setPageTab] = useUrlSearchState(
     "tab",
     "profile" as ProjectPageTab,
@@ -239,6 +279,8 @@ export function ProjectWorkspacePage({
     hasData: Boolean(scopedBrief),
     hasError: Boolean(error),
   });
+  /* Archived/disabled projects are read-only rooms — no member management. */
+  const membersReadOnly = Boolean(project.archivedAt || !project.enabled);
 
   return (
     <section id="project-detail-panel" className="workspace-page project-workspace-page" aria-label={t("project.page_label", { project: project.name })} tabIndex={-1}>
@@ -311,7 +353,12 @@ export function ProjectWorkspacePage({
 
       <div className="workspace-body">
         {pageTab === "profile" ? (
-          <ProjectProfile project={project} agents={agents} />
+          <ProjectProfile
+            project={project}
+            agents={agents}
+            onAddMember={membersReadOnly ? undefined : () => setMemberEditor({ member: null })}
+            onEditMember={membersReadOnly ? undefined : (member) => setMemberEditor({ member })}
+          />
         ) : pageTab === "workspace" ? (
           <div className="workspace-inspect" role="tabpanel" id="project-page-panel-workspace" aria-labelledby="project-page-tab-workspace">
             <ProjectWorkspaceFiles projectId={project.id} emptyMark={<ProjectMark />} />
@@ -335,6 +382,15 @@ export function ProjectWorkspacePage({
           />
         )}
       </div>
+
+      <ProjectMemberEditor
+        open={memberEditor !== null}
+        member={memberEditor?.member ?? null}
+        project={project}
+        agents={agents}
+        computers={computers}
+        onClose={() => setMemberEditor(null)}
+      />
     </section>
   );
 }

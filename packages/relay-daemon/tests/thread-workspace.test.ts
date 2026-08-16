@@ -25,7 +25,7 @@ test("thread workspaces are persistent and isolated beneath the configured local
   }
 });
 
-test("cloud BoxLite workspaces use the same thread identity under the guest mount", () => {
+test("BoxLite mounts only the active thread at the guest workspace root", () => {
   const root = mkdtempSync(join(tmpdir(), "relay-cloud-thread-workspaces-"));
   try {
     const workspace = new ThreadWorkspaceManager(root, "boxlite").ensure(
@@ -36,10 +36,7 @@ test("cloud BoxLite workspaces use the same thread identity under the guest moun
       workspace.hostPath,
       join(root, "019fbff6-5fd8-71d1-8140-29fd1f767b39"),
     );
-    assert.equal(
-      workspace.executionPath,
-      "/workspace/019fbff6-5fd8-71d1-8140-29fd1f767b39",
-    );
+    assert.equal(workspace.executionPath, "/workspace");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

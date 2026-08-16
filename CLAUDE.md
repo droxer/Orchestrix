@@ -26,7 +26,7 @@ Relay splits into a **backend** (control plane) and **daemons** (execution plane
 
 ### Workspace layout
 
-- **`relay-core`** — Shared protocol and pure helpers. `state.ts` (agent state, `AgentName`), `agents.ts` (`AGENT_REGISTRY` — the per-agent definition table), `commands.ts`/`prompts.ts` (agent CLI argv + prompt text), `nodes.ts` (registry-driven `runAgentNode` execution unit), `renderers.ts` (streaming JSONL → terminal text), `token-usage.ts` (`TokenUsage` type and `normalizeTokenUsage` — normalizes input/output/cache counts from any agent CLI output format), `guest.ts`/`env.ts` (guest auth provisioning, env/`REPO_ROOT`), `daemon-node-protocol.ts` (backend ⇄ daemon command/event types), `daemon-node-token.ts` (per-employee token file under `<workspace>/.relay/daemon-nodes/<employee>.token`), `format.ts` (ANSI helpers).
+- **`relay-core`** — Shared protocol and pure helpers. `state.ts` (agent state, `AgentName`), `agents.ts` (`AGENT_REGISTRY` — the per-agent definition table), `commands.ts`/`prompts.ts` (agent CLI argv + prompt text), `nodes.ts` (registry-driven `runAgentNode` execution unit), `renderers.ts` (streaming JSONL → terminal text), `token-usage.ts` (`TokenUsage` type and `normalizeTokenUsage` — normalizes input/output/cache counts from any agent CLI output format), `guest.ts`/`env.ts` (guest auth provisioning, env/`REPO_ROOT`), `daemon-node-protocol.ts` (backend ⇄ daemon command/event types), `daemon-node-token.ts` (per-employee token file under the daemon's private state directory, `~/.relay/daemon-nodes/<sandboxId>/credentials/<employee>.token`, migrated automatically from the legacy `<workspace>/.relay/daemon-nodes/<employee>.token` location), `format.ts` (ANSI helpers).
 - **`relay-chat`** — Provider-neutral chat gateway. `gateway.ts` (`RelayChatGateway`) routes chat provider events to the Relay backend and streams session updates back. `providers/` contains Discord, Telegram, and Lark conversation adapters. `relay-client.ts` wraps the backend HTTP/SSE API. `identity.ts` provides `StaticChatIdentityResolver`. `commands.ts` parses slash commands from chat messages.
 - **root `backend/`** — Python control plane. Pure backend: it queues work for daemons and never runs agent CLIs or BoxLite itself.
   - `backend/relay/app.py` — FastAPI backend (`/sandboxes`, `/daemon-nodes`, `/sessions`, `/tasks`, `/cp`, and the web UI at `/`); HTTP routes are split by domain under `backend/relay/api/` — `admin_routes.py` (users, departments, employee edits, org settings, node assignment, agent management, dashboard data), `auth_routes.py`, `chat_routes.py`, `daemon_node_routes.py`, `sandbox_routes.py`, `session_routes.py`, `task_routes.py`, `web_routes.py`.
@@ -42,7 +42,7 @@ Relay splits into a **backend** (control plane) and **daemons** (execution plane
 
 ### Backend / daemon / client token contract
 
-- The per-employee token lives at `<workspace>/.relay/daemon-nodes/<employee>.token` (created by whichever side starts first via `ensureDaemonNodeToken`); `RELAY_DAEMON_TOKEN` overrides it (`RELAY_DAEMON_NODE_TOKEN` is the accepted legacy name). The backend stores only a SHA-256 hash; a fresh provision returns the plaintext exactly once.
+- The per-employee token lives at `~/.relay/daemon-nodes/<sandboxId>/credentials/<employee>.token` on the daemon's host (created by whichever side starts first via `ensureDaemonNodeToken`); this directory must never be mounted into an agent sandbox. A one-time migration reads and deletes any token found at the legacy `<workspace>/.relay/daemon-nodes/<employee>.token` path. `RELAY_DAEMON_TOKEN` overrides it (`RELAY_DAEMON_NODE_TOKEN` is the accepted legacy name). The backend stores only a SHA-256 hash; a fresh provision returns the plaintext exactly once.
 - Re-registering a sandbox with a different token is rejected (401) — registration cannot rotate or hijack tokens.
 - An authorized command poll revives a `stopped`/`failed` daemon record to `ready` (covers backend restarts); provisioning by employee prefers the live daemon over offline placeholders.
 - Deleting a non-managed node leaves a tombstone (`status: "deleted"` + `retiredAt`) instead of dropping the row — `registry.retire_deleted`. Registrations, polls, heartbeats, and events from a deleted node answer `410`, matched by node id and by workspace identity so a daemon restart cannot resurrect it; the daemon shuts down on `410`. Re-enrolling the machine works because provisioning a fresh record gives registration a live row to land on.
@@ -66,12 +66,12 @@ Relay splits into a **backend** (control plane) and **daemons** (execution plane
 
 ### Data layout
 
-Session/task events, snapshots, artifacts, links, and token usage live in the configured database. Remaining operational state lives under `.relay/` (repo root by default — `DEFAULT_RELAY_DATA_DIR` — for the daemon registry; the host workspace for daemon tokens/logs):
+Session/task events, snapshots, artifacts, links, and token usage live in the configured database. Remaining operational state lives under `.relay/` (repo root by default — `DEFAULT_RELAY_DATA_DIR` — for the daemon registry) and under the daemon host's private state directory (never mounted into an agent sandbox) for tokens/logs:
 
 ```
-.relay/daemon/{nodes,commands,runs,run-requests,events}/ # persisted daemon registry state
-<workspace>/.relay/daemon-nodes/<employee>.token   # shared daemon auth token
-<workspace>/.relay/daemon-nodes/logs/*.jsonl       # daemon structured logs
+.relay/daemon/{nodes,commands,runs,run-requests,events}/               # persisted daemon registry state
+~/.relay/daemon-nodes/<sandboxId>/credentials/<employee>.token         # daemon auth token
+~/.relay/daemon-nodes/<sandboxId>/logs/*.jsonl                         # daemon structured logs
 ```
 
 Legacy `.relay/sessions/` and `.relay/tasks/` trees are migration inputs only;

@@ -222,10 +222,6 @@ export function ThreadsView({
           setEditingProject(null);
           setProjectDrawerOpen(true);
         }}
-        onEditProject={(project) => {
-          setEditingProject(project);
-          setProjectDrawerOpen(true);
-        }}
         onNewThread={onNewThread}
         onRenameThread={onRenameThread}
         onCloseThread={onCloseThread}
@@ -428,7 +424,6 @@ export function ThreadsView({
       ) : null}
       <ProjectDrawer
         open={projectDrawerOpen}
-        agents={logicalAgents}
         computers={runtimeNodes}
         project={editingProject}
         onClose={() => setProjectDrawerOpen(false)}

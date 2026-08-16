@@ -776,10 +776,14 @@ dev = [
     { name = "pre-commit" },
     { name = "pytest" },
 ]
+migration = [
+    { name = "alembic" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "alembic", marker = "extra == 'dev'", specifier = ">=1.17.0" },
+    { name = "alembic", marker = "extra == 'migration'", specifier = ">=1.17.0" },
     { name = "cryptography", specifier = ">=49.0.0" },
     { name = "fastapi", specifier = ">=0.128.0" },
     { name = "httpx", specifier = ">=0.28.1" },
@@ -791,7 +795,7 @@ requires-dist = [
     { name = "sqlalchemy", specifier = ">=2.0.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.38.0" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["migration", "dev"]
 
 [[package]]
 name = "sqlalchemy"

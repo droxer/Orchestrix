@@ -2986,21 +2986,33 @@ def test_sandbox_ui_token_can_manage_owned_sessions(monkeypatch) -> None:
             },
             headers=node_token_headers,
         )
-        assert node_token_session.status_code == 201
-        assert node_token_session.json()["ownerEmployeeId"] == "alice"
-        assert (
-            token_client.get(
-                f"/api/v1/threads/{node_token_session.json()['id']}",
-                headers=node_token_headers,
-            ).status_code
-            == 200
-        )
+        assert node_token_session.status_code == 401
 
         bad_token = token_client.get(
             "/api/v1/threads", headers={"Authorization": "Bearer wrong"}
         )
         assert bad_token.status_code == 401
         assert bad_token.json()["detail"] == "Invalid sandbox token."
+
+
+def test_anonymous_caller_cannot_provision_employee_sandbox(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        anonymous = TestClient(app)
+
+        response = anonymous.post(
+            "/api/v1/sandboxes",
+            json={
+                "employeeId": "victim",
+                "nodeToken": "attacker-node-token",
+                "workspacePath": "/tmp/victim",
+            },
+            headers={"Authorization": "Bearer attacker-ui-token"},
+        )
+
+        assert response.status_code == 401
+        assert app.state.registry.monitor_nodes() == []
 
 
 def test_employee_can_ask_assigned_daemon_node_without_daemon_node_token(

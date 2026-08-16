@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
@@ -12,6 +13,7 @@ from zoneinfo import ZoneInfo
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
+from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from .api import (
@@ -69,7 +71,8 @@ from .persistence.stores import (
     LocalDaemonStore,
 )
 from .persistence.team_store import DatabaseTeamStore, LocalTeamStore
-from .security.auth import auth_store_from_env, configure_admin_token
+from .security.auth import USER_COOKIE_NAME, auth_store_from_env, configure_admin_token
+from .security.rate_limit import AuthRateLimiter
 from .services.event_notifier import (
     CONTROL_PLANE_NOTIFICATION_CHANNEL,
     KeyedEventNotifier,
@@ -114,6 +117,99 @@ class ServerTimingMiddleware:
             await send(message)
 
         await self.app(scope, receive, send_with_timing)
+
+
+class CookieRequestGuardMiddleware:
+    """Reject cross-site mutations that carry a browser session cookie."""
+
+    _unsafe_methods = {"POST", "PUT", "PATCH", "DELETE"}
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(
+        self, scope: Scope, receive: Receive, send: Send
+    ) -> None:
+        if scope["type"] != "http" or scope.get("method") not in self._unsafe_methods:
+            await self.app(scope, receive, send)
+            return
+        headers = {
+            key.decode("latin-1").lower(): value.decode("latin-1")
+            for key, value in scope.get("headers", [])
+        }
+        cookie = headers.get("cookie", "")
+        if f"{USER_COOKIE_NAME}=" not in cookie:
+            await self.app(scope, receive, send)
+            return
+        origin = headers.get("origin", "").rstrip("/")
+        fetch_site = headers.get("sec-fetch-site", "").lower()
+        if (origin and not _request_origin_allowed(scope, headers, origin)) or (
+            not origin and fetch_site == "cross-site"
+        ):
+            response = JSONResponse(
+                {"detail": "Cross-site request rejected."}, status_code=403
+            )
+            await response(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
+
+def _request_origin_allowed(
+    scope: Scope, headers: dict[str, str], origin: str
+) -> bool:
+    host = headers.get("host", "")
+    if host and origin == f"{scope.get('scheme', 'http')}://{host}":
+        return True
+    if origin in deploy_config.cors_allow_origins():
+        return True
+    pattern = deploy_config.cors_allow_origin_regex()
+    return bool(pattern and re.fullmatch(pattern, origin))
+
+
+class SecurityHeadersMiddleware:
+    """Apply one browser hardening policy to API and backend-served UI."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(
+        self, scope: Scope, receive: Receive, send: Send
+    ) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_security_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                existing = {key.lower() for key, _value in headers}
+
+                def add(key: bytes, value: bytes) -> None:
+                    if key.lower() not in existing:
+                        headers.append((key, value))
+
+                add(b"x-content-type-options", b"nosniff")
+                add(b"x-frame-options", b"DENY")
+                add(b"referrer-policy", b"strict-origin-when-cross-origin")
+                add(
+                    b"content-security-policy",
+                    b"base-uri 'self'; object-src 'none'; frame-ancestors 'none'",
+                )
+                add(
+                    b"permissions-policy",
+                    b"camera=(), microphone=(), geolocation=()",
+                )
+                if str(scope.get("path", "")).startswith("/api"):
+                    add(b"cache-control", b"no-store")
+                if scope.get("scheme") == "https":
+                    add(
+                        b"strict-transport-security",
+                        b"max-age=31536000; includeSubDomains",
+                    )
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, send_with_security_headers)
 
 
 def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
@@ -210,6 +306,8 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
         redoc_url=API_REDOC_PATH,
     )
     app.add_middleware(ServerTimingMiddleware)
+    app.add_middleware(CookieRequestGuardMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware)
     _configure_cors(app)
     app.state.session_store = session_store
     app.state.task_store = task_store
@@ -221,6 +319,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.state.registry = registry
     app.state.backend = backend
     app.state.auth_store = auth_store
+    app.state.auth_rate_limiter = AuthRateLimiter()
     app.state.managed_node_store = managed_node_store
     app.state.agent_store = agent_store
     app.state.team_store = team_store

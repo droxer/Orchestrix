@@ -11,8 +11,10 @@ import {
   projectPageTabForKey,
   resolveProjectOverviewState,
   showThreadChrome,
+  agentsEligibleForProject,
 } from "../src/lib/projectPage.js";
 import type {
+  AgentPlacement,
   EmployeeAgent,
   ProjectMember,
   ProjectRecord,
@@ -216,5 +218,47 @@ describe("project page behavior", () => {
     assert.deepEqual(scoped.sessions.map((session) => session.id), ["session-1"]);
     assert.deepEqual(scoped.tasks.map((task) => task.id), ["task-1"]);
     assert.deepEqual(scoped.activeRuns.map((run) => run.runId), ["run-1"]);
+  });
+
+  it("offers only agents the backend would accept as project members", () => {
+    const placement = (overrides: Partial<AgentPlacement> = {}): AgentPlacement => ({
+      id: "placement-1",
+      agentId: "agent-1",
+      employeeId: "employee-1",
+      daemonNodeId: "node-1",
+      executorKind: "codex",
+      desiredState: "active",
+      status: "ready",
+      priority: 0,
+      agentVersion: 1,
+      workspacePolicy: {},
+      conditions: [],
+      createdAt: "2026-08-15T00:00:00Z",
+      updatedAt: "2026-08-15T00:00:00Z",
+      ...overrides,
+    });
+    const computerId = "device:employee-1:main";
+
+    const eligible = [
+      // Stable computer-id match, the common case.
+      agent({ id: "by-computer", placements: [placement({ computerId: computerId })] }),
+      // Legacy placement with no computer id falls back to the runtime node.
+      agent({ id: "by-node", placements: [placement({ runtimeNodeId: "node-1" })] }),
+      agent({ id: "by-daemon", placements: [placement({ daemonNodeId: "node-1" })] }),
+    ];
+    const rejected = [
+      // Runtime node matches, but the placement names a DIFFERENT computer —
+      // the backend rejects this as project_member_computer_mismatch.
+      agent({ id: "wrong-computer", placements: [placement({ computerId: "device:employee-1:other", runtimeNodeId: "node-1" })] }),
+      agent({ id: "draining", placements: [placement({ computerId: computerId, desiredState: "draining" })] }),
+      agent({ id: "disabled", enabled: false, placements: [placement({ computerId: computerId })] }),
+      agent({ id: "deleted", deletedAt: "2026-08-16T00:00:00Z", placements: [placement({ computerId: computerId })] }),
+      agent({ id: "unplaced", placements: [] }),
+    ];
+
+    assert.deepEqual(
+      agentsEligibleForProject([...eligible, ...rejected], computerId, "node-1").map((entry) => entry.id),
+      ["by-computer", "by-node", "by-daemon"],
+    );
   });
 });

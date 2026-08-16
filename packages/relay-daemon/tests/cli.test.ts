@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { parseArgs } from "../src/cli.js";
+import { assertHostAgentExecutionAllowed } from "../src/index.js";
 
 test("relay-daemon CLI parses admin-created credential flags", () => {
   const args = parseArgs([
@@ -22,6 +23,7 @@ test("relay-daemon CLI parses admin-created credential flags", () => {
     "--sandbox",
     "none",
     "--use-local-agent-home",
+    "--allow-host-agent-execution",
   ]);
 
   assert.deepEqual(args, {
@@ -33,6 +35,7 @@ test("relay-daemon CLI parses admin-created credential flags", () => {
     workspaceId: "repo:relay",
     sandbox: "none",
     useLocalAgentHome: true,
+    allowHostAgentExecution: true,
     doctor: false,
     help: false,
     version: false,
@@ -51,6 +54,7 @@ test("relay-daemon CLI still allows env-only runtime options", () => {
     workspaceId: undefined,
     sandbox: undefined,
     useLocalAgentHome: false,
+    allowHostAgentExecution: false,
     doctor: false,
     help: false,
     version: false,
@@ -69,8 +73,18 @@ test("relay-daemon CLI parses doctor mode", () => {
     workspaceId: undefined,
     sandbox: undefined,
     useLocalAgentHome: false,
+    allowHostAgentExecution: false,
     doctor: true,
     help: false,
     version: false,
   });
+});
+
+test("host agent execution requires an explicit high-risk opt-in", () => {
+  assert.throws(
+    () => assertHostAgentExecutionAllowed("none", false),
+    /allow-host-agent-execution/,
+  );
+  assert.doesNotThrow(() => assertHostAgentExecutionAllowed("none", true));
+  assert.doesNotThrow(() => assertHostAgentExecutionAllowed("boxlite", false));
 });

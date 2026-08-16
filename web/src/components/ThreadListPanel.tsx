@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionAdd, ActionCompose, ActionEdit, ChevronDownIcon, ChevronUpIcon, WorkspaceFolder } from "./icons";
+import { ActionAdd, ActionCompose, ChevronDownIcon, WorkspaceFolder } from "./icons";
 import { ThreadRow, type ThreadItem } from "./ThreadRow";
 import { groupThreads } from "../lib/threadGroups";
 import { projectThreadBuckets } from "../lib/threads";
@@ -24,7 +24,6 @@ export function ThreadListPanel({
   onSelectThread,
   onSelectProject,
   onCreateProject,
-  onEditProject,
   onNewThread,
   onRenameThread,
   onCloseThread,
@@ -40,7 +39,6 @@ export function ThreadListPanel({
   onSelectThread: (sessionId: string) => void;
   onSelectProject: (projectId: string | null) => void;
   onCreateProject: () => void;
-  onEditProject: (project: ProjectRecord) => void;
   onNewThread: (projectId?: string | null) => void;
   onRenameThread: (session: RelaySession) => void;
   onCloseThread: (sessionId: string) => void;
@@ -75,6 +73,30 @@ export function ThreadListPanel({
         ))}
       </div>
     ) : null);
+  };
+
+  // Threads inside a project render flat: the group headers that make sense
+  // for a long unscoped list are pure chrome around one to five rows, so the
+  // attention order (needs you → running → idle) is kept but the grouping is
+  // dropped and each row carries its own state pip instead.
+  const renderProjectThreads = (items: ThreadItem[]) => {
+    const groups = groupThreads(items);
+    const flat: Array<{ item: ThreadItem; state: "attn" | "run" | "idle" }> = [
+      ...groups.needsYou.map((item) => ({ item, state: "attn" as const })),
+      ...groups.running.map((item) => ({ item, state: "run" as const })),
+      ...groups.idle.map((item) => ({ item, state: "idle" as const })),
+    ];
+    return flat.map(({ item, state }) => (
+      <ThreadRow
+        key={item.session.id}
+        item={item}
+        state={state}
+        selected={selectedSessionId === item.session.id}
+        onSelect={onSelectThread}
+        onRename={onRenameThread}
+        onClose={onCloseThread}
+      />
+    ));
   };
 
   return (
@@ -128,20 +150,18 @@ export function ThreadListPanel({
           const expanded = selectedProjectId === project.id || (!project.archivedAt && !collapsedProjects.has(project.id));
           const computerLabel = computers.find((computer) => computer.id === project.computerId)?.displayName
             || project.computerId.replace(/^device:[^:]+:/, "");
+          // A collapsed project hides its threads, so the row needs its own
+          // signal for "something in here needs a look" — the same attn/run
+          // vocabulary as a thread's own state pip, aggregated up one level.
+          const projectGroups = groupThreads(projectThreads);
+          const projectState: "attn" | "run" | undefined = projectGroups.needsYou.length > 0
+            ? "attn"
+            : projectGroups.running.length > 0
+              ? "run"
+              : undefined;
           return (
           <section key={project.id} className={`project-folder${selectedProjectId === project.id ? " active" : ""}${project.archivedAt ? " archived" : ""}${expanded ? " expanded" : " collapsed"}`}>
             <div className="project-folder-header">
-              <button
-                type="button"
-                className="project-folder-select"
-                aria-current={selectedProjectId === project.id ? "page" : undefined}
-                onClick={() => onSelectProject(project.id)}
-              >
-                <WorkspaceFolder size={15} aria-hidden="true" />
-                <span className="project-folder-name">{project.name}</span>
-                {project.archivedAt ? <small>{t("project.archived")}</small> : null}
-                <span className="project-folder-count tnum">{projectThreads.length}</span>
-              </button>
               <button
                 type="button"
                 className="project-folder-toggle"
@@ -153,33 +173,28 @@ export function ThreadListPanel({
                   return next;
                 })}
               >
-                {expanded ? <ChevronUpIcon size={14} /> : <ChevronDownIcon size={14} />}
+                <ChevronDownIcon size={14} />
               </button>
-              {!project.archivedAt && project.enabled ? <button
+              <button
                 type="button"
-                className="project-folder-settings"
-                aria-label={t("project.edit")}
-                title={t("project.edit")}
-                onClick={() => onEditProject(project)}
+                className="project-folder-select"
+                aria-current={selectedProjectId === project.id ? "page" : undefined}
+                title={`${project.name} · ${t("project.member_count", { count: project.members.length })} · ${computerLabel}`}
+                onClick={() => onSelectProject(project.id)}
               >
-                <ActionEdit size={14} />
-              </button> : null}
-              {!project.archivedAt && project.enabled ? <button
-                type="button"
-                className="project-folder-new"
-                aria-label={t("project.new_thread", { project: project.name })}
-                title={t("project.new_thread", { project: project.name })}
-                onClick={() => onNewThread(project.id)}
-              >
-                <ActionCompose size={14} />
-              </button> : null}
-            </div>
-            <div className="project-folder-meta">
-              <span>{t("project.member_count", { count: project.members.length })}</span>
-              <span title={project.computerId}>{computerLabel}</span>
+                <span className="project-folder-icon">
+                  <WorkspaceFolder size={15} aria-hidden="true" />
+                  {projectState ? (
+                    <span className="project-folder-state-dot" data-tone={projectState} aria-hidden="true" />
+                  ) : null}
+                </span>
+                <span className="project-folder-name">{project.name}</span>
+                {project.archivedAt ? <small>{t("project.archived")}</small> : null}
+                <span className="project-folder-count tnum">{projectThreads.length}</span>
+              </button>
             </div>
             {expanded ? <div className="project-folder-threads">
-                {renderThreads(projectThreads)}
+                {renderProjectThreads(projectThreads)}
                 {projectThreads.length === 0 ? <p className="project-folder-empty">{t("project.no_threads")}</p> : null}
               </div> : null}
           </section>

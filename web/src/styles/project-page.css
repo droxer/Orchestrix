@@ -50,77 +50,140 @@
   padding: clamp(var(--sp-5), 4vw, var(--sp-8));
 }
 
-.project-profile-intro {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.72fr) minmax(280px, 1.28fr);
-  align-items: end;
-  gap: clamp(var(--sp-5), 5vw, var(--sp-9));
-  padding: 0 0 clamp(var(--sp-5), 4vw, var(--sp-8));
-  border-bottom: 1px solid var(--line-1);
-}
-
-.project-profile-eyebrow,
-.project-member-lane-instructions > span {
+.project-member-tile-instructions > span {
   color: var(--ink-4);
   font: var(--type-micro);
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
 }
 
-.project-profile-intro h2 {
-  max-width: 12ch;
-  margin: var(--sp-2) 0 0;
-  color: var(--ink-1);
-  font: var(--type-display);
-  letter-spacing: var(--type-display-track);
-}
-
-.project-profile-intro > p {
-  max-width: 58ch;
-  margin: 0;
-  color: var(--ink-3);
-  font: var(--type-body);
-}
-
-.project-member-lanes {
+/* Crew as a card grid, not a table: each card is one agent's charter —
+   who they are (head), what they own (body). auto-fill keeps the grid
+   honest from a phone column up to three across without a breakpoint. */
+.project-member-tiles {
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  gap: var(--sp-4);
   padding-bottom: var(--sp-8);
 }
 
-.project-member-lane {
-  --lane-gutter: clamp(48px, 7vw, 92px);
-
+.project-member-tile {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(260px, 0.78fr) minmax(320px, 1.22fr);
+  align-content: start;
+  gap: var(--sp-3);
   min-width: 0;
-  padding: clamp(var(--sp-5), 3.5vw, var(--sp-7)) 0 clamp(var(--sp-5), 3.5vw, var(--sp-7)) var(--lane-gutter);
-  border-bottom: 1px solid var(--line-1);
+  padding: var(--sp-4) var(--sp-4) var(--sp-5);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-3);
+  background: color-mix(in srgb, var(--surface-2) 34%, transparent);
   opacity: 0;
-  animation: project-lane-enter var(--t-draw) var(--ease) forwards;
-  animation-delay: calc(var(--project-member-index) * 45ms);
+  animation: project-tile-enter var(--t-slow) var(--ease) forwards;
+  animation-delay: calc(var(--project-member-index) * var(--t-stagger));
+  transition: border-color var(--t-fast) var(--ease);
 }
 
-.project-member-lane::before {
+.project-member-tile-edit {
   position: absolute;
-  top: var(--sp-5);
-  bottom: var(--sp-5);
-  left: calc(var(--lane-gutter) - var(--sp-4));
-  width: 1px;
-  content: "";
-  background: var(--line-1);
+  top: var(--sp-2);
+  right: var(--sp-2);
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: var(--r-1);
+  color: var(--ink-3);
+  opacity: 0;
+  transition:
+    opacity var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease);
 }
 
-.project-member-lane.is-lead::before {
-  width: 3px;
-  background: var(--action);
+.project-member-tile:hover .project-member-tile-edit,
+.project-member-tile:focus-within .project-member-tile-edit,
+.project-member-tile-edit:focus-visible {
+  opacity: 1;
 }
 
-.project-member-lane.is-lead {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--action-soft) 38%, transparent), transparent 54%);
+.project-member-tile-edit:hover {
+  color: var(--ink-1);
+  background: var(--surface-2);
 }
 
-.project-member-lane.is-missing {
+/* The add tile is an invitation, not a record — dashed, quiet, centered. */
+.project-member-tile-add {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--sp-2);
+  min-height: 118px;
+  min-width: 0;
+  padding: var(--sp-4);
+  border: 1px dashed var(--line-1);
+  border-radius: var(--r-3);
+  background: transparent;
+  color: var(--ink-3);
+  font: var(--type-label);
+  cursor: pointer;
+  transition:
+    color var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease);
+}
+
+.project-member-tile-add:hover {
+  border-color: var(--line-strong);
+  background: color-mix(in srgb, var(--surface-2) 40%, transparent);
+  color: var(--ink-1);
+}
+
+.project-member-tile-add:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
+}
+
+.project-profile-empty {
+  display: grid;
+  justify-items: center;
+}
+
+.project-profile-empty-action {
+  margin-top: calc(-1 * var(--sp-4));
+}
+
+/* Member editor drawer form. */
+.project-member-form {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-4);
+}
+
+.project-member-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-5);
+}
+
+.project-member-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--ink-2);
+  font: var(--type-body-sm);
+  cursor: pointer;
+}
+
+.project-member-tile:hover {
+  border-color: var(--line-strong);
+}
+
+.project-member-tile.is-lead {
+  border-color: color-mix(in srgb, var(--action) 34%, var(--line-2));
+}
+
+.project-member-tile.is-missing {
   background-image: repeating-linear-gradient(
     -45deg,
     transparent,
@@ -130,37 +193,43 @@
   );
 }
 
-.project-member-lane-head {
-  position: relative;
+.project-member-tile-head {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
-  align-content: start;
+  grid-template-columns: 2.5ch 34px minmax(0, 1fr);
   align-items: center;
-  gap: var(--sp-3);
+  column-gap: var(--sp-3);
   min-width: 0;
-  padding-right: clamp(var(--sp-4), 4vw, var(--sp-8));
 }
 
-.project-member-lane-index {
-  position: absolute;
-  right: calc(100% + var(--sp-6));
-  top: 0;
+.project-member-tile-index {
   color: var(--ink-4);
   font: var(--type-code);
+  letter-spacing: var(--type-code-track);
 }
 
-.project-member-lane .agent-state {
+.project-member-tile .agent-state {
   width: 34px;
   height: 34px;
 }
 
-.project-member-lane-identity {
+.project-member-tile-identity {
   display: grid;
   min-width: 0;
   gap: var(--sp-1);
 }
 
-.project-member-lane-identity strong {
+/* Badges ride the name line — a trailing badge column would strand them at
+   the card's far edge on wide tiles. */
+.project-member-tile-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.project-member-tile-name > strong {
+  min-width: 0;
   overflow: hidden;
   color: var(--ink-1);
   font: var(--type-heading);
@@ -169,7 +238,7 @@
   white-space: nowrap;
 }
 
-.project-member-lane-identity > span {
+.project-member-tile-meta {
   overflow: hidden;
   color: var(--ink-4);
   font: var(--type-label);
@@ -177,69 +246,41 @@
   white-space: nowrap;
 }
 
-.project-member-lane-badges {
-  display: flex;
-  grid-column: 2 / -1;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  padding-top: var(--sp-2);
-}
-
-.project-member-lane-brief {
+.project-member-tile-body {
   display: grid;
-  grid-template-columns: minmax(120px, 0.42fr) minmax(180px, 1fr);
-  gap: var(--sp-4) clamp(var(--sp-5), 4vw, var(--sp-8));
+  gap: var(--sp-3);
   min-width: 0;
 }
 
-.project-member-lane-role {
-  display: grid;
-  align-content: start;
-  gap: var(--sp-2);
-}
-
-.project-member-lane-role > span {
-  color: var(--ink-4);
-  font: var(--type-micro);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-}
-
-.project-member-lane-role strong {
-  color: var(--ink-1);
-  font: var(--type-label-strong);
-}
-
-.project-member-lane-brief > p,
-.project-member-lane-instructions p {
+.project-member-tile-responsibilities {
   margin: 0;
   color: var(--ink-2);
   font: var(--type-body-sm);
   white-space: pre-wrap;
 }
 
-.project-member-lane-instructions {
+.project-member-tile-responsibilities strong {
+  color: var(--ink-1);
+  font-weight: 600;
+}
+
+.project-member-tile-instructions {
   display: grid;
-  grid-column: 2;
   gap: var(--sp-2);
-  padding-top: var(--sp-4);
+  padding-top: var(--sp-3);
   border-top: 1px solid var(--line-2);
 }
 
-@keyframes project-lane-enter {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+.project-member-tile-instructions p {
+  margin: 0;
+  color: var(--ink-2);
+  font: var(--type-body-sm);
+  white-space: pre-wrap;
 }
 
-@media (max-width: 1040px) {
-  .project-member-lane {
-    grid-template-columns: 1fr;
-    gap: var(--sp-5);
-  }
-
-  .project-member-lane-head {
-    padding-right: 0;
-  }
+@keyframes project-tile-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @media (max-width: 820px) {
@@ -287,51 +328,8 @@
   }
 }
 
-@media (max-width: 640px) {
-  .project-profile-intro {
-    grid-template-columns: 1fr;
-    align-items: start;
-    gap: var(--sp-4);
-  }
-
-  .project-profile-intro h2 {
-    font: var(--type-title);
-    letter-spacing: var(--type-title-track);
-  }
-
-  .project-member-lane {
-    --lane-gutter: 38px;
-    padding-block: var(--sp-5);
-  }
-
-  .project-member-lane-head {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .project-member-lane-head > .project-member-lane-index {
-    right: calc(100% + var(--sp-4));
-  }
-
-  .project-member-lane-identity {
-    grid-column: 2;
-  }
-
-  .project-member-lane-badges {
-    grid-column: 2;
-  }
-
-  .project-member-lane-brief {
-    grid-template-columns: 1fr;
-    gap: var(--sp-4);
-  }
-
-  .project-member-lane-instructions {
-    grid-column: 1;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .project-member-lane {
+  .project-member-tile {
     opacity: 1;
     animation: none;
     transform: none;

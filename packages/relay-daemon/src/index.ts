@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { accessSync, constants, mkdirSync, statSync } from "node:fs";
+import { accessSync, chmodSync, constants, mkdirSync, statSync } from "node:fs";
 import { appendFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
@@ -18,7 +18,12 @@ import type {
   StreamExecResult,
   CodexCollaborationEvent,
 } from "relay-core";
-import { startOrchestratorSession, ensureAgentReady as ensureSandboxAgentReady, type ActiveOrchestratorSession } from "./sandbox-session.js";
+import {
+  startOrchestratorSession,
+  ensureAgentReady as ensureSandboxAgentReady,
+  resolveBoxliteHome,
+  type ActiveOrchestratorSession,
+} from "./sandbox-session.js";
 import { diffGeneratedFiles, snapshotGeneratedFiles } from "./generated-files.js";
 import { consumeRoundResult } from "./round-result.js";
 import { agentWorkspaceSubpath, ensureAgentWorkspaceDir } from "./agent-workspace.js";
@@ -80,6 +85,8 @@ export interface DaemonRuntimeOptions {
    * processes (for daemons that already live inside a sandbox).
    */
   sandbox?: DaemonSandboxMode;
+  /** Explicit acknowledgement required before running agents as host processes. */
+  allowHostAgentExecution?: boolean;
   employeeId?: string;
   workspacePath?: string;
   workspaceId?: string;
@@ -95,6 +102,8 @@ export interface DaemonRuntimeOptions {
   fetchFn?: typeof fetch;
   token?: string;
   enrollmentToken?: string;
+  /** Daemon-private credentials and logs. This directory must never be mounted into an agent sandbox. */
+  stateDir?: string;
   logDir?: string;
   logger?: DaemonLogger;
   signal?: AbortSignal;
@@ -173,9 +182,17 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   if (!sandboxId) throw new Error("RELAY_SANDBOX_ID or RELAY_ENROLLMENT_TOKEN is required for the relay daemon.");
   const effectiveEmployeeId = configuredEmployeeId ?? employeeId;
   const sandboxMode = resolveSandboxMode(options.sandbox ?? process.env.RELAY_SANDBOX_MODE ?? enrolledSandboxMode);
+  if (!options.environment) {
+    assertHostAgentExecutionAllowed(
+      sandboxMode,
+      options.allowHostAgentExecution ?? process.env.RELAY_ALLOW_HOST_AGENT_EXECUTION === "1",
+    );
+  }
+  const stateDir = resolveDaemonStateDirectory(sandboxId, options.stateDir);
   configureAgentProcessEnvironment(sandboxMode, workspacePath, options.agentHome);
   const tokenResolution = ensureDaemonNodeToken({
-    workspacePath,
+    credentialDirectory: join(stateDir, "credentials"),
+    legacyWorkspacePath: workspacePath,
     employeeId: effectiveEmployeeId,
     token: options.token ?? process.env.RELAY_DAEMON_TOKEN ?? process.env.RELAY_DAEMON_NODE_TOKEN ?? enrolledToken,
   });
@@ -196,7 +213,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   const logger = options.logger ?? createDaemonLogger({
     workspacePath,
     sandboxId,
-    logDir: options.logDir,
+    logDir: options.logDir ?? join(stateDir, "logs"),
   });
   const registrationRefreshIntervalMs = options.heartbeatIntervalMs ?? positiveIntEnv("RELAY_DAEMON_HEARTBEAT_MS") ?? positiveIntEnv("RELAY_DAEMON_NODE_HEARTBEAT_MS") ?? 5 * 60_000;
   const configuredLivenessHeartbeatIntervalMs = options.livenessHeartbeatIntervalMs
@@ -216,7 +233,14 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   };
   logger.info("daemon starting", { sandboxId, employeeId: effectiveEmployeeId, workspacePath, backendUrl, sandboxMode });
   setHealth("starting", { employeeId: effectiveEmployeeId, workspacePath, backendUrl, sandboxMode });
-  const maxConcurrentRuns = options.maxConcurrentRuns ?? positiveIntEnv("RELAY_DAEMON_MAX_CONCURRENT_RUNS") ?? 1;
+  const requestedMaxConcurrentRuns = options.maxConcurrentRuns
+    ?? positiveIntEnv("RELAY_DAEMON_MAX_CONCURRENT_RUNS")
+    ?? 1;
+  // The BoxLite adapter owns one active guest at a time. Serializing runs also
+  // lets each guest mount only its active thread instead of the whole node root.
+  const maxConcurrentRuns = sandboxMode === "boxlite" && !options.environment
+    ? 1
+    : requestedMaxConcurrentRuns;
   const activeRuns = new Map<string, { command: DaemonNodeRunCommand; controller: AbortController; promise: Promise<void> }>();
   const shutdownGraceMs = options.shutdownGraceMs ?? positiveIntEnv("RELAY_DAEMON_SHUTDOWN_GRACE_MS") ?? 10_000;
   const shutdownController = new AbortController();
@@ -603,8 +627,19 @@ export async function runRelayDaemonDoctor(options: DaemonRuntimeOptions = {}): 
   const employeeId = configuredEmployeeId ?? process.env.USER ?? "local";
   const workspacePath = firstNonBlank(options.workspacePath, process.env.RELAY_WORKSPACE, process.env.WORKSPACE) ?? process.cwd();
   const sandboxMode = resolveSandboxMode(options.sandbox ?? process.env.RELAY_SANDBOX_MODE);
+  if (!options.environment) {
+    assertHostAgentExecutionAllowed(
+      sandboxMode,
+      options.allowHostAgentExecution ?? process.env.RELAY_ALLOW_HOST_AGENT_EXECUTION === "1",
+    );
+  }
+  const stateDir = resolveDaemonStateDirectory(sandboxId ?? "doctor", options.stateDir);
   configureAgentProcessEnvironment(sandboxMode, workspacePath, options.agentHome);
-  const logger = options.logger ?? createDaemonLogger({ workspacePath, sandboxId: sandboxId ?? "doctor", logDir: options.logDir });
+  const logger = options.logger ?? createDaemonLogger({
+    workspacePath,
+    sandboxId: sandboxId ?? "doctor",
+    logDir: options.logDir ?? join(stateDir, "logs"),
+  });
   const fetchFn = options.fetchFn ?? fetch;
   const checks: DaemonDoctorCheck[] = [];
   const add = (name: string, ok: boolean, detail: string): void => {
@@ -618,7 +653,8 @@ export async function runRelayDaemonDoctor(options: DaemonRuntimeOptions = {}): 
   let token = "";
   try {
     token = ensureDaemonNodeToken({
-      workspacePath,
+      credentialDirectory: join(stateDir, "credentials"),
+      legacyWorkspacePath: workspacePath,
       employeeId,
       token: options.token ?? process.env.RELAY_DAEMON_TOKEN ?? process.env.RELAY_DAEMON_NODE_TOKEN,
     }).token;
@@ -790,7 +826,7 @@ async function executeCommand(
     : command.workspaceLayout === "project"
       ? threadWorkspaces.ensureProject(command.sessionId, requiredProjectSubpath(command))
       : threadWorkspaces.nodeRoot(command.sessionId);
-  await environment.ensureAgentReady(command.agent, signal);
+  await environment.ensureAgentReady(command.agent, signal, threadWorkspace.hostPath);
   if (signal?.aborted) {
     await postRunCancelled(fetchFn, eventUrl, command, token, signal.reason, cancellationTerminalEventSignal?.()).catch((error: unknown) => {
       logger.error("terminal event post failed", {
@@ -1010,7 +1046,7 @@ function commandLeaseEventFields(command: DaemonNodeRunCommand): { leaseId?: str
 
 export interface DaemonExecutionEnvironment {
   readonly sandboxMode: DaemonSandboxMode;
-  ensureAgentReady(agent: AgentName, signal?: AbortSignal): Promise<void>;
+  ensureAgentReady(agent: AgentName, signal?: AbortSignal, hostWorkspace?: string): Promise<void>;
   execStream: typeof localProcessExecStream;
   close(): Promise<void>;
 }
@@ -1021,6 +1057,30 @@ export function resolveSandboxMode(value: string | undefined): DaemonSandboxMode
   if (trimmed === "none") return "none";
   if (trimmed === "boxlite") return "boxlite";
   throw new Error(`Unknown sandbox mode ${JSON.stringify(trimmed)}. Use "boxlite" or "none".`);
+}
+
+export function assertHostAgentExecutionAllowed(
+  mode: DaemonSandboxMode,
+  allowed: boolean,
+): void {
+  if (mode === "none" && !allowed) {
+    throw new Error(
+      'Host agent execution is disabled. Use BoxLite, or pass --allow-host-agent-execution '
+      + 'only after accepting that agent commands will run with your user account permissions.',
+    );
+  }
+}
+
+export function resolveDaemonStateDirectory(
+  sandboxId: string,
+  override = process.env.RELAY_DAEMON_STATE_DIR,
+): string {
+  const directory = resolve(
+    override?.trim() || join(homedir(), ".relay", "daemon-nodes", safeLogFileName(sandboxId)),
+  );
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  chmodSync(directory, 0o700);
+  return directory;
 }
 
 function createExecutionEnvironment(
@@ -1053,40 +1113,52 @@ function createBoxliteEnvironment(
   logger: DaemonLogger,
 ): DaemonExecutionEnvironment {
   let starting: Promise<ActiveOrchestratorSession> | undefined;
-  // The sandbox boots lazily on the first run command and stays up for the
-  // daemon's lifetime so consecutive agent runs share one VM.
-  const start = (): Promise<ActiveOrchestratorSession> => {
-    starting ??= startOrchestratorSession((text) => {
+  let mountedWorkspace: string | undefined;
+  const boxliteHome = resolveBoxliteHome(workspacePath);
+  const stop = async (): Promise<void> => {
+    if (!starting) return;
+    const pending = starting;
+    starting = undefined;
+    mountedWorkspace = undefined;
+    try {
+      const active = await pending;
+      await active.close();
+    } catch {
+      // The sandbox never came up; nothing to tear down.
+    }
+  };
+  // A new guest is started when work moves to another thread. Its only
+  // workspace volume is that thread's host directory.
+  const start = async (hostWorkspace = workspacePath): Promise<ActiveOrchestratorSession> => {
+    const nextWorkspace = resolve(hostWorkspace);
+    if (starting && mountedWorkspace === nextWorkspace) return starting;
+    if (starting) await stop();
+    mountedWorkspace = nextWorkspace;
+    starting = startOrchestratorSession((text) => {
       logger.info("sandbox", { sandboxId, text: text.trimEnd() });
     }, {
       boxName: boxNameForSandbox(sandboxId),
-      workspacePath,
+      workspacePath: nextWorkspace,
+      boxliteHome,
     }).catch((error: unknown) => {
       starting = undefined;
+      mountedWorkspace = undefined;
       throw error;
     });
     return starting;
   };
   return {
     sandboxMode: "boxlite",
-    async ensureAgentReady(agent, signal) {
-      await start();
+    async ensureAgentReady(agent, signal, hostWorkspace) {
+      await start(hostWorkspace);
       await ensureSandboxAgentReady(agent, undefined, signal);
     },
     execStream: async (cmd, args = [], options = {}) => {
-      await start();
+      await start(mountedWorkspace ?? workspacePath);
       return defaultExecutionManager.execStream(cmd, args, options);
     },
     async close() {
-      if (!starting) return;
-      const pending = starting;
-      starting = undefined;
-      try {
-        const active = await pending;
-        await active.close();
-      } catch {
-        // The sandbox never came up; nothing to tear down.
-      }
+      await stop();
     },
   };
 }
@@ -1283,8 +1355,10 @@ export function createDaemonLogger(input: {
   sandboxId: string;
   logDir?: string;
 }): DaemonLogger {
-  const logDir = input.logDir ?? join(input.workspacePath, ".relay", "daemon-nodes", "logs");
-  mkdirSync(logDir, { recursive: true });
+  const logDir = input.logDir
+    ?? join(homedir(), ".relay", "daemon-nodes", safeLogFileName(input.sandboxId), "logs");
+  mkdirSync(logDir, { recursive: true, mode: 0o700 });
+  chmodSync(logDir, 0o700);
   const logPath = join(logDir, `${safeLogFileName(input.sandboxId)}.jsonl`);
   return new JsonlDaemonLogger(logDir, logPath);
 }

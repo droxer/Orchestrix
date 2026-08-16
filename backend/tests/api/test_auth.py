@@ -840,7 +840,7 @@ def test_authenticated_user_can_list_own_sandbox_and_daemon_node_without_token(m
         _assert_no_secret_fields(response.json())
 
 
-def test_unauthenticated_user_can_list_all_sandboxes_and_daemon_nodes(monkeypatch) -> None:
+def test_unauthenticated_user_cannot_list_sandboxes_or_daemon_nodes(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         admin_client = TestClient(create_app(root))
@@ -862,23 +862,93 @@ def test_unauthenticated_user_can_list_all_sandboxes_and_daemon_nodes(monkeypatc
         client = TestClient(create_app(root))
 
         response = client.get("/api/v1/sandboxes")
-        assert response.status_code == 200
-        assert {sandbox["employeeId"] for sandbox in response.json()["sandboxes"]} == {"alice", "bob"}
-        _assert_no_secret_fields(response.json())
+        assert response.status_code == 401
 
         response = client.get("/api/v1/daemon-nodes")
-        assert response.status_code == 200
-        assert {node["employeeId"] for node in response.json()["nodes"]} == {"alice", "bob"}
-        _assert_no_secret_fields(response.json())
+        assert response.status_code == 401
 
-        # A stale/invalid bearer token should fall back to the public list, not 401.
+        # A stale bearer token must not fall back to an inventory disclosure.
         response = client.get("/api/v1/sandboxes", headers={"Authorization": "Bearer invalid-token"})
-        assert response.status_code == 200
-        assert {sandbox["employeeId"] for sandbox in response.json()["sandboxes"]} == {"alice", "bob"}
+        assert response.status_code == 401
 
         response = client.get("/api/v1/daemon-nodes", headers={"Authorization": "Bearer invalid-token"})
-        assert response.status_code == 200
-        assert {node["employeeId"] for node in response.json()["nodes"]} == {"alice", "bob"}
+        assert response.status_code == 401
+
+
+def test_cross_site_request_cannot_mutate_cookie_authenticated_session(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _login(client, "admin", "secret123")
+
+        rejected = client.post(
+            "/api/v1/auth/logout",
+            headers={
+                "Origin": "https://attacker.example",
+                "Sec-Fetch-Site": "cross-site",
+            },
+        )
+
+        assert rejected.status_code == 403
+        assert client.get("/api/v1/auth/me").status_code == 200
+        accepted = client.post(
+            "/api/v1/auth/logout",
+            headers={"Origin": "http://testserver", "Sec-Fetch-Site": "same-origin"},
+        )
+        assert accepted.status_code == 200
+
+
+def test_json_endpoints_reject_simple_cross_site_content_type(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+
+        response = client.post(
+            "/api/v1/auth/login",
+            content='{"username":"admin","password":"secret123"}',
+            headers={"Content-Type": "text/plain"},
+        )
+
+        assert response.status_code == 415
+
+
+def test_login_rate_limit_stops_repeated_password_checks(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    monkeypatch.setenv("RELAY_AUTH_RATE_LIMIT_ATTEMPTS", "3")
+    monkeypatch.setenv("RELAY_AUTH_RATE_LIMIT_WINDOW_SECONDS", "60")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+
+        for _ in range(3):
+            response = client.post(
+                "/api/v1/auth/login",
+                json={"username": "admin", "password": "wrong-password"},
+            )
+            assert response.status_code == 401
+
+        limited = client.post(
+            "/api/v1/auth/login",
+            json={"username": "admin", "password": "wrong-password"},
+        )
+        assert limited.status_code == 429
+        assert int(limited.headers["Retry-After"]) > 0
+
+
+def test_backend_applies_browser_security_headers(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root), base_url="https://relay.example")
+
+        response = client.get("/api")
+
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        assert response.headers["X-Frame-Options"] == "DENY"
+        assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+        assert "frame-ancestors 'none'" in response.headers["Content-Security-Policy"]
+        assert response.headers["Strict-Transport-Security"].startswith("max-age=")
+        assert response.headers["Cache-Control"] == "no-store"
 
 
 def test_chat_service_token_can_act_as_employee(monkeypatch) -> None:

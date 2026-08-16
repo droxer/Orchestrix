@@ -303,6 +303,76 @@ def test_project_rejects_incompatible_computer_and_inactive_agent(monkeypatch) -
         assert inactive.json()["detail"] == "project_member_computer_mismatch"
 
 
+def test_project_update_revalidates_legacy_placements(monkeypatch) -> None:
+    """Placements recorded before they carried a stable computerId only know
+    their daemon node. Updates must resolve the computer's current node (the
+    way create does) or the roster of every pre-computerId project becomes
+    impossible to edit — even re-saving the unchanged members used to return
+    project_member_computer_mismatch."""
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        computer = _register_computer(app, "node_alice_legacy_update", "machine-legacy-update")
+        lead = _agent(client, app, computer, "Lead", "codex")
+        _login_alice(client)
+
+        created = client.post(
+            "/api/v1/projects",
+            json={
+                "name": "Legacy roster",
+                "daemonNodeId": computer["id"],
+                "leadAgentId": lead["id"],
+                "members": [
+                    {
+                        "agentId": lead["id"],
+                        "role": "planner",
+                        "functionTitle": "Lead",
+                        "responsibilities": "Plan",
+                    }
+                ],
+            },
+        )
+        assert created.status_code == 201, created.text
+        project = created.json()["project"]
+
+        # Placements recorded before they carried a stable computerId only
+        # know their daemon node — simulate that view of the world.
+        original_list = app.state.agent_placement_store.list_placements
+
+        def legacy_list(*args, **kwargs):
+            return [
+                {**record, "computerId": None}
+                for record in original_list(*args, **kwargs)
+            ]
+
+        monkeypatch.setattr(
+            app.state.agent_placement_store, "list_placements", legacy_list
+        )
+
+        updated = client.patch(
+            f"/api/v1/projects/{project['id']}",
+            json={
+                "expectedVersion": project["version"],
+                "members": [
+                    {
+                        "agentId": lead["id"],
+                        "role": "planner",
+                        "functionTitle": "Lead",
+                        "responsibilities": "Plan and coordinate",
+                    }
+                ],
+            },
+        )
+
+        assert updated.status_code == 200, updated.text
+        assert (
+            updated.json()["project"]["members"][0]["responsibilities"]
+            == "Plan and coordinate"
+        )
+
+
 def test_project_bounds_and_member_deletion_guard(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

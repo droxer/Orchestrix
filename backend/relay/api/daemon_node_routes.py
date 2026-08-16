@@ -164,12 +164,7 @@ def list_daemon_nodes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
             if actor_can_access_sandbox(actor, node)
         ]
         return {"nodes": [present_computer(ctx, node) for node in nodes]}
-    return {
-        "nodes": [
-            {key: value for key, value in node.items() if key != "displayName"}
-            for node in ctx.registry.monitor_nodes()
-        ]
-    }
+    raise HTTPException(401, "Authentication required.")
 
 
 @router.patch("/daemon-nodes/{sandbox_id}")

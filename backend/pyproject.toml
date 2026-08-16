@@ -16,6 +16,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+migration = [
+  "alembic>=1.17.0",
+]
 dev = [
   "alembic>=1.17.0",
   "pre-commit>=4.0.0",

@@ -334,11 +334,46 @@ export function AgentProfilePanel({
   if (isDetail) {
     /* The profile tab carries only what you can CHANGE about the record —
        portrait, name, role, instructions. Runtime, computer, availability,
-       and id are printed once by the RecordBand above every tab, so
-       restating them here (as the old hero and the collapsed "Details"
-       disclosure both did) would put the same facts on screen twice. */
+       and id are printed once by the RecordBand above every tab, and the
+       page header owns the agent's name, so identity here shrinks to one
+       portrait + role row above the document. A rail restating the name
+       (as the old two-column dossier did) would put the same fact on
+       screen twice. */
     return (
-      <div className="workspace-profile-panel workspace-profile-dossier">
+      <div className="workspace-profile-panel workspace-profile-dossier agent-dossier">
+        <div className="agent-dossier-identity">
+          <ProfileImagePicker
+            imageUrl={agent.profileImageUrl}
+            name={agent.displayName}
+            fallback={<IdentityMonogram name={agent.displayName} size={22} />}
+            editable={canEditProfile}
+            disabled={saving}
+            onUpload={handleImageUpload}
+            onRemove={handleImageRemove}
+          />
+          <div className="agent-dossier-identity-meta">
+            <div className="workspace-dossier-field">
+              <span className="workspace-dossier-field-label" id="agent-default-role-label">
+                {t("admin.v2.agent_role_label")}
+              </span>
+              {/* Role is set at creation and immutable thereafter (birth
+                  certificate field) — always render read-only, never editable. */}
+              <span className="workspace-dossier-field-value" aria-labelledby="agent-default-role-label">
+                {agent.defaultRole
+                  ? t(`admin.v2.agent_role.${agent.defaultRole}`, { defaultValue: agent.defaultRole })
+                  : t("admin.v2.agent_role_none")}
+              </span>
+            </div>
+            <p className="workspace-dossier-stamp">
+              {t("admin.v2.agent_meta_version", { version: agent.version })}
+              {" · "}
+              {t("admin.v2.agent_meta_created", { time: formatRelativeTime(agent.createdAt, t) })}
+              {" · "}
+              {t("admin.v2.agent_meta_updated", { time: formatRelativeTime(agent.updatedAt, t) })}
+            </p>
+          </div>
+        </div>
+
         <div className="workspace-dossier-doc">
           <AgentProfileEditor
             name={agent.displayName}
@@ -354,58 +389,13 @@ export function AgentProfilePanel({
             onCancel={() => setEditingProfile(false)}
             onSave={() => void handleProfileSave()}
           />
-        </div>
-
-        <aside className="workspace-dossier-rail" aria-label={t("workspace.identity_label")}>
-          <div className="workspace-dossier-portrait">
-            <ProfileImagePicker
-              imageUrl={agent.profileImageUrl}
-              name={agent.displayName}
-              fallback={<IdentityMonogram name={agent.displayName} size={22} />}
-              editable={canEditProfile}
-              disabled={saving}
-              onUpload={handleImageUpload}
-              onRemove={handleImageRemove}
-            />
-          </div>
-
-          <div className="workspace-dossier-field">
-            <span className="workspace-dossier-field-label" id="agent-name-label">
-              {t("admin.v2.agent_name")}
-            </span>
-            <span className="workspace-dossier-field-value" aria-labelledby="agent-name-label" translate="no">
-              {agent.displayName}
-            </span>
-          </div>
-
-          <div className="workspace-dossier-field">
-            <span className="workspace-dossier-field-label" id="agent-default-role-label">
-              {t("admin.v2.agent_role_label")}
-            </span>
-            {/* Role is set at creation and immutable thereafter (birth
-                certificate field) — always render read-only, never editable. */}
-            <span className="workspace-dossier-field-value" aria-labelledby="agent-default-role-label">
-              {agent.defaultRole
-                ? t(`admin.v2.agent_role.${agent.defaultRole}`, { defaultValue: agent.defaultRole })
-                : t("admin.v2.agent_role_none")}
-            </span>
-          </div>
-
-          <p className="workspace-dossier-stamp">
-            {t("admin.v2.agent_meta_version", { version: agent.version })}
-            {" · "}
-            {t("admin.v2.agent_meta_created", { time: formatRelativeTime(agent.createdAt, t) })}
-            {" · "}
-            {t("admin.v2.agent_meta_updated", { time: formatRelativeTime(agent.updatedAt, t) })}
-          </p>
-
           {canEditProfile && error ? (
             <p className="adm-form-error" role="alert">{t("admin.v2.action_failed", { message: error })}</p>
           ) : null}
-        </aside>
+        </div>
 
-        {/* Management lives below the two columns and spans both — it acts on
-            the whole record, not on the document or the identity rail. */}
+        {/* Management lives at the foot of the record — it acts on the whole
+            agent, not on the identity row or the document. */}
         {canEditProfile ? (
           <div className="workspace-dossier-admin">
             {canManage ? (

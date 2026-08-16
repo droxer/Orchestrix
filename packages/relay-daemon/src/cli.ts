@@ -31,6 +31,10 @@ Options:
   --use-local-agent-home
                         Deprecated compatibility flag. Local mode uses this
                         user's HOME for existing agent auth and config by default.
+  --allow-host-agent-execution
+                        Explicitly allow sandbox "none" to run model-generated
+                        commands with this user's host permissions (also
+                        RELAY_ALLOW_HOST_AGENT_EXECUTION=1).
   --doctor              Check backend, token, workspace, auth, and agent CLIs,
                         then exit without running the daemon loop.
   --help                Show this help message.
@@ -52,9 +56,14 @@ export interface DaemonCliArgs {
   workspaceId?: string;
   sandbox?: string;
   useLocalAgentHome: boolean;
+  allowHostAgentExecution: boolean;
   doctor: boolean;
   help: boolean;
   version: boolean;
+}
+
+export function resolveAllowHostAgentExecution(args: DaemonCliArgs): boolean {
+  return args.allowHostAgentExecution || process.env.RELAY_ALLOW_HOST_AGENT_EXECUTION === "1";
 }
 
 export function parseArgs(argv: string[]): DaemonCliArgs {
@@ -67,6 +76,7 @@ export function parseArgs(argv: string[]): DaemonCliArgs {
   let workspaceId: string | undefined;
   let sandbox: string | undefined;
   let useLocalAgentHome = false;
+  let allowHostAgentExecution = false;
   let doctor = false;
   let help = false;
   let version = false;
@@ -80,6 +90,8 @@ export function parseArgs(argv: string[]): DaemonCliArgs {
       doctor = true;
     } else if (arg === "--use-local-agent-home") {
       useLocalAgentHome = true;
+    } else if (arg === "--allow-host-agent-execution") {
+      allowHostAgentExecution = true;
     } else if (arg === "--backend-url") {
       const value = argv[i + 1];
       if (!value || value.startsWith("-")) {
@@ -150,6 +162,7 @@ export function parseArgs(argv: string[]): DaemonCliArgs {
     workspaceId,
     sandbox,
     useLocalAgentHome,
+    allowHostAgentExecution,
     doctor,
     help,
     version,
@@ -198,6 +211,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
       workspacePath,
       workspaceId: args.workspaceId ?? process.env.RELAY_WORKSPACE_ID,
       sandbox: resolveSandboxMode(args.sandbox ?? process.env.RELAY_SANDBOX_MODE),
+      allowHostAgentExecution: resolveAllowHostAgentExecution(args),
       agentHome: args.useLocalAgentHome ? homedir() : undefined,
     });
     for (const check of report.checks) {
@@ -215,6 +229,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     workspacePath,
     workspaceId: args.workspaceId ?? process.env.RELAY_WORKSPACE_ID,
     sandbox: resolveSandboxMode(args.sandbox ?? process.env.RELAY_SANDBOX_MODE),
+    allowHostAgentExecution: resolveAllowHostAgentExecution(args),
     agentHome: args.useLocalAgentHome ? homedir() : undefined,
   });
 }

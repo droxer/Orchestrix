@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
@@ -24,6 +25,13 @@ from relay.persistence.task_store import (
     LocalTaskStore,
 )
 from relay.security.auth import DatabaseUserAuthStore
+
+
+def test_backend_container_runs_as_non_root_runtime_user() -> None:
+    dockerfile = Path("backend/Dockerfile").read_text(encoding="utf-8")
+
+    assert "USER relay" in dockerfile
+    assert "useradd" in dockerfile
 
 
 def test_app_factory_wires_backend_state_and_routes() -> None:

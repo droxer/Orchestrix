@@ -146,6 +146,8 @@ class UserAuthStore:
     ):
         self.root_dir = Path(root_dir)
         self.auth_dir = self.root_dir / "auth"
+        self.auth_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(self.auth_dir, 0o700)
         self.users_path = self.auth_dir / "users.json"
         self.sessions_path = self.auth_dir / "sessions.json"
         self.deleted_employees_path = self.auth_dir / "deleted_employees.json"
@@ -280,7 +282,7 @@ class UserAuthStore:
         now = datetime.now(timezone.utc)
         expires_at = now.timestamp() + self.session_ttl_seconds
         session = {
-            "token": token,
+            "tokenHash": hash_session_token(token),
             "userId": user_id,
             "createdAt": _format_iso(now),
             "expiresAt": _format_iso(
@@ -290,14 +292,28 @@ class UserAuthStore:
         sessions = self._read_sessions()
         sessions.append(session)
         self._write_sessions(sessions)
-        return session
+        return {**session, "token": token}
 
     def get_session_by_token(self, token: str | None) -> dict[str, Any] | None:
         if not token:
             return None
         sessions = self._read_sessions()
         for session in sessions:
-            if session.get("token") == token:
+            expected_hash = session.get("tokenHash")
+            legacy_token = session.get("token")
+            matches = bool(
+                isinstance(expected_hash, str)
+                and secrets.compare_digest(expected_hash, hash_session_token(token))
+            ) or bool(
+                isinstance(legacy_token, str)
+                and len(legacy_token) == len(token)
+                and secrets.compare_digest(legacy_token, token)
+            )
+            if matches:
+                if legacy_token:
+                    session["tokenHash"] = hash_session_token(token)
+                    session.pop("token", None)
+                    self._write_sessions(sessions)
                 expires_at = _parse_iso(session.get("expiresAt"))
                 if expires_at and expires_at <= datetime.now(timezone.utc):
                     self.delete_session(token)
@@ -316,7 +332,12 @@ class UserAuthStore:
     def delete_session(self, token: str) -> bool:
         sessions = self._read_sessions()
         before = len(sessions)
-        sessions = [s for s in sessions if s.get("token") != token]
+        token_hash = hash_session_token(token)
+        sessions = [
+            session
+            for session in sessions
+            if session.get("tokenHash") != token_hash and session.get("token") != token
+        ]
         if len(sessions) < before:
             self._write_sessions(sessions)
             return True
@@ -344,13 +365,13 @@ class UserAuthStore:
         return _read_json(self.users_path) if self.users_path.exists() else []
 
     def _write_users(self, users: list[dict[str, Any]]) -> None:
-        _write_json(self.users_path, users)
+        _write_json(self.users_path, users, mode=0o600)
 
     def _read_sessions(self) -> list[dict[str, Any]]:
         return _read_json(self.sessions_path) if self.sessions_path.exists() else []
 
     def _write_sessions(self, sessions: list[dict[str, Any]]) -> None:
-        _write_json(self.sessions_path, sessions)
+        _write_json(self.sessions_path, sessions, mode=0o600)
 
     @staticmethod
     def _public_user(user: dict[str, Any]) -> dict[str, Any]:

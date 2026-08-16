@@ -15,15 +15,15 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # Resolve dependencies before copying sources so a code-only change reuses the
-# cached dependency layer. `--extra dev` is included because Alembic (used by
-# the release migration step) is a dev dependency.
+# cached dependency layer. The migration extra carries Alembic without shipping
+# test and pre-commit tooling in the runtime image.
 COPY backend/pyproject.toml backend/uv.lock ./backend/
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --project backend --extra dev --frozen --no-install-project
+    uv sync --project backend --extra migration --frozen --no-install-project
 
 COPY backend/ ./backend/
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --project backend --extra dev --frozen
+    uv sync --project backend --extra migration --frozen
 
 # Bind every interface: the platform routes to the container's published port,
 # which arrives as $PORT and is read by relay.core.deploy_config.
@@ -36,7 +36,11 @@ ENV HOST=0.0.0.0 \
 
 # Operational state that is not in Postgres (profile images, managed-node
 # records) lives here. Mount a volume at /data to keep it across deploys.
-RUN mkdir -p /data
+RUN useradd --system --uid 10001 --user-group --home-dir /nonexistent --shell /usr/sbin/nologin relay \
+    && mkdir -p /data \
+    && chown -R relay:relay /data
+
+USER relay
 
 EXPOSE 8790
 

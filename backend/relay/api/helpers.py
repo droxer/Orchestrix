@@ -17,7 +17,6 @@ from starlette.requests import ClientDisconnect
 from ..core.models import AGENT_NAMES
 from ..daemon_registry import (
     DaemonNodeRegistry,
-    daemon_node_token_matches,
     sandbox_ui_token_matches,
     workspace_paths_match,
 )
@@ -29,6 +28,9 @@ CHAT_SERVICE_EMPLOYEE_HEADER = "x-relay-employee-id"
 
 
 async def json_body(request: Request) -> dict[str, Any]:
+    content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    if content_type != "application/json":
+        raise HTTPException(415, "Content-Type must be application/json.")
     try:
         value = await request.json()
     except ClientDisconnect as error:
@@ -438,7 +440,7 @@ def authorized_sandbox_for_token(registry: DaemonNodeRegistry, token: str | None
         return None
     return next((
         sandbox for sandbox in registry.list_ready()
-        if sandbox_ui_token_matches(sandbox, token) or daemon_node_token_matches(sandbox, token)
+        if sandbox_ui_token_matches(sandbox, token)
     ), None)
 
 

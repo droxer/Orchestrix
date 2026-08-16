@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -161,6 +162,26 @@ def test_database_task_store_persists_assignment_status_activity_and_link() -> N
         assert any("Assigned to codex" in item["message"] for item in task["activity"])
 
 
+def test_database_task_snapshot_excludes_authoritative_histories() -> None:
+    with TemporaryDirectory() as root:
+        database_url = f"sqlite:///{root}/compact.db"
+        store = DatabaseTaskStore(database_url, create_schema=True)
+        task = store.create_task({"title": "Keep the snapshot bounded"})
+        for index in range(10):
+            store.record_activity(task["id"], f"Activity {index}")
+
+        with store.engine.begin() as conn:
+            raw_snapshot = conn.execute(
+                text("select snapshot from tasks where id = :id"), {"id": task["id"]}
+            ).scalar_one()
+        snapshot = json.loads(raw_snapshot) if isinstance(raw_snapshot, str) else raw_snapshot
+
+        assert "events" not in snapshot
+        assert "activity" not in snapshot
+        assert snapshot["eventCount"] == len(store.get_task(task["id"])["events"])
+        assert len(store.get_task(task["id"])["activity"]) == 10
+
+
 def test_database_task_summaries_project_histories_before_transfer() -> None:
     with TemporaryDirectory() as root:
         store = DatabaseTaskStore(
@@ -184,7 +205,8 @@ def test_database_task_summaries_project_histories_before_transfer() -> None:
             for statement in statements
             if statement.lstrip().upper().startswith("SELECT")
         )
-        assert "json_remove(tasks.snapshot" in summary_select
+        assert "json_remove(tasks.snapshot" not in summary_select
+        assert "tasks.snapshot" in summary_select
         assert "events" not in summaries[0]
         assert "activity" not in summaries[0]
         assert summaries[0]["lastActivity"]["message"] == "Projected activity"

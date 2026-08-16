@@ -69,16 +69,7 @@ def sandboxes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
             if actor_can_access_sandbox(actor, sandbox)
         ]
         return {"sandboxes": allowed}
-    return {
-        "sandboxes": [
-            {
-                key: value
-                for key, value in public_computer_record(ctx, sandbox).items()
-                if key != "displayName"
-            }
-            for sandbox in ctx.backend.list()
-        ]
-    }
+    raise HTTPException(401, "Authentication required.")
 
 
 @router.post("/sandboxes", status_code=201)
@@ -88,7 +79,9 @@ async def provision_sandbox(request: Request, ctx: AppContextDep) -> dict[str, A
     if not employee_id:
         raise HTTPException(400, "employeeId is required.")
     actor = request_actor_or_none(request, ctx.auth_store)
-    if actor and not actor["isAdmin"] and employee_id != actor["employeeId"]:
+    if not actor:
+        raise HTTPException(401, "Authentication required.")
+    if not actor["isAdmin"] and employee_id != actor["employeeId"]:
         raise HTTPException(403, "Sandbox access denied.")
     try:
         sandbox = ctx.backend.provision(
@@ -98,14 +91,8 @@ async def provision_sandbox(request: Request, ctx: AppContextDep) -> dict[str, A
                 "workspacePath": string_field(body, "workspacePath") or None,
                 "token": bearer_token(request),
                 "nodeToken": string_field(body, "nodeToken") or None,
-                **(
-                    {
-                        "actorEmployeeId": actor["employeeId"],
-                        "actorIsAdmin": actor["isAdmin"],
-                    }
-                    if actor
-                    else {}
-                ),
+                "actorEmployeeId": actor["employeeId"],
+                "actorIsAdmin": actor["isAdmin"],
             }
         )
         logger.info(

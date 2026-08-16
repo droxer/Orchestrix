@@ -31,7 +31,6 @@ export const GENERATED_FILE_EXTENSIONS = new Set([
   ".webp",
   ".xls",
   ".xlsx",
-  ".zip",
 ]);
 
 const OUTPUT_FILE_TEXT_EXTENSIONS = new Set([
@@ -92,8 +91,10 @@ const CONTENT_TYPES: Record<string, string> = {
   ".webp": "image/webp",
   ".xls": "application/vnd.ms-excel",
   ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  ".zip": "application/zip",
 };
+
+const SENSITIVE_FILE_NAME = /(?:^|[._-])(credential|credentials|secret|secrets|token|tokens|password|passwd|api[._-]?key|private[._-]?key)(?:[._-]|$)/i;
+const LIKELY_SECRET_CONTENT = /(?:-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:OPENAI|ANTHROPIC|AWS|GITHUB|GOOGLE|RELAY)?_?(?:API_?KEY|ACCESS_?TOKEN|SECRET|PASSWORD)\s*["']?\s*[:=]\s*["']?[A-Za-z0-9_./+\-=]{8,}|\bsk-[A-Za-z0-9_-]{8,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\bAKIA[A-Z0-9]{16})/i;
 
 export interface GeneratedFileCandidate {
   path: string;
@@ -145,6 +146,21 @@ function isSiblingAgentHome(relativeDir: string, ownAgentHomeSubdir: string | un
   return relativeDir !== ownAgentHomeSubdir;
 }
 
+function isSensitiveCandidate(path: string, name: string, extension: string, bytes: number): boolean {
+  if (SENSITIVE_FILE_NAME.test(name) || name === ".env" || name.startsWith(".env.")) return true;
+  const textLike = OUTPUT_FILE_TEXT_EXTENSIONS.has(extension)
+    || extension === ".csv"
+    || extension === ".html"
+    || extension === ".svg"
+    || extension === ".tsv";
+  if (!textLike || bytes > GENERATED_FILE_CONTENT_MAX_BYTES) return false;
+  try {
+    return LIKELY_SECRET_CONTENT.test(readFileSync(path, "utf8"));
+  } catch {
+    return true;
+  }
+}
+
 function listCandidates(
   workspacePath: string | undefined,
   options: GeneratedFileScanOptions = {},
@@ -189,6 +205,7 @@ function listCandidates(
       if (!stat.isFile()) continue;
       const relativePath = relative(workspacePath, path).split(sep).join("/");
       if (!GENERATED_FILE_EXTENSIONS.has(extension) && !isTextDocumentFile(relativePath, extension)) continue;
+      if (isSensitiveCandidate(path, entry.name, extension, stat.size)) continue;
       files.push({
         path,
         relativePath,

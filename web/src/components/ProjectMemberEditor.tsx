@@ -1,0 +1,344 @@
+"use client";
+
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
+import { useRelayMutations } from "../hooks/useRelayMutations";
+import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
+import { computerId as stableComputerId } from "../lib/createAgent";
+import { agentsEligibleForProject } from "../lib/projectPage";
+import {
+  AGENT_ROLE_OPTIONS,
+  type AgentRole,
+  type DaemonNodeMonitorRecord,
+  type EmployeeAgent,
+  type ProjectMember,
+  type ProjectRecord,
+} from "../types";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useDialogs } from "@/components/ui/DialogProvider";
+import { Drawer } from "@/components/ui/Drawer";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { AdminDelete } from "./icons";
+
+type MemberDraft = {
+  agentId: string;
+  role: AgentRole;
+  functionTitle: string;
+  responsibilities: string;
+  instructions: string;
+  enabled: boolean;
+  lead: boolean;
+};
+
+const EMPTY_DRAFT: MemberDraft = {
+  agentId: "",
+  role: "implementer",
+  functionTitle: "",
+  responsibilities: "",
+  instructions: "",
+  enabled: true,
+  lead: false,
+};
+
+function draftKey(draft: MemberDraft): string {
+  return JSON.stringify(draft);
+}
+
+/* The update API replaces the roster wholesale, so every member save (add,
+   edit, remove) re-serializes the current record with one entry changed. */
+function rosterPayload(project: ProjectRecord) {
+  return project.members.map((member) => ({
+    agentId: member.agentId,
+    role: member.role,
+    functionTitle: member.functionTitle,
+    responsibilities: member.responsibilities,
+    ...(member.instructions ? { instructions: member.instructions } : {}),
+    enabled: member.enabled,
+  }));
+}
+
+export function ProjectMemberEditor({
+  open,
+  member,
+  project,
+  agents,
+  computers,
+  onClose,
+}: {
+  open: boolean;
+  /** Null member = add mode; an existing member = edit mode. */
+  member: ProjectMember | null;
+  project: ProjectRecord;
+  agents: EmployeeAgent[];
+  computers: DaemonNodeMonitorRecord[];
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const { confirm } = useDialogs();
+  const { updateProjectMutation } = useRelayMutations();
+  const [draft, setDraft] = useState<MemberDraft>(EMPTY_DRAFT);
+  const [briefError, setBriefError] = useState<string | null>(null);
+  const initializedKeyRef = useRef<string | null>(null);
+  const initialDraftKeyRef = useRef(draftKey(EMPTY_DRAFT));
+  const agentLabelId = useId();
+  const roleLabelId = useId();
+
+  const runtimeNodeId = useMemo(
+    () => computers.find((computer) => stableComputerId(computer) === project.computerId)?.id ?? "",
+    [computers, project.computerId],
+  );
+  const memberAgentIds = useMemo(
+    () => new Set(project.members.map((item) => item.agentId)),
+    [project.members],
+  );
+  const candidates = useMemo(
+    () => agentsEligibleForProject(agents, project.computerId, runtimeNodeId)
+      .filter((agent) => !memberAgentIds.has(agent.id)),
+    [agents, project.computerId, runtimeNodeId, memberAgentIds],
+  );
+  const editingAgent = useMemo(
+    () => agents.find((agent) => agent.id === member?.agentId) ?? null,
+    [agents, member],
+  );
+  const busy = updateProjectMutation.isPending;
+
+  useEffect(() => {
+    if (!open) {
+      initializedKeyRef.current = null;
+      return;
+    }
+    const initializationKey = member ? `${project.id}:${project.version}:${member.agentId}` : `${project.id}:${project.version}:new`;
+    if (initializedKeyRef.current === initializationKey) return;
+    initializedKeyRef.current = initializationKey;
+    const initial = member
+      ? {
+          agentId: member.agentId,
+          role: member.role,
+          functionTitle: member.functionTitle,
+          responsibilities: member.responsibilities,
+          instructions: member.instructions ?? "",
+          enabled: member.enabled,
+          lead: member.agentId === project.leadAgentId,
+        }
+      : EMPTY_DRAFT;
+    setDraft(initial);
+    setBriefError(null);
+    initialDraftKeyRef.current = draftKey(initial);
+  }, [open, member, project.id, project.version, project.leadAgentId]);
+
+  const dirty = initializedKeyRef.current !== null && draftKey(draft) !== initialDraftKeyRef.current;
+  const confirmDiscard = useUnsavedChangesGuard(open && dirty && !busy);
+
+  function patch(patchDraft: Partial<MemberDraft>) {
+    setDraft((current) => ({ ...current, ...patchDraft }));
+    setBriefError(null);
+  }
+
+  function pickAgent(agentId: string | null) {
+    const agent = agents.find((candidate) => candidate.id === agentId);
+    patch({
+      agentId: agentId ?? "",
+      ...(agent ? { role: agent.defaultRole ?? "implementer", functionTitle: agent.displayName } : {}),
+    });
+  }
+
+  async function requestClose() {
+    if (busy) return;
+    if (await confirmDiscard()) onClose();
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!member && !draft.agentId) {
+      setBriefError(t("project.member_choose_required"));
+      return;
+    }
+    if (!draft.functionTitle.trim() || !draft.responsibilities.trim()) {
+      setBriefError(t("project.member_fields_required"));
+      return;
+    }
+    const payload = {
+      agentId: draft.agentId,
+      role: draft.role,
+      functionTitle: draft.functionTitle.trim(),
+      responsibilities: draft.responsibilities.trim(),
+      ...(draft.instructions.trim() ? { instructions: draft.instructions.trim() } : {}),
+      enabled: draft.enabled,
+    };
+    const base = rosterPayload(project);
+    const members = member
+      ? base.map((item) => (item.agentId === member.agentId ? payload : item))
+      : [...base, payload];
+    const leadAgentId = draft.lead
+      ? draft.agentId
+      : project.leadAgentId === draft.agentId
+        ? null
+        : project.leadAgentId;
+    try {
+      await updateProjectMutation.mutateAsync({
+        projectId: project.id,
+        input: { expectedVersion: project.version, leadAgentId, members },
+      });
+      onClose();
+    } catch {
+      // The shared mutation handler announces the server error; preserve the form.
+    }
+  }
+
+  async function remove() {
+    if (!member || busy) return;
+    const name = editingAgent?.displayName ?? member.agentId;
+    const accepted = await confirm({
+      title: t("project.member_remove_confirm_title", { name }),
+      message: t("project.member_remove_confirm_message"),
+      confirmLabel: t("project.member_remove"),
+      tone: "danger",
+    });
+    if (!accepted) return;
+    const members = rosterPayload(project).filter((item) => item.agentId !== member.agentId);
+    const leadAgentId = project.leadAgentId === member.agentId
+      ? members[0]?.agentId ?? null
+      : project.leadAgentId;
+    try {
+      await updateProjectMutation.mutateAsync({
+        projectId: project.id,
+        input: { expectedVersion: project.version, leadAgentId, members },
+      });
+      onClose();
+    } catch {
+      // The shared mutation handler announces the error and keeps the drawer open.
+    }
+  }
+
+  return (
+    <Drawer
+      open={open}
+      onClose={() => { void requestClose(); }}
+      kicker={project.name}
+      title={member ? t("project.member_edit") : t("project.member_add")}
+      subtitle={member ? editingAgent?.displayName ?? member.agentId : undefined}
+      width="form"
+      closeLabel={t("admin.v2.close_drawer")}
+      bodyClassName="adm-drawer-body--column"
+    >
+      <form className="project-member-form" onSubmit={(event) => void submit(event)} noValidate>
+        {!member ? (
+          candidates.length ? (
+            <Field label={t("project.member_agent")} labelId={agentLabelId} wrapper="div">
+              <Select value={draft.agentId} onValueChange={pickAgent}>
+                <SelectTrigger className="w-full" aria-labelledby={agentLabelId} data-modal-initial-focus>
+                  <SelectValue placeholder={t("project.member_choose_agent")}>
+                    {(value: string | null) => agents.find((candidate) => candidate.id === value)?.displayName ?? t("project.member_choose_agent")}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {candidates.map((agent) => (
+                    <SelectItem key={agent.id} value={agent.id}>{agent.displayName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          ) : (
+            <p className="project-empty-hint">{t("project.member_no_agents")}</p>
+          )
+        ) : null}
+
+        {member || draft.agentId ? (
+          <>
+            <Field label={t("project.role")} labelId={roleLabelId} wrapper="div">
+              <Select value={draft.role} onValueChange={(value) => patch({ role: value as AgentRole })}>
+                <SelectTrigger className="w-full" aria-labelledby={roleLabelId}>
+                  <SelectValue>{(value: AgentRole) => t(`project.roles.${value}`)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {AGENT_ROLE_OPTIONS.map((role) => (
+                    <SelectItem key={role} value={role}>{t(`project.roles.${role}`)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label={t("project.function_title")}>
+              <Input
+                maxLength={120}
+                value={draft.functionTitle}
+                onChange={(event) => patch({ functionTitle: event.target.value })}
+              />
+            </Field>
+            <Field label={t("project.responsibilities")}>
+              <Textarea
+                maxLength={4000}
+                rows={3}
+                value={draft.responsibilities}
+                onChange={(event) => patch({ responsibilities: event.target.value })}
+              />
+            </Field>
+            <Field label={t("project.instructions")}>
+              <Textarea
+                maxLength={8000}
+                rows={5}
+                value={draft.instructions}
+                onChange={(event) => patch({ instructions: event.target.value })}
+              />
+            </Field>
+
+            <div className="project-member-flags">
+              <label className="project-member-flag">
+                <Checkbox
+                  checked={draft.lead}
+                  onCheckedChange={(value) => patch({ lead: value === true })}
+                  aria-label={t("project.member_make_lead")}
+                />
+                <span>{t("project.member_make_lead")}</span>
+              </label>
+              <label className="project-member-flag">
+                <Checkbox
+                  checked={draft.enabled}
+                  onCheckedChange={(value) => patch({ enabled: value === true })}
+                  aria-label={t("project.member_enabled")}
+                />
+                <span>{t("project.member_enabled")}</span>
+              </label>
+            </div>
+          </>
+        ) : null}
+
+        {briefError ? <p className="text-sm text-danger" role="alert">{briefError}</p> : null}
+
+        {member ? (
+          <div className="adm-drawer-section">
+            <p className="adm-drawer-section-title">{t("admin.v2.danger_zone")}</p>
+            <div className="adm-drawer-section-actions">
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => void remove()}
+                disabled={busy}
+              >
+                <AdminDelete size={14} aria-hidden="true" />
+                {t("project.member_remove")}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="adm-form-actions">
+          <Button size="cta" type="button" variant="ghost" onClick={() => void requestClose()} disabled={busy}>
+            {t("dialog.cancel")}
+          </Button>
+          <Button
+            size="cta"
+            type="submit"
+            loading={busy}
+            disabled={!member && !draft.agentId}
+          >
+            {t("project.member_save")}
+          </Button>
+        </div>
+      </form>
+    </Drawer>
+  );
+}

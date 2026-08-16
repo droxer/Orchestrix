@@ -123,7 +123,13 @@ describe("application typography roles", () => {
       const source = readFileSync(path.join(styles, file), "utf8");
       for (const rule of source.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
         const [, , body] = rule;
-        if (!/font-family:\s*var\(--font-mono\)/.test(body)) continue;
+        // The `font:` shorthand (e.g. `font: var(--type-code)`) doesn't spell
+        // `font-family:`, but it resolves to the same mono face and must opt
+        // back out of the inherited body tracking just the same.
+        const optsMono =
+          /font-family:\s*var\(--font-mono\)/.test(body) ||
+          /font:\s*var\(--type-code\)/.test(body);
+        if (!optsMono) continue;
         if (/letter-spacing:/.test(body)) continue;
         problems.push(`${file}:${source.slice(0, rule.index).split("\n").length}`);
       }

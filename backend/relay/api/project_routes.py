@@ -9,7 +9,11 @@ from ..persistence.project_store import (
     ProjectValidationError,
     ProjectVersionConflict,
 )
-from ..services.project_catalog import create_project_payload, update_project_payload
+from ..services.project_catalog import (
+    create_project_payload,
+    resolve_target_node_id,
+    update_project_payload,
+)
 from ..services.project_runtime import project_runtime_node
 from .deps import AppContextDep
 from .helpers import json_body, request_actor
@@ -172,12 +176,16 @@ async def update_project(
     current = project_for_owner(ctx, project_id, actor["employeeId"])
     body = await json_body(request)
     try:
+        target_node_id = resolve_target_node_id(
+            ctx.registry.monitor_nodes(), current["computerId"]
+        )
         patch, expected_version = update_project_payload(
             actor["employeeId"],
             current,
             body,
             agent_store=ctx.agent_store,
             placement_store=ctx.agent_placement_store,
+            target_node_id=target_node_id,
         )
         project = ctx.project_store.update_project(
             project_id, patch, expected_version=expected_version

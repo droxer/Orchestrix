@@ -57,6 +57,23 @@ def create_project_payload(
     }
 
 
+def resolve_target_node_id(monitor_nodes: list[dict[str, Any]], computer_id_value: str) -> str | None:
+    """Find the live daemon node currently hosting a project's computer.
+
+    Legacy placements predate stable computer ids, so roster validation
+    falls back to matching the daemon node currently hosting the project's
+    computer, the same lookup `create_project_payload` performs up front.
+    """
+    return next(
+        (
+            node["id"]
+            for node in monitor_nodes
+            if not node.get("retiredAt") and computer_id(node) == computer_id_value
+        ),
+        None,
+    )
+
+
 def update_project_payload(
     owner_employee_id: str,
     current: dict[str, Any],
@@ -64,6 +81,7 @@ def update_project_payload(
     *,
     agent_store: Any,
     placement_store: Any,
+    target_node_id: str | None = None,
 ) -> tuple[dict[str, Any], int]:
     expected_version = payload.get("expectedVersion")
     if not isinstance(expected_version, int) or isinstance(expected_version, bool):
@@ -84,7 +102,11 @@ def update_project_payload(
             patch.get("members", current["members"]),
             patch.get("leadAgentId", current["leadAgentId"]),
             target_computer_id=current["computerId"],
-            target_node_id=None,
+            # Create resolves the node's id up front; updates must do the same
+            # (via the caller) or legacy placements — those recorded before
+            # placements carried a stable computerId — can never revalidate,
+            # which locks the roster of every pre-computerId project.
+            target_node_id=target_node_id,
             agent_store=agent_store,
             placement_store=placement_store,
         )

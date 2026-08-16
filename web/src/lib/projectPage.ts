@@ -11,6 +11,35 @@ export type ProjectOverviewState = "hidden" | "loading" | "error" | "not-found" 
 
 export const PROJECT_PAGE_TABS: readonly ProjectPageTab[] = ["profile", "workspace", "activities"];
 
+/** Backend roster cap — the add-member affordance hides at the limit. */
+export const MAX_PROJECT_MEMBERS = 32;
+
+/* Member eligibility mirrors the backend's project_member_computer_mismatch
+   rule exactly (backend/relay/services/project_catalog.py): an agent can join
+   a project's roster only when one of its active placements points at the
+   project's stable computer id, or — for legacy placements that predate
+   computer ids — at the runtime node currently hosting that computer.
+   Filtering on runtime node alone (as the thread composer does) offers
+   agents the backend then rejects, so the picker cannot reuse it. */
+export function agentsEligibleForProject(
+  agents: readonly EmployeeAgent[],
+  computerId: string,
+  runtimeNodeId: string,
+): EmployeeAgent[] {
+  return agents.filter((agent) =>
+    !agent.deletedAt
+    && agent.enabled
+    && agent.placements.some((placement) =>
+      placement.desiredState === "active"
+      && (
+        placement.computerId === computerId
+        || (
+          !placement.computerId
+          && (placement.runtimeNodeId || placement.daemonNodeId) === runtimeNodeId
+        )
+      )));
+}
+
 export function parseProjectPageTab(value: string | null): ProjectPageTab {
   return PROJECT_PAGE_TABS.includes(value as ProjectPageTab)
     ? value as ProjectPageTab

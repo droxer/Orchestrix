@@ -1,5 +1,5 @@
 import { accessSync, constants, lstatSync, mkdirSync, realpathSync, statSync } from "node:fs";
-import { isAbsolute, posix, resolve, sep } from "node:path";
+import { isAbsolute, resolve, sep } from "node:path";
 
 import { GUEST_WORKSPACE, type DaemonNodeSandboxMode } from "relay-core";
 
@@ -52,9 +52,7 @@ export class ThreadWorkspaceManager {
     return {
       sessionId,
       hostPath,
-      executionPath: this.sandboxMode === "boxlite"
-        ? posix.join(GUEST_WORKSPACE, sessionId)
-        : hostPath,
+      executionPath: this.sandboxMode === "boxlite" ? GUEST_WORKSPACE : hostPath,
     };
   }
 
@@ -78,9 +76,7 @@ export class ThreadWorkspaceManager {
     return {
       sessionId,
       hostPath,
-      executionPath: this.sandboxMode === "boxlite"
-        ? posix.join(GUEST_WORKSPACE, ...segments)
-        : hostPath,
+      executionPath: this.sandboxMode === "boxlite" ? GUEST_WORKSPACE : hostPath,
     };
   }
 

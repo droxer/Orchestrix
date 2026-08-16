@@ -530,6 +530,40 @@
   align-items: start;
 }
 
+/* Agent detail profile: one calm column. The page header owns the agent's
+   name and the RecordBand owns runtime/host/availability/id, so the dossier
+   keeps only what is left — a portrait + role identity row, then the
+   document, then management at the foot. Scoped to the agent record: the
+   team record still uses the doc + rail grid above. */
+.workspace-profile .agent-dossier {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+.agent-dossier-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding-bottom: var(--sp-5);
+  border-bottom: 1px solid var(--line-2);
+}
+
+.agent-dossier-identity-meta {
+  display: grid;
+  min-width: 0;
+  gap: var(--sp-2);
+}
+
+.agent-dossier-identity-meta .workspace-dossier-field {
+  gap: var(--sp-1);
+}
+
+.agent-dossier-identity-meta .workspace-dossier-stamp {
+  padding-top: 0;
+  border-top: 0;
+}
+
 .workspace-profile .adm-cred-row {
   display: grid;
   grid-template-columns: minmax(108px, 132px) minmax(0, 1fr);

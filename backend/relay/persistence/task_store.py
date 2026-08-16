@@ -29,7 +29,6 @@ from sqlalchemy import (
     or_,
     select,
     text,
-    type_coerce,
     update,
 )
 from sqlalchemy.exc import IntegrityError
@@ -89,6 +88,26 @@ def compact_task_summary(
     if activity:
         summary["lastActivity"] = activity[-1]
     return summary
+
+
+def compact_task_snapshot(
+    task: dict[str, Any], *, event_count: int | None = None
+) -> dict[str, Any]:
+    """Persist current task state without duplicating event/activity history."""
+    snapshot = {
+        key: value
+        for key, value in task.items()
+        if key not in {"events", "activity", "eventCount", "activityCount"}
+    }
+    events = task.get("events") or []
+    activity = task.get("activity") or []
+    snapshot["eventCount"] = len(events) if event_count is None else event_count
+    snapshot["activityCount"] = len(activity)
+    if activity:
+        snapshot["lastActivity"] = activity[-1]
+    else:
+        snapshot.pop("lastActivity", None)
+    return snapshot
 
 
 def _task_session_link_events(task_id: str, session_id: str) -> list[dict[str, Any]]:
@@ -280,7 +299,7 @@ class LocalTaskStore:
                 ),
                 encoding="utf-8",
             )
-            _write_json(self._snapshot_path(task_id), task)
+            _write_json(self._snapshot_path(task_id), compact_task_snapshot(task))
             return task
 
     def append_event(self, task_id: str, event: dict[str, Any]) -> dict[str, Any]:
@@ -311,14 +330,17 @@ class LocalTaskStore:
             )
             events = [*current.get("events", []), *new_events]
             task = materialize_task_events(events)
-            _write_json(self._snapshot_path(task_id), task)
+            _write_json(self._snapshot_path(task_id), compact_task_snapshot(task))
             return task
 
     def get_task(self, task_id: str) -> dict[str, Any]:
         with self._lock:
+            events = _read_jsonl(self._events_path(task_id))
+            if events:
+                return materialize_task_events(events)
             if self._snapshot_path(task_id).exists():
                 return _read_json(self._snapshot_path(task_id))
-            return materialize_task_events(_read_jsonl(self._events_path(task_id)))
+            return materialize_task_events(events)
 
     def list_tasks(self) -> list[dict[str, Any]]:
         if not self.tasks_dir.exists():
@@ -901,7 +923,10 @@ class DatabaseTaskStore:
                 "linkedSessionIds", []
             ):
                 return current
-            task = materialize_task_events([*current.get("events", []), *events])
+            existing_events = self._events_for_task(conn, task_pk)
+            if not existing_events:
+                existing_events = list(current.get("events", []))
+            task = materialize_task_events([*existing_events, *events])
             claimed = conn.execute(
                 update(self.tasks)
                 .where(
@@ -954,59 +979,46 @@ class DatabaseTaskStore:
         with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
-                    select(self.tasks.c.snapshot).where(self.tasks.c.id == task_id)
+                    select(self.tasks.c.id, self.tasks.c.snapshot).where(
+                        self.tasks.c.id == task_id
+                    )
                 )
                 .mappings()
                 .first()
             )
             if not row:
                 raise KeyError(task_id)
-        return row["snapshot"]
+            events = self._events_for_task(conn, row["id"])
+            if not events:
+                events = list((row["snapshot"] or {}).get("events", []))
+            return materialize_task_events(events) if events else row["snapshot"]
 
     def list_tasks(self) -> list[dict[str, Any]]:
         with store_transaction(self.engine) as conn:
             rows = (
                 conn.execute(
-                    select(self.tasks.c.snapshot).order_by(
+                    select(self.tasks.c.id, self.tasks.c.snapshot).order_by(
                         self.tasks.c.updated_at.desc()
                     )
                 )
                 .mappings()
                 .all()
             )
-        return [row["snapshot"] for row in rows if not row["snapshot"].get("deletedAt")]
+            tasks = []
+            for row in rows:
+                events = self._events_for_task(conn, row["id"])
+                task = materialize_task_events(events) if events else row["snapshot"]
+                if not task.get("deletedAt"):
+                    tasks.append(task)
+            return tasks
 
     def list_task_summaries(
         self, *, employee_id: str | None = None, limit: int | None = None
     ) -> list[dict[str, Any]]:
-        compact_snapshot = (
-            self.tasks.c.snapshot.op("-")("events").op("-")("activity")
-            if self.engine.dialect.name == "postgresql"
-            else func.json_remove(
-                self.tasks.c.snapshot,
-                "$.events",
-                "$.activity",
-            )
-        )
-        activity_count = (
-            func.jsonb_array_length(self.tasks.c.snapshot["activity"])
-            if self.engine.dialect.name == "postgresql"
-            else func.json_array_length(self.tasks.c.snapshot["activity"])
-        )
-        last_activity = (
-            select(self.events.c.payload["activity"])
-            .where(self.events.c.task_id == self.tasks.c.id)
-            .where(self.events.c.type == "task.activity")
-            .order_by(self.events.c.sequence.desc())
-            .limit(1)
-            .scalar_subquery()
-        )
         statement = (
             select(
-                type_coerce(compact_snapshot, json_type()).label("summary"),
+                self.tasks.c.snapshot.label("summary"),
                 self.tasks.c.version,
-                func.coalesce(activity_count, 0).label("activity_count"),
-                type_coerce(last_activity, json_type()).label("last_activity"),
             )
             .where(self.tasks.c.snapshot["deletedAt"].as_string().is_(None))
             .order_by(self.tasks.c.updated_at.desc())
@@ -1027,11 +1039,11 @@ class DatabaseTaskStore:
                 **compact_task_summary(
                     row["summary"],
                     event_count=int(row["version"] or 0),
-                    activity_count=int(row["activity_count"] or 0),
+                    activity_count=int(row["summary"].get("activityCount") or 0),
                 ),
                 **(
-                    {"lastActivity": row["last_activity"]}
-                    if row["last_activity"]
+                    {"lastActivity": row["summary"]["lastActivity"]}
+                    if row["summary"].get("lastActivity")
                     else {}
                 ),
             }
@@ -1202,7 +1214,9 @@ class DatabaseTaskStore:
                 ),
             ]
             task_pk = row["id"]
-            snapshot_events = list(snapshot.get("events", []))
+            snapshot_events = self._events_for_task(conn, task_pk)
+            if not snapshot_events:
+                snapshot_events = list(snapshot.get("events", []))
             sequence = int(row["version"] or 0)
             for offset, event in enumerate(events):
                 conn.execute(
@@ -1315,7 +1329,9 @@ class DatabaseTaskStore:
                 next_run_date,
             )
             task_pk = row["id"]
-            snapshot_events = list(routine.get("events", []))
+            snapshot_events = self._events_for_task(conn, task_pk)
+            if not snapshot_events:
+                snapshot_events = list(routine.get("events", []))
             sequence = int(row["version"] or 0)
             for offset, event in enumerate(routine_events):
                 conn.execute(
@@ -1412,12 +1428,15 @@ class DatabaseTaskStore:
             )
             task_pk = row["id"]
             sequence = int(row["version"] or 0)
+            prior_events = self._events_for_task(conn, task_pk)
+            if not prior_events:
+                prior_events = list(routine.get("events", []))
             conn.execute(
                 insert(self.events).values(
                     **task_event_to_row(task_pk, sequence, event)
                 )
             )
-            updated = materialize_task_events([*routine.get("events", []), event])
+            updated = materialize_task_events([*prior_events, event])
             conn.execute(
                 update(self.tasks)
                 .where(self.tasks.c.id == task_pk)
@@ -1515,7 +1534,10 @@ class DatabaseTaskStore:
             return current
         events = _task_session_unlink_events(task_id, session_id)
         sequence = int(row["version"] or 0)
-        task = materialize_task_events([*current.get("events", []), *events])
+        prior_events = self._events_for_task(conn, row["id"])
+        if not prior_events:
+            prior_events = list(current.get("events", []))
+        task = materialize_task_events([*prior_events, *events])
         claimed = conn.execute(
             update(self.tasks)
             .where(self.tasks.c.id == row["id"], self.tasks.c.version == sequence)
@@ -1631,7 +1653,7 @@ def task_to_row(
         "routine_cadence": task.get("routineCadence"),
         "routine_next_run_date": _parse_date(task.get("routineNextRunDate")),
         "routine_enabled": bool(task.get("routineEnabled")),
-        "snapshot": task,
+        "snapshot": compact_task_snapshot(task, event_count=version),
         "version": version,
         "created_at": _parse_iso(task["createdAt"]),
         "updated_at": _parse_iso(task["updatedAt"]),

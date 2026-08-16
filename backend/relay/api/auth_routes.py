@@ -20,6 +20,21 @@ from .helpers import json_body, string_field
 router = APIRouter()
 
 
+def _auth_rate_key(request: Request, scope: str, identity: str = "") -> str:
+    client_host = request.client.host if request.client else "unknown"
+    return f"{scope}:{client_host}:{identity.strip().lower()}"
+
+
+def _consume_auth_attempt(request: Request, key: str) -> None:
+    retry_after = request.app.state.auth_rate_limiter.consume(key)
+    if retry_after is not None:
+        raise HTTPException(
+            429,
+            "Too many authentication attempts. Try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
 @router.get("/auth/status")
 async def auth_status(ctx: AppContextDep) -> dict[str, Any]:
     return {"requiresBootstrap": not ctx.auth_store.has_users()}
@@ -59,6 +74,8 @@ async def update_auth_preferences(request: Request, ctx: AppContextDep) -> dict[
 @router.post("/auth/bootstrap")
 async def auth_bootstrap(request: Request, response: Response, ctx: AppContextDep) -> dict[str, Any]:
     body = await json_body(request)
+    rate_key = _auth_rate_key(request, "bootstrap")
+    _consume_auth_attempt(request, rate_key)
     try:
         user = ctx.auth_store.bootstrap_with_token(
             string_field(body, "token"),
@@ -67,6 +84,7 @@ async def auth_bootstrap(request: Request, response: Response, ctx: AppContextDe
         )
     except ValueError as error:
         raise HTTPException(400, str(error)) from error
+    request.app.state.auth_rate_limiter.reset(rate_key)
     session = ctx.auth_store.create_session(user["id"])
     attrs = user_session_cookie_attrs_for_request(
         request, max_age_seconds=ctx.auth_store.session_ttl_seconds
@@ -78,9 +96,13 @@ async def auth_bootstrap(request: Request, response: Response, ctx: AppContextDe
 @router.post("/auth/login")
 async def auth_login(request: Request, response: Response, ctx: AppContextDep) -> dict[str, Any]:
     body = await json_body(request)
-    user = ctx.auth_store.authenticate(string_field(body, "username"), string_field(body, "password"))
+    username = string_field(body, "username")
+    rate_key = _auth_rate_key(request, "login", username)
+    _consume_auth_attempt(request, rate_key)
+    user = ctx.auth_store.authenticate(username, string_field(body, "password"))
     if not user:
         raise HTTPException(401, "Invalid username or password.")
+    request.app.state.auth_rate_limiter.reset(rate_key)
     session = ctx.auth_store.create_session(user["id"])
     attrs = user_session_cookie_attrs_for_request(
         request, max_age_seconds=ctx.auth_store.session_ttl_seconds

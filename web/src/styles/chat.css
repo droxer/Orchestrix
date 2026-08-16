@@ -10,8 +10,7 @@
 }
 
 .chat-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
   gap: var(--sp-3);
   padding: 0 var(--page-gutter);
@@ -21,6 +20,7 @@
 
 .chat-title {
   min-width: 0;
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   gap: var(--sp-3);
@@ -92,7 +92,7 @@
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  min-width: 0;
+  flex: none;
 }
 
 .chat-agent-select {

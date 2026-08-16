@@ -33,15 +33,25 @@ type ThreadRowProps = {
   onSelect: (sessionId: string) => void;
   onRename?: (session: RelaySession) => void;
   onClose?: (sessionId: string) => void;
+  /** Projects-directory mode: the flat list has no group headers, so the row
+      carries its own state pip (and speaks the state in its aria-label). */
+  state?: "attn" | "run" | "idle";
 };
 
-export function ThreadRow({ item, selected, onSelect, onRename, onClose }: ThreadRowProps) {
+export function ThreadRow({ item, selected, onSelect, onRename, onClose, state }: ThreadRowProps) {
   const { t, i18n } = useTranslation();
   const { session } = item;
   const label = threadLabel(session);
   const stamp = relativeTime(session.updatedAt, i18n.language);
   const offlineLabel = item.nodeOffline ? t("thread.node_offline") : "";
-  const rowLabel = [label, offlineLabel, stamp].filter(Boolean).join(" · ");
+  const stateLabel = state
+    ? state === "attn"
+      ? t("thread.group_needs_you")
+      : state === "run"
+        ? t("thread.group_running")
+        : t("thread.group_idle")
+    : "";
+  const rowLabel = [label, offlineLabel, stateLabel, stamp].filter(Boolean).join(" · ");
   const deleteEnabled = canDeleteThread(item);
 
   function handleClose() {
@@ -59,6 +69,9 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose }: Threa
       >
         <span className="conversation-copy">
           <span className="conversation-topline">
+            {state ? (
+              <span className="conversation-state-dot" data-tone={state} aria-hidden="true" />
+            ) : null}
             <span className="conversation-name">
               <strong>{label}</strong>
               {item.nodeOffline ? (
