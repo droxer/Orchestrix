@@ -71,7 +71,7 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
         open={open}
         onClose={onClose}
         title={t("admin.v2.credentials_title")}
-        closeLabel={t("admin.v2.close_drawer")}
+        closeLabel={t("drawer.close")}
         layer={1}
         width="detail"
       >
@@ -100,12 +100,9 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
       open={open}
       onClose={onClose}
       title={t("admin.v2.credentials_title")}
-      subtitle={
-        <span className="code" translate="no">
-          {employeeLabel} · {node.id}
-        </span>
-      }
-      closeLabel={t("admin.v2.close_drawer")}
+      subtitle={`${employeeLabel} · ${node.id}`}
+      subtitleMono
+      closeLabel={t("drawer.close")}
       layer={1}
       width="detail"
       bodyClassName={hasDangerZone ? "adm-drawer-body--column" : undefined}

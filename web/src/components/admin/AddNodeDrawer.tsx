@@ -143,7 +143,7 @@ export function AddNodeDrawer({
       kicker={t("admin.v2.provision_kicker_node")}
       title={t("admin.v2.add_node_title")}
       subtitle={t(isManaged ? "admin.v2.add_node_sub_managed" : "admin.v2.add_node_sub_local")}
-      closeLabel={t("admin.v2.close_drawer")}
+      closeLabel={t("drawer.close")}
       bodyClassName="adm-drawer-body--column"
       width="form"
     >
@@ -183,6 +183,7 @@ export function AddNodeDrawer({
             >
               <Input
                 ref={workspacePathRef}
+                data-modal-initial-focus
                 name="add-node-workspace-path"
                 autoComplete="off"
                 value={workspacePath}
@@ -237,7 +238,7 @@ export function AddNodeDrawer({
             >
               <SelectTrigger
                 ref={employeeTriggerRef}
-                data-modal-initial-focus
+                {...(isManaged ? { "data-modal-initial-focus": true } : {})}
                 className="w-full code"
                 aria-labelledby={employeeLabelId}
                 aria-invalid={Boolean(fieldErrors.employeeId) || undefined}

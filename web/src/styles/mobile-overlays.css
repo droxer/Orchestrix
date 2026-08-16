@@ -198,10 +198,8 @@
   }
 
   /* ── Artifact library drawer chrome ────────────────────────────── */
-  .artifact-library-drawer-body .adm-drawer-head {
-    padding-inline: var(--sp-4);
-  }
-
+  /* (The drawer head is a sibling of the body in Drawer.tsx markup, so head
+     padding comes from the generic .adm-drawer-head rule above.) */
   .artifact-preview-pane {
     padding-inline: var(--sp-4);
   }

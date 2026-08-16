@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormEvent, ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -339,9 +339,19 @@ export function TaskDrawer({
   const assignmentFieldId = `${fieldPrefix}-assignment`;
   const assignmentSummaryId = `${fieldPrefix}-assignment-summary`;
   const busy = saving || deleting;
+  const [titleError, setTitleError] = useState<string | null>(null);
 
   function updateBase(patch: Partial<TaskBoardFormState>): void {
     onChange({ ...form, ...patch } as TaskBoardFormState);
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    if (!form.title.trim()) {
+      setTitleError(t("admin.v2.chat_error_field_required", { field: t("backlog.title_field") }));
+      return;
+    }
+    onSubmit(event);
   }
 
   const agentOptions = logicalAgents.filter((agent) => assignmentOptionVisible(
@@ -385,20 +395,25 @@ export function TaskDrawer({
       title={title}
       subtitle={subtitle}
       subtitleMono={form.variant === "backlog" && Boolean(form.id)}
-      width={form.variant === "routine" ? 600 : 560}
-      closeLabel={t("admin.v2.close_drawer")}
+      width={form.variant === "routine" ? "routine" : "task"}
+      closeLabel={t("drawer.close")}
       bodyClassName="adm-drawer-body--column"
       onClosed={onClosed}
     >
-      <form className="adm-form task-board-drawer-form" onSubmit={onSubmit}>
+      <form className="adm-form task-board-drawer-form" onSubmit={handleSubmit} noValidate>
         {meta}
-        <Field label={t("backlog.title_field")}>
+        <Field label={t("backlog.title_field")} error={titleError ?? undefined} errorId="task-drawer-title-error">
           <Input
             data-modal-initial-focus={initialFocus === "title" ? "" : undefined}
             name={`${fieldPrefix}-title`}
             required
             value={form.title}
-            onChange={(event) => updateBase({ title: event.target.value })}
+            onChange={(event) => {
+              updateBase({ title: event.target.value });
+              if (titleError) setTitleError(null);
+            }}
+            aria-invalid={Boolean(titleError) || undefined}
+            aria-describedby={titleError ? "task-drawer-title-error" : undefined}
           />
         </Field>
         <Field label={t("backlog.description")}>

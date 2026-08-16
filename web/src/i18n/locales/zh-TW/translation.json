@@ -1187,6 +1187,9 @@
   "sheet": {
     "close": "關閉"
   },
+  "drawer": {
+    "close": "關閉抽屜"
+  },
   "cancel": {
     "reason": "從 Relay Web UI 取消。"
   },
@@ -1275,6 +1278,8 @@
     "create_action": "新增智能體",
     "create_title": "建立智能體",
     "create_sub": "先選擇它執行的電腦與執行環境，再選擇角色。",
+    "create_section_placement": "執行位置",
+    "create_section_identity": "身份",
     "create_computer_label": "電腦",
     "create_computer_placeholder": "選擇一台電腦",
     "create_computer_empty": "暫無可用電腦，請先連接一台。",

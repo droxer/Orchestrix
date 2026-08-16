@@ -217,6 +217,8 @@
    properties animate. */
 .artifact-library-shell {
   display: grid;
+  /* 48px rail: intentionally wider than --touch-target (44px) so the icon
+     strip keeps breathing room around its 44px buttons. */
   grid-template-columns: 48px minmax(0, 1fr);
   height: 100%;
   min-height: 0;

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useRelayMutations } from "../hooks/useRelayMutations";
+import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { computerId as stableComputerId } from "../lib/createAgent";
 import { agentsForThreadNode } from "../lib/threadRuntime";
 import {
@@ -32,6 +33,15 @@ type MemberDraft = {
   enabled: boolean;
 };
 
+function projectDraftKey(
+  name: string,
+  computerId: string,
+  members: MemberDraft[],
+  leadAgentId: string,
+): string {
+  return JSON.stringify({ name, computerId, members, leadAgentId });
+}
+
 export function ProjectDrawer({
   open,
   agents,
@@ -58,6 +68,7 @@ export function ProjectDrawer({
   const [error, setError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const initializedKeyRef = useRef<string | null>(null);
+  const initialDraftKeyRef = useRef(projectDraftKey("", "", [], ""));
   const projectComputers = useMemo(
     () => computers.filter((computer) => computer.capabilities?.includes("project-workspaces")),
     [computers],
@@ -84,21 +95,32 @@ export function ProjectDrawer({
     initializedKeyRef.current = initializationKey;
     if (!project) {
       reset();
+      initialDraftKeyRef.current = projectDraftKey("", "", [], "");
       return;
     }
-    setName(project.name);
-    setComputerId(projectRuntimeNodeId);
-    setMembers(project.members.map((member) => ({
+    const draftMembers = project.members.map((member) => ({
       agentId: member.agentId,
       role: member.role,
       functionTitle: member.functionTitle,
       responsibilities: member.responsibilities,
       instructions: member.instructions ?? "",
       enabled: member.enabled,
-    })));
+    }));
+    setName(project.name);
+    setComputerId(projectRuntimeNodeId);
+    setMembers(draftMembers);
     setLeadAgentId(project.leadAgentId ?? "");
     setError(null);
+    initialDraftKeyRef.current = projectDraftKey(
+      project.name,
+      projectRuntimeNodeId,
+      draftMembers,
+      project.leadAgentId ?? "",
+    );
   }, [open, project, projectRuntimeNodeId]);
+  const currentDraftKey = projectDraftKey(name, computerId, members, leadAgentId);
+  const hasUnsavedChanges = initializedKeyRef.current !== null && currentDraftKey !== initialDraftKeyRef.current;
+  const confirmDiscardChanges = useUnsavedChangesGuard(open && hasUnsavedChanges && !busy);
 
   function reset() {
     setName("");
@@ -108,10 +130,9 @@ export function ProjectDrawer({
     setError(null);
   }
 
-  function close() {
+  async function requestClose() {
     if (busy) return;
-    reset();
-    onClose();
+    if (await confirmDiscardChanges()) onClose();
   }
 
   function selectComputer(value: string | null) {
@@ -199,7 +220,6 @@ export function ProjectDrawer({
             leadAgentId: leadAgentId || null,
             members: roster,
           });
-      reset();
       onClose();
       onSaved(result.project);
     } catch {
@@ -221,7 +241,6 @@ export function ProjectDrawer({
         projectId: project.id,
         expectedVersion: project.version,
       });
-      reset();
       onClose();
       onSaved(result.project);
     } catch {
@@ -232,13 +251,14 @@ export function ProjectDrawer({
   return (
     <Drawer
       open={open}
-      onClose={close}
+      onClose={() => { void requestClose(); }}
       kicker={t("project.setup_kicker")}
       title={t(project ? "project.edit" : "project.setup_title")}
       subtitle={t(project ? "project.edit_subtitle" : "project.setup_subtitle")}
       width="wide"
       closeLabel={t("admin.v2.close_drawer")}
       bodyClassName="adm-drawer-body--column"
+      onClosed={reset}
     >
       <form className="project-setup-form" onSubmit={(event) => void submit(event)} noValidate>
         {!project ? (
@@ -321,7 +341,7 @@ export function ProjectDrawer({
             </Button>
           ) : null}
           <span className="project-setup-action-note">{members.length ? t("project.setup_members_ready", { count: members.length }) : t("project.setup_members_empty")}</span>
-          <Button size="cta" type="button" variant="ghost" onClick={close} disabled={busy}>{t("dialog.cancel")}</Button>
+          <Button size="cta" type="button" variant="ghost" onClick={() => void requestClose()} disabled={busy}>{t("dialog.cancel")}</Button>
           <Button size="cta" type="submit" loading={createProjectMutation.isPending || updateProjectMutation.isPending}>{t(project ? "project.save" : "project.create")}</Button>
         </div>
       </form>

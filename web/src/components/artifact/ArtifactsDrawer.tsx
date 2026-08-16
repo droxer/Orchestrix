@@ -5,6 +5,7 @@ import { Drawer } from "@/components/ui/Drawer";
 import { ArtifactBody } from "./ArtifactBody";
 import { ArtifactIndexStrip } from "./ArtifactIndexStrip";
 import { ArtifactPreviewHeader } from "./ArtifactPreviewHeader";
+import { OVERLAY_TAKEOVER_QUERY } from "../../lib/breakpoints";
 
 function resolveSessionId(artifact: RelayArtifact, fallback: string): string {
   return (artifact as unknown as { sessionId?: string }).sessionId ?? fallback;
@@ -16,12 +17,14 @@ export function ArtifactsDrawer({
   artifacts,
   sessionId,
   initialArtifactId,
+  layer = 0,
 }: {
   open: boolean;
   onClose: () => void;
   artifacts: RelayArtifact[];
   sessionId: string;
   initialArtifactId?: string;
+  layer?: number;
 }) {
   const { t } = useTranslation();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -34,8 +37,12 @@ export function ArtifactsDrawer({
   useEffect(() => {
     if (!open) return;
     setSelectedId(initialArtifactId ?? artifactsRef.current[0]?.id ?? null);
-    const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 820px)").matches;
-    setStripExpanded(isMobile);
+
+    const mq = window.matchMedia(OVERLAY_TAKEOVER_QUERY);
+    setStripExpanded(mq.matches);
+    const handleChange = (event: MediaQueryListEvent) => setStripExpanded(event.matches);
+    mq.addEventListener("change", handleChange);
+    return () => mq.removeEventListener("change", handleChange);
   }, [open, initialArtifactId]);
 
   const selectedArtifact = useMemo(
@@ -53,8 +60,9 @@ export function ArtifactsDrawer({
     <Drawer
       open={open}
       onClose={onClose}
+      layer={layer}
       width="wide"
-      closeLabel={t("sheet.close")}
+      closeLabel={t("drawer.close")}
       title={t("artifact.drawer_title")}
       subtitle={subtitle}
       bodyClassName="artifact-library-drawer-body"

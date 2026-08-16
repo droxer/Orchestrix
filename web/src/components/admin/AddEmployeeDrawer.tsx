@@ -81,7 +81,7 @@ export function AddEmployeeDrawer({
   const namePreview = displayName.trim();
 
   useEffect(() => {
-    if (!open) {
+    if (open) {
       setEmployeeId("");
       setDisplayName("");
       setEmail("");
@@ -160,7 +160,7 @@ export function AddEmployeeDrawer({
       kicker={t("admin.v2.provision_kicker_employee")}
       title={t("admin.v2.add_employee_title")}
       subtitle={t("admin.v2.add_employee_sub")}
-      closeLabel={t("admin.v2.close_drawer")}
+      closeLabel={t("drawer.close")}
       bodyClassName="adm-drawer-body--column"
       width="form"
     >

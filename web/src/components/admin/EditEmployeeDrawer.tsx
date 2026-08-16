@@ -111,7 +111,8 @@ export function EditEmployeeDrawer({
       kicker={t("admin.v2.provision_kicker_employee")}
       title={t("admin.v2.edit_employee_title")}
       subtitle={employee ? `@${employee.id}` : undefined}
-      closeLabel={t("admin.v2.close_drawer")}
+      subtitleMono={Boolean(employee)}
+      closeLabel={t("drawer.close")}
       bodyClassName="adm-drawer-body--column"
       width="form"
     >

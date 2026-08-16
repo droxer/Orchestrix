@@ -166,7 +166,7 @@ function RosterRow({
               <span className="agents-roster-row-runtime">
                 <span className="sr-only">{t("agents_page.runtime")}: </span>
                 <span className="agents-roster-row-runtime-mark" aria-hidden="true">
-                  <AgentMark agent={agent.executorKind} size={10} />
+                  <AgentMark agent={agent.executorKind} size={12} />
                 </span>
                 <span className="agents-roster-row-runtime-label" translate="no">{runtime}</span>
               </span>

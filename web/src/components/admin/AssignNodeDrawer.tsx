@@ -172,10 +172,11 @@ export function AssignNodeDrawer({
     <Drawer
       open={open}
       onClose={() => { void requestClose(); }}
+      kicker={t("admin.v2.provision_kicker_node")}
       title={t("admin.v2.assign_title")}
       subtitle={t("admin.v2.assign_sub")}
-      width="detail"
-      closeLabel={t("admin.v2.close_drawer")}
+      width="form"
+      closeLabel={t("drawer.close")}
       bodyClassName="adm-drawer-body--column"
     >
       <form
@@ -280,9 +281,9 @@ export function AssignNodeDrawer({
             <ul
               ref={nodeListRef}
               className="adm-assign-node-list"
+              role="radiogroup"
               aria-label={t("admin.assign_node")}
               tabIndex={-1}
-              aria-invalid={Boolean(fieldErrors.nodeId) || undefined}
               aria-describedby={fieldErrors.nodeId ? "assign-node-node-error" : undefined}
             >
               {unassignedNodes.map((node) => {
@@ -298,6 +299,7 @@ export function AssignNodeDrawer({
                         name="assign-node-id"
                         value={node.id}
                         checked={isSelected}
+                        aria-invalid={Boolean(fieldErrors.nodeId) || undefined}
                         onChange={() => {
                           setNodeId(node.id);
                           setCreateNew(false);
@@ -349,6 +351,7 @@ export function AssignNodeDrawer({
                     name="assign-node-id"
                     value="__new__"
                     checked={createNew}
+                    aria-invalid={Boolean(fieldErrors.nodeId) || undefined}
                     onChange={() => {
                       setCreateNew(true);
                       setNodeId("");

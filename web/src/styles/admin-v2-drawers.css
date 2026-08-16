@@ -214,6 +214,32 @@
   border-top: 1px solid var(--line-1);
 }
 
+/* Left-aligned slot inside the pinned footer (e.g. Delete opposite the
+   save/cancel pair). Shared by the task and team drawers. */
+.adm-form-actions-leading {
+  margin-right: auto;
+}
+
+/* Fields sit on the drawer's raised --surface-3 panel; give inputs the next
+   elevation step so they read as fillable wells in every drawer, not just the
+   task board where this mapping started. */
+.adm-drawer [data-slot="input"],
+.adm-drawer [data-slot="select-trigger"],
+.adm-drawer [data-slot="textarea"] {
+  background: var(--surface-1);
+  border-color: var(--line-1);
+  color: var(--ink-1);
+}
+
+.adm-drawer [data-slot="input"]::placeholder,
+.adm-drawer [data-slot="textarea"]::placeholder {
+  color: var(--ink-3);
+}
+
+.adm-drawer [data-slot="select-trigger"] [data-slot="select-value"][data-placeholder] {
+  color: var(--ink-3);
+}
+
 /* ── Drawer inline sections (placements, danger zone) ─────────────── */
 .adm-drawer-section {
   display: flex;
@@ -415,7 +441,7 @@
 
 .adm-assign-node-path.muted {
   font-style: italic;
-  opacity: 0.7;
+  color: var(--ink-4);
 }
 
 .adm-assign-node-status {
@@ -740,7 +766,7 @@
   justify-content: center;
   gap: var(--sp-1);
   width: 100%;
-  height: 34px;
+  height: var(--control-h-sm);
   padding: 0 var(--sp-3);
   border: none;
   border-radius: calc(var(--r-2) - 2px);
@@ -855,7 +881,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
+  width: var(--control-h-xs);
   height: var(--control-h-xs);
   flex-shrink: 0;
   border: 1px solid transparent;
@@ -1004,11 +1030,8 @@
 }
 
 /* ── Responsive ───────────────────────────────────────────────────── */
-@media (max-width: 768px) {
-  /* Employee-row mobile layout lives with the row itself in
-     admin-v2-views.css (@media ≤720px) — one component, one breakpoint. */
-
-  .adm-drawer { width: 100%; }
-}
+/* Drawer width on small screens is owned by the 820px full-viewport takeover
+   in mobile-overlays.css (width 100% + dvh + safe-area) — one component, one
+   breakpoint. */
 
 /* Reduced motion: covered by the global reset in a11y.css (loads last, wins). */
