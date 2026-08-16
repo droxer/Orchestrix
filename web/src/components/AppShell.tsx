@@ -52,7 +52,7 @@ type AppShellProps = {
   threadSpaceWidth: number;
   threadSpaceResizing: boolean;
   threadListHidden: boolean;
-  mobileChatChrome: MobileChatChrome;
+  mobileChatChrome: MobileChatChrome | null;
   user: CurrentUser;
   onLogout: () => void;
   /** Starts a fresh thread in the composer (the `n` chord / palette command). */
@@ -219,12 +219,14 @@ export function AppShell({
                 <span className="mobile-topbar-title">{activeThreadLabel}</span>
               </div>
               <div className="mobile-topbar-chat-tools">
-                <ArtifactNavButton
-                  artifactCount={mobileChatChrome.artifactCount}
-                  onOpenArtifacts={mobileChatChrome.onToggleSpace}
-                  expanded={mobileChatChrome.spaceOpen}
-                  disabled={mobileChatChrome.spaceDisabled}
-                />
+                {mobileChatChrome ? (
+                  <ArtifactNavButton
+                    artifactCount={mobileChatChrome.artifactCount}
+                    onOpenArtifacts={mobileChatChrome.onToggleSpace}
+                    expanded={mobileChatChrome.spaceOpen}
+                    disabled={mobileChatChrome.spaceDisabled}
+                  />
+                ) : null}
                 <PreferencesButton prefsOpen={prefsOpen} setPrefsOpen={setPrefsOpen} />
               </div>
             </>

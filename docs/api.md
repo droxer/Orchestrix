@@ -27,7 +27,8 @@ documentation locations, and UI metadata from the backend's shared constants.
 ```
 
 Agent lists use `q` and `availability`. Agent details use `tab`, `scope`, `path`,
-and `item`; team details use `tab` and `artifact`; create dialogs use
+and `item`; team details use `tab` and `artifact`; project details use `tab`
+plus `path` and `item` on the Workspace tab; create dialogs use
 `dialog=create`. IDs are percent-encoded path segments. Navigation to another
 route or entity removes query state owned by the previous destination.
 
@@ -109,6 +110,8 @@ POST /api/v1/projects
 GET    /api/v1/projects/{id}
 PATCH  /api/v1/projects/{id}     { expectedVersion, name?, leadAgentId?, members?, enabled? }
 DELETE /api/v1/projects/{id}?expectedVersion={version}
+GET    /api/v1/projects/{id}/workspace/files?path={relativePath}
+GET    /api/v1/projects/{id}/workspace/file?path={relativePath}
 ```
 
 The selected Computer must advertise `project-workspaces`; every enabled member
@@ -119,6 +122,14 @@ instructions to 8,000 characters. Updates use optimistic versions; stale writes
 return `project_version_conflict`. Duplicate live names return
 `project_name_taken`. Archiving is a soft delete: it disables future dispatch
 while preserving tasks, threads, events, and workspace files.
+
+Project workspace reads address the persistent shared project root directly;
+they do not require a Thread. They are live-only and return
+`placement-unavailable` when the bound Computer is offline or lacks
+`workspace-read-shared`. `GET /api/v1/workspace/brief?projectId={id}` returns
+that project's recent Threads, active tasks, active runs, artifacts, and bound
+Computer. `projectId`, `agentId`, and `teamId` brief selectors are mutually
+exclusive.
 
 Task/thread creation accepts `projectId`. Project dispatch rejects Computer,
 team, or non-member overrides; the backend resolves the fixed roster and the

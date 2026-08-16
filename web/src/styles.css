@@ -56,6 +56,7 @@
 
 @import "./styles/login.css" layer(relay);
 @import "./styles/workspace.css" layer(relay);
+@import "./styles/project-page.css" layer(relay);
 @import "./styles/backlog.css" layer(relay);
 @import "./styles/agents.css" layer(relay);
 @import "./styles/teams.css" layer(relay);

@@ -11,11 +11,13 @@ import {
   deleteTask,
   getWorkspaceBrief,
   listAgentWorkspaceFiles,
+  listProjectWorkspaceFiles,
   listArtifacts,
   listEmployeeAgents,
   listSessionSummaries,
   listTaskArtifacts,
   readAgentWorkspaceFile,
+  readProjectWorkspaceFile,
   reissueComputerToken,
   RelayApiError,
   renameSession,
@@ -480,6 +482,20 @@ describe("apiJson", () => {
     assert.deepEqual(requestedUrls, ["/api/v1/workspace/brief?teamId=team+delivery"]);
   });
 
+  it("fetches project-scoped activity", async () => {
+    let requestedUrl = "";
+    globalThis.fetch = (async (input) => {
+      requestedUrl = String(input);
+      return new Response(JSON.stringify({ projectId: "project/1" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    assert.equal((await getWorkspaceBrief({ projectId: "project/1" })).projectId, "project/1");
+    assert.equal(requestedUrl, "/api/v1/workspace/brief?projectId=project%2F1");
+  });
+
   it("lists agent workspace files", async () => {
     let requestedUrl = "";
     globalThis.fetch = (async (input) => {
@@ -535,6 +551,48 @@ describe("apiJson", () => {
     assert.equal(result.content, "hello world\n");
     assert.equal(result.isBinary, false);
     assert.equal(requestedUrl, "/api/v1/agents/agent_1/workspace/file?path=src%2Fapp.tsx&threadId=ses_1");
+  });
+
+  it("browses the persistent project workspace without a thread id", async () => {
+    const requestedUrls: string[] = [];
+    globalThis.fetch = (async (input) => {
+      requestedUrls.push(String(input));
+      const preview = String(input).includes("/workspace/file?");
+      return new Response(JSON.stringify(preview ? {
+        projectId: "project/1",
+        scope: "shared",
+        source: "live",
+        nodeId: "node-1",
+        path: "notes/brief.md",
+        exists: true,
+        isBinary: false,
+        bytes: 5,
+        content: "hello",
+        truncated: false,
+        limitBytes: 262144,
+        generatedAt: "2026-08-16T00:00:00Z",
+      } : {
+        projectId: "project/1",
+        scope: "shared",
+        source: "live",
+        nodeId: "node-1",
+        path: "notes",
+        exists: true,
+        entries: [],
+        generatedAt: "2026-08-16T00:00:00Z",
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    await listProjectWorkspaceFiles({ projectId: "project/1", path: "notes" });
+    await readProjectWorkspaceFile({ projectId: "project/1", path: "notes/brief.md" });
+
+    assert.deepEqual(requestedUrls, [
+      "/api/v1/projects/project%2F1/workspace/files?path=notes",
+      "/api/v1/projects/project%2F1/workspace/file?path=notes%2Fbrief.md",
+    ]);
   });
 });
 

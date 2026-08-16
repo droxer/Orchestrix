@@ -31,7 +31,12 @@ def _bootstrap(client: TestClient) -> None:
 
 
 def _register_computer(
-    app, node_id: str, machine_id: str, *, project_workspaces: bool = True
+    app,
+    node_id: str,
+    machine_id: str,
+    *,
+    project_workspaces: bool = True,
+    workspace_read_shared: bool = False,
 ) -> dict:
     return app.state.registry.register(
         {
@@ -43,6 +48,7 @@ def _register_computer(
             "capabilities": [
                 "thread-workspaces",
                 *(["project-workspaces"] if project_workspaces else []),
+                *(["workspace-read-shared"] if workspace_read_shared else []),
             ],
             "status": "ready",
             "workspacePath": "/workspace/relay",
@@ -342,6 +348,12 @@ def test_project_bounds_and_member_deletion_guard(monkeypatch) -> None:
             },
         ).json()["project"]
 
+        incompatible = client.get(
+            f"/api/v1/projects/{project['id']}/workspace/files"
+        )
+        assert incompatible.status_code == 503
+        assert incompatible.json()["detail"] == {"reason": "placement-unavailable"}
+
         client.post("/api/v1/auth/logout")
         assert (
             client.post(
@@ -493,6 +505,14 @@ def test_project_routes_are_owner_scoped(monkeypatch) -> None:
 
         assert client.get("/api/v1/projects").json()["projects"] == []
         assert client.get(f"/api/v1/projects/{project['id']}").status_code == 403
+        assert (
+            client.get(f"/api/v1/projects/{project['id']}/workspace/files").status_code
+            == 403
+        )
+        assert (
+            client.get(f"/api/v1/workspace/brief?projectId={project['id']}").status_code
+            == 403
+        )
         assert (
             client.patch(
                 f"/api/v1/projects/{project['id']}",
@@ -992,3 +1012,237 @@ def test_project_room_rejects_malformed_assignment_instead_of_running_everyone(
             )
             == []
         )
+
+
+def test_project_workspace_browses_persistent_root_without_thread(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        computer = _register_computer(
+            app,
+            "node_alice_a",
+            "machine-a",
+            workspace_read_shared=True,
+        )
+        lead = _agent(client, app, computer, "Lead", "codex")
+        _login_alice(client)
+        project = client.post(
+            "/api/v1/projects",
+            json={
+                "name": "Persistent room",
+                "daemonNodeId": computer["id"],
+                "leadAgentId": lead["id"],
+                "members": [
+                    {
+                        "agentId": lead["id"],
+                        "role": "planner",
+                        "functionTitle": "Lead",
+                        "responsibilities": "Plan",
+                    }
+                ],
+            },
+        ).json()["project"]
+        commands: list[dict] = []
+
+        async def dispatch(_ctx, node, command):
+            assert node["id"] == computer["id"]
+            commands.append(command)
+            if command["type"] == "workspace.list":
+                return {
+                    "type": "workspace.listing",
+                    "path": "notes",
+                    "exists": True,
+                    "entries": [
+                        {
+                            "name": "brief.md",
+                            "path": "notes/brief.md",
+                            "kind": "file",
+                            "bytes": 5,
+                        }
+                    ],
+                }
+            if command["path"] == "assets/logo.png":
+                return {
+                    "type": "workspace.file",
+                    "path": "assets/logo.png",
+                    "bytes": 3,
+                    "isBinary": True,
+                    "truncated": True,
+                    "contentBase64": "AAEC",
+                }
+            return {
+                "type": "workspace.file",
+                "path": "notes/brief.md",
+                "bytes": 5,
+                "isBinary": False,
+                "truncated": False,
+                "contentBase64": "aGVsbG8=",
+            }
+
+        monkeypatch.setattr(
+            "relay.api.project_routes.dispatch_workspace_command", dispatch
+        )
+
+        listing = client.get(
+            f"/api/v1/projects/{project['id']}/workspace/files?path=notes"
+        )
+        preview = client.get(
+            f"/api/v1/projects/{project['id']}/workspace/file?path=notes/brief.md"
+        )
+        binary = client.get(
+            f"/api/v1/projects/{project['id']}/workspace/file?path=assets/logo.png"
+        )
+
+        assert listing.status_code == 200, listing.text
+        assert listing.json()["projectId"] == project["id"]
+        assert listing.json()["source"] == "live"
+        assert listing.json()["nodeId"] == computer["id"]
+        assert listing.json()["path"] == "notes"
+        assert listing.json()["entries"][0]["name"] == "brief.md"
+        assert preview.status_code == 200, preview.text
+        assert preview.json()["content"] == "hello"
+        assert binary.status_code == 200, binary.text
+        assert binary.json()["isBinary"] is True
+        assert binary.json()["content"] is None
+        assert binary.json()["contentBase64"] == "AAEC"
+        assert binary.json()["truncated"] is True
+        assert binary.json()["limitBytes"] == 256 * 1024
+        assert all(isinstance(command["id"], str) and command["id"] for command in commands)
+        assert [
+            {key: value for key, value in command.items() if key != "id"}
+            for command in commands
+        ] == [
+            {
+                "type": "workspace.list",
+                "scope": "shared",
+                "sessionId": project["id"],
+                "workspaceLayout": "project",
+                "workspaceSubpath": project["workspaceSubpath"],
+                "path": "notes",
+            },
+            {
+                "type": "workspace.read",
+                "scope": "shared",
+                "sessionId": project["id"],
+                "workspaceLayout": "project",
+                "workspaceSubpath": project["workspaceSubpath"],
+                "path": "notes/brief.md",
+            },
+            {
+                "type": "workspace.read",
+                "scope": "shared",
+                "sessionId": project["id"],
+                "workspaceLayout": "project",
+                "workspaceSubpath": project["workspaceSubpath"],
+                "path": "assets/logo.png",
+            },
+        ]
+
+
+def test_project_workspace_and_brief_are_project_scoped(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        computer = _register_computer(
+            app,
+            "node_alice_a",
+            "machine-a",
+            workspace_read_shared=True,
+        )
+        lead = _agent(client, app, computer, "Lead", "codex")
+        _login_alice(client)
+
+        def create_project(name: str) -> dict:
+            return client.post(
+                "/api/v1/projects",
+                json={
+                    "name": name,
+                    "daemonNodeId": computer["id"],
+                    "leadAgentId": lead["id"],
+                    "members": [
+                        {
+                            "agentId": lead["id"],
+                            "role": "planner",
+                            "functionTitle": "Lead",
+                            "responsibilities": "Plan",
+                        }
+                    ],
+                },
+            ).json()["project"]
+
+        project = create_project("Scoped room")
+        other = create_project("Other room")
+        session = app.state.session_store.create_session(
+            {
+                "ownerEmployeeId": "alice",
+                "taskGoal": "Scoped thread",
+                "workspacePath": "/workspace/relay",
+                "projectId": project["id"],
+                "workspaceLayout": "project",
+                "workspaceSubpath": project["workspaceSubpath"],
+                "computerId": project["computerId"],
+            }
+        )
+        app.state.session_store.create_session(
+            {
+                "ownerEmployeeId": "alice",
+                "taskGoal": "Other thread",
+                "workspacePath": "/workspace/relay",
+                "projectId": other["id"],
+            }
+        )
+        task = app.state.task_store.create_task(
+            {
+                "ownerEmployeeId": "alice",
+                "title": "Scoped task",
+                "projectId": project["id"],
+                "status": "assigned",
+            }
+        )
+        app.state.task_store.create_task(
+            {
+                "ownerEmployeeId": "alice",
+                "title": "Other task",
+                "projectId": other["id"],
+                "status": "assigned",
+            }
+        )
+
+        brief = client.get(f"/api/v1/workspace/brief?projectId={project['id']}")
+
+        assert brief.status_code == 200, brief.text
+        body = brief.json()
+        assert body["projectId"] == project["id"]
+        assert [item["id"] for item in body["sessions"]] == [session["id"]]
+        assert [item["id"] for item in body["tasks"]] == [task["id"]]
+        assert [node["id"] for node in body["nodes"]] == [computer["id"]]
+        assert (
+            client.get(
+                f"/api/v1/workspace/brief?projectId={project['id']}&teamId=team-x"
+            ).status_code
+            == 400
+        )
+        assert (
+            client.get(
+                f"/api/v1/projects/{project['id']}/workspace/file?path=../secret"
+            ).status_code
+            == 400
+        )
+        assert (
+            client.get(
+                "/api/v1/projects/00000000-0000-4000-8000-000000000000/workspace/files"
+            ).status_code
+            == 404
+        )
+
+        # The first-class project workspace is live-only.
+        app.state.registry.delete(computer["id"])
+        unavailable = client.get(f"/api/v1/projects/{project['id']}/workspace/files")
+        assert unavailable.status_code == 503
+        assert unavailable.json()["detail"] == {"reason": "placement-unavailable"}

@@ -56,7 +56,7 @@ export function parseAppPath(pathname: string, _search = ""): AppLocationState {
     return { route: "projects", mobileView: "threads", sessionId: null };
   }
   if (head === "projects" && second && rest.length === 0) {
-    return { route: "projects", mobileView: "threads", sessionId: null, projectId: decodeSegment(second) };
+    return { route: "projects", mobileView: "chat", sessionId: null, projectId: decodeSegment(second) };
   }
   if (head === "projects" && second && rest[0] === "new" && rest.length === 1) {
     return { route: "projects", ...base, projectId: decodeSegment(second), composingNew: true };
@@ -113,6 +113,7 @@ export function hrefForRoute(route: AppRoute, sessionId?: string | null): string
 
 const AGENT_TABS = new Set(["profile", "activities"]);
 const TEAM_TABS = new Set(["profile", "activities", "workspace"]);
+const PROJECT_TABS = new Set(["profile", "workspace", "activities"]);
 const AGENT_AVAILABILITY = new Set(["ready", "busy", "pending", "offline"]);
 
 function copyParam(source: URLSearchParams, target: URLSearchParams, key: string): void {
@@ -144,6 +145,13 @@ export function canonicalSearchForPath(pathname: string, search = ""): string {
     if (source.get("space") === "1") {
       target.set("space", "1");
       copyParam(source, target, "artifact");
+    }
+  } else if (head === "projects" && entityId && rest.length === 0) {
+    const tab = source.get("tab") || "profile";
+    if (PROJECT_TABS.has(tab) && tab !== "profile") target.set("tab", tab);
+    if (tab === "workspace") {
+      copyParam(source, target, "path");
+      copyParam(source, target, "item");
     }
   } else if (head === "agents" && !entityId) {
     copyParam(source, target, "q");

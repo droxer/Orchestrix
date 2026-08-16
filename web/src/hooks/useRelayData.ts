@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { listDaemonNodes, listProjects, listSandboxes, listSessionSummaries, listTasks } from "../api";
 import type { DaemonNodeMonitorRecord, ProjectRecord, RelaySession, RelayTaskSummary, SandboxRecord } from "../types";
+import type { ProjectCollectionStatus } from "../lib/projectPage";
 import { mergeSessionSummaries } from "../lib/sessionPollMerge";
 import { RELAY_POLL_INTERVALS_MS } from "../lib/relayPolling";
 
@@ -23,6 +24,8 @@ type RelayDataResult = {
   sessions: RelaySession[];
   tasks: RelayTaskSummary[];
   projects: ProjectRecord[];
+  projectsStatus: ProjectCollectionStatus;
+  projectsError: string;
   isRefreshing: boolean;
   refresh: (signal?: AbortSignal, tokenOverride?: string) => Promise<void>;
   setSandboxes: Dispatch<SetStateAction<SandboxRecord[]>>;
@@ -111,6 +114,16 @@ export function useRelayData(
   const sessions = sessionsQuery.data ?? [];
   const tasks = tasksQuery.data ?? [];
   const projects = projectsQuery.data ?? [];
+  const projectsStatus: ProjectCollectionStatus = projectsQuery.isError
+    ? "error"
+    : projectsQuery.isPending || (!projectsQuery.isFetchedAfterMount && projectsQuery.fetchStatus === "fetching")
+      ? "loading"
+      : "ready";
+  const projectsError = projectsQuery.error instanceof Error
+    ? projectsQuery.error.message
+    : projectsQuery.error
+      ? String(projectsQuery.error)
+      : "";
 
   // When disabled (e.g. logged out) drop cached rows so the UI clears at once,
   // matching the previous reset-to-empty behavior.
@@ -181,6 +194,8 @@ export function useRelayData(
     sessions,
     tasks,
     projects,
+    projectsStatus,
+    projectsError,
     isRefreshing: manualRefreshPending,
     refresh,
     setSandboxes,

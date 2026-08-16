@@ -8,21 +8,20 @@ fallback here — Thread artifacts remain the durable record.
 
 from __future__ import annotations
 
-import base64
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
 from ..core.ids import new_database_id
 from ..security.auth import require_admin_session
-from .agent_workspace_routes import (
-    WORKSPACE_FILE_PREVIEW_LIMIT,
-    _dispatch,
-    _path,
-    _timestamp,
-    _workspace_error,
-)
 from .deps import AppContext, AppContextDep
+from .workspace_transport import (
+    dispatch_workspace_command,
+    live_workspace_file,
+    live_workspace_listing,
+    raise_workspace_error,
+    workspace_path,
+)
 
 router = APIRouter()
 
@@ -45,9 +44,9 @@ async def node_workspace_files(
     node_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
-    path = _path(request.query_params.get("path"))
+    path = workspace_path(request.query_params.get("path"))
     node = _shared_capable_node(ctx, node_id)
-    event = await _dispatch(
+    event = await dispatch_workspace_command(
         ctx,
         node,
         {
@@ -57,16 +56,12 @@ async def node_workspace_files(
             "path": path,
         },
     )
-    _workspace_error(event)
-    return {
-        "nodeId": node["id"],
-        "scope": "shared",
-        "source": "live",
-        "path": event.get("path", path),
-        "exists": bool(event.get("exists")),
-        "entries": event.get("entries") or [],
-        "generatedAt": _timestamp(),
-    }
+    raise_workspace_error(event)
+    return live_workspace_listing(
+        event,
+        path=path,
+        metadata={"nodeId": node["id"], "scope": "shared"},
+    )
 
 
 @router.get("/admin/daemon-nodes/{node_id}/workspace/file")
@@ -74,9 +69,9 @@ async def node_workspace_file(
     node_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
-    path = _path(request.query_params.get("path"), required=True)
+    path = workspace_path(request.query_params.get("path"), required=True)
     node = _shared_capable_node(ctx, node_id)
-    event = await _dispatch(
+    event = await dispatch_workspace_command(
         ctx,
         node,
         {
@@ -86,27 +81,9 @@ async def node_workspace_file(
             "path": path,
         },
     )
-    _workspace_error(event)
-    raw = event.get("contentBase64")
-    is_binary = bool(event.get("isBinary"))
-    content = (
-        None
-        if is_binary
-        else base64.b64decode(raw).decode("utf-8", errors="replace")
-        if isinstance(raw, str)
-        else None
+    raise_workspace_error(event)
+    return live_workspace_file(
+        event,
+        path=path,
+        metadata={"nodeId": node["id"], "scope": "shared"},
     )
-    return {
-        "nodeId": node["id"],
-        "scope": "shared",
-        "source": "live",
-        "path": event.get("path", path),
-        "exists": True,
-        "isBinary": is_binary,
-        "bytes": event.get("bytes") or 0,
-        "content": content,
-        "contentBase64": raw if is_binary and isinstance(raw, str) else None,
-        "truncated": bool(event.get("truncated")),
-        "limitBytes": WORKSPACE_FILE_PREVIEW_LIMIT,
-        "generatedAt": _timestamp(),
-    }

@@ -1,7 +1,7 @@
 import asyncio
 from types import SimpleNamespace
 
-from relay.api.agent_workspace_routes import _dispatch
+from relay.api.workspace_transport import dispatch_workspace_command
 from relay.services.event_notifier import KeyedEventNotifier, workspace_response_key
 from relay.services.workspace_query import WorkspaceQueryBroker
 
@@ -42,7 +42,7 @@ def test_workspace_dispatch_reads_response_persisted_by_another_replica():
         )
         command = {"id": "cmd_distributed", "type": "workspace.list"}
         pending = asyncio.create_task(
-            _dispatch(ctx, {"id": "node_a"}, command)
+            dispatch_workspace_command(ctx, {"id": "node_a"}, command)
         )
         await asyncio.sleep(0)
         response = {

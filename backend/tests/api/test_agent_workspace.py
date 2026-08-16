@@ -175,7 +175,7 @@ def test_thread_snapshot_fallback_does_not_mix_other_threads(monkeypatch, tmp_pa
 def test_live_workspace_timeout_returns_placement_unavailable(monkeypatch, tmp_path):
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     monkeypatch.setattr(
-        "relay.api.agent_workspace_routes.WORKSPACE_COMMAND_TIMEOUT_SECONDS", 0.01
+        "relay.api.workspace_transport.WORKSPACE_COMMAND_TIMEOUT_SECONDS", 0.01
     )
     app = create_app(tmp_path)
     client = TestClient(app)
@@ -268,7 +268,7 @@ def test_live_workspace_listing_uses_the_selected_placement(monkeypatch, tmp_pat
             ],
         }
 
-    monkeypatch.setattr("relay.api.agent_workspace_routes._dispatch", listing)
+    monkeypatch.setattr("relay.api.agent_workspace_routes.dispatch_workspace_command", listing)
     response = client.get(
         f"/api/v1/agents/{agent['id']}/workspace/files?threadId={session['id']}"
     )
@@ -319,7 +319,7 @@ def test_live_workspace_file_passes_binary_bytes_through(monkeypatch, tmp_path):
             "contentBase64": base64.b64encode(png).decode(),
         }
 
-    monkeypatch.setattr("relay.api.agent_workspace_routes._dispatch", read)
+    monkeypatch.setattr("relay.api.agent_workspace_routes.dispatch_workspace_command", read)
     response = client.get(
         f"/api/v1/agents/{agent['id']}/workspace/file"
         f"?threadId={session['id']}&path=logo.png"
@@ -383,7 +383,7 @@ def test_shared_scope_lists_the_thread_workspace_root(monkeypatch, tmp_path):
             ],
         }
 
-    monkeypatch.setattr("relay.api.agent_workspace_routes._dispatch", listing)
+    monkeypatch.setattr("relay.api.agent_workspace_routes.dispatch_workspace_command", listing)
     response = client.get(
         f"/api/v1/agents/{agent['id']}/workspace/files"
         f"?scope=shared&threadId={session['id']}"
@@ -469,7 +469,7 @@ def test_team_shared_scope_allows_a_current_member_before_its_first_run(
             "entries": [],
         }
 
-    monkeypatch.setattr("relay.api.agent_workspace_routes._dispatch", listing)
+    monkeypatch.setattr("relay.api.agent_workspace_routes.dispatch_workspace_command", listing)
     response = client.get(
         f"/api/v1/agents/{member['id']}/workspace/files"
         f"?scope=shared&threadId={session['id']}&teamId={team['id']}"
@@ -601,7 +601,7 @@ def test_project_member_reads_shared_project_workspace_before_first_run(
             "entries": [],
         }
 
-    monkeypatch.setattr("relay.api.agent_workspace_routes._dispatch", listing)
+    monkeypatch.setattr("relay.api.agent_workspace_routes.dispatch_workspace_command", listing)
     response = client.get(
         f"/api/v1/agents/{member['id']}/workspace/files"
         f"?scope=shared&threadId={session['id']}"
@@ -656,7 +656,7 @@ def test_thread_workspace_read_rejects_legacy_daemon(monkeypatch, tmp_path):
         raise AssertionError("legacy daemon must not receive a thread workspace read")
 
     monkeypatch.setattr(
-        "relay.api.agent_workspace_routes._dispatch", unexpected_dispatch
+        "relay.api.agent_workspace_routes.dispatch_workspace_command", unexpected_dispatch
     )
     response = client.get(
         f"/api/v1/agents/{agent['id']}/workspace/files"

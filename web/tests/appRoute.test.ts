@@ -17,7 +17,7 @@ describe("app pathname routes", () => {
     assert.deepEqual(parseAppPath("/threads/new"), { route: "main", mobileView: "chat", sessionId: null, composingNew: true });
     assert.deepEqual(parseAppPath("/threads/ses%2F123"), { route: "main", mobileView: "chat", sessionId: "ses/123" });
     assert.deepEqual(parseAppPath("/projects"), { route: "projects", mobileView: "threads", sessionId: null });
-    assert.deepEqual(parseAppPath("/projects/prj%2F123"), { route: "projects", mobileView: "threads", sessionId: null, projectId: "prj/123" });
+    assert.deepEqual(parseAppPath("/projects/prj%2F123"), { route: "projects", mobileView: "chat", sessionId: null, projectId: "prj/123" });
     assert.deepEqual(parseAppPath("/projects/prj%2F123/new"), { route: "projects", mobileView: "chat", sessionId: null, projectId: "prj/123", composingNew: true });
     assert.deepEqual(parseAppPath("/projects/prj%2F123/threads/ses%2F123"), { route: "projects", mobileView: "chat", sessionId: "ses/123", projectId: "prj/123" });
     assert.deepEqual(parseAppPath("/agents/agent%201"), { route: "agents", mobileView: "chat", sessionId: null, agentId: "agent 1" });
@@ -85,6 +85,14 @@ describe("app pathname routes", () => {
     assert.equal(
       canonicalBrowserUrl("/teams/team-1", "?tab=workspace&scope=shared&path=src&item=file%3Aa.ts"),
       "/teams/team-1?tab=workspace&path=src&item=file%3Aa.ts",
+    );
+    assert.equal(
+      canonicalBrowserUrl("/projects/project-1", "?tab=workspace&scope=shared&path=src&item=file%3Aa.ts"),
+      "/projects/project-1?tab=workspace&path=src&item=file%3Aa.ts",
+    );
+    assert.equal(
+      canonicalBrowserUrl("/projects/project-1", "?tab=activities&path=stale&item=file%3Aa.ts"),
+      "/projects/project-1?tab=activities",
     );
     assert.equal(canonicalBrowserUrl("/agents/agent-1", "?tab=artifacts&item=artifact%3Aold"), "/agents/agent-1");
     assert.equal(canonicalBrowserUrl("/agents/agent-1", "?tab=activities"), "/agents/agent-1?tab=activities");
