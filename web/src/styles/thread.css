@@ -104,7 +104,8 @@
 }
 
 .project-folder-select,
-.project-folder-new {
+.project-folder-new,
+.project-folder-settings {
   border: 0;
   background: transparent;
   color: var(--ink-2);
@@ -135,7 +136,8 @@
   font: var(--type-label);
 }
 
-.project-folder-new {
+.project-folder-new,
+.project-folder-settings {
   display: grid;
   place-items: center;
   width: 30px;
@@ -146,7 +148,9 @@
 }
 
 .project-folder:hover .project-folder-new,
-.project-folder:focus-within .project-folder-new {
+.project-folder:focus-within .project-folder-new,
+.project-folder:hover .project-folder-settings,
+.project-folder:focus-within .project-folder-settings {
   opacity: 1;
 }
 
@@ -165,14 +169,16 @@
 
 .project-folder-toggle:hover,
 .project-folder-toggle:focus-visible,
-.project-folder-new:focus-visible {
+.project-folder-new:focus-visible,
+.project-folder-settings:focus-visible {
   color: var(--ink-1);
   background: var(--surface-2);
 }
 
 .project-folder-select:focus-visible,
 .project-folder-toggle:focus-visible,
-.project-folder-new:focus-visible {
+.project-folder-new:focus-visible,
+.project-folder-settings:focus-visible {
   outline: var(--focus-outline);
   outline-offset: var(--focus-offset);
 }
@@ -199,7 +205,8 @@
   color: var(--ink-4);
 }
 
-.project-folder-new:hover {
+.project-folder-new:hover,
+.project-folder-settings:hover {
   color: var(--ink-1);
   background: var(--surface-2);
 }
@@ -329,7 +336,7 @@
 .project-member-index { color: var(--ink-4); }
 .project-setup-action-note { flex: 1; align-self: center; color: var(--ink-3); font: var(--type-label); }
 
-@media (max-width: 680px) {
+@media (max-width: 640px) {
   .project-setup-intro, .project-setup-basics-grid, .project-setup-agent-grid, .project-member-brief-grid { grid-template-columns: 1fr; }
   .project-setup-roster-heading { align-items: start; flex-direction: column; }
   .project-setup-action-note { display: none; }

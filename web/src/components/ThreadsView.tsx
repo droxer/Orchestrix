@@ -161,6 +161,7 @@ export function ThreadsView({
 }: ThreadsViewProps) {
   const { t } = useTranslation();
   const [projectDrawerOpen, setProjectDrawerOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<ProjectRecord | null>(null);
   const agentDisplayNames = useMemo(() => buildExecutorDisplayNameMap(logicalAgents), [logicalAgents]);
   const logicalAgentNames = useMemo(() => buildLogicalAgentNameMap(logicalAgents), [logicalAgents]);
   const logicalAgentImages = useMemo(() => buildLogicalAgentImageMap(logicalAgents), [logicalAgents]);
@@ -194,7 +195,14 @@ export function ThreadsView({
         selectedProjectId={selectedProjectId}
         onSelectThread={onSelectThread}
         onSelectProject={onSelectProject}
-        onCreateProject={() => setProjectDrawerOpen(true)}
+        onCreateProject={() => {
+          setEditingProject(null);
+          setProjectDrawerOpen(true);
+        }}
+        onEditProject={(project) => {
+          setEditingProject(project);
+          setProjectDrawerOpen(true);
+        }}
         onNewThread={onNewThread}
         onRenameThread={onRenameThread}
         onCloseThread={onCloseThread}
@@ -320,8 +328,9 @@ export function ThreadsView({
         open={projectDrawerOpen}
         agents={logicalAgents}
         computers={runtimeNodes}
+        project={editingProject}
         onClose={() => setProjectDrawerOpen(false)}
-        onCreated={(project) => onSelectProject(project.id)}
+        onSaved={(project) => onSelectProject(project.id)}
       />
     </>
   );

@@ -12,7 +12,7 @@ Relay introduces an owner-scoped `Project` aggregate with:
 
 - one immutable stable `computerId`;
 - one relative `workspaceSubpath` (`projects/<project-id>` by default);
-- one lead agent and an ordered roster;
+- one lead agent and an ordered Project Agent roster;
 - a required role, function title, and responsibilities for every member;
 - versioned, event-authoritative updates and archival.
 
@@ -22,7 +22,12 @@ Every project dispatch resolves the current daemon runtime for the project's sta
 
 All conversations in a project resolve to the same physical project directory. Runs targeting the same directory are serialized by the daemon workspace gate, while different project directories may run concurrently. The project roster is compiled into each collaboration round, including the project revision and every member's role-specific brief.
 
-The web client exposes the hierarchy `Projects -> Project -> task conversations`, plus an `Unclassified` folder for legacy conversations. Project-room composers do not offer Computer, team, or individual-agent overrides; an explicit mention may address a project member for a turn, while an unaddressed message runs the project room.
+The web client exposes the hierarchy `Projects -> Project -> task conversations`, plus an `Unclassified` folder for legacy conversations. Project-room composers do not offer Computer, team, or individual-agent overrides; an explicit mention may address a Project Agent for a turn, while an unaddressed message runs the project room.
+
+In this decision, roster members are Logical Agents, canonically called
+**Project Agents**. They are not human collaborators. Project access remains
+owner-scoped until a separate employee membership and role policy is defined;
+the agent roster must never be reused as an authorization list.
 
 ## Consequences
 

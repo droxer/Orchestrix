@@ -35,6 +35,7 @@ import type {
   OrgSettingsResponse,
   ProjectsResponse,
   ProjectRecord,
+  UpdateProjectInput,
   UpdateControlPanelEmployeeInput,
   AgentTeam,
   AgentTeamsResponse,
@@ -646,6 +647,20 @@ export function listProjects(signal?: AbortSignal): Promise<ProjectsResponse> {
 
 export function createProject(input: CreateProjectInput): Promise<{ project: ProjectRecord }> {
   return apiJson<{ project: ProjectRecord }>("/projects", { method: "POST", body: input });
+}
+
+export function updateProject(projectId: string, input: UpdateProjectInput): Promise<{ project: ProjectRecord }> {
+  return apiJson<{ project: ProjectRecord }>(`/projects/${encodeURIComponent(projectId)}`, {
+    method: "PATCH",
+    body: input,
+  });
+}
+
+export function archiveProject(projectId: string, expectedVersion: number): Promise<{ project: ProjectRecord }> {
+  const query = new URLSearchParams({ expectedVersion: String(expectedVersion) });
+  return apiJson<{ project: ProjectRecord }>(`/projects/${encodeURIComponent(projectId)}?${query.toString()}`, {
+    method: "DELETE",
+  });
 }
 
 export function createTask(input: CreateTaskInput): Promise<RelayTask> {

@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionAdd, ActionCompose, ChevronDownIcon, ChevronUpIcon, WorkspaceFolder } from "./icons";
+import { ActionAdd, ActionCompose, ActionEdit, ChevronDownIcon, ChevronUpIcon, WorkspaceFolder } from "./icons";
 import { ThreadRow, type ThreadItem } from "./ThreadRow";
 import { groupThreads } from "../lib/threadGroups";
 import { projectThreadBuckets } from "../lib/threads";
@@ -24,6 +24,7 @@ export function ThreadListPanel({
   onSelectThread,
   onSelectProject,
   onCreateProject,
+  onEditProject,
   onNewThread,
   onRenameThread,
   onCloseThread,
@@ -39,6 +40,7 @@ export function ThreadListPanel({
   onSelectThread: (sessionId: string) => void;
   onSelectProject: (projectId: string | null) => void;
   onCreateProject: () => void;
+  onEditProject: (project: ProjectRecord) => void;
   onNewThread: (projectId?: string | null) => void;
   onRenameThread: (session: RelaySession) => void;
   onCloseThread: (sessionId: string) => void;
@@ -153,6 +155,15 @@ export function ThreadListPanel({
               >
                 {expanded ? <ChevronUpIcon size={14} /> : <ChevronDownIcon size={14} />}
               </button>
+              {!project.archivedAt && project.enabled ? <button
+                type="button"
+                className="project-folder-settings"
+                aria-label={t("project.edit")}
+                title={t("project.edit")}
+                onClick={() => onEditProject(project)}
+              >
+                <ActionEdit size={14} />
+              </button> : null}
               {!project.archivedAt && project.enabled ? <button
                 type="button"
                 className="project-folder-new"
