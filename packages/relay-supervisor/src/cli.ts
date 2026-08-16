@@ -56,7 +56,7 @@ Command templates can use:
   {{employeeId}} {{sandboxId}} {{nodeToken}} {{workspacePath}} {{backendUrl}}
 
 Example for a remote workstation provider:
-  relay-supervisor --provider command --command "gcloud workstations ssh relay-{{employeeId}} --start-workstation --command 'relay-daemon --backend-url {{backendUrl}} --sandbox-id {{sandboxId}} --employee-id {{employeeId}} --token {{nodeToken}} --sandbox none'"
+  relay-supervisor --provider command --command "gcloud workstations ssh relay-{{employeeId}} --start-workstation --command 'relay-daemon --backend-url {{backendUrl}} --sandbox-id {{sandboxId}} --employee-id {{employeeId}} --token {{nodeToken}} --sandbox none --allow-host-agent-execution'"
 `);
 }
 

@@ -28,7 +28,9 @@ so the backend needs a public URL, but daemons never need inbound ports.
 You *can* run a daemon in a plain container with `--sandbox none`, where agents
 are host processes rather than VM guests. That trades the sandbox boundary for
 container isolation only, and you must supply each agent CLI's credentials in
-the image. Treat it as a deliberate choice, not the default.
+the image. Relay requires `--allow-host-agent-execution` (or
+`RELAY_ALLOW_HOST_AGENT_EXECUTION=1`) so this trust decision cannot happen by
+accident. Treat it as a deliberate choice, not the default.
 
 ### The supervisor
 

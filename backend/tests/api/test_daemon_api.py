@@ -2072,9 +2072,11 @@ def test_control_panel_creates_local_mode_daemon_node(monkeypatch) -> None:
         assert body["node"]["nodeLocation"] == "employee-device"
         assert body["node"]["displayName"] == "Alice's MacBook"
         assert "--sandbox none" in body["daemonCommand"]
+        assert "--allow-host-agent-execution" in body["daemonCommand"]
         assert "--use-local-agent-home" in body["daemonCommand"]
         assert body["nodeToken"] not in body["daemonCommand"]
         assert body["daemonEnv"]["RELAY_SANDBOX_MODE"] == "none"
+        assert body["daemonEnv"]["RELAY_ALLOW_HOST_AGENT_EXECUTION"] == "1"
         assert body["daemonEnv"]["RELAY_USE_LOCAL_AGENT_HOME"] == "1"
 
         listing = client.get("/api/v1/admin/daemon-nodes")
@@ -2097,8 +2099,10 @@ def test_control_panel_creates_local_mode_daemon_node(monkeypatch) -> None:
         assert duplicate_body["node"]["id"] == body["node"]["id"]
         assert duplicate_body["node"]["sandboxMode"] == "none"
         assert "--sandbox none" in duplicate_body["daemonCommand"]
+        assert "--allow-host-agent-execution" in duplicate_body["daemonCommand"]
         assert "--use-local-agent-home" in duplicate_body["daemonCommand"]
         assert duplicate_body["daemonEnv"]["RELAY_SANDBOX_MODE"] == "none"
+        assert duplicate_body["daemonEnv"]["RELAY_ALLOW_HOST_AGENT_EXECUTION"] == "1"
 
 
 def test_control_panel_rejects_unknown_sandbox_mode(monkeypatch) -> None:
@@ -3191,14 +3195,9 @@ def test_employee_can_name_owned_computer_and_name_survives_heartbeat(
             alice_client.get("/api/v1/daemon-nodes").json()["nodes"][0]["displayName"]
             == "Office Mac Studio"
         )
-        assert (
-            "displayName"
-            not in TestClient(app).get("/api/v1/daemon-nodes").json()["nodes"][0]
-        )
-        assert (
-            "displayName"
-            not in TestClient(app).get("/api/v1/sandboxes").json()["sandboxes"][0]
-        )
+        anonymous_client = TestClient(app)
+        assert anonymous_client.get("/api/v1/daemon-nodes").status_code == 401
+        assert anonymous_client.get("/api/v1/sandboxes").status_code == 401
 
         heartbeat = admin_client.post(
             "/api/v1/daemon-node-registrations",

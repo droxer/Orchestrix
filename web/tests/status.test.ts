@@ -494,6 +494,7 @@ describe("Relay web admin node helpers", () => {
     }, "tok_secret", "http://127.0.0.1:8790");
 
     assert.match(command, /--sandbox none/);
+    assert.match(command, /--allow-host-agent-execution/);
     assert.match(command, /--use-local-agent-home/);
   });
 

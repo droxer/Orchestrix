@@ -43,10 +43,12 @@ The daemon owns this mapping through one interface that returns:
 - `executionPath`, used as the agent process working directory.
 
 For local execution (`sandbox: none`), both paths are the host thread
-directory. For BoxLite execution, the daemon mounts the node root at
-`/workspace` once and uses `/workspace/<thread-id>` as the execution path.
-Every run passes its workspace explicitly; it does not mutate a process-global
-environment variable.
+directory. For BoxLite execution, the daemon mounts only the selected host
+thread directory at `/workspace`; the guest never receives the node root or
+sibling thread directories. Every run passes its workspace explicitly; it does
+not mutate a process-global environment variable. Because a BoxLite instance
+has one mount, the daemon serializes BoxLite runs and restarts the guest when
+the selected thread changes.
 
 Agents participating in one thread share its root. A logical agent's private
 directory remains `agents/agent-<encoded-agent-id>/`, now beneath the thread
@@ -100,6 +102,6 @@ workspace layout retain `node-root` compatibility.
   thread-layout runs and never sends those daemons a thread-scoped live-read
   command. Upgraded daemons honor each session's recorded layout, and the
   backend interprets generated-file paths using the same layout.
-- A mounted node root is still visible to the BoxLite guest. This decision
-  provides working-directory isolation, not a stronger per-thread VM security
-  boundary; a future hard-isolation mode may mount only the selected thread.
+- A BoxLite guest can see only the active thread mount. Local `sandbox: none`
+  remains a deliberate host-trust mode and requires an explicit execution
+  opt-in.

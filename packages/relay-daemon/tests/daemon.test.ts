@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import type { AddressInfo } from "node:net";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import test, { type TestContext } from "node:test";
+import test, { after, type TestContext } from "node:test";
 
 import {
   backendReconnectDelayMs,
@@ -20,6 +20,15 @@ import {
   type DaemonExecutionEnvironment,
   type DaemonLogger,
 } from "../src/index.js";
+
+const previousDaemonStateDir = process.env.RELAY_DAEMON_STATE_DIR;
+const testDaemonStateDir = mkdtempSync(join(tmpdir(), "relay-daemon-private-state-"));
+process.env.RELAY_DAEMON_STATE_DIR = testDaemonStateDir;
+after(() => {
+  if (previousDaemonStateDir === undefined) delete process.env.RELAY_DAEMON_STATE_DIR;
+  else process.env.RELAY_DAEMON_STATE_DIR = previousDaemonStateDir;
+  rmSync(testDaemonStateDir, { recursive: true, force: true });
+});
 import { acquireBoxliteHomeLock } from "../src/box.js";
 import { agentWorkspaceSubpath } from "../src/agent-workspace.js";
 import { listAgentWorkspace, readAgentWorkspaceFile, WorkspaceReadError } from "../src/workspace-read.js";
@@ -955,14 +964,16 @@ test("relay daemon batches large alternating output without losing order", async
 test("daemon logger flushes non-blocking node and run logs", async (t) => {
   const root = mkdtempSync(join(tmpdir(), "relay-daemon-logger-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  const logger = createDaemonLogger({ workspacePath: root, sandboxId: "sbx_test" });
+  const logDir = join(root, "private-daemon-state", "logs");
+  const logger = createDaemonLogger({ workspacePath: root, sandboxId: "sbx_test", logDir });
 
   logger.output({ runId: "run_test", stream: "stdout", text: "hello", sequence: 0 });
   assert.equal(typeof logger.flush, "function");
   await logger.flush?.();
 
-  assert.match(readFileSync(join(root, ".relay", "daemon-nodes", "logs", "sbx_test.jsonl"), "utf8"), /"text":"hello"/);
-  assert.match(readFileSync(join(root, ".relay", "daemon-nodes", "logs", "run_test.jsonl"), "utf8"), /"text":"hello"/);
+  assert.match(readFileSync(join(logDir, "sbx_test.jsonl"), "utf8"), /"text":"hello"/);
+  assert.match(readFileSync(join(logDir, "run_test.jsonl"), "utf8"), /"text":"hello"/);
+  assert.equal(existsSync(join(root, ".relay")), false);
 });
 
 test("relay daemon exits startup preflight after external stop", async () => {

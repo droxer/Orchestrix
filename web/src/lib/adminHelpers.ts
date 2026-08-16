@@ -52,7 +52,9 @@ export function buildDaemonStartCommand(
     "--sandbox",
     sandboxMode,
   ];
-  if (sandboxMode === "none") parts.push("--use-local-agent-home");
+  if (sandboxMode === "none") {
+    parts.push("--allow-host-agent-execution", "--use-local-agent-home");
+  }
   if (node.employeeId) parts.push("--employee-id", node.employeeId);
   if (node.workspacePath) parts.push("--workspace", node.workspacePath);
   return `read -rsp 'Relay node token: ' RELAY_DAEMON_NODE_TOKEN && echo && export RELAY_DAEMON_NODE_TOKEN && ${parts.map(shellQuote).join(" ")}`;

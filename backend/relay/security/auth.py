@@ -173,7 +173,7 @@ class UserAuthStore:
             raise ValueError("Employee is already deleted.")
         record = {"id": employee_id, "deletedAt": now_iso()}
         entries.append(record)
-        _write_json(self.deleted_employees_path, entries)
+        _write_json(self.deleted_employees_path, entries, mode=0o600)
         logger.info("Employee soft-deleted", employee_id=employee_id)
         return record
 
@@ -224,7 +224,7 @@ class UserAuthStore:
                 for entry in _read_json(self.deleted_employees_path)
                 if entry.get("id") != user["employeeId"]
             ]
-            _write_json(self.deleted_employees_path, entries)
+            _write_json(self.deleted_employees_path, entries, mode=0o600)
         logger.info("User created", user_id=user["id"], username=username, role=role)
         return self._public_user(user)
 

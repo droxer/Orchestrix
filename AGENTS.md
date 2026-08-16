@@ -216,16 +216,16 @@ database. Remaining generated operational state lives under `.relay/`:
 
 ```text
 .relay/daemon/{nodes,commands,runs,run-requests,events}/
-.relay/daemon-nodes/<employee-id>.token
-.relay/daemon-nodes/logs/*.jsonl
+~/.relay/daemon-nodes/<sandbox-id>/credentials/<employee-id>.token
+~/.relay/daemon-nodes/<sandbox-id>/logs/*.jsonl
 ```
 
 Legacy `.relay/sessions/` and `.relay/tasks/` trees are migration inputs only;
 the runtime does not use them as its session/task store.
 
-The host workspace mounts into the BoxLite guest at `/workspace`
-(`GUEST_WORKSPACE`). The guest `agent` user's UID/GID is aligned to the host
-owner so file ownership stays sane.
+Only the active thread's host directory mounts into the BoxLite guest at
+`/workspace` (`GUEST_WORKSPACE`). The guest `agent` user's UID/GID is aligned
+to the host owner so file ownership stays sane.
 
 ## Verification
 

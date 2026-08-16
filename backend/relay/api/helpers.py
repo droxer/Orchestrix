@@ -29,6 +29,14 @@ CHAT_SERVICE_EMPLOYEE_HEADER = "x-relay-employee-id"
 
 async def json_body(request: Request) -> dict[str, Any]:
     content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    if not content_type:
+        try:
+            if not await request.body():
+                return {}
+        except ClientDisconnect as error:
+            raise HTTPException(
+                400, "Client disconnected while reading request body."
+            ) from error
     if content_type != "application/json":
         raise HTTPException(415, "Content-Type must be application/json.")
     try:
@@ -150,6 +158,7 @@ def daemon_start_env(request: Request, node: dict[str, Any], sandbox_mode: str =
     # Reusing the host user's agent auth only makes sense when agents run as
     # direct execution; in boxlite mode guest provisioning handles agent auth.
     if sandbox_mode == "none":
+        env["RELAY_ALLOW_HOST_AGENT_EXECUTION"] = "1"
         env["RELAY_USE_LOCAL_AGENT_HOME"] = "1"
     if node.get("employeeId"):
         env["RELAY_EMPLOYEE_ID"] = node["employeeId"]
@@ -183,7 +192,7 @@ def daemon_start_command(
         sandbox_mode,
     ]
     if sandbox_mode == "none":
-        parts.append("--use-local-agent-home")
+        parts.extend(["--allow-host-agent-execution", "--use-local-agent-home"])
     if node.get("employeeId"):
         parts.extend(["--employee-id", node["employeeId"]])
     if node.get("workspacePath"):

@@ -32,6 +32,13 @@ Optional:
   BoxLite VM. Set `none` for a manual/local node that runs agents in the
   daemon's current host environment, such as an employee workstation or an
   already-isolated agent box.
+- `RELAY_ALLOW_HOST_AGENT_EXECUTION`: must be `1` when `RELAY_SANDBOX_MODE=none`.
+  This explicit opt-in acknowledges that agent commands receive the daemon
+  user's host permissions. The equivalent flag is
+  `--allow-host-agent-execution`.
+- `RELAY_DAEMON_STATE_DIR`: private daemon credentials and logs. Defaults to
+  `~/.relay/daemon-nodes/<sandbox-id>` and is deliberately outside the agent
+  workspace mount.
 - `RELAY_BOXLITE_HOME`: BoxLite runtime state directory for `boxlite` mode.
   Defaults to a per-workspace directory under `~/.relay/boxlite`, isolated from
   BoxLite's global `~/.boxlite` state.
@@ -92,6 +99,7 @@ relay-daemon \
   --sandbox-id "$RELAY_SANDBOX_ID" \
   --token "$RELAY_DAEMON_NODE_TOKEN" \
   --sandbox none \
+  --allow-host-agent-execution \
   --workspace "$RELAY_WORKSPACE" \
   --use-local-agent-home
 ```
@@ -107,7 +115,8 @@ explicitly, so concurrent new threads do not share a working directory.
 For a local daemon configured with:
 
 ```sh
-relay-daemon --sandbox none --workspace /Users/alice/RelayWorkspaces ...
+relay-daemon --sandbox none --allow-host-agent-execution \
+  --workspace /Users/alice/RelayWorkspaces ...
 ```
 
 Relay uses:
@@ -119,8 +128,9 @@ Relay uses:
       agent-<encoded-agent-id>/
 ```
 
-BoxLite and cloud nodes use the same host layout. The node root is mounted at
-`/workspace`, and the agent runs from `/workspace/<thread-id>`.
+BoxLite and cloud nodes use the same host layout. For each run, only the active
+host thread directory is mounted at `/workspace`; sibling threads and private
+daemon credentials are not visible in the guest.
 
 The backend stamps new threads with `workspaceLayout: thread`. A historical
 thread without that event field runs from the configured node root for backward

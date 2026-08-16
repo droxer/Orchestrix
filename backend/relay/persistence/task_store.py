@@ -1379,7 +1379,15 @@ class DatabaseTaskStore:
             )
             if not row:
                 raise KeyError(routine_id)
-            routine = row["snapshot"] or {}
+            compact_routine = row["snapshot"] or {}
+            prior_events = self._events_for_task(conn, row["id"])
+            if not prior_events:
+                prior_events = list(compact_routine.get("events", []))
+            routine = (
+                materialize_task_events(prior_events)
+                if prior_events
+                else compact_routine
+            )
             if routine.get("deletedAt"):
                 return None
 
@@ -1428,9 +1436,6 @@ class DatabaseTaskStore:
             )
             task_pk = row["id"]
             sequence = int(row["version"] or 0)
-            prior_events = self._events_for_task(conn, task_pk)
-            if not prior_events:
-                prior_events = list(routine.get("events", []))
             conn.execute(
                 insert(self.events).values(
                     **task_event_to_row(task_pk, sequence, event)
