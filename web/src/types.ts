@@ -267,7 +267,7 @@ export interface ProjectRecord {
   computerId: string;
   workspaceLayout: "project";
   workspaceSubpath: string;
-  leadAgentId: string;
+  leadAgentId: string | null;
   members: ProjectMember[];
   enabled: boolean;
   version: number;
@@ -283,7 +283,7 @@ export interface ProjectsResponse {
 export interface CreateProjectInput {
   name: string;
   daemonNodeId: string;
-  leadAgentId: string;
+  leadAgentId?: string | null;
   members: Array<{
     agentId: string;
     role: AgentRole;
@@ -297,7 +297,7 @@ export interface CreateProjectInput {
 export interface UpdateProjectInput {
   expectedVersion: number;
   name?: string;
-  leadAgentId?: string;
+  leadAgentId?: string | null;
   members?: CreateProjectInput["members"];
   enabled?: boolean;
 }
