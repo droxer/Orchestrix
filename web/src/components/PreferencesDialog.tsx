@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRef } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { OverlayCloseButton } from "@/components/ui/OverlayCloseButton";
-import { readAnimationDurationMs } from "@/lib/animationDuration";
 import { PreferencesPanel, type PreferencesPanelProps } from "./PreferencesPanel";
 import { useModalDrawer } from "../hooks/useModalDrawer";
+import { useOverlayVisibility } from "../hooks/useOverlayVisibility";
 
 export type PreferencesDialogProps = {
   open: boolean;
@@ -16,24 +16,9 @@ export type PreferencesDialogProps = {
 
 export function PreferencesDialog({ open, onClose, preferences }: PreferencesDialogProps) {
   const { t } = useTranslation();
-  const [visible, setVisible] = useState(open);
-  const [closing, setClosing] = useState(false);
-  const dialogRef = useModalDrawer<HTMLDivElement>(onClose, visible, !closing);
-
-  useEffect(() => {
-    if (open) {
-      setVisible(true);
-      setClosing(false);
-      return;
-    }
-    if (!visible) return;
-    setClosing(true);
-    const timer = window.setTimeout(() => {
-      setVisible(false);
-      setClosing(false);
-    }, readAnimationDurationMs(dialogRef.current));
-    return () => window.clearTimeout(timer);
-  }, [open, visible]);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const { visible, closing } = useOverlayVisibility(open, dialogRef);
+  useModalDrawer<HTMLDivElement>(onClose, visible, !closing, dialogRef);
 
   if (!visible || typeof document === "undefined") return null;
 

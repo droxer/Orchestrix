@@ -1210,6 +1210,9 @@
   "sheet": {
     "close": "Close"
   },
+  "drawer": {
+    "close": "Close drawer"
+  },
   "cancel": {
     "reason": "Cancelled from Relay web UI."
   },
@@ -1298,6 +1301,8 @@
     "create_action": "New agent",
     "create_title": "Create agent",
     "create_sub": "Pick the computer and runtime it will run on, then its role.",
+    "create_section_placement": "Placement",
+    "create_section_identity": "Identity",
     "create_computer_label": "Computer",
     "create_computer_placeholder": "Select a computer",
     "create_computer_empty": "No computers available. Connect one first.",

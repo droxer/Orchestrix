@@ -179,6 +179,17 @@
     height: var(--touch-target);
   }
 
+  /* Drawer controls that sit below the touch target on fine pointers:
+     the run-mode segment (34px) and the destructive placement remove (28px). */
+  .adm-profile-segment-btn {
+    min-height: var(--touch-target);
+  }
+
+  .adm-placement-remove {
+    width: var(--touch-target);
+    height: var(--touch-target);
+  }
+
   .backlog-view-btn {
     width: var(--touch-target);
     height: var(--touch-target);

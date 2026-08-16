@@ -1,21 +1,22 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useId, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { OverlayCloseButton } from "@/components/ui/OverlayCloseButton";
 import { useModalDrawer } from "@/hooks/useModalDrawer";
-import { readAnimationDurationMs } from "@/lib/animationDuration";
+import { useOverlayVisibility } from "@/hooks/useOverlayVisibility";
 import { isDrawerTop, isDrawerUnderlay, registerDrawer, subscribeDrawerStack } from "@/lib/drawerStack";
-
-/** Fallback exit duration when the panel's animation duration can't be read. */
-const FALLBACK_CLOSE_MS = 150;
 
 /** Named panel widths — call sites pick a role, not a pixel count, so drawer
  *  sizing stays consistent across the app. `form` for single-column edit
- *  forms, `detail` for read/inspect panels, `wide` for preview panes. */
+ *  forms, `detail` for read/inspect panels, `wide` for preview panes. `task`
+ *  and `routine` are the task-board drawer's two variants (routine needs room
+ *  for its schedule fields). */
 const DRAWER_WIDTHS = {
   form: 460,
   detail: 520,
+  task: 560,
+  routine: 600,
   wide: 900,
 } as const;
 
@@ -63,8 +64,6 @@ export function Drawer({
   const drawerId = useRef(Symbol("drawer")).current;
   const titleId = useId();
   const subtitleId = useId();
-  const [visible, setVisible] = useState(false);
-  const [closing, setClosing] = useState(false);
 
   // Only the top of the drawer stack owns the keyboard; everything below is
   // an underlay — visually recessed and inert to Escape/Tab/AT.
@@ -75,30 +74,9 @@ export function Drawer({
     () => false,
   );
 
-  const panelRef = useModalDrawer<HTMLElement>(onClose, visible, top && !closing);
-
-  // Hold onClosed in a ref so a fresh inline arrow from the caller doesn't
-  // restart the exit timer on every render.
-  const onClosedRef = useRef(onClosed);
-  useEffect(() => {
-    onClosedRef.current = onClosed;
-  });
-
-  useEffect(() => {
-    if (open) {
-      setVisible(true);
-      setClosing(false);
-      return;
-    }
-    if (!visible) return;
-    setClosing(true);
-    const timer = window.setTimeout(() => {
-      setVisible(false);
-      setClosing(false);
-      onClosedRef.current?.();
-    }, readAnimationDurationMs(panelRef.current, FALLBACK_CLOSE_MS));
-    return () => window.clearTimeout(timer);
-  }, [open, visible, panelRef]);
+  const panelRef = useRef<HTMLElement>(null);
+  const { visible, closing } = useOverlayVisibility(open, panelRef, onClosed);
+  useModalDrawer<HTMLElement>(onClose, visible, top && !closing, panelRef);
 
   useEffect(() => {
     registerDrawer(drawerId, layer, visible);
@@ -158,7 +136,11 @@ export function Drawer({
             {kicker ? <p className="adm-drawer-kicker">{kicker}</p> : null}
             <h2 id={titleId} className="adm-drawer-title">{title}</h2>
             {subtitle ? (
-              <p id={subtitleId} className={`adm-drawer-sub${subtitleMono ? " adm-drawer-sub--mono" : ""}`}>
+              <p
+                id={subtitleId}
+                className={`adm-drawer-sub${subtitleMono ? " adm-drawer-sub--mono" : ""}`}
+                translate={subtitleMono ? "no" : undefined}
+              >
                 {subtitle}
               </p>
             ) : null}

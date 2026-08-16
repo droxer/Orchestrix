@@ -8,10 +8,12 @@ interface ArtifactTarget {
   artifact: RelayArtifact;
   sessionId: string;
   allArtifacts: RelayArtifact[];
+  /** Drawer stack layer — 1 when opened over another drawer (e.g. TaskDrawer). */
+  layer?: number;
 }
 
 interface ArtifactViewerContextValue {
-  open: (artifact: RelayArtifact, sessionId: string, allArtifacts?: RelayArtifact[]) => void;
+  open: (artifact: RelayArtifact, sessionId: string, allArtifacts?: RelayArtifact[], layer?: number) => void;
 }
 
 const ArtifactViewerContext = createContext<ArtifactViewerContextValue | null>(null);
@@ -20,8 +22,8 @@ export function ArtifactViewerProvider({ children }: { children: ReactNode }) {
   const [target, setTarget] = useState<ArtifactTarget | null>(null);
 
   const open = useCallback(
-    (artifact: RelayArtifact, sessionId: string, allArtifacts?: RelayArtifact[]) => {
-      setTarget({ artifact, sessionId, allArtifacts: allArtifacts ?? [artifact] });
+    (artifact: RelayArtifact, sessionId: string, allArtifacts?: RelayArtifact[], layer?: number) => {
+      setTarget({ artifact, sessionId, allArtifacts: allArtifacts ?? [artifact], layer });
     },
     [],
   );
@@ -38,6 +40,7 @@ export function ArtifactViewerProvider({ children }: { children: ReactNode }) {
         artifacts={target?.allArtifacts ?? []}
         sessionId={target?.sessionId ?? ""}
         initialArtifactId={target?.artifact.id}
+        layer={target?.layer ?? 0}
       />
     </ArtifactViewerContext.Provider>
   );

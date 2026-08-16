@@ -41,11 +41,12 @@ export function TeamDrawer({
   const membersError = validationError === "members";
 
   useEffect(() => {
+    if (!open) return;
     setName(team?.name ?? "");
     setMemberIds(team?.memberAgentIds ?? []);
     setLeadId(team?.leadAgentId ?? "");
     setValidationError(null);
-  }, [open, team]);
+  }, [open, team?.id]);
 
   const { agents: employeeAgents } = useEmployeeAgents(open ? employeeId : undefined);
   const agents = useMemo(
@@ -137,10 +138,10 @@ export function TeamDrawer({
       title={team ? t("teams.edit") : t("teams.add")}
       subtitle={t("teams.drawer_subtitle")}
       width="form"
-      closeLabel={t("admin.v2.close_drawer")}
+      closeLabel={t("drawer.close")}
       bodyClassName="adm-drawer-body--column"
     >
-      <form className="adm-form team-drawer-form" onSubmit={(event) => void submit(event)} noValidate>
+      <form className="adm-form" onSubmit={(event) => void submit(event)} noValidate>
         <Field
           label={t("teams.name")}
           error={validationError === "name" ? t("teams.name_required") : undefined}

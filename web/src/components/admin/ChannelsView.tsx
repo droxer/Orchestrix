@@ -148,6 +148,7 @@ function ChannelCreateForm({
   onCredentialChange,
   onSubmit,
   submitLabel,
+  onCancel,
   idPrefix = "chat",
 }: {
   displayName: string;
@@ -165,6 +166,7 @@ function ChannelCreateForm({
   onCredentialChange: (key: string, value: string) => void;
   onSubmit: () => void;
   submitLabel: string;
+  onCancel?: () => void;
   idPrefix?: string;
 }) {
   const { t } = useTranslation();
@@ -187,6 +189,7 @@ function ChannelCreateForm({
       >
         <Input
           ref={displayNameRef}
+          data-modal-initial-focus
           name={`${idPrefix}-display-name`}
           autoComplete="organization"
           value={displayName}
@@ -247,10 +250,22 @@ function ChannelCreateForm({
         </Field>
       ))}
       <small>{t("admin.v2.chat_telegram_secret_generated")}</small>
-      <Button type="submit" loading={busy} loadingLabel={t("admin.creating")}>
-        <AdminConnect size={16} aria-hidden="true" />
-        <span>{submitLabel}</span>
-      </Button>
+      {onCancel ? (
+        <div className="adm-form-actions">
+          <Button size="cta" type="button" variant="ghost" onClick={onCancel} disabled={busy}>
+            {t("admin.v2.cancel")}
+          </Button>
+          <Button size="cta" type="submit" loading={busy} loadingLabel={t("admin.creating")}>
+            <AdminConnect size={16} aria-hidden="true" />
+            <span>{submitLabel}</span>
+          </Button>
+        </div>
+      ) : (
+        <Button type="submit" loading={busy} loadingLabel={t("admin.creating")}>
+          <AdminConnect size={16} aria-hidden="true" />
+          <span>{submitLabel}</span>
+        </Button>
+      )}
     </form>
   );
 }
@@ -1035,11 +1050,11 @@ export function ChannelsView({
         kicker={t("admin.v2.chat_eyebrow")}
         title={t("admin.v2.chat_new_title")}
         subtitle={t("admin.v2.chat_new_sub")}
-        closeLabel={t("admin.v2.close_drawer")}
+        closeLabel={t("drawer.close")}
         bodyClassName="adm-drawer-body--column"
         width="form"
       >
-        <ChannelCreateForm {...createFormProps} idPrefix="chat-drawer" />
+        <ChannelCreateForm {...createFormProps} idPrefix="chat-drawer" onCancel={() => setCreateOpen(false)} />
       </Drawer>
     </div>
   );

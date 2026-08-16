@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useRelayMutations } from "../hooks/useRelayMutations";
+import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { agentsForThreadNode } from "../lib/threadRuntime";
 import {
   AGENT_ROLE_OPTIONS,
@@ -58,6 +59,12 @@ export function ProjectDrawer({
     () => agentsForThreadNode(agents.filter((agent) => !agent.deletedAt), computerId),
     [agents, computerId],
   );
+  const hasUnsavedChanges = Boolean(
+    name.trim()
+    || computerId
+    || members.some((member) => member.functionTitle.trim() || member.responsibilities.trim() || member.instructions.trim()),
+  );
+  const confirmDiscardChanges = useUnsavedChangesGuard(open && hasUnsavedChanges && !createProjectMutation.isPending);
 
   function reset() {
     setName("");
@@ -67,10 +74,9 @@ export function ProjectDrawer({
     setError(null);
   }
 
-  function close() {
+  async function requestClose() {
     if (createProjectMutation.isPending) return;
-    reset();
-    onClose();
+    if (await confirmDiscardChanges()) onClose();
   }
 
   function selectComputer(value: string | null) {
@@ -145,7 +151,6 @@ export function ProjectDrawer({
           ...(member.instructions.trim() ? { instructions: member.instructions.trim() } : {}),
         })),
       });
-      reset();
       onClose();
       onCreated(result.project);
     } catch {
@@ -156,13 +161,14 @@ export function ProjectDrawer({
   return (
     <Drawer
       open={open}
-      onClose={close}
+      onClose={() => { void requestClose(); }}
       kicker={t("project.setup_kicker")}
       title={t("project.setup_title")}
       subtitle={t("project.setup_subtitle")}
       width="wide"
       closeLabel={t("admin.v2.close_drawer")}
       bodyClassName="adm-drawer-body--column"
+      onClosed={reset}
     >
       <form className="project-setup-form" onSubmit={(event) => void submit(event)} noValidate>
         <div className="project-setup-intro">
@@ -236,7 +242,7 @@ export function ProjectDrawer({
         {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
         <div className="project-setup-actions adm-form-actions">
           <span className="project-setup-action-note">{members.length ? t("project.setup_members_ready", { count: members.length }) : t("project.setup_members_empty")}</span>
-          <Button size="cta" type="button" variant="ghost" onClick={close} disabled={createProjectMutation.isPending}>{t("dialog.cancel")}</Button>
+          <Button size="cta" type="button" variant="ghost" onClick={() => void requestClose()} disabled={createProjectMutation.isPending}>{t("dialog.cancel")}</Button>
           <Button size="cta" type="submit" loading={createProjectMutation.isPending}>{t("project.create")}</Button>
         </div>
       </form>

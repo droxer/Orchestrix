@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createAgent, listSandboxes } from "../../api";
@@ -93,6 +93,11 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
   const computerLabelId = useId();
   const runtimeLabelId = useId();
   const roleLabelId = useId();
+  const placementHeadingId = useId();
+  const identityHeadingId = useId();
+  const computerTriggerRef = useRef<HTMLButtonElement>(null);
+  const runtimeTriggerRef = useRef<HTMLButtonElement>(null);
+  const roleTriggerRef = useRef<HTMLButtonElement>(null);
 
   const sandboxesQuery = useQuery({
     queryKey: ["create-agent", "sandboxes"],
@@ -121,8 +126,21 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
   const [defaultRole, setDefaultRole] = useState<AgentRole | "">("");
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    computerId?: string;
+    executorKind?: string;
+    defaultRole?: string;
+  }>({});
   const [isBusy, setIsBusy] = useState(false);
+
+  function clearFieldError(field: "computerId" | "executorKind" | "defaultRole") {
+    setFieldErrors((previous) => {
+      if (!(field in previous)) return previous;
+      const next = { ...previous };
+      delete next[field];
+      return next;
+    });
+  }
 
   const runtimeOptions = useMemo(
     (): AgentName[] =>
@@ -141,16 +159,20 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
       setDefaultRole("");
       setDisplayName("");
       setError(null);
-      setFieldError(null);
+      setFieldErrors({});
       setIsBusy(false);
     }
   }, [open]);
 
   // The runtime picked for a previous computer may not exist on the newly
   // selected one — drop it rather than silently submitting a stale pick.
+  // A computer with exactly one ready runtime gets it pre-selected; there is
+  // nothing to choose.
   useEffect(() => {
     if (executorKind && !runtimeOptions.includes(executorKind)) {
-      setExecutorKind("");
+      setExecutorKind(runtimeOptions.length === 1 ? runtimeOptions[0] : "");
+    } else if (!executorKind && runtimeOptions.length === 1) {
+      setExecutorKind(runtimeOptions[0]);
     }
   }, [runtimeOptions, executorKind]);
 
@@ -166,19 +188,20 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!computerId) {
-      setFieldError(t("agents_page.create_computer_required"));
+    if (!computerId || !executorKind || !defaultRole) {
+      const nextErrors: typeof fieldErrors = {};
+      if (!computerId) nextErrors.computerId = t("agents_page.create_computer_required");
+      if (!executorKind) nextErrors.executorKind = t("agents_page.create_runtime_required");
+      if (!defaultRole) nextErrors.defaultRole = t("agents_page.create_role_required");
+      setFieldErrors(nextErrors);
+      // Move focus to the first invalid control so keyboard and
+      // screen-reader users land on the problem, not back at the top.
+      if (!computerId) computerTriggerRef.current?.focus();
+      else if (!executorKind) runtimeTriggerRef.current?.focus();
+      else roleTriggerRef.current?.focus();
       return;
     }
-    if (!executorKind) {
-      setFieldError(t("agents_page.create_runtime_required"));
-      return;
-    }
-    if (!defaultRole) {
-      setFieldError(t("agents_page.create_role_required"));
-      return;
-    }
-    setFieldError(null);
+    setFieldErrors({});
     setError(null);
     setIsBusy(true);
     try {
@@ -206,25 +229,38 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
       title={t("agents_page.create_title")}
       subtitle={t("agents_page.create_sub")}
       width="form"
-      closeLabel={t("admin.v2.close_drawer")}
+      closeLabel={t("drawer.close")}
       bodyClassName="adm-drawer-body--column"
     >
-      <form className="adm-form" onSubmit={(event) => void handleSubmit(event)} noValidate>
-        <fieldset className="adm-form-section">
+      <form className="adm-form adm-provision-form" onSubmit={(event) => void handleSubmit(event)} noValidate>
+        <section className="adm-provision-section" aria-labelledby={placementHeadingId}>
+          <header className="adm-provision-section-head">
+            <h3 id={placementHeadingId} className="adm-provision-section-title">
+              {t("agents_page.create_section_placement")}
+            </h3>
+          </header>
           <Field
             label={t("agents_page.create_computer_label")}
             labelId={computerLabelId}
             wrapper="div"
+            error={fieldErrors.computerId}
+            errorId="create-agent-computer-error"
           >
             <Select
               value={computerId || null}
-              onValueChange={(value) => setComputerId(value ?? "")}
+              onValueChange={(value) => {
+                setComputerId(value ?? "");
+                clearFieldError("computerId");
+              }}
               disabled={isBusy || sandboxesQuery.isLoading || computerOptions.length === 0}
             >
               <SelectTrigger
+                ref={computerTriggerRef}
                 data-modal-initial-focus
                 className="w-full"
                 aria-labelledby={computerLabelId}
+                aria-invalid={Boolean(fieldErrors.computerId) || undefined}
+                aria-describedby={fieldErrors.computerId ? "create-agent-computer-error" : undefined}
               >
                 <SelectValue placeholder={t("agents_page.create_computer_placeholder")}>
                   {(value: string | null) => {
@@ -261,6 +297,8 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
             label={t("agents_page.create_runtime_label")}
             labelId={runtimeLabelId}
             wrapper="div"
+            error={fieldErrors.executorKind}
+            errorId="create-agent-runtime-error"
           >
             <div
               className="create-agent-runtime-picker"
@@ -297,18 +335,36 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
               <p className="adm-form-hint">{t("agents_page.create_runtime_empty")}</p>
             ) : null}
           </Field>
+        </section>
 
+        <section className="adm-provision-section" aria-labelledby={identityHeadingId}>
+          <header className="adm-provision-section-head">
+            <h3 id={identityHeadingId} className="adm-provision-section-title">
+              {t("agents_page.create_section_identity")}
+            </h3>
+          </header>
           <Field
             label={t("admin.v2.agent_role_label")}
             labelId={roleLabelId}
             wrapper="div"
+            error={fieldErrors.defaultRole}
+            errorId="create-agent-role-error"
           >
             <Select
               value={defaultRole || null}
-              onValueChange={(value) => setDefaultRole((value ?? "") as AgentRole)}
+              onValueChange={(value) => {
+                setDefaultRole((value ?? "") as AgentRole);
+                clearFieldError("defaultRole");
+              }}
               disabled={isBusy}
             >
-              <SelectTrigger className="w-full" aria-labelledby={roleLabelId}>
+              <SelectTrigger
+                ref={roleTriggerRef}
+                className="w-full"
+                aria-labelledby={roleLabelId}
+                aria-invalid={Boolean(fieldErrors.defaultRole) || undefined}
+                aria-describedby={fieldErrors.defaultRole ? "create-agent-role-error" : undefined}
+              >
                 <SelectValue placeholder={t("agents_page.create_role_placeholder")}>
                   {(value: string | null) => value
                     ? t(`admin.v2.agent_role.${value}`, { defaultValue: value })
@@ -336,9 +392,8 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
               disabled={isBusy}
             />
           </Field>
-        </fieldset>
+        </section>
 
-        {fieldError ? <div className="adm-form-error" role="alert">{fieldError}</div> : null}
         {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
 
         <div className="adm-form-actions">

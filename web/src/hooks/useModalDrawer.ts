@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import { acquireBodyScrollLock } from "@/lib/bodyScrollLock";
 
 const FOCUSABLE =
@@ -15,9 +15,19 @@ const FOCUSABLE =
  * ownership (top of an overlay stack) — only the active layer listens for
  * Escape/Tab, so stacked overlays don't all close on one Escape or fight over
  * focus. `active` defaults to true for single-overlay callers.
+ *
+ * `externalRef` lets callers that need the panel element for their own
+ * timing (e.g. useOverlayVisibility reading the exit animation duration)
+ * share one ref with this hook instead of attaching two.
  */
-export function useModalDrawer<T extends HTMLElement>(onClose: () => void, enabled = true, active = true) {
-  const panelRef = useRef<T>(null);
+export function useModalDrawer<T extends HTMLElement>(
+  onClose: () => void,
+  enabled = true,
+  active = true,
+  externalRef?: RefObject<T | null>,
+) {
+  const internalRef = useRef<T>(null);
+  const panelRef = externalRef ?? internalRef;
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
   // Hold onClose in a ref so the effects don't re-run when callers pass a

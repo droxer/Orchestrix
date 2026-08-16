@@ -94,7 +94,7 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
       title={t("computer.connect_title")}
       subtitle={result ? t("computer.connect_success_sub") : t("computer.connect_sub")}
       width="form"
-      closeLabel={t("admin.v2.close_drawer")}
+      closeLabel={t("drawer.close")}
       bodyClassName="adm-drawer-body--column"
     >
       {result ? (

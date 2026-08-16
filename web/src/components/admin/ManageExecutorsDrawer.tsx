@@ -115,7 +115,7 @@ export function ManageExecutorsDrawer({ open, onClose, node, onUpdated, onSave }
         open={open}
         onClose={onClose}
         title={t("admin.v2.manage_executors_title")}
-        closeLabel={t("admin.v2.close_drawer")}
+        closeLabel={t("drawer.close")}
         layer={1}
       >
         <p className="adm-cred-empty">{t("admin.v2.no_node_selected")}</p>
@@ -128,12 +128,9 @@ export function ManageExecutorsDrawer({ open, onClose, node, onUpdated, onSave }
       open={open}
       onClose={() => { void requestClose(); }}
       title={t("admin.v2.manage_executors_title")}
-      subtitle={
-        <span className="code" translate="no">
-          {node.employeeId ? `@${node.employeeId}` : t("admin.unassigned")} · {node.id}
-        </span>
-      }
-      closeLabel={t("admin.v2.close_drawer")}
+      subtitle={`${node.employeeId ? `@${node.employeeId}` : t("admin.unassigned")} · ${node.id}`}
+      subtitleMono
+      closeLabel={t("drawer.close")}
       layer={1}
       width="detail"
       bodyClassName="adm-drawer-body--column"

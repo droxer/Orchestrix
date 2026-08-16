@@ -1011,28 +1011,15 @@
 }
 
 @media (max-width: 480px) {
+  /* Form-grid ergonomics only: below 480px two-column fields cramp. Drawer
+     chrome breakpoints are owned by the 820px takeover in mobile-overlays.css. */
   .task-drawer-form-grid {
     grid-template-columns: 1fr;
   }
 }
 
-/* Keep shadcn fields visually consistent inside the raised drawer surface. */
-.task-board-drawer-form [data-slot="input"],
-.task-board-drawer-form [data-slot="select-trigger"],
-.task-board-drawer-form [data-slot="textarea"] {
-  background: var(--surface-1);
-  border-color: var(--line-1);
-  color: var(--ink-1);
-}
-
-.task-board-drawer-form [data-slot="input"]::placeholder,
-.task-board-drawer-form [data-slot="textarea"]::placeholder {
-  color: var(--ink-3);
-}
-
-.task-board-drawer-form [data-slot="select-trigger"] [data-slot="select-value"][data-placeholder] {
-  color: var(--ink-3);
-}
+/* Drawer input elevation moved to .adm-drawer in admin-v2-drawers.css so every
+   drawer shares the raised-field mapping. */
 
 /* ── Task drawer read-only meta + form extras ─────────────────────── */
 
@@ -1058,9 +1045,8 @@
   font: var(--type-body-sm);
 }
 
-.adm-form-actions-leading {
-  margin-right: auto;
-}
+/* .adm-form-actions-leading moved next to .adm-form-actions in
+   admin-v2-drawers.css — shared drawer-footer primitive. */
 
 /* Removed with `.adm-field`: this re-asserted a 14px (--type-body-sm) hint for
    hints that were direct field children, which made the task drawer's next-run

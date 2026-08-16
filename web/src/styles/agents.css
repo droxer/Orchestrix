@@ -189,28 +189,25 @@
   flex: none;
 }
 
+/* Runtime reads as plain meta, not a boxed chip: the team-member roster
+   (.team-member-option-meta) renders kind as icon + text, and the boxed
+   treatment here was heavier than the agent name it annotates while its
+   19px inset divider cramped the label. Icon + mono text matches the
+   computer segments beside it. */
 .agents-roster-row-runtime {
-  display: inline-grid;
-  grid-template-columns: 19px auto;
-  align-items: stretch;
-  height: 19px;
-  overflow: hidden;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-1);
-  background: var(--surface-1);
-  color: var(--ink-1);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--ink-3);
   font-family: var(--font-mono);
   font-size: var(--fs-1);
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: var(--type-code-track);
-  line-height: 17px;
 }
 
 .agents-roster-row-runtime-mark {
-  display: grid;
-  place-items: center;
-  border-right: 1px solid var(--line-1);
-  background: var(--surface-2);
+  display: inline-flex;
+  align-items: center;
 }
 
 .agents-roster-row-runtime-mark > svg {
@@ -218,7 +215,9 @@
 }
 
 .agents-roster-row-runtime-label {
-  padding: 0 var(--sp-1-5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .agents-roster-row-meta-separator {
