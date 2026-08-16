@@ -63,6 +63,8 @@ import type {
   AgentWorkspaceFileResponse,
   NodeWorkspaceFilesResponse,
   NodeWorkspaceFileResponse,
+  ProjectWorkspaceFilesResponse,
+  ProjectWorkspaceFileResponse,
   WorkspaceScope,
 } from "./types.js";
 import type { Language, Theme } from "./lib/appStorage.js";
@@ -584,13 +586,14 @@ export function listArtifacts(
 }
 
 export function getWorkspaceBrief(
-  input: { employeeId?: string; agentId?: string; teamId?: string } = {},
+  input: { employeeId?: string; agentId?: string; teamId?: string; projectId?: string } = {},
   signal?: AbortSignal,
 ): Promise<WorkspaceBriefResponse> {
   const params = new URLSearchParams();
   if (input.employeeId) params.set("employeeId", input.employeeId);
   if (input.agentId) params.set("agentId", input.agentId);
   if (input.teamId) params.set("teamId", input.teamId);
+  if (input.projectId) params.set("projectId", input.projectId);
   const query = params.toString();
   return apiJson<WorkspaceBriefResponse>(`/workspace/brief${query ? `?${query}` : ""}`, { signal });
 }
@@ -617,6 +620,24 @@ export function readAgentWorkspaceFile(
   if (input.teamId) params.set("teamId", input.teamId);
   if (input.scope && input.scope !== "agent-home") params.set("scope", input.scope);
   return apiJson<AgentWorkspaceFileResponse>(`/agents/${encodeURIComponent(input.agentId)}/workspace/file?${params.toString()}`, { signal });
+}
+
+export function listProjectWorkspaceFiles(
+  input: { projectId: string; path?: string },
+  signal?: AbortSignal,
+): Promise<ProjectWorkspaceFilesResponse> {
+  const params = new URLSearchParams();
+  if (input.path) params.set("path", input.path);
+  const query = params.toString();
+  return apiJson<ProjectWorkspaceFilesResponse>(`/projects/${encodeURIComponent(input.projectId)}/workspace/files${query ? `?${query}` : ""}`, { signal });
+}
+
+export function readProjectWorkspaceFile(
+  input: { projectId: string; path: string },
+  signal?: AbortSignal,
+): Promise<ProjectWorkspaceFileResponse> {
+  const params = new URLSearchParams({ path: input.path });
+  return apiJson<ProjectWorkspaceFileResponse>(`/projects/${encodeURIComponent(input.projectId)}/workspace/file?${params.toString()}`, { signal });
 }
 
 export function listNodeWorkspaceFiles(

@@ -121,7 +121,7 @@ export function useAppRouter({
   const navigateToProject = useCallback((projectId: string | null) => {
     navigateToAppState({
       route: "projects",
-      mobileView: "threads",
+      mobileView: projectId ? "chat" : "threads",
       sessionId: null,
       projectId,
     });
@@ -134,6 +134,7 @@ export function useAppRouter({
   return {
     route: locationState.route,
     mobileView: locationState.mobileView,
+    routedSessionId: locationState.sessionId,
     projectId: locationState.projectId ?? null,
     agentId: locationState.agentId ?? null,
     teamWorkspaceId: locationState.teamWorkspaceId ?? null,

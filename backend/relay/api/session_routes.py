@@ -316,8 +316,13 @@ async def list_artifacts(request: Request, ctx: AppContextDep) -> dict[str, Any]
 async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     requested_team_id = (request.query_params.get("teamId") or "").strip()
-    if requested_team_id and request.query_params.get("agentId"):
-        raise HTTPException(400, "agentId and teamId cannot be combined.")
+    requested_agent_id = (request.query_params.get("agentId") or "").strip()
+    requested_project_id = (request.query_params.get("projectId") or "").strip()
+    selectors = [requested_agent_id, requested_team_id, requested_project_id]
+    if len([value for value in selectors if value]) > 1:
+        raise HTTPException(
+            400, "agentId, teamId, and projectId are mutually exclusive."
+        )
     team = ctx.team_store.get_team(requested_team_id) if requested_team_id else None
     if requested_team_id and (not team or team.get("deletedAt")):
         raise HTTPException(404, "Team not found.")
@@ -328,9 +333,25 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
     ):
         raise HTTPException(403, "Cannot read another employee's team workspace.")
 
-    agent = agent_for_workspace(ctx, actor, request.query_params.get("agentId"))
+    project = (
+        ctx.project_store.get_project(requested_project_id)
+        if requested_project_id
+        else None
+    )
+    if requested_project_id and not project:
+        raise HTTPException(404, "Project not found.")
+    if (
+        project
+        and not actor["isAdmin"]
+        and project.get("ownerEmployeeId") != actor["employeeId"]
+    ):
+        raise HTTPException(403, "Cannot read another employee's project workspace.")
+
+    agent = agent_for_workspace(ctx, actor, requested_agent_id)
     employee_id = (
-        team.get("ownerEmployeeId")
+        project.get("ownerEmployeeId")
+        if project
+        else team.get("ownerEmployeeId")
         if team
         else agent_supervisor_employee_id(agent)
         if agent
@@ -345,9 +366,12 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
         if session.get("ownerEmployeeId") == employee_id
         and (not agent or session_uses_agent(session, agent["id"]))
         and (not team or session.get("teamId") == team["id"])
+        and (not project or session.get("projectId") == project["id"])
     ]
     sessions = ensure_sessions_managed_affinity(ctx, sessions)
-    team_session_ids = {session["id"] for session in sessions} if team else set()
+    scoped_session_ids = (
+        {session["id"] for session in sessions} if team or project else set()
+    )
     placements: list[dict[str, Any]] | None = None
     if agent:
         placements = ctx.agent_placement_store.list_placements(agent_id=agent["id"])
@@ -366,9 +390,9 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
             any(run.get("logicalAgentId") == agent["id"] for run in active_node_runs)
             if agent
             else any(
-                run.get("sessionId") in team_session_ids for run in active_node_runs
+                run.get("sessionId") in scoped_session_ids for run in active_node_runs
             )
-            if team
+            if team or project
             else False
         )
         has_placement = placements is not None and any(
@@ -380,7 +404,9 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
             for placement in placements
         )
         include_node = (
-            node.get("employeeId") == employee_id
+            resolve_computer_id(node) == project.get("computerId")
+            if project
+            else node.get("employeeId") == employee_id
             if placements is None
             else has_placement or has_authorized_run
         )
@@ -391,7 +417,8 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
         for node in nodes
         for run in node.get("activeRuns", [])
         if (not agent or run.get("logicalAgentId") == agent["id"])
-        and (not team or run.get("sessionId") in team_session_ids)
+        and (not team or run.get("sessionId") in scoped_session_ids)
+        and (not project or run.get("sessionId") in scoped_session_ids)
     ]
     tasks = [
         task
@@ -402,6 +429,7 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
         )
         and (not agent or task.get("assignedAgentId") == agent["id"])
         and (not team or task.get("assignedTeamId") == team["id"])
+        and (not project or task.get("projectId") == project["id"])
     ]
     artifacts = [
         artifact_index_item(session, artifact)
@@ -423,6 +451,7 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
         "employeeId": employee_id,
         **({"agentId": agent["id"]} if agent else {}),
         **({"teamId": team["id"]} if team else {}),
+        **({"projectId": project["id"]} if project else {}),
         "nodes": nodes,
         "activeRuns": sorted(
             active_runs, key=lambda item: item.get("startedAt") or "", reverse=True

@@ -18,17 +18,26 @@ import { ThreadHeader } from "./ThreadHeader";
 import { TranscriptEmpty } from "./TranscriptEmpty";
 import { MessageBlock, isGroupedContinuation, type DerivedMessage } from "./MessageBlock";
 import { phaseDividerLabel } from "../lib/projectMessages";
+import { resolveProjectOverviewState, type ProjectCollectionStatus } from "../lib/projectPage";
 import { DecisionBar } from "./composer/DecisionBar";
 import { Composer, type ComposerHandle } from "./composer/Composer";
 import { ThreadSpacePanel } from "./space/ThreadSpacePanel";
 import { buildSpaceItems, threadHasMultipleProducers } from "../lib/threadSpace";
 import { ProjectDrawer } from "./ProjectDrawer";
+import { ProjectWorkspacePage } from "./ProjectWorkspacePage";
+import { RelayEmptyState } from "./RelayEmptyState";
+import { Button } from "@/components/ui/button";
 
 export type ThreadsViewProps = {
   directoryMode: "threads" | "projects";
   filteredThreads: ThreadItem[];
   projects: ProjectRecord[];
   selectedProjectId: string | null;
+  projectsStatus: ProjectCollectionStatus;
+  projectsError: string;
+  onRetryProjects: () => void;
+  showProjectOverview: boolean;
+  showProjectDirectoryEmpty: boolean;
   threadQuery: string;
   setThreadQuery: Dispatch<SetStateAction<string>>;
   activeSession: RelaySession | undefined;
@@ -98,6 +107,11 @@ export function ThreadsView({
   filteredThreads,
   projects,
   selectedProjectId,
+  projectsStatus,
+  projectsError,
+  onRetryProjects,
+  showProjectOverview,
+  showProjectDirectoryEmpty,
   threadQuery,
   setThreadQuery,
   activeSession,
@@ -181,6 +195,15 @@ export function ThreadsView({
     () => threadHasMultipleProducers(activeSession?.agentRuns),
     [activeSession?.agentRuns],
   );
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.id === selectedProjectId) ?? null,
+    [projects, selectedProjectId],
+  );
+  const projectOverviewState = resolveProjectOverviewState({
+    showProjectOverview,
+    project: selectedProject,
+    collectionStatus: projectsStatus,
+  });
 
   return (
     <>
@@ -208,6 +231,84 @@ export function ThreadsView({
         onCloseThread={onCloseThread}
       />
 
+      {projectOverviewState === "ready" && selectedProject ? (
+        <ProjectWorkspacePage
+          project={selectedProject}
+          agents={logicalAgents}
+          computers={runtimeNodes}
+          onOpenThread={onSelectThread}
+          onNewThread={() => onNewThread(selectedProject.id)}
+          onOpenSettings={() => {
+            setEditingProject(selectedProject);
+            setProjectDrawerOpen(true);
+          }}
+          onBack={() => onSelectProject(null)}
+        />
+      ) : projectOverviewState === "loading" ? (
+        <section
+          id="project-detail-panel"
+          className="chat-panel project-directory-empty project-route-state"
+          aria-label={t("project.loading")}
+          aria-busy="true"
+          role="status"
+          tabIndex={-1}
+        >
+          <RelayEmptyState
+            fill
+            mark
+            title={t("project.loading")}
+            body={t("project.loading_body")}
+          />
+        </section>
+      ) : projectOverviewState === "error" ? (
+        <section
+          id="project-detail-panel"
+          className="chat-panel project-directory-empty project-route-state"
+          aria-label={t("project.load_failed")}
+          role="alert"
+          tabIndex={-1}
+        >
+          <RelayEmptyState
+            fill
+            mark
+            title={t("project.load_failed")}
+            body={projectsError || t("project.load_failed_body")}
+            actions={(
+              <Button type="button" variant="outline" size="sm" onClick={onRetryProjects}>
+                {t("workspace.retry")}
+              </Button>
+            )}
+          />
+        </section>
+      ) : projectOverviewState === "not-found" ? (
+        <section
+          id="project-detail-panel"
+          className="chat-panel project-directory-empty project-route-state"
+          aria-label={t("project.not_found")}
+          tabIndex={-1}
+        >
+          <RelayEmptyState
+            fill
+            mark
+            title={t("project.not_found")}
+            body={t("project.not_found_body")}
+            actions={(
+              <Button type="button" variant="outline" size="sm" onClick={() => onSelectProject(null)}>
+                {t("project.back")}
+              </Button>
+            )}
+          />
+        </section>
+      ) : showProjectDirectoryEmpty ? (
+        <section id="chat-panel" className="chat-panel project-directory-empty" aria-label={t("project.projects")} tabIndex={-1}>
+          <RelayEmptyState
+            fill
+            mark
+            title={t("project.select_title")}
+            body={t("project.select_body")}
+          />
+        </section>
+      ) : (
       <section id="chat-panel" className="chat-panel" aria-label={t("nav.threads")} tabIndex={-1}>
         <ThreadHeader
           activeSession={activeSession}
@@ -310,8 +411,9 @@ export function ThreadsView({
           onCancelRun={onCancelRun}
         />
       </section>
+      )}
 
-      {spaceOpen && activeSession ? (
+      {!showProjectOverview && !showProjectDirectoryEmpty && spaceOpen && activeSession ? (
         <ThreadSpacePanel
           sessionId={activeSession.id}
           items={spaceItems}

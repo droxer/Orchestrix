@@ -4,14 +4,23 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
+from ..core.ids import new_database_id
 from ..persistence.project_store import (
     ProjectValidationError,
     ProjectVersionConflict,
 )
 from ..services.project_catalog import create_project_payload, update_project_payload
+from ..services.project_runtime import project_runtime_node
 from .deps import AppContextDep
 from .helpers import json_body, request_actor
 from .project_helpers import project_for_owner
+from .workspace_transport import (
+    dispatch_workspace_command,
+    live_workspace_file,
+    live_workspace_listing,
+    raise_workspace_error,
+    workspace_path,
+)
 
 router = APIRouter()
 
@@ -21,6 +30,45 @@ def _project_error(error: Exception) -> HTTPException:
         return HTTPException(409, "project_version_conflict")
     code = error.code if isinstance(error, ProjectValidationError) else str(error)
     return HTTPException(409 if code == "project_name_taken" else 400, code)
+
+
+def _readable_project(
+    ctx: AppContextDep, request: Request, project_id: str
+) -> dict[str, Any]:
+    """Return an owner-visible project, including an archived project."""
+    actor = request_actor(request, ctx.auth_store)
+    project = ctx.project_store.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found.")
+    if not actor["isAdmin"] and project.get("ownerEmployeeId") != actor["employeeId"]:
+        raise HTTPException(403, "Project belongs to another employee.")
+    return project
+
+
+def _project_workspace_node(
+    ctx: AppContextDep, project: dict[str, Any]
+) -> dict[str, Any]:
+    node = project_runtime_node(project, ctx.registry.monitor_nodes())
+    if node is None or "workspace-read-shared" not in (node.get("capabilities") or []):
+        raise HTTPException(503, {"reason": "placement-unavailable"})
+    return node
+
+
+def _project_workspace_command(
+    project: dict[str, Any], *, command_id: str, command_type: str, path: str
+) -> dict[str, Any]:
+    return {
+        "id": command_id,
+        "type": command_type,
+        "scope": "shared",
+        # Project ids use the same validated database-id alphabet as sessions.
+        # The daemon only uses this field as a routing identifier for project
+        # layouts; workspaceSubpath selects the persistent project root.
+        "sessionId": project["id"],
+        "workspaceLayout": "project",
+        "workspaceSubpath": project["workspaceSubpath"],
+        "path": path,
+    }
 
 
 @router.get("/projects")
@@ -55,8 +103,65 @@ async def create_project(request: Request, ctx: AppContextDep) -> dict[str, Any]
 async def get_project(
     project_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
-    actor = request_actor(request, ctx.auth_store)
-    return {"project": project_for_owner(ctx, project_id, actor["employeeId"])}
+    return {"project": _readable_project(ctx, request, project_id)}
+
+
+@router.get("/projects/{project_id}/workspace/files")
+async def project_workspace_files(
+    project_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    project = _readable_project(ctx, request, project_id)
+    path = workspace_path(request.query_params.get("path"))
+    node = _project_workspace_node(ctx, project)
+    event = await dispatch_workspace_command(
+        ctx,
+        node,
+        _project_workspace_command(
+            project,
+            command_id=new_database_id(),
+            command_type="workspace.list",
+            path=path,
+        ),
+    )
+    raise_workspace_error(event)
+    return live_workspace_listing(
+        event,
+        path=path,
+        metadata={
+            "projectId": project["id"],
+            "scope": "shared",
+            "nodeId": node["id"],
+        },
+    )
+
+
+@router.get("/projects/{project_id}/workspace/file")
+async def project_workspace_file(
+    project_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    project = _readable_project(ctx, request, project_id)
+    path = workspace_path(request.query_params.get("path"), required=True)
+    node = _project_workspace_node(ctx, project)
+    event = await dispatch_workspace_command(
+        ctx,
+        node,
+        _project_workspace_command(
+            project,
+            command_id=new_database_id(),
+            command_type="workspace.read",
+            path=path,
+        ),
+    )
+    raise_workspace_error(event)
+    return live_workspace_file(
+        event,
+        path=path,
+        metadata={
+            "projectId": project["id"],
+            "scope": "shared",
+            "nodeId": node["id"],
+        },
+    )
 
 
 @router.patch("/projects/{project_id}")

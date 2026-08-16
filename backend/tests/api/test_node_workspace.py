@@ -37,7 +37,9 @@ def test_admin_browses_node_shared_workspace(monkeypatch, tmp_path):
             return {"type": "workspace.listing", "path": "", "exists": True, "entries": [{"name": "shared.md", "path": "shared.md", "kind": "file", "bytes": 5, "updatedAt": "2026-07-19T00:00:00Z"}]}
         return {"type": "workspace.file", "path": "shared.md", "bytes": 5, "isBinary": False, "truncated": False, "contentBase64": "aGVsbG8="}
 
-    monkeypatch.setattr("relay.api.node_workspace_routes._dispatch", dispatch)
+    monkeypatch.setattr(
+        "relay.api.node_workspace_routes.dispatch_workspace_command", dispatch
+    )
     listing = client.get("/api/v1/admin/daemon-nodes/node_1/workspace/files")
     assert listing.status_code == 200, listing.text
     assert listing.json()["nodeId"] == "node_1"
@@ -61,7 +63,9 @@ def test_node_workspace_file_passes_binary_bytes_through(monkeypatch, tmp_path):
     async def dispatch(_ctx, _node, _command):
         return {"type": "workspace.file", "path": "logo.png", "bytes": len(png), "isBinary": True, "truncated": False, "contentBase64": base64.b64encode(png).decode()}
 
-    monkeypatch.setattr("relay.api.node_workspace_routes._dispatch", dispatch)
+    monkeypatch.setattr(
+        "relay.api.node_workspace_routes.dispatch_workspace_command", dispatch
+    )
     file = client.get("/api/v1/admin/daemon-nodes/node_1/workspace/file?path=logo.png")
     assert file.status_code == 200, file.text
     body = file.json()

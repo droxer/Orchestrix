@@ -158,6 +158,7 @@ export interface WorkspaceBriefTask {
 export interface WorkspaceBriefResponse {
   employeeId: string;
   teamId?: string;
+  projectId?: string;
   workspacePath?: string;
   nodes: DaemonNodeMonitorRecord[];
   activeRuns: DaemonNodeMonitorRecord["activeRuns"];
@@ -215,6 +216,33 @@ export interface AgentWorkspaceFileResponse {
   bytes: number;
   content: string | null;
   /** Raw bytes (base64, capped at limitBytes) for binary previews — images, PDFs. */
+  contentBase64?: string | null;
+  truncated: boolean;
+  limitBytes: number;
+  generatedAt: string;
+}
+
+export interface ProjectWorkspaceFilesResponse {
+  projectId: string;
+  scope: "shared";
+  source: "live";
+  nodeId: string;
+  path: string;
+  exists: boolean;
+  entries: WorkspaceFileEntry[];
+  generatedAt: string;
+}
+
+export interface ProjectWorkspaceFileResponse {
+  projectId: string;
+  scope: "shared";
+  source: "live";
+  nodeId: string;
+  path: string;
+  exists: boolean;
+  isBinary: boolean;
+  bytes: number;
+  content: string | null;
   contentBase64?: string | null;
   truncated: boolean;
   limitBytes: number;

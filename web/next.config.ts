@@ -18,6 +18,8 @@ const CLIENT_ROUTES = [
   "/agents/:path*",
   "/teams",
   "/teams/:path*",
+  "/projects",
+  "/projects/:path*",
   "/channels",
   "/admin",
   "/admin/:path*",

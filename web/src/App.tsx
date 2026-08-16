@@ -65,6 +65,7 @@ import { useStableValue } from "./hooks/useStableValue";
 import { useUrlSearchState } from "./hooks/useUrlSearchState";
 import { validatedReturnTo } from "./lib/appRoute";
 import { clampSpaceWidth, SPACE_WIDTH_DEFAULT } from "./lib/threadSpace";
+import { showThreadChrome } from "./lib/projectPage";
 
 const AdminPage = lazy(() => import("./components/AdminPage").then((m) => ({ default: m.AdminPage })));
 const BacklogPage = lazy(() => import("./components/BacklogPage").then((m) => ({ default: m.BacklogPage })));
@@ -183,7 +184,18 @@ export function App() {
   const recoveryOperationIdsRef = useRef(new Map<string, string>());
 
   const selectedEmployeeToken = tokens[selectedEmployee];
-  const { sandboxes, nodes, sessions, tasks, projects, isRefreshing, refresh, setSandboxes } = useRelayData(selectedEmployeeToken, Boolean(user));
+  const {
+    sandboxes,
+    nodes,
+    sessions,
+    tasks,
+    projects,
+    projectsStatus,
+    projectsError,
+    isRefreshing,
+    refresh,
+    setSandboxes,
+  } = useRelayData(selectedEmployeeToken, Boolean(user));
   const { localNodes, refreshLocalDaemonNodes } = useLocalDaemonNodes(
     hydrated && user?.role === "admin" && canUseLocalControlPanel(),
   );
@@ -341,6 +353,7 @@ export function App() {
   const {
     route,
     mobileView,
+    routedSessionId,
     projectId: routedProjectId,
     agentId,
     teamWorkspaceId,
@@ -387,33 +400,14 @@ export function App() {
     [effectiveSelectableLogicalAgents],
   );
   const requiresRuntimeSelection = initializingThread && !activeProject;
-  useEffect(() => {
-    if (!routedProjectId || !activeProject || composingNew || activeSession?.projectId === routedProjectId) return;
-    const firstProjectThread = myThreads.find((session) => session.projectId === routedProjectId);
-    setPendingUserMessage(null);
-    setPendingThreadTeamId(null);
-    if (firstProjectThread) {
-      setSelectedSessionId(firstProjectThread.id);
-      setActiveSessionId(firstProjectThread.id);
-      syncThreadUrl(firstProjectThread.id, true, routedProjectId);
-      return;
-    }
-    setSelectedSessionId(undefined);
-    setActiveSessionId(null);
-    setComposingNew(!activeProject.archivedAt && activeProject.enabled);
-    if (!activeProject.archivedAt && activeProject.enabled) {
-      syncThreadUrl(null, true, routedProjectId);
-    }
-  }, [
-    activeProject,
-    activeSession?.projectId,
-    composingNew,
-    myThreads,
-    routedProjectId,
-    setActiveSessionId,
-    setSelectedSessionId,
-    syncThreadUrl,
-  ]);
+  const showProjectOverview = route === "projects"
+    && Boolean(routedProjectId)
+    && !routedSessionId
+    && !composingNew;
+  const showProjectDirectoryEmpty = route === "projects"
+    && !routedProjectId
+    && !routedSessionId
+    && !composingNew;
   const detailAgent = useMemo(
     () => logicalAgents.find((agent) => agent.id === agentId) ?? null,
     [agentId, logicalAgents],
@@ -476,19 +470,26 @@ export function App() {
     if (present) setPendingUserMessage(null);
   }, [messages, pendingUserMessage]);
 
-  const activeThreadLabel = activeSession
-    ? (activeSession.title?.trim() || activeSession.taskGoal)
-    : t("thread.new_thread");
+  const activeThreadLabel = showProjectOverview && activeProject
+    ? activeProject.name
+    : activeSession
+      ? (activeSession.title?.trim() || activeSession.taskGoal)
+      : t("thread.new_thread");
 
   const skipLinkHref = useMemo(() => {
+    if (route === "projects" && showProjectOverview) return "#project-detail-panel";
     if (route === "main" || route === "projects") return mobileView === "threads" ? "#thread-panel" : "#chat-panel";
     if (route === "agents" && agentId) return "#agent-detail-panel";
     return `#${WORK_ROUTE_SKIP_IDS[route]}`;
-  }, [agentId, route, mobileView]);
+  }, [agentId, route, mobileView, showProjectOverview]);
 
   const awaitingDecision = useMemo(() => isAwaitingFeedbackDecision(activeSession), [activeSession]);
 
-  const spaceVisible = (route === "main" || route === "projects") && spaceOpen && Boolean(activeSession);
+  const threadChromeVisible = showThreadChrome(showProjectOverview);
+  const spaceVisible = threadChromeVisible
+    && (route === "main" || route === "projects")
+    && spaceOpen
+    && Boolean(activeSession);
 
   const threadItems = useMemo<ThreadItem[]>(() => {
     const runningBy = new Map(visibleNodes.flatMap((node) => node.activeRuns.map((run) => [run.sessionId, run.agent] as const)));
@@ -509,10 +510,10 @@ export function App() {
     const matchingProjectIds = new Set(
       projects.filter((project) => project.name.toLowerCase().includes(query)).map((project) => project.id),
     );
-    return projects.filter((project) => matchingProjectIds.has(project.id) || threadItems.some(
+    return projects.filter((project) => project.id === routedProjectId || matchingProjectIds.has(project.id) || threadItems.some(
       (item) => item.session.projectId === project.id && matchesThreadQuery(item.session, threadQuery),
     ));
-  }, [projects, route, threadItems, threadQuery]);
+  }, [projects, route, routedProjectId, threadItems, threadQuery]);
   const directoryThreads = useMemo(() => {
     if (route !== "projects") return threadsForDirectory(filteredThreads, projects, "threads");
     const query = threadQuery.trim().toLowerCase();
@@ -1199,7 +1200,10 @@ export function App() {
       onNavigateRoute={navigateToRoute}
       hrefForRoute={hrefForSideNavRoute}
       mobileView={mobileView}
-      onMobileViewChange={navigateToMobileView}
+      onMobileViewChange={(view) => {
+        if (view === "threads" && showProjectOverview) navigateToProject(null);
+        else navigateToMobileView(view);
+      }}
       sidenavExpanded={sidenavExpanded}
       setSidenavExpanded={applySidenavExpanded}
       prefsOpen={prefsOpen}
@@ -1210,12 +1214,12 @@ export function App() {
       threadSpaceWidth={spaceWidth}
       threadSpaceResizing={spaceResizing}
       threadListHidden={threadListHidden}
-      mobileChatChrome={{
+      mobileChatChrome={threadChromeVisible ? {
         artifactCount: visibleArtifacts.length,
         spaceOpen: spaceVisible,
         spaceDisabled: !activeSession,
         onToggleSpace: toggleThreadSpace,
-      }}
+      } : null}
       user={user}
       onLogout={() => void handleLogout()}
       onNewThread={startNewThread}
@@ -1276,7 +1280,12 @@ export function App() {
             directoryMode={route === "projects" ? "projects" : "threads"}
             filteredThreads={directoryThreads}
             projects={route === "projects" ? directoryProjects : []}
-            selectedProjectId={route === "projects" ? routedProjectId ?? activeSession?.projectId ?? null : null}
+            selectedProjectId={route === "projects" ? routedProjectId : null}
+            projectsStatus={projectsStatus}
+            projectsError={projectsError}
+            onRetryProjects={() => void refresh()}
+            showProjectOverview={showProjectOverview}
+            showProjectDirectoryEmpty={showProjectDirectoryEmpty}
             threadQuery={threadQuery}
             setThreadQuery={setThreadQuery}
             activeSession={activeSession}

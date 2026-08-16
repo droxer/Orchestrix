@@ -3,11 +3,18 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { listAgentWorkspaceFiles, readAgentWorkspaceFile } from "../api";
+import {
+  listAgentWorkspaceFiles,
+  listProjectWorkspaceFiles,
+  readAgentWorkspaceFile,
+  readProjectWorkspaceFile,
+} from "../api";
 import type {
   AgentWorkspaceFileResponse,
   WorkspaceFileEntry,
   AgentWorkspaceFilesResponse,
+  ProjectWorkspaceFileResponse,
+  ProjectWorkspaceFilesResponse,
   WorkspaceBriefSession,
 } from "../types";
 import { isWorkspaceRetryableError, preferredWorkspaceThreadId, workspaceFilesEmptyState, workspaceHomeStatus } from "../lib/workspaceHome";
@@ -30,6 +37,19 @@ const parseString = (value: string | null): string => value ?? "";
 /** Agent-private files vs the shared root inside the selected Thread workspace. */
 type WorkspaceFileScope = "personal" | "shared";
 const parseFileScope = (value: string | null): WorkspaceFileScope => value === "shared" ? "shared" : "personal";
+
+type WorkspaceListingResponse = AgentWorkspaceFilesResponse | ProjectWorkspaceFilesResponse;
+type WorkspacePreviewResponse = AgentWorkspaceFileResponse | ProjectWorkspaceFileResponse;
+type WorkspaceTarget =
+  | {
+      kind: "thread";
+      agentId: string;
+      teamId?: string;
+      threads: WorkspaceBriefSession[];
+      fixedScope?: WorkspaceFileScope;
+      refreshVersion: number;
+    }
+  | { kind: "project"; projectId: string; refreshVersion: number };
 
 function parentPath(path: string): string {
   const parts = path.split("/").filter(Boolean);
@@ -141,6 +161,47 @@ export function ThreadWorkspaceFiles({
   emptyMark?: ReactNode;
   refreshVersion?: number;
 }) {
+  return (
+    <WorkspaceFileBrowser
+      target={{
+        kind: "thread",
+        agentId,
+        teamId,
+        threads,
+        fixedScope,
+        refreshVersion,
+      }}
+      emptyMark={emptyMark}
+    />
+  );
+}
+
+/** Persistent shared project root; unlike a Thread workspace it has no scope
+ * or Thread selector and is available before the first conversation exists. */
+export function ProjectWorkspaceFiles({
+  projectId,
+  emptyMark,
+  refreshVersion = 0,
+}: {
+  projectId: string;
+  emptyMark?: ReactNode;
+  refreshVersion?: number;
+}) {
+  return (
+    <WorkspaceFileBrowser
+      target={{ kind: "project", projectId, refreshVersion }}
+      emptyMark={emptyMark}
+    />
+  );
+}
+
+function WorkspaceFileBrowser({
+  target,
+  emptyMark,
+}: {
+  target: WorkspaceTarget;
+  emptyMark?: ReactNode;
+}) {
   const { t } = useTranslation();
   const [filePath, setFilePath] = useUrlSearchState("path", "", parseString, (value) => value || null);
   const [selectedKey, setSelectedKey] = useUrlSearchState("item", "", parseString, (value) => value || null);
@@ -152,41 +213,47 @@ export function ThreadWorkspaceFiles({
     (value) => value === "personal" ? null : value,
   );
   const [snapshotBannerDismissed, setSnapshotBannerDismissed] = useState(false);
+  const threads = target.kind === "thread" ? target.threads : [];
   const selectedThreadId = preferredWorkspaceThreadId(threads, requestedThreadId);
-  const fileScope = fixedScope ?? selectableScope;
+  const fileScope = target.kind === "project" ? "shared" : target.fixedScope ?? selectableScope;
+  const targetKey = target.kind === "project"
+    ? `project:${target.projectId}`
+    : `thread:${target.agentId}:${target.teamId ?? ""}:${selectedThreadId}`;
   const selectedPath = selectedKey.startsWith("file:") ? selectedKey.slice(5) : "";
   const selected: FileSelection | null = selectedPath
     ? { path: selectedPath, name: selectedPath.split("/").at(-1) || selectedPath }
     : null;
   const fileQuery = useQuery({
-    queryKey: ["agent-workspace", agentId, teamId, selectedThreadId, fileScope, filePath, refreshVersion],
-    queryFn: ({ signal }) => listAgentWorkspaceFiles({
-      agentId,
-      threadId: selectedThreadId!,
-      teamId,
-      path: filePath,
-      scope: fileScope === "shared" ? "shared" : undefined,
-    }, signal),
-    enabled: Boolean(agentId && selectedThreadId),
+    queryKey: ["workspace-files", targetKey, fileScope, filePath, target.refreshVersion],
+    queryFn: ({ signal }): Promise<WorkspaceListingResponse> => target.kind === "project"
+      ? listProjectWorkspaceFiles({ projectId: target.projectId, path: filePath }, signal)
+      : listAgentWorkspaceFiles({
+          agentId: target.agentId,
+          threadId: selectedThreadId,
+          teamId: target.teamId,
+          path: filePath,
+          scope: fileScope === "shared" ? "shared" : undefined,
+        }, signal),
+    enabled: target.kind === "project" || Boolean(target.agentId && selectedThreadId),
   });
   const contentQuery = useQuery({
-    queryKey: ["agent-workspace-file", agentId, teamId, selectedThreadId, fileScope, selectedPath, refreshVersion],
-    // Mirrors the listing's gate exactly: every workspace and private agent
-    // subdirectory belongs to one Thread.
-    enabled: Boolean(agentId && selectedThreadId && selectedPath),
-    queryFn: ({ signal }) => readAgentWorkspaceFile({
-      agentId,
-      threadId: selectedThreadId!,
-      teamId,
-      path: selectedPath,
-      scope: fileScope === "shared" ? "shared" : undefined,
-    }, signal),
+    queryKey: ["workspace-file", targetKey, fileScope, selectedPath, target.refreshVersion],
+    enabled: Boolean(selectedPath && (target.kind === "project" || (target.agentId && selectedThreadId))),
+    queryFn: ({ signal }): Promise<WorkspacePreviewResponse> => target.kind === "project"
+      ? readProjectWorkspaceFile({ projectId: target.projectId, path: selectedPath }, signal)
+      : readAgentWorkspaceFile({
+          agentId: target.agentId,
+          threadId: selectedThreadId,
+          teamId: target.teamId,
+          path: selectedPath,
+          scope: fileScope === "shared" ? "shared" : undefined,
+        }, signal),
   });
   const homeStatus = workspaceHomeStatus(fileQuery.data, snapshotBannerDismissed);
 
   useEffect(() => {
     setSnapshotBannerDismissed(false);
-  }, [agentId, selectedThreadId, fileScope]);
+  }, [targetKey, fileScope]);
 
   function openDirectory(path: string): void {
     setFilePath(path);
@@ -212,7 +279,7 @@ export function ThreadWorkspaceFiles({
     setSelectedKey("");
   }
 
-  if (!agentId) {
+  if (target.kind === "thread" && !target.agentId) {
     return <WorkspaceEmpty title={t("workspace.files_unavailable")} mark={emptyMark ?? <WorkspaceFile size={18} />} announce />;
   }
 
@@ -225,7 +292,7 @@ export function ThreadWorkspaceFiles({
               line. The thread picker stays in BOTH scopes because the shared
               root and every Agent-private subdirectory belong to that Thread. */}
           <div className="workspace-files-bar">
-            {!fixedScope ? (
+            {target.kind === "thread" && !target.fixedScope ? (
               <span className="workspace-scope-options" role="radiogroup" aria-label={t("workspace.scope_label")}>
                 {(["personal", "shared"] as const).map((scopeOption) => (
                   <Button
@@ -247,7 +314,7 @@ export function ThreadWorkspaceFiles({
             ) : null}
             <WorkspacePathBreadcrumb path={filePath} onNavigate={openDirectory} />
             <div className="workspace-files-bar-end">
-              {threads.length ? (
+              {target.kind === "thread" && threads.length ? (
                 <Select value={selectedThreadId} onValueChange={switchThread}>
                   <SelectTrigger className="workspace-thread-select" aria-label={t("workspace.thread_label")}>
                     {/* The label is passed explicitly: the items only register
@@ -280,7 +347,7 @@ export function ThreadWorkspaceFiles({
               ) : null}
             </div>
           </div>
-          {!fixedScope && fileScope === "personal" && homeStatus.kind === "snapshot-banner" ? (
+          {target.kind === "thread" && !target.fixedScope && fileScope === "personal" && homeStatus.kind === "snapshot-banner" ? (
             <SnapshotBanner onDismiss={() => setSnapshotBannerDismissed(true)} />
           ) : null}
           <FilesPane
@@ -343,7 +410,7 @@ function FilesPane({
   onSelectFile,
   onRetry,
 }: {
-  data?: AgentWorkspaceFilesResponse;
+  data?: WorkspaceListingResponse;
   error: unknown;
   isLoading: boolean;
   path: string;
@@ -447,7 +514,7 @@ function FilePreview({
   error,
 }: {
   name: string;
-  data?: AgentWorkspaceFileResponse;
+  data?: WorkspacePreviewResponse;
   isLoading: boolean;
   error: unknown;
 }) {
