@@ -886,6 +886,10 @@ def test_cross_site_request_cannot_mutate_cookie_authenticated_session(monkeypat
             headers={
                 "Origin": "https://attacker.example",
                 "Sec-Fetch-Site": "cross-site",
+                # Forwarded headers are client-spoofable unless a trusted
+                # proxy sanitizes them, so they must not bypass the guard.
+                "X-Forwarded-Host": "attacker.example",
+                "X-Forwarded-Proto": "https",
             },
         )
 
@@ -896,6 +900,28 @@ def test_cross_site_request_cannot_mutate_cookie_authenticated_session(monkeypat
             headers={"Origin": "http://testserver", "Sec-Fetch-Site": "same-origin"},
         )
         assert accepted.status_code == 200
+
+
+def test_same_origin_browser_mutation_survives_nextjs_proxy(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _login(client, "admin", "secret123")
+
+        response = client.post(
+            "/api/v1/auth/logout",
+            headers={
+                # Next.js preserves the browser origin while proxying the
+                # request to the backend's upstream Host.
+                "Origin": "http://127.0.0.1:5000",
+                "Sec-Fetch-Site": "same-origin",
+                "X-Forwarded-Host": "127.0.0.1:5000",
+                "X-Forwarded-Proto": "http",
+            },
+        )
+
+        assert response.status_code == 200
 
 
 def test_json_endpoints_reject_simple_cross_site_content_type(monkeypatch) -> None:

@@ -143,7 +143,12 @@ class CookieRequestGuardMiddleware:
             return
         origin = headers.get("origin", "").rstrip("/")
         fetch_site = headers.get("sec-fetch-site", "").lower()
-        if (origin and not _request_origin_allowed(scope, headers, origin)) or (
+        origin_allowed = origin and _request_origin_allowed(scope, headers, origin)
+        # A same-origin browser request can reach Relay through the Next.js
+        # rewrite proxy with the public Origin preserved but the upstream Host
+        # substituted. Sec-Fetch-Site is browser-controlled, so it identifies
+        # that safe proxy case without trusting spoofable X-Forwarded-* values.
+        if (origin and not origin_allowed and fetch_site != "same-origin") or (
             not origin and fetch_site == "cross-site"
         ):
             response = JSONResponse(
