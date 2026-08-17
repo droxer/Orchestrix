@@ -405,7 +405,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1-5);
-  padding: 3px var(--sp-2);
+  padding: var(--sp-0-5) var(--sp-2);
   border-radius: var(--r-2);
   background: var(--surface-1);
 }
