@@ -623,7 +623,7 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--sp-1-5);
 }
 
 .create-agent-runtime-option-name {

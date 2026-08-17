@@ -149,16 +149,6 @@ export function ComputerTokenDrawer({ open, onClose, node }: ComputerTokenDrawer
             </>
           ) : (
             <>
-              <Button
-                size="cta"
-                type="button"
-                variant="outline"
-                onClick={() => void handleReissue()}
-                disabled={busy !== null}
-                loading={busy === "reissue"}
-              >
-                {busy === "reissue" ? t("computer.token_reissuing") : t("computer.token_reissue_action")}
-              </Button>
               {!unrecoverable ? (
                 <Button
                   size="cta"
@@ -170,6 +160,16 @@ export function ComputerTokenDrawer({ open, onClose, node }: ComputerTokenDrawer
                   {busy === "reveal" ? t("computer.token_revealing") : t("computer.token_reveal_action")}
                 </Button>
               ) : null}
+              <Button
+                size="cta"
+                type="button"
+                variant="outline"
+                onClick={() => void handleReissue()}
+                disabled={busy !== null}
+                loading={busy === "reissue"}
+              >
+                {busy === "reissue" ? t("computer.token_reissuing") : t("computer.token_reissue_action")}
+              </Button>
             </>
           )}
         </div>
