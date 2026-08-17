@@ -8,18 +8,19 @@
 
 <p align="center"><strong>Every Employee. Amplified.</strong></p>
 
-Relay is a local-first control plane for AI work. Employees can start threads, assign durable tasks, schedule routines, and coordinate named AI agents and teams from one interface.
+Relay is a local-first control plane for AI work. Employees can start threads, assign persistent tasks, schedule routines, and coordinate named AI agents and teams from one interface.
 
-Relay records identity, computer placement, approvals, tasks, and history.
+Relay records identity, approvals, tasks, and history, and tracks which computer hosts each agent.
 
-The Python backend never executes an agent CLI. Daemons run Claude Code, Codex, Pi, and Kimi on local or managed computers, inside BoxLite or a configured local environment.
+The Python backend never executes agents. Relay daemons run Claude Code, Codex, Pi, and Kimi on local or managed computers, inside BoxLite or a configured local environment.
 
 ## What you can do
 
 - Start a thread with an explicit agent and computer. The agent decides whether the goal needs an answer, investigation, workspace changes, validation, review, or a clarifying question. Stream tool output, approve decisions, cancel or retry work, and hand the thread to another agent.
 - Plan work in a backlog, schedule recurring routines, assign agents or teams, set due dates, and follow dispatch and event history.
-- Create named agents and teams with profiles, computer placements, workspace files, generated artifacts, and recent activity.
-- Enroll employee computers or reconcile managed computers while tracking health, capacity, command leases, and restart-safe identity.
+- Create named agents and teams with profiles, computer placement, workspace files, generated artifacts, and recent activity.
+- Create projects that bind a persistent shared workspace and an ordered roster of project agents to one computer, then run project conversations that share that workspace.
+- Enroll employee computers or reconcile managed computers while tracking health, capacity, command leases, and durable identity.
 - Connect Discord, Telegram, and Lark through one chat gateway that maps external identities and conversations to Relay.
 - Operate employees, agents, computers, fleet health, activity, and token usage from the administration area.
 
@@ -27,7 +28,7 @@ The Python backend never executes an agent CLI. Daemons run Claude Code, Codex, 
 
 ### Start and direct a thread
 
-Choose where work runs and which named agent or team handles it; Relay gives the goal to the selected participants and lets them choose the appropriate execution path.
+Choose where work runs and which named agent or team handles it; Relay gives the goal to the selected participants and lets each agent choose the appropriate execution path.
 
 <p align="center">
   <img src="docs/images/relay-threads-phosphor.png" alt="Relay thread composer with agent and computer selection" width="960">
@@ -88,28 +89,6 @@ make stop               # stop Relay, daemon, supervisor, and BoxLite
 ```
 
 Use `make run-fresh` only after changing `dockerfile` or the BoxLite image contents.
-
-## Architecture
-
-```mermaid
-flowchart LR
-    Clients["Web and chat adapters"] --> API["FastAPI control plane"]
-    API --> State["Event stores, auth, scheduler"]
-    API --> Queue["Leased daemon command queue"]
-    Queue --> Daemon["Relay daemon"]
-    Daemon --> Runtime["BoxLite or local environment"]
-    Runtime --> CLIs["Claude Code, Codex, Pi, Kimi"]
-    Daemon -->|"ordered run events"| API
-    Supervisor["Managed-computer supervisor"] --> Daemon
-```
-
-The control plane owns durable threads, tasks, agent and team identity, computer placement, approvals, and audit history. Daemons own agent execution and workspace access. Every agent run flows through the leased daemon command path.
-
-The supervisor reconciles requested managed computers into daemon processes. Its built-in provider runs local processes; a command-template provider can connect external infrastructure.
-
-The repository map, state ownership, and engineering invariants are maintained in [`AGENTS.md`](AGENTS.md).
-
-Target architecture and implementation details live in [`docs/system-architecture.md`](docs/system-architecture.md) and [`docs/implementation-plan.md`](docs/implementation-plan.md).
 
 ## Deployment
 
