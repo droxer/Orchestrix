@@ -8,11 +8,15 @@
 
 - [`../README.zh-CN.md`](../README.zh-CN.md) — 中文产品概览和最短的开发环境启动路径。
 - [`local-development.md`](local-development.md) — 环境、配置、服务、数据布局和测试流程的权威指南。
+- [`deployment.md`](deployment.md) — 权威托管部署流程（Web UI 部署在 Vercel，后端与
+  Postgres 部署在 Railway）及其所需的 origin、cookie 和代理配置。
 - [`../backend/migrations/README.md`](../backend/migrations/README.md) — 数据库迁移和旧对话导入的权威流程。
 - [`api.md`](api.md) — 当前浏览器路由和 HTTP API 契约。
 - [`../AGENTS.md`](../AGENTS.md) — Codex 使用的仓库结构、工程不变量和验证指南。
 - [`../CLAUDE.md`](../CLAUDE.md) — Claude Code 使用的命令、架构细节、不变量和测试指南。
 - [`../CONTEXT.md`](../CONTEXT.md) — 简短的权威产品术语表。
+- [`CODEX-NAVIGATION-GUIDE.md`](CODEX-NAVIGATION-GUIDE.md) — 行为的权威来源、
+  必须联动变更的相邻表面，以及评审 diff 包中应包含的证据（英文）。
 
 ## 产品与架构
 
@@ -21,6 +25,8 @@
 - [`system-architecture.md`](system-architecture.md) 负责目标架构和战略技术选择。
 - [`implementation-plan.md`](implementation-plan.md) 将目标架构转换为服务边界、数据模型、API、运行流程和实施阶段。
 - [`agent-first-runtime-design.md`](agent-first-runtime-design.md) 与 [`agent-first-runtime-migration.md`](agent-first-runtime-migration.md) 负责逻辑智能体运行时设计及其迁移状态。
+- [`composer-agent-mentions-design.md`](composer-agent-mentions-design.md) 负责
+  已批准但尚未实现的输入框 `@` 提及设计（英文）。
 - [`managed-node-provisioning.md`](managed-node-provisioning.md) 负责托管计算机的期望状态、注册、协调和供应商生命周期。
 - [`node-heartbeats.md`](node-heartbeats.md) 负责执行平面的存活租约。
 - [`backend-low-latency-scalability-plan.md`](backend-low-latency-scalability-plan.md) 负责多副本低延迟与可扩展性方案。

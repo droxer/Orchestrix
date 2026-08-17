@@ -5,8 +5,9 @@
 Accepted for durable round metadata. Its execution-mode semantics are
 superseded and removed by
 [ADR-015](015-adaptive-agent-execution.md). This decision does not adopt the
-proposed discussion-plan-approval workflow in
-[`agent-team-room-design.md`](../agent-team-room-design.md).
+proposed Ask/Action/Review discussion-plan-approval workflow explored and
+retired during design; that workflow's execution modes were removed from
+Relay.
 
 ## Context
 

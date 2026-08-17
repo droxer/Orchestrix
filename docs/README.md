@@ -23,6 +23,9 @@ document.
 - [`../CLAUDE.md`](../CLAUDE.md) — Claude Code commands, architecture details,
   invariants, and test guidance.
 - [`../CONTEXT.md`](../CONTEXT.md) — short canonical product terminology.
+- [`CODEX-NAVIGATION-GUIDE.md`](CODEX-NAVIGATION-GUIDE.md) — where behavior
+  lives, which neighboring surfaces move with it, and what a review diff
+  packet must show.
 
 ## Product and architecture
 
@@ -37,6 +40,8 @@ document.
 - [`agent-first-runtime-design.md`](agent-first-runtime-design.md) and
   [`agent-first-runtime-migration.md`](agent-first-runtime-migration.md) own the
   logical-agent runtime design and its rollout status.
+- [`composer-agent-mentions-design.md`](composer-agent-mentions-design.md) owns
+  the approved, not-yet-implemented `@`-mention composer design.
 - [`managed-node-provisioning.md`](managed-node-provisioning.md) owns managed
   computer desired state, enrollment, reconciliation, and provider lifecycle.
 - [`node-heartbeats.md`](node-heartbeats.md) owns the execution-plane liveness
