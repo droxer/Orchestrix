@@ -21,7 +21,7 @@ export function parseTeamSelectValue(value: string | null): string | null {
 // stay listed (disabled) with their availability spelled out so users can see
 // why a target cannot take the thread. A team thread keeps the team fixed for
 // its lifetime, so `teamLocked` renders the trigger read-only.
-export function AgentSelect({ logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, teams = [], activeTeamId = null, onTeamPicked, teamLocked = false, teamOptionsEnabled = false }: {
+export function AgentSelect({ logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, teams = [], activeTeamId = null, onTeamPicked, teamLocked = false, teamOptionsEnabled = false, running = false }: {
   logicalAgents: EmployeeAgent[];
   activeLogicalAgentId: string | null;
   onLogicalAgentPicked: (agent: EmployeeAgent) => void;
@@ -34,6 +34,10 @@ export function AgentSelect({ logicalAgents, activeLogicalAgentId, onLogicalAgen
   /** Teams are pickable only while staging a new thread — a started thread
    *  keeps the participants it began with. */
   teamOptionsEnabled?: boolean;
+  /** True while THIS thread's run is the cause of the selected agent being
+   *  busy — suppresses the trigger busy pip, which would otherwise duplicate
+   *  the rail's live pulse 20px away. */
+  running?: boolean;
 }) {
   const { t } = useTranslation();
   const activeLogicalAgent = logicalAgents.find(
@@ -89,7 +93,7 @@ export function AgentSelect({ logicalAgents, activeLogicalAgentId, onLogicalAgen
             {t("thread.no_available_agent")}
           </span>
         )}
-        {!activeTeam && activeLogicalAgent?.availability === "busy" ? (
+        {!activeTeam && !running && activeLogicalAgent?.availability === "busy" ? (
           <>
             <span className="header-agent-busy-pip" aria-hidden="true" />
             <span className="sr-only">{t("status.busy")}</span>

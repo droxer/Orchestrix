@@ -226,6 +226,7 @@ const ComposerView = forwardRef<ComposerHandle, {
                   onTeamPicked={pickTeam}
                   teamLocked={teamLocked}
                   teamOptionsEnabled={initializingThread}
+                  running={running}
                 />
               ) : null}
             </div>

@@ -119,15 +119,21 @@ function BacklogStats({ tasks }: { tasks: RelayTaskListItem[] }) {
       </span>
       <span className="backlog-stat">
         <span className="backlog-stat-eyebrow">{t("backlog.metric_active")}</span>
-        <span className="backlog-stat-value tone-active">{stats.active}</span>
+        <span className="backlog-stat-value">{stats.active}</span>
       </span>
       <span className="backlog-stat">
         <span className="backlog-stat-eyebrow">{t("backlog.metric_blocked")}</span>
-        <span className={cn("backlog-stat-value", stats.blocked > 0 && "tone-blocked")}>{stats.blocked}</span>
+        <span className="backlog-stat-value">
+          {stats.blocked > 0 ? <StateMark shape="ring" className="backlog-stat-mark" /> : null}
+          {stats.blocked}
+        </span>
       </span>
       <span className="backlog-stat">
         <span className="backlog-stat-eyebrow">{t("backlog.metric_overdue")}</span>
-        <span className={cn("backlog-stat-value", stats.overdue > 0 && "tone-overdue")}>{stats.overdue}</span>
+        <span className="backlog-stat-value">
+          {stats.overdue > 0 ? <StateMark shape="ring" className="backlog-stat-mark" /> : null}
+          {stats.overdue}
+        </span>
       </span>
     </p>
   );
@@ -710,7 +716,10 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     // Without preventDefault the browser never fires `drop` on this element.
     if (!draggedTask) return;
     event.preventDefault();
-    event.dataTransfer.dropEffect = draggedTask.status === status ? "none" : "move";
+    // The cursor must agree with the drop: a lane that refuses the drop (own
+    // lane, or any rejection) reports "none", never a move it won't honour.
+    const refused = draggedTask.status === status || Boolean(taskDropRejection(draggedTask, status));
+    event.dataTransfer.dropEffect = refused ? "none" : "move";
     if (dropLane !== status) setDropLane(status);
   }
 
@@ -790,8 +799,12 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
         }
       />
 
-      <BacklogStats tasks={backlogTasks} />
-      <BacklogFiltersBar filters={filters} agents={logicalAgents} onChange={setFilters} />
+      {backlogTasks.length > 0 ? (
+        <>
+          <BacklogStats tasks={backlogTasks} />
+          <BacklogFiltersBar filters={filters} agents={logicalAgents} onChange={setFilters} />
+        </>
+      ) : null}
 
       {showEmptyBoard ? (
         (() => {
@@ -802,6 +815,8 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
               body={filtered ? t("backlog.no_match_body") : t("backlog.no_tasks_body")}
               createLabel={filtered ? undefined : t("backlog.new_task")}
               onCreate={filtered ? undefined : () => openTaskForm(emptyBacklogForm(currentUser))}
+              clearLabel={filtered ? t("backlog.clear_filters") : undefined}
+              onClear={filtered ? () => setFilters(initialFilters) : undefined}
             />
           );
         })()

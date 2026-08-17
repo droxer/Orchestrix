@@ -1,30 +1,8 @@
-/* Project room — an operational dossier, not another dashboard. The profile
-   reads as a numbered set of crew lanes; files and activity retain the shared
-   workspace grammar so moving between records never changes the controls. */
-
-.project-workspace-page {
-  position: relative;
-  isolation: isolate;
-}
-
-.project-workspace-page::before {
-  position: absolute;
-  inset: 0 0 auto;
-  z-index: -1;
-  height: 220px;
-  content: "";
-  pointer-events: none;
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--line-1) 34%, transparent) 1px, transparent 1px),
-    linear-gradient(color-mix(in srgb, var(--line-1) 26%, transparent) 1px, transparent 1px);
-  background-size: 32px 32px;
-  mask-image: linear-gradient(to bottom, black, transparent);
-  opacity: 0.42;
-}
-
-.project-workspace-page .page-header {
-  background: color-mix(in srgb, var(--surface-0) 94%, transparent);
-}
+/* Project room — an operational dossier, not another dashboard. The page is
+   flat --surface-0 like every other route: no blueprint grid, no translucent
+   header — member tiles are opaque cards in the shared card grammar, and
+   files/activity retain the shared workspace grammar so moving between
+   records never changes the controls. */
 
 .project-mark {
   display: inline-grid;
@@ -76,7 +54,10 @@
   padding: var(--sp-4) var(--sp-4) var(--sp-5);
   border: 1px solid var(--line-1);
   border-radius: var(--r-3);
-  background: color-mix(in srgb, var(--surface-2) 34%, transparent);
+  /* Standard card recipe — opaque --surface-1 + hairline, same grammar as
+     every other card in the app (the translucent fill only existed to let
+     the deleted blueprint grid show through). Hover strengthens the edge. */
+  background: var(--surface-1);
   opacity: 0;
   animation: project-tile-enter var(--t-slow) var(--ease) forwards;
   animation-delay: calc(var(--project-member-index) * var(--t-stagger));
@@ -179,32 +160,16 @@
   border-color: var(--line-strong);
 }
 
-.project-member-tile.is-lead {
-  border-color: color-mix(in srgb, var(--action) 34%, var(--line-2));
-}
-
-.project-member-tile.is-missing {
-  background-image: repeating-linear-gradient(
-    -45deg,
-    transparent,
-    transparent 10px,
-    color-mix(in srgb, var(--line-1) 24%, transparent) 10px,
-    color-mix(in srgb, var(--line-1) 24%, transparent) 11px
-  );
-}
+/* Lead and missing states are carried by the name-line Badges (info /
+   warning) and dimmed ink — no tinted borders or hatch fills, which would
+   break the single card grammar. */
 
 .project-member-tile-head {
   display: grid;
-  grid-template-columns: 2.5ch 34px minmax(0, 1fr);
+  grid-template-columns: 34px minmax(0, 1fr);
   align-items: center;
   column-gap: var(--sp-3);
   min-width: 0;
-}
-
-.project-member-tile-index {
-  color: var(--ink-4);
-  font: var(--type-code);
-  letter-spacing: var(--type-code-track);
 }
 
 .project-member-tile .agent-state {
@@ -303,10 +268,21 @@
     border: 0;
   }
 
+  /* The mobile topbar already names the page, so the in-page header recedes
+     to a screen-reader clip — the h1 stays in the a11y tree (unlike
+     display:none), matching the other routes' clip-not-remove treatment. */
   .project-workspace-page .page-header-kicker,
   .project-workspace-page .page-header-title-row,
   .project-workspace-page .page-header-subtitle {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
   }
 
   .project-workspace-page .page-header-toolbar {

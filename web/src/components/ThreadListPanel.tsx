@@ -143,7 +143,9 @@ export function ThreadListPanel({
         onChange={(e) => setQuery(e.target.value)}
       />
       <section
-        className="conversation-list project-directory"
+        // project-directory widens the row gap for folder blocks; in threads
+        // mode the list must keep conversation-list's tight single-line gap.
+        className={directoryMode === "projects" ? "conversation-list project-directory" : "conversation-list"}
         aria-label={directoryMode === "projects" ? t("project.projects") : t("nav.threads")}
       >
         {directoryMode === "projects" ? hierarchy.projects.map(({ project, threads: projectThreads }) => {
@@ -200,13 +202,20 @@ export function ThreadListPanel({
           </section>
         )}) : renderThreads(hierarchy.unclassified)}
         {(directoryMode === "projects" ? hierarchy.projects.length === 0 : threads.length === 0) ? (
-          <p className="conversation-empty">
-            {query.trim()
-              ? t("thread.no_matches")
-              : directoryMode === "projects"
-                ? t("project.no_projects")
-                : t("thread.no_threads")}
-          </p>
+          query.trim() ? (
+            <p className="conversation-empty">{t("thread.no_matches")}</p>
+          ) : (
+            <div className="conversation-empty">
+              <p>{directoryMode === "projects" ? t("project.no_projects") : t("thread.no_threads")}</p>
+              <button
+                type="button"
+                className="conversation-empty-action"
+                onClick={() => (directoryMode === "projects" ? onCreateProject() : onNewThread(null))}
+              >
+                {directoryMode === "projects" ? t("project.create") : t("thread.new_thread")}
+              </button>
+            </div>
+          )
         ) : null}
       </section>
     </aside>

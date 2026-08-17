@@ -328,9 +328,11 @@ function TeamProfile({
                         {/* Per-member readiness, not the team's — the band
                             carries the team's own availability. */}
                         <span className="team-profile-member-state">
-                          {member.enabled
-                            ? <StatusPill value={member.availability} />
-                            : <Badge variant="neutral">{t("teams.disabled")}</Badge>}
+                          {!member.enabled
+                            ? <Badge variant="neutral">{t("teams.disabled")}</Badge>
+                            : member.availability !== "ready"
+                              ? <StatusPill value={member.availability} />
+                              : null}
                         </span>
                       </li>
                     );
@@ -561,6 +563,7 @@ export function TeamWorkspacePage({
           </span>
         )}
         titleVariant="display"
+        titleAs="h2"
         layout="stacked"
         toolbar={(
           <div className="workspace-page-tabs" role="tablist" aria-label={t("teams.sections")}>

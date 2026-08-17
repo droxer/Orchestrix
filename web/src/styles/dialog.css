@@ -43,18 +43,6 @@
   animation: overlay-panel-out var(--t-fast) var(--ease) forwards;
 }
 
-.dialog-modal[data-tone="danger"] {
-  border-left: 3px solid var(--err);
-  padding-left: calc(var(--sp-6) - 2px);
-}
-
-.dialog-kicker {
-  margin: 0;
-  font: var(--type-micro);
-  letter-spacing: var(--track-0);
-  color: var(--err);
-}
-
 .dialog-title-row {
   display: flex;
   align-items: flex-start;
@@ -76,10 +64,6 @@
   overflow-wrap: anywhere;
 }
 
-.dialog-modal[data-tone="danger"] .dialog-title {
-  color: var(--err);
-}
-
 .dialog-message {
   margin: 0;
   font: var(--type-body-sm);
@@ -97,7 +81,7 @@
   padding: 0 var(--sp-3);
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
-  background: var(--surface-0);
+  background: var(--field-on-overlay);
   color: var(--ink-1);
   font-size: var(--fs-4);
   transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);

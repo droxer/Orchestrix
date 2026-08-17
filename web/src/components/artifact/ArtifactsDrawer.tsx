@@ -5,6 +5,7 @@ import { Drawer } from "@/components/ui/Drawer";
 import { ArtifactBody } from "./ArtifactBody";
 import { ArtifactIndexStrip } from "./ArtifactIndexStrip";
 import { ArtifactPreviewHeader } from "./ArtifactPreviewHeader";
+import { ArtifactsEmpty } from "./ArtifactsEmpty";
 import { OVERLAY_TAKEOVER_QUERY } from "../../lib/breakpoints";
 
 function resolveSessionId(artifact: RelayArtifact, fallback: string): string {
@@ -68,33 +69,38 @@ export function ArtifactsDrawer({
       bodyClassName="artifact-library-drawer-body"
     >
       <div className={`artifact-library-shell${stripExpanded ? " strip-expanded" : ""}`}>
-        {artifacts.length > 0 ? (
-          <ArtifactIndexStrip
-            artifacts={artifacts}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            expanded={stripExpanded}
-            onExpandedChange={setStripExpanded}
-          />
-        ) : null}
+        {artifacts.length === 0 ? (
+          /* Empty library: no strip, no preview chrome — the ghost-ledger
+             empty state spans the whole shell (see .artifact-library-shell >
+             .artifacts-empty in artifact.css). */
+          <ArtifactsEmpty title={t("artifact.drawer_empty")} />
+        ) : (
+          <>
+            <ArtifactIndexStrip
+              artifacts={artifacts}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              expanded={stripExpanded}
+              onExpandedChange={setStripExpanded}
+            />
 
-        <section className="artifact-preview-pane" aria-label={t("artifact.preview_label")}>
-          {selectedArtifact ? (
-            <>
-              <ArtifactPreviewHeader
-                artifact={selectedArtifact}
-                sessionId={effectiveSessionId}
-              />
-              <div className="artifact-preview-body">
-                <ArtifactBody artifact={selectedArtifact} sessionId={effectiveSessionId} />
-              </div>
-            </>
-          ) : (
-            <p className="artifact-preview-status">
-              {artifacts.length === 0 ? t("artifact.drawer_empty") : t("artifact.preview_placeholder")}
-            </p>
-          )}
-        </section>
+            <section className="artifact-preview-pane" aria-label={t("artifact.preview_label")}>
+              {selectedArtifact ? (
+                <>
+                  <ArtifactPreviewHeader
+                    artifact={selectedArtifact}
+                    sessionId={effectiveSessionId}
+                  />
+                  <div className="artifact-preview-body">
+                    <ArtifactBody artifact={selectedArtifact} sessionId={effectiveSessionId} />
+                  </div>
+                </>
+              ) : (
+                <p className="artifact-preview-status">{t("artifact.preview_placeholder")}</p>
+              )}
+            </section>
+          </>
+        )}
       </div>
     </Drawer>
   );

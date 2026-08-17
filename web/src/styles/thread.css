@@ -8,7 +8,9 @@
   min-height: 0;
   padding: var(--sp-4) 0 0;
   border-right: 1px solid var(--line-1);
-  background: var(--surface-1);
+  /* Shell zone role (see --surface-list in palette.css): the list panel is a
+     distinct elevation step between rail and canvas in both registers. */
+  background: var(--surface-list);
 }
 
 .conversation-header {
@@ -16,7 +18,11 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-4);
+  min-height: var(--header-h);
   padding: 0 var(--page-gutter);
+  /* Continues the chat/thread-space header horizon at y=64 so all three panes
+     break on the same hairline; search stays in the second grid row. */
+  border-bottom: 1px solid var(--line-1);
 }
 
 .conversation-heading {
@@ -81,6 +87,9 @@
   border-top: 0;
 }
 
+/* Applied only in projects directory mode (ThreadListPanel gates the class
+   on directoryMode): folder blocks are multi-part sections, so they take the
+   wider --sp-2 section gap instead of the list's tight --sp-0-5 row gap. */
 .project-directory {
   gap: var(--sp-2);
 }
@@ -275,13 +284,13 @@
   grid-template-columns: minmax(0, 1.2fr) minmax(220px, .8fr);
   gap: var(--sp-4);
 }
-.project-name-input { min-height: 48px; font-size: 1.05rem; }
-.project-computer-select { min-height: 48px; }
+.project-name-input { min-height: var(--control-h); }
+.project-computer-select { min-height: var(--control-h); }
 /* Edit mode: the computer is immutable, so it renders as text, not a dead select. */
 .project-computer-static {
   display: flex;
   align-items: center;
-  min-height: 48px;
+  min-height: var(--control-h);
   margin: 0;
   color: var(--ink-1);
   font: var(--type-body);
@@ -307,7 +316,8 @@
   align-items: stretch;
   width: 100%;
   content-visibility: auto;
-  contain-intrinsic-size: auto 68px;
+  /* Estimate matches the row floor: 2×--sp-row padding + one line (~44px). */
+  contain-intrinsic-size: auto 44px;
   border: 0;
   border-radius: var(--r-2);
   overflow: hidden;
@@ -324,7 +334,11 @@
   gap: var(--sp-3);
   flex: 1;
   min-width: 0;
-  min-height: 64px;
+  /* One-line rows (state pip + name + stamp): the floor is two row-pad steps
+     plus one line box (--sp-5 ≈ the 13px/1.4 label line), so it resolves to
+     44px in the standard scope and 36px under data-density="compact" — the
+     old 64px was a two-line card floor wrapped around a single line. */
+  min-height: calc(var(--sp-row) * 2 + var(--sp-5));
   padding: var(--sp-row) var(--sp-3);
   border: 0;
   border-radius: inherit;
@@ -348,19 +362,40 @@
   content: "";
   position: absolute;
   left: 0;
-  top: 14px;
-  bottom: 14px;
+  /* Inset holds the bar at ~55% of the one-line row height (was 14px at the
+     old 64px floor). */
+  top: 10px;
+  bottom: 10px;
   width: 2px;
   border-radius: calc(var(--r-1) / 2);
   background: var(--action);
 }
 
 .conversation-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-3);
   margin: 0;
   padding: var(--page-gutter);
   color: var(--ink-3);
   font-size: var(--fs-3);
   line-height: var(--leading-normal);
+}
+
+.conversation-empty p {
+  margin: 0;
+}
+
+/* Routes the empty pane to the one action that fills it — a text button in
+   the reading face, not full chrome, so the dead pane stays quiet. */
+.conversation-empty-action {
+  padding: 0;
+  color: var(--link);
+  font: var(--type-label-strong);
+}
+.conversation-empty-action:hover {
+  color: var(--link-hover);
 }
 
 .conversation-copy {

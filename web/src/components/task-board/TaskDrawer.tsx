@@ -426,7 +426,8 @@ export function TaskDrawer({
         </Field>
         <div className="task-drawer-form-grid">
           {form.variant === "routine" ? <RoutineFields form={form} onChange={onChange} /> : null}
-          <Field label={t("backlog.priority")} wrapper="div" className="task-drawer-form-grid-full">
+          {form.variant === "backlog" ? <BacklogFields form={form} onChange={onChange} /> : null}
+          <Field label={t("backlog.priority")} wrapper="div">
             <Select
               value={form.priority}
               onValueChange={(value) => {
@@ -444,7 +445,6 @@ export function TaskDrawer({
               </SelectContent>
             </Select>
           </Field>
-          {form.variant === "backlog" ? <BacklogFields form={form} onChange={onChange} /> : null}
           <Field
             label={t("backlog.assignment_label")}
             wrapper="div"

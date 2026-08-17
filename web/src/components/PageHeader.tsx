@@ -9,6 +9,7 @@ export function PageHeader({
   toolbar,
   actions,
   titleVariant = "default",
+  titleAs = "h1",
   layout = "inline",
 }: {
   title: ReactNode;
@@ -18,9 +19,13 @@ export function PageHeader({
   toolbar?: ReactNode;
   actions?: ReactNode;
   titleVariant?: "default" | "display";
+  /** Heading level. Nested detail panes (team/agent detail under a roster)
+   *  demote to "h2" so the roster title stays the single page h1. */
+  titleAs?: "h1" | "h2" | "h3";
   layout?: "inline" | "stacked";
 }) {
   const stacked = layout === "stacked";
+  const TitleTag = titleAs;
 
   return (
     <header
@@ -32,7 +37,7 @@ export function PageHeader({
       <div className={cn("page-header-lead", stacked && "page-header-lead--stacked")}>
         {kicker ? <span className="page-header-kicker">{kicker}</span> : null}
         <div className={cn("page-header-title-row", stacked && "page-header-title-row--wrap")}>
-          <h1
+          <TitleTag
             className={cn(
               "page-header-title",
               titleVariant === "display"
@@ -41,7 +46,7 @@ export function PageHeader({
             )}
           >
             {title}
-          </h1>
+          </TitleTag>
           {count != null ? (
             <span className="page-header-count">{count}</span>
           ) : null}

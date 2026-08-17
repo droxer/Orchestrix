@@ -22,7 +22,6 @@
   display: flex;
   flex-direction: column;
   background: var(--surface-3);
-  border: 1px solid var(--line-1);
   border-radius: var(--r-3);
   box-shadow: var(--shadow-2);
   overflow: hidden;

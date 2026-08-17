@@ -143,11 +143,13 @@
   color: var(--ink-4);
 }
 
+/* No italic: synthesized CJK oblique reads as a rendering bug (markdown.css
+   normalizes zh blockquotes for the same reason); the marker + --ink-3 already
+   separate the reasoning tier. */
 .agent-thinking-body {
   min-width: 0;
   font-family: var(--font-sans);
   font-size: var(--fs-3);
-  font-style: italic;
   line-height: var(--leading-loose);
   color: var(--ink-3);
 }

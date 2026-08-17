@@ -18,7 +18,11 @@
 }
 
 /* Runtime control: environment stays visible beside the agent. Keeping
-   it in the footer removes a second floating card above the composer. */
+   it in the footer removes a second floating card above the composer.
+   The plate is reserved for the interactive picker on a new thread; the
+   read-only readout for a started thread (.thread-runtime-readout) wears
+   no chrome of its own — a bordered box inside the boxed composer footer
+   read as a control where there is nothing to click. */
 .thread-runtime-rail {
   display: flex;
   align-items: center;
@@ -81,25 +85,18 @@
 }
 
 /* Read-only twin of the trigger, for a thread already pinned to its computer.
-   It deliberately does NOT borrow the trigger's chrome (no plate, no hover, no
-   chevron) — same rail, same anatomy, but nothing that invites a click. The
-   presence dot leads because a pinned computer can go dark mid-thread. */
+   It wears no chrome at all — no plate, no border, no fill, no divider
+   hairline, no label: just a presence dot and the machine's name in quiet
+   ink, sitting directly on the composer card. Nothing invites a click
+   because there is nothing here to click. The dot leads because a pinned
+   computer can go dark mid-thread. */
 .thread-runtime-readout {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-2);
+  gap: var(--sp-1-5);
   min-width: 0;
-  color: var(--ink-1);
-  font: var(--type-label-strong);
-}
-
-.thread-runtime-readout > svg {
-  flex: none;
   color: var(--ink-3);
-}
-
-.thread-runtime-readout[data-ownership="managed"] > svg {
-  color: var(--action);
+  font: var(--type-label);
 }
 
 .thread-runtime-readout-name {
@@ -108,13 +105,9 @@
   white-space: nowrap;
 }
 
-/* An offline computer recedes to muted ink, matching the fleet cards — the
+/* An offline computer recedes another step, matching the fleet cards — the
    name stays readable, the row stops looking live. */
 .thread-runtime-readout[data-online="false"] {
-  color: var(--ink-3);
-}
-
-.thread-runtime-readout[data-online="false"] > svg {
   color: var(--ink-4);
 }
 

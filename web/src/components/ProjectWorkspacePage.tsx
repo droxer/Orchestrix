@@ -73,7 +73,6 @@ function ProjectMemberLane({
       style={{ "--project-member-index": index } as CSSProperties}
     >
       <header className="project-member-tile-head">
-        <span className="project-member-tile-index tnum">{String(index + 1).padStart(2, "0")}</span>
         <AgentStateBadge
           agent={agent?.executorKind}
           ready={enabled && availability === "ready"}

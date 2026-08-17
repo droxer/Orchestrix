@@ -38,9 +38,10 @@ describe("Agent team management", () => {
     assert.match(teamWorkspaceSource, /getWorkspaceBrief\(\{ teamId: team\.id \}/);
     assert.doesNotMatch(agentDetailSource, /nav\.refresh|NavRefresh/);
     assert.doesNotMatch(teamWorkspaceSource, /nav\.refresh|NavRefresh/);
-    assert.match(teamsSource, /actions=\{teamId \? null :/);
+    assert.match(teamsSource, /actions=\{\(\s*<Button type="button" size="sm" onClick=\{\(\) => setAddTeam\(true\)\}/);
     assert.match(teamsSource, /open=\{!teamId && addTeam\}/);
-    assert.match(agentsSource, /isDetailRoute \? null : \(/);
+    assert.match(agentsSource, /<RosterFilterBar/);
+    assert.doesNotMatch(agentsSource, /isDetailRoute/);
     assert.doesNotMatch(teamsSource, /editTeam/);
     assert.doesNotMatch(teamsSource, /onEdit=/);
     assert.match(teamWorkspaceSource, /className="team-profile-inline-form"/);

@@ -341,7 +341,6 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             <NavChannels size={18} />
             <span className="sidenav-label sr-only">{t("nav.channels")}</span>
             <span className="sidenav-badge" aria-hidden="true">{t("nav.coming_soon_short")}</span>
-            <span className="sidenav-badge-dot" aria-hidden="true" />
           </span>
           {isAdmin ? (
             <a

@@ -69,7 +69,7 @@ export function TeamsPage({
           count={t("teams.count", { count: teams.length })}
           titleVariant="display"
           layout="stacked"
-          actions={teamId ? null : (
+          actions={(
             <Button type="button" size="sm" onClick={() => setAddTeam(true)}>
               <ActionAdd size={15} aria-hidden="true" />
               <span>{t("teams.add")}</span>

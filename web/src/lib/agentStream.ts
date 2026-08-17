@@ -185,16 +185,34 @@ export function reasoningDisplay(
  *
  * `userVisibleAgentSegments` stays prose-only: it decides the raw fallback and
  * drives the copy affordance, neither of which wants reasoning.
+ *
+ * Lifecycle narration is the one exception to "keep everything": started /
+ * finished / changed-files rows only narrate progress, so once the run
+ * settles they are dropped — the chrome already reports the outcome. Warn and
+ * error narration stays.
  */
+// Pure lifecycle narration — "Codex started.", "Claude finished.", "Codex
+// changed files." — is progress signal while the run is live, but once the
+// turn settles the chrome already shows the run is over and the rows add
+// nothing; they would sit in the transcript forever. warn/bad narrations
+// (api retries, failures, omitted stderr) report something the chrome does
+// not, so they survive settling.
+function narrationSurvivesSettle(segment: AgentSegment): boolean {
+  if (segment.kind !== "narration") return true;
+  const tone = segment.params?.tone;
+  return tone === "warn" || tone === "bad";
+}
+
 export function displayAgentSegments(segments: AgentSegment[], streaming: boolean): AgentSegment[] {
   if (streaming) return segments;
   const visible = new Set(userVisibleAgentSegments(segments));
   return segments.filter(
     (segment) =>
-      segment.kind === "tool"
-      || segment.kind === "command"
-      || segment.kind === "thinking"
-      || visible.has(segment),
+      narrationSurvivesSettle(segment)
+      && (segment.kind === "tool"
+        || segment.kind === "command"
+        || segment.kind === "thinking"
+        || visible.has(segment)),
   );
 }
 

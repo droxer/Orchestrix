@@ -182,7 +182,11 @@ export function EmployeesView({
       ) : null}
 
       {filtered.length === 0 ? (
-        <p className="adm-empty-body">{t(employeeEmptyStateTranslationKey(query, filter))}</p>
+        <RelayEmptyState
+          className="adm-employees-empty"
+          fill
+          title={t(employeeEmptyStateTranslationKey(query, filter))}
+        />
       ) : layout === "card" ? (
         <div className="adm-fleet-grid">
           {filtered.map((member) => (
@@ -240,7 +244,6 @@ export function EmployeesView({
                   </div>
                   <div className="adm-emp-metrics" role="cell">
                     <div className="adm-emp-metric">
-                      <span className="adm-emp-metric-label">{t("admin.v2.col_local_limit")}</span>
                       <span className={`adm-emp-ratio tnum ${isOverLocalComputerLimit(member) ? "" : "tone-muted"}`}>
                         {localComputerUsageLabel(member)}
                       </span>

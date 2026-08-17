@@ -146,7 +146,6 @@ export function CommandMenu({
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleKeyDown}
           />
-          <kbd className="command-kbd" aria-hidden="true">esc</kbd>
         </div>
         {visible.length === 0 ? (
           <p className="command-empty" role="status">{t("command.empty")}</p>

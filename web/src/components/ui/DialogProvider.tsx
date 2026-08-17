@@ -238,9 +238,6 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                 data-tone={isDangerConfirm ? "danger" : undefined}
                 inert={dialogClosing || undefined}
               >
-                {isDangerConfirm ? (
-                  <p className="dialog-kicker">{t("dialog.danger_kicker")}</p>
-                ) : null}
                 <div className="dialog-title-row">
                   {isDangerConfirm ? (
                     <StatusWarn size={20} className="dialog-danger-icon" aria-hidden="true" />

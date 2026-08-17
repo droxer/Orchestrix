@@ -485,7 +485,6 @@ export function AgentProfilePanel({
             </Button>
             <Button variant="ghost"
               type="button"
-              className="adm-copy-pill"
               onClick={() => setRenaming(false)}
               disabled={saving}
               aria-label={t("admin.v2.cancel")}

@@ -135,19 +135,16 @@
   border-radius: var(--r-1);
 }
 
+/* Availability inside the picker list is a read-only fact on an
+   already-bordered row: plain muted text + pip, not a bordered uppercase
+   capsule. The pill outline added nothing the row's own chrome didn't. */
 .chat-agent-option-availability {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
   margin-left: auto;
-  padding: 2px var(--sp-1-5);
-  border: 1px solid currentColor;
-  border-radius: var(--r-full);
-  font-size: var(--fs-1);
-  font-weight: 600;
-  line-height: var(--leading-snug);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  font-size: var(--fs-2);
+  color: var(--ink-3);
 }
 
 /* Disabled rows stay fully legible: status is communicated by label and
@@ -159,13 +156,11 @@
 
 .chat-agent-option-availability[data-availability="pending"] {
   color: var(--warn);
-  background: color-mix(in srgb, var(--warn) 8%, transparent);
 }
 
 .chat-agent-option-availability[data-availability="offline"],
 .chat-agent-option-availability[data-availability="inactive"] {
   color: var(--err);
-  background: color-mix(in srgb, var(--err) 7%, transparent);
 }
 
 .chat-agent-state-pip {
@@ -384,19 +379,21 @@
 .rail-node-system.tone-bad  { background: var(--err); }
 .rail-node-system.tone-info { background: var(--info); }
 
-/* A continuation from the same agent drops its header and softens the node. */
+/* A continuation from the same agent drops its header and empties the rail
+   node: the hidden header already carries the grouping cue, so repeating the
+   speaker glyph — even dimmed — is noise, not rhythm. */
 .msg-agent.grouped .turn-body > header {
   display: none;
 }
 
 .msg-agent.grouped .rail-node-agent {
-  border-color: color-mix(in srgb, var(--line-1) 55%, transparent);
+  border: none;
   background: transparent;
 }
 
 .msg-agent.grouped .rail-node-agent > svg,
 .msg-agent.grouped .rail-node-agent > .profile-image {
-  opacity: 0.4;
+  display: none;
 }
 
 /* Consecutive turns from the same agent are one continued answer, so they pull

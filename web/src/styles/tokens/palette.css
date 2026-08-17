@@ -48,6 +48,15 @@
   --surface-2: #1c1f23; /* fills, search, hover */
   --surface-3: #22262b; /* drawers, modals */
 
+  /* Zone surfaces — the three-pane shell (rail → list → canvas) reads as a
+     monotonic elevation ladder in BOTH registers. The generic --surface-N
+     indices cannot serve this job: "cards" and "list panel" want the same
+     surface-1 in dark, but the light register's raised-is-lighter ladder then
+     puts the list ABOVE the rail (see the light block). These roles pin the
+     zone order explicitly. Dark: rail is the lightest step, canvas darkest. */
+  --surface-rail: #1c1f23;
+  --surface-list: #16181b;
+
   /* Ink — every tier that can carry TEXT clears WCAG 1.4.3 (4.5:1) against the
      worst plane it can land on, which is --surface-3, not the canvas. ink-4 was
      #6b727b (3.86:1 on canvas, 3.13:1 on a drawer) while carrying timestamps,
@@ -371,6 +380,15 @@ html[data-theme="light"] {
   --surface-1: #fafbfc;
   --surface-2: #e9ecef; /* recessed fill — see the note above */
   --surface-3: #ffffff; /* top plane: the one pure white */
+
+  /* Zone surfaces — mirror the dark register's monotonic rail → list → canvas
+     ladder. In light "raised = lighter", so the rail is the lightest step (shy
+     of --surface-3's pure white so drawers keep the top plane), the list sits
+     between it and the canvas. Without these the generic --surface-2 rail
+     (#e9ecef) reads DARKER than the canvas while the --surface-1 list
+     (#fafbfc) reads lighter — a non-monotonic ladder the hairline can't fix. */
+  --surface-rail: #f7f8fa;
+  --surface-list: #f3f4f6;
 
   /* Ink — same AA rule as the dark register, worst plane here is --surface-2
      (the recessed fill, the one plane that moves toward the ink rather than

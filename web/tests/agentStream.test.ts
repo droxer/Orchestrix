@@ -571,6 +571,51 @@ describe("agent stream parsing", () => {
     assert.deepEqual(displayAgentSegments(segments, false), segments);
   });
 
+  it("drops lifecycle narration once the turn settles", () => {
+    // Started / finished / changed-files rows only narrate progress; settled
+    // chrome already reports the outcome, so the rows would be noise forever.
+    const segments: AgentSegment[] = [
+      { kind: "narration", key: "agent_stream.codex_started", params: { tone: "info" } },
+      { kind: "text", text: "Done." },
+      { kind: "narration", key: "agent_stream.codex_changed_files", params: { tone: "info" } },
+      { kind: "narration", key: "agent_stream.codex_finished", params: { tone: "good" } },
+      { kind: "narration", key: "agent_stream.claude_finished", params: { tone: "good" } },
+    ];
+
+    // Live streams are untouched — the narration is the only visible progress.
+    assert.deepEqual(displayAgentSegments(segments, true), segments);
+    assert.deepEqual(displayAgentSegments(segments, false), [
+      { kind: "text", text: "Done." },
+    ]);
+  });
+
+  it("keeps warn and error narration after the turn settles", () => {
+    // Retries, failures and omitted stderr report something the chrome does
+    // not, so they survive settling.
+    const segments: AgentSegment[] = [
+      { kind: "text", text: "Partial answer." },
+      { kind: "narration", key: "agent_stream.claude_api_retry", params: { attempt: 2, max: 5, tone: "warn" } },
+      { kind: "narration", key: "agent_stream.codex_failed", params: { message: "boom", tone: "bad" } },
+      { kind: "narration", key: "agent_stream.stderr_omitted", params: { count: 4, tone: "warn" } },
+    ];
+
+    assert.deepEqual(displayAgentSegments(segments, false), segments);
+  });
+
+  it("drops settled lifecycle narration from the combined stream display", () => {
+    const displayed = displayAgentStreamSegments([
+      { kind: "narration", key: "agent_stream.codex_started", params: { tone: "info" } },
+      { kind: "text", text: "Answer." },
+      { kind: "narration", key: "agent_stream.codex_finished", params: { tone: "good" } },
+    ], [{ kind: "status", tone: "warn", text: "deprecation warning" }], false);
+
+    assert.deepEqual(displayed.segments, [
+      { kind: "text", text: "Answer." },
+      { kind: "status", tone: "warn", text: "deprecation warning" },
+    ]);
+    assert.equal(displayed.liveTextIndex, -1);
+  });
+
   it("keeps reasoning out of the copied plain text", () => {
     // Rendering reasoning is a transcript decision; the copy affordance stays
     // the agent's prose answer.

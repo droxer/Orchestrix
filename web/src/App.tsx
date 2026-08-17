@@ -1265,7 +1265,6 @@ export function App() {
           <AgentsPage
             currentUser={user}
             detailAgent={detailAgent}
-            isDetailRoute={agentId !== null}
             onOpenAgent={openAgentDetail}
             onOpenThread={openThread}
           />

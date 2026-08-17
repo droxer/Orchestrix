@@ -30,27 +30,24 @@ function runtimeLabel(node: DaemonNodeMonitorRecord): string {
 export function ThreadRuntimeReadout({ node }: { node: DaemonNodeMonitorRecord }) {
   const { t } = useTranslation();
   const ownership = nodeOwnershipProfile(node);
-  const OwnershipMark = nodeOwnershipIcon(ownership);
   const online = Boolean(node.online) && !node.stale;
   const name = runtimeLabel(node);
   const ownershipLabel = t(`admin.v2.node_ownership_${ownership}`);
   const presenceLabel = online ? t("nodes.presence_online") : t("nodes.presence_offline");
+  // Bare context, not a control: no rail plate, no label, no divider — just
+  // the presence dot and the machine's name on the composer card. Ownership
+  // and presence stay in the tooltip and the sr-only line.
   return (
-    <div className="thread-runtime-rail" aria-label={t("thread.runtime_label")}>
-      <span className="thread-runtime-context">{t("thread.runs_on")}</span>
-      <span className="thread-runtime-divider" aria-hidden="true" />
-      <span
-        className="thread-runtime-readout"
-        data-ownership={ownership}
-        data-online={online ? "true" : "false"}
-        title={`${name} · ${ownershipLabel} · ${presenceLabel}`}
-      >
-        <span className="adm-presence" data-online={online ? "true" : "false"} aria-hidden="true" />
-        <OwnershipMark size={16} aria-hidden="true" />
-        <span className="thread-runtime-readout-name" translate="no">{name}</span>
-        <span className="sr-only">{ownershipLabel} · {presenceLabel}</span>
-      </span>
-    </div>
+    <span
+      className="thread-runtime-readout"
+      data-online={online ? "true" : "false"}
+      aria-label={t("thread.runtime_label")}
+      title={`${name} · ${ownershipLabel} · ${presenceLabel}`}
+    >
+      <span className="adm-presence" data-online={online ? "true" : "false"} aria-hidden="true" />
+      <span className="thread-runtime-readout-name" translate="no">{name}</span>
+      <span className="sr-only">{ownershipLabel} · {presenceLabel}</span>
+    </span>
   );
 }
 

@@ -88,6 +88,12 @@
   --control-fill: color-mix(in srgb, var(--ink-1) 8%, transparent);
   --control-fill-hover: color-mix(in srgb, var(--ink-1) 16%, transparent);
 
+  /* Text fields sitting on a --surface-3 overlay (drawer, dialog, modal)
+     recede to the canvas tier in BOTH registers so they read as fillable
+     wells without a per-sheet fork (dialog.css vs admin-v2-drawers.css used
+     to answer this question in opposite ways). */
+  --field-on-overlay: var(--surface-0);
+
   /* Focus — 2px ring at a 2px offset (WCAG 1.4.11), drawn with `outline`.
 
      OUTLINE, NOT BOX-SHADOW. A box-shadow ring is painted inside the nearest

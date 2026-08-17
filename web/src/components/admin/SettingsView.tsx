@@ -7,6 +7,7 @@ import { getOrgSettings, reissueAdminToken, updateOrgSettings } from "../../api"
 import { CheckIcon } from "../icons";
 import { CredCopyRow } from "./CredCopyRow";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -99,12 +100,22 @@ function AdminTokenCard({
   onReissued: () => void;
 }) {
   const { t } = useTranslation();
+  const { confirm } = useDialogs();
   const { copiedField, copy } = useCopyFeedback();
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleReissue() {
-    if (!window.confirm(t("admin.v2.settings_admin_token_reissue_confirm"))) return;
+    /* Reissuing kills the current token immediately — the most destructive
+       action in settings — so it goes through the themed danger confirm, not
+       native window.confirm (same pattern as CredentialsDrawer/EmployeesView). */
+    const ok = await confirm({
+      title: t("admin.v2.settings_admin_token_reissue"),
+      message: t("admin.v2.settings_admin_token_reissue_confirm"),
+      confirmLabel: t("admin.v2.settings_admin_token_reissue"),
+      tone: "danger",
+    });
+    if (!ok) return;
     setIsBusy(true);
     setError(null);
     try {

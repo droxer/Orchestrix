@@ -421,14 +421,6 @@
   white-space: nowrap;
 }
 
-.sidenav-badge::before {
-  content: "";
-  width: 4px;
-  height: 4px;
-  border-radius: var(--r-full);
-  background: var(--warn);
-}
-
 .sidenav-panel[data-expanded="true"] .sidenav-btn .sidenav-badge,
 .sidenav-more-item .sidenav-badge {
   display: inline-flex;

@@ -138,6 +138,7 @@ export function AgentDetailPage({
           </span>
         )}
         titleVariant="display"
+        titleAs="h2"
         layout="stacked"
         toolbar={(
           <div className="workspace-page-tabs" role="tablist" aria-label={t("agents_page.detail_sections")}>

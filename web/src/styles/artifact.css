@@ -87,27 +87,6 @@
   color: var(--err);
 }
 
-.artifact-chip-cta {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 var(--sp-2);
-  color: var(--ink-2);
-  font: var(--type-label-strong);
-  white-space: nowrap;
-  opacity: 0.6;
-  transition: opacity var(--t-fast) var(--ease);
-}
-.artifact-chip:hover .artifact-chip-cta,
-.artifact-chip-main:focus-visible .artifact-chip-cta {
-  opacity: 1;
-}
-
-@media (max-width: 560px) {
-  .artifact-chip-cta {
-    display: none;
-  }
-}
-
 /* Diff: per-line add/delete coloring with a sign gutter. */
 .artifact-diff {
   font-family: var(--font-mono);
@@ -587,4 +566,12 @@
   padding: 0;
   overflow: hidden;
   height: 100%;
+}
+
+/* Empty library: ArtifactsEmpty replaces the strip + preview pane entirely,
+   so it must escape the shell's 48px rail column / strip row and span the
+   full grid — its own auto margins then center the ghost ledger. */
+.artifact-library-shell > .artifacts-empty {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
 }

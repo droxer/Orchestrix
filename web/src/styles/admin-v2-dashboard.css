@@ -340,11 +340,10 @@
 }
 
 .adm-dash-stat-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: var(--r-full);
   background: currentColor;
-  flex-shrink: 0;
 }
 
 .adm-dash-stat.tone-good { color: var(--ok); }
@@ -506,8 +505,10 @@
     font-size: var(--fs-5);
   }
 
-  /* Compact viewports drop a card to the `compact` padding tier. */
-  [data-slot="card"] {
+  /* Compact viewports drop a card to the `compact` padding tier. Scoped to
+     the dashboard root: admin CSS bundles globally, so a bare
+     `[data-slot="card"]` would restyle every Card in the app at phone width. */
+  .adm-dash [data-slot="card"] {
     padding: var(--sp-4);
     gap: var(--sp-3);
   }

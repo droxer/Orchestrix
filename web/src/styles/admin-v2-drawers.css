@@ -21,7 +21,6 @@
   display: flex;
   flex-direction: column;
   background: var(--surface-3);
-  border: 1px solid var(--line-1);
   box-shadow: var(--shadow-2);
   /* Entrances cross real distance → --t-slow (see palette.css motion note);
      the underlay recess is a state change → stays --t-fast. */
@@ -186,7 +185,8 @@
   margin: 0;
   padding: var(--sp-3) var(--sp-4);
   border-radius: var(--r-2);
-  background: color-mix(in srgb, var(--err) 6%, transparent);
+  --tone: var(--err);
+  border: 1px solid var(--tone-line);
   color: var(--err);
   font-size: var(--fs-3);
   line-height: var(--leading-normal);
@@ -220,13 +220,13 @@
   margin-right: auto;
 }
 
-/* Fields sit on the drawer's raised --surface-3 panel; give inputs the next
-   elevation step so they read as fillable wells in every drawer, not just the
-   task board where this mapping started. */
+/* Fields on a raised --surface-3 overlay recede to the canvas tier so they
+   read as fillable wells — the shared --field-on-overlay role, matching the
+   dialog's answer to the same question. */
 .adm-drawer [data-slot="input"],
 .adm-drawer [data-slot="select-trigger"],
 .adm-drawer [data-slot="textarea"] {
-  background: var(--surface-1);
+  background: var(--field-on-overlay);
   border-color: var(--line-1);
   color: var(--ink-1);
 }
@@ -319,7 +319,7 @@
 }
 
 .adm-assign-operator-name {
-  font-size: var(--fs-5);
+  font-size: var(--fs-heading);
   font-weight: 500;
   color: var(--ink-1);
 }
@@ -401,9 +401,11 @@
 }
 
 .adm-assign-node.selected {
-  border-color: var(--action);
-  background: color-mix(in srgb, var(--action) 5%, var(--surface-0));
-  box-shadow: var(--accent-bar);
+  /* Selectable list-row recipe: action-soft wash + nearest action-edge border
+     (40% ≈ 30% on a 1px hairline). Shared with channel-list rows; no accent
+     bar, no full-strength action border. */
+  border-color: var(--line-drag);
+  background: var(--action-soft);
 }
 
 .adm-assign-node-body {
@@ -581,7 +583,7 @@
 }
 
 .create-agent-runtime-option:hover:not(:disabled) {
-  border-color: var(--line-3);
+  border-color: var(--line-strong);
   background: var(--surface-2);
   transform: translateY(-1px);
 }
@@ -677,7 +679,7 @@
 }
 
 .adm-provision-preview-handle {
-  font-size: var(--fs-5);
+  font-size: var(--fs-heading);
   font-weight: 500;
   color: var(--ink-1);
   line-height: var(--leading-display);
@@ -707,12 +709,10 @@
 
 .adm-provision-outcome.is-managed {
   border-left-color: var(--action);
-  background: color-mix(in srgb, var(--action) 5%, var(--surface-0));
 }
 
 .adm-provision-outcome.is-local {
   border-left-color: var(--info);
-  background: color-mix(in srgb, var(--info) 6%, var(--surface-0));
 }
 
 .adm-provision-outcome-label {
@@ -802,8 +802,8 @@
 }
 
 .adm-profile-segment-dot {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: var(--r-full);
   flex-shrink: 0;
 }

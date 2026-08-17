@@ -25,7 +25,6 @@ interface AgentsPageProps {
   currentUser: CurrentUser;
   /** The agent currently inspected in the detail pane, driven by the pathname. */
   detailAgent: EmployeeAgent | null;
-  isDetailRoute: boolean;
   onOpenAgent: (agent: EmployeeAgent) => void;
   onOpenThread: (sessionId: string) => void;
 }
@@ -213,7 +212,6 @@ function RosterRow({
 export function AgentsPage({
   currentUser,
   detailAgent,
-  isDetailRoute,
   onOpenAgent,
   onOpenThread,
 }: AgentsPageProps) {
@@ -314,14 +312,12 @@ export function AgentsPage({
           }
         />
 
-        {isDetailRoute ? null : (
-          <RosterFilterBar
-            query={query}
-            availability={availability}
-            onQueryChange={setQuery}
-            onAvailabilityChange={setAvailability}
-          />
-        )}
+        <RosterFilterBar
+          query={query}
+          availability={availability}
+          onQueryChange={setQuery}
+          onAvailabilityChange={setAvailability}
+        />
 
         {loading ? (
           <div className="route-loading" role="status" aria-live="polite">

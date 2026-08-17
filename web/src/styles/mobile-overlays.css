@@ -200,8 +200,13 @@
   /* ── Artifact library drawer chrome ────────────────────────────── */
   /* (The drawer head is a sibling of the body in Drawer.tsx markup, so head
      padding comes from the generic .adm-drawer-head rule above.) */
-  .artifact-preview-pane {
-    padding-inline: var(--sp-4);
+  /* This file loads after artifact.css, so the generic .adm-drawer-body
+     padding above would silently defeat .artifact-library-drawer-body's
+     edge-to-edge `padding: 0` — re-assert it here. Preview content keeps a
+     single gutter from its own rules (.artifact-preview-header, viewer
+     bodies), so no compensating pane padding is wanted. */
+  .artifact-library-drawer-body {
+    padding: 0;
   }
 }
 

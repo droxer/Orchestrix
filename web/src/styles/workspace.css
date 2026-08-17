@@ -1762,16 +1762,6 @@
   color: var(--ink-2);
 }
 
-.workspace-error-action {
-  min-height: 34px;
-  border: 1px solid var(--action);
-  border-radius: var(--r-2);
-  background: var(--action);
-  padding: 0 var(--sp-4);
-  color: var(--on-action);
-  font: var(--type-label-strong);
-  cursor: pointer;
-}
 
 @keyframes workspace-skeleton {
   0% { background-position: 120% 0; }

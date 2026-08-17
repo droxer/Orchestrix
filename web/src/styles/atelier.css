@@ -62,11 +62,12 @@ body {
 }
 
 /* A themed rail, not a permanently-dark island: the active route is a
-   solid action plate — no ambient glow. */
+   solid action plate — no ambient glow. Background reads the shell zone role
+   (see --surface-rail in palette.css), not the generic surface-2 fill. */
 .sidenav-panel {
   align-items: center;
   padding: var(--sp-4) var(--sp-2) var(--sp-3);
-  background: var(--surface-2);
+  background: var(--surface-rail);
   border-right: 0;
   color: var(--ink-2);
 }

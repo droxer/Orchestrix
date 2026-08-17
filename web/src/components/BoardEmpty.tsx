@@ -10,11 +10,15 @@ export function BoardEmpty({
   body,
   createLabel,
   onCreate,
+  clearLabel,
+  onClear,
 }: {
   title: string;
   body: string;
   createLabel?: string;
   onCreate?: () => void;
+  clearLabel?: string;
+  onClear?: () => void;
 }) {
   return (
     <div className="backlog-board-empty">
@@ -24,6 +28,10 @@ export function BoardEmpty({
         <Button size="sm" onClick={onCreate}>
           <ActionCompose size={14} />
           {createLabel}
+        </Button>
+      ) : onClear && clearLabel ? (
+        <Button size="sm" variant="ghost" onClick={onClear}>
+          {clearLabel}
         </Button>
       ) : null}
     </div>

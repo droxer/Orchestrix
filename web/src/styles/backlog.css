@@ -58,9 +58,12 @@
   color: var(--ink-1);
 }
 
-.backlog-stat-value.tone-active { color: var(--ink-1); }
-.backlog-stat-value.tone-blocked { color: var(--err); }
-.backlog-stat-value.tone-overdue { color: var(--err); }
+/* A nonzero problem count carries a hollow-ring mark — shape, not colour
+   (--err is byte-identical to --ink-1), is how the system says "problem". */
+.backlog-stat-mark {
+  --mark-accent: var(--err);
+  margin-inline-end: var(--sp-1);
+}
 
 /* ── Filter bar ────────────────────────────────────────────────────── */
 
@@ -84,7 +87,7 @@
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  min-height: 38px;
+  min-height: var(--control-h-sm);
   padding: 0 var(--sp-3);
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
@@ -235,9 +238,15 @@
   display: flex;
   flex-direction: column;
   scroll-snap-align: start;
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-3);
-  background: var(--surface-3);
+}
+
+/* Lanes are not boxes: the palette ladder reserves surface-1 for cards and
+   surface-3 for drawers/modals, so a filled + bordered lane double-frames
+   every card it holds. The lane itself is transparent; column structure is
+   carried by a single hairline between lanes (see .backlog-lane-label's
+   comment) and the lane-head's bottom rule. */
+.backlog-lane + .backlog-lane {
+  border-left: 1px solid var(--line-1);
 }
 
 /* Chip that trails the finger during a touch drag, standing in for the drag
@@ -330,20 +339,24 @@
 
 /* ── Task cards ──────────────────────────────────────────────────────── */
 
+/* Cards own surface-1 on the palette ladder (the lane beneath them is
+   transparent, so there is no parent plane to lift off). */
 .backlog-task {
   position: relative;
   content-visibility: auto;
   contain-intrinsic-size: auto 180px;
   border: 1px solid var(--line-1);
   border-radius: var(--r-3);
-  background: var(--surface-3);
+  background: var(--surface-1);
   padding: var(--sp-4);
-  transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+  transition: border-color var(--t-fast) var(--ease);
 }
 
+/* Hover strengthens the edge, not the fill (roles.css: cards that are
+   targets change border, not plane) — a fill change would either push the
+   card down the ladder or duplicate the resting surface. */
 .backlog-task:hover {
   border-color: var(--line-strong);
-  background: var(--surface-1);
 }
 
 /* content-visibility: auto would let the browser skip painting the card
@@ -656,14 +669,23 @@
 .backlog-due.warn { color: var(--warn); }
 .backlog-due.bad { color: var(--err); }
 
+/* Actions overlay the card's bottom on hover — absolutely positioned, so the
+   resting card carries no reserved (invisible) footer. The overlay reads
+   --surface-1 to match the card, plus a hairline and the card's inner bottom
+   radius. */
 .backlog-task-actions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--sp-1);
-  margin-top: var(--sp-3);
-  padding-top: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
   border-top: 1px solid var(--line-2);
+  background: var(--surface-1);
+  border-radius: 0 0 calc(var(--r-3) - 1px) calc(var(--r-3) - 1px);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--t-fast) var(--ease);
@@ -930,6 +952,10 @@
 }
 
 .task-assignment-summary[data-tone="good"] .task-assignment-summary-mark::after { background: var(--ok); }
+/* Busy agents emit data-tone="info" (TaskDrawer availabilityTone); without
+   this rule the pip fell back to the neutral --ink-4 default. Order matches
+   .agent-state.tone-* above. */
+.task-assignment-summary[data-tone="info"] .task-assignment-summary-mark::after { background: var(--info); }
 .task-assignment-summary[data-tone="warn"] .task-assignment-summary-mark::after { background: var(--warn); }
 .task-assignment-summary[data-tone="bad"] .task-assignment-summary-mark::after {
   background: transparent;
@@ -1250,8 +1276,16 @@
     --backlog-lane-w: min(84vw, 280px);
   }
 
+  /* Touch has no hover to reveal the overlay, so the actions return to an
+     in-flow footer — always visible and reachable, space earned not reserved. */
   .backlog-task-actions {
+    position: static;
+    margin-top: var(--sp-3);
+    padding: var(--sp-3) 0 0;
+    background: transparent;
+    border-radius: 0;
     opacity: 1;
+    pointer-events: auto;
   }
 }
 

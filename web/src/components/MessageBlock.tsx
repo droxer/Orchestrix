@@ -127,8 +127,6 @@ function ArtifactChip({ artifact, sessionId, allArtifacts, onOpenArtifact }: { a
   const body = useArtifactBody(sessionId, artifact.id, { enabled: shouldLoadBody });
   const stat = shouldLoadBody && body.isSuccess ? summarizeArtifact(artifact.kind, body.data ?? "") : null;
   const kindLabel = t(`artifact.kind.${artifact.kind}`, { defaultValue: artifact.kind });
-  const createdTime = formatTime(artifact.createdAt, locale);
-
   return (
     <article className="artifact-chip" data-kind={artifact.kind}>
       <Button variant="ghost"
@@ -151,12 +149,9 @@ function ArtifactChip({ artifact, sessionId, allArtifacts, onOpenArtifact }: { a
             ) : (
               <span className="artifact-stat tnum tone-neutral">{formatArtifactSize(artifact.bytes, t, locale)}</span>
             )}
-            <span aria-hidden="true">·</span>
-            {createdTime ? <time dateTime={artifact.createdAt}>{createdTime}</time> : null}
           </span>
           <strong>{artifact.title}</strong>
         </span>
-        <span className="artifact-chip-cta" aria-hidden="true">{t("artifact.view")}</span>
       </Button>
     </article>
   );

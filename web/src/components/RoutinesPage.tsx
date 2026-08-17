@@ -81,16 +81,15 @@ function RoutineStats({ routines, tasks }: { routines: RelayTaskListItem[]; task
   return (
     <p className="backlog-stats" aria-label={t("routine.metrics")}>
       <span className="backlog-stat">
-        <span className="backlog-stat-eyebrow">{t("routine.metric_total")}</span>
-        <span className="backlog-stat-value">{stats.total}</span>
-      </span>
-      <span className="backlog-stat">
         <span className="backlog-stat-eyebrow">{t("routine.metric_enabled")}</span>
-        <span className="backlog-stat-value tone-active">{stats.enabled}</span>
+        <span className="backlog-stat-value">{stats.enabled}</span>
       </span>
       <span className="backlog-stat">
         <span className="backlog-stat-eyebrow">{t("routine.metric_due")}</span>
-        <span className={cn("backlog-stat-value", stats.due > 0 && "tone-overdue")}>{stats.due}</span>
+        <span className="backlog-stat-value">
+          {stats.due > 0 ? <StateMark shape="ring" className="backlog-stat-mark" /> : null}
+          {stats.due}
+        </span>
       </span>
       <span className="backlog-stat">
         <span className="backlog-stat-eyebrow">{t("routine.metric_running")}</span>
