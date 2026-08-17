@@ -27,9 +27,8 @@ Supporting design specifications:
 | 5 | public and internal APIs |
 | 6-7 | security and observability |
 | 8 | deployment topology |
-| 9 | phased build plan |
-| 10 | current local implementation map |
-| 11-13 | decisions, open questions, and next steps |
+| 9 | current local implementation map |
+| 10-12 | decisions, open questions, and next steps |
 
 ## Architecture Decision Records
 
@@ -626,65 +625,7 @@ Object storage
 Audit/SIEM export
 ```
 
-## 9. Implementation Phases
-
-The phases are ordered to keep the current local product usable while extracting cloud-ready boundaries incrementally.
-
-### Phase 0: Local Relay Hardening
-
-- Keep host orchestrator in TypeScript.
-- Keep BoxLite lifecycle outside the sandbox.
-- Keep task/session event model stable.
-- Add explicit technical ADRs for control-plane and guest-worker boundaries.
-- Improve command redaction and artifact handling.
-
-### Phase 1: Execution Service Boundary
-
-- Extract execution interfaces from direct BoxLite calls.
-- Introduce `ExecutionManager` with `createSandbox`, `exec`, `stream`, `kill`, and `destroy`.
-- Add optional sandbox guest worker for command execution and streaming.
-- Keep all authorization and workflow state in the host/control plane.
-
-### Phase 2: Durable Backend
-
-- Move `.relay` stores to PostgreSQL-backed repositories.
-- Add API auth and workspace ownership.
-- Add Redis/SSE/WebSocket live event fanout.
-- Add object storage for artifacts.
-
-### Phase 3: Temporal Runtime
-
-- Implement Temporal workflows for assignment chains.
-- Add approval waits and cancellation signals.
-- Add retry policies and failure classification.
-- Add resumable sessions.
-
-### Phase 4: MCP Gateway and Governance
-
-- Build Tool Registry.
-- Add Policy Engine checks.
-- Add Secret Broker.
-- Route internal/external tool calls through MCP Gateway.
-- Add approval gates for high-risk writes.
-
-### Phase 5: Memory Plane
-
-- Add memory object schema.
-- Add retrieval at prompt assembly time.
-- Add memory candidate extraction after session completion.
-- Add reviewable writeback.
-- Add vector and keyword indexing.
-
-### Phase 6: Enterprise Readiness
-
-- Tenant policies.
-- Audit export.
-- Data retention controls.
-- Admin UI.
-- Multi-region or private deployment mode.
-- Sandbox tiering across BoxLite, Kubernetes/gVisor, E2B/Kata, and Cloud Workstations.
-
-## 10. Current Local Implementation
+## 9. Current Local Implementation
 
 This blueprint does not duplicate the fast-changing repository map or local
 operator workflow. Use these living owners instead:
@@ -700,7 +641,7 @@ operator workflow. Use these living owners instead:
 Update those owners when the implementation changes; keep this document focused
 on the target system and its delivery phases.
 
-## 11. Key Engineering Decisions
+## 10. Key Engineering Decisions
 
 | Decision | Direction |
 | :- | :- |
@@ -715,7 +656,7 @@ on the target system and its delivery phases.
 | API state | task/session APIs are canonical, channels are clients |
 | Current local mode | PostgreSQL is required for sessions and tasks; local files are limited to remaining operational compatibility state |
 
-## 12. Open Technical Questions
+## 11. Open Technical Questions
 
 - Should the guest worker use stdio, Unix socket, or localhost HTTP inside the sandbox?
 - What is the minimum policy language for tool and approval rules?
@@ -724,7 +665,7 @@ on the target system and its delivery phases.
 - What sandbox tier should be the default for enterprise private deployment?
 - How should artifact redaction be implemented before persistence?
 
-## 13. Immediate Next Steps
+## 12. Immediate Next Steps
 
 1. Keep ADRs current for control-plane placement, sandbox guest-worker scope, and governed tool authority.
 2. Continue expanding the TypeScript `ExecutionManager` boundary toward `SandboxHandle` and `ExecutionHandle` contracts.

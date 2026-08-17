@@ -96,7 +96,7 @@ allows public access.
 
 Admins configure chat clients in Relay Web:
 
-1. Open **Admin Console -> Integrations**.
+1. Open **Admin Console -> Channels**.
 2. Create a Discord, Telegram, or Lark integration.
 3. Add the provider tenant or guild ID when the provider has one.
 4. Store the provider secret. Relay records only whether a secret is configured
@@ -257,16 +257,20 @@ Support the same logical commands everywhere:
 
 ```text
 /relay run --agent agent_alice_builder fix the auth flow
-/relay run --agent agent_alice_reviewer review this diff
+/relay new --agent agent_alice_reviewer review this diff
+/relay list
+/relay switch sess_123
 /relay status sess_123
 /relay cancel sess_123 no longer needed
 ```
 
-The current shared parser supports:
+The current shared parser (`packages/relay-chat/src/commands.ts`) supports:
 
-- `run`
-- `status`
-- `cancel`
+- `run` / `new` — start a session (aliases of each other).
+- `list` — list the conversation's known sessions.
+- `switch <sessionId>` — change which session subsequent messages target.
+- `status <sessionId>`
+- `cancel <sessionId> [reason]`
 - `--agent`
 - `--session`
 
