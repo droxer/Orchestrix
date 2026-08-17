@@ -33,7 +33,13 @@
   min-height: 100vh;
   min-height: 100svh;
   padding: var(--sp-6) var(--sp-4);
-  background: var(--lg-canvas);
+  /* Faint spotlight behind the card so wide viewports read as a composed
+     moment instead of a box lost in an empty canvas. Not an elevation cue
+     (the system runs flat, no drop shadows) — a radial wash, same as any
+     other background. */
+  background:
+    radial-gradient(60% 55% at 50% 42%, color-mix(in srgb, var(--lg-elevated) 22%, transparent), transparent 70%),
+    var(--lg-canvas);
   color: var(--lg-ink);
   font-family: var(--font-sans);
 }
@@ -44,12 +50,19 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-6);
-  width: min(100%, 400px);
+  width: min(100%, 420px);
   padding: var(--sp-7) var(--sp-6);
   background: color-mix(in srgb, var(--lg-elevated) 35%, var(--lg-canvas));
   border: 1px solid var(--lg-hairline-soft);
   border-radius: var(--r-3);
   animation: rise var(--t-slow) var(--ease);
+}
+
+.login-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
 }
 
 .login-brand {
@@ -77,7 +90,8 @@
 .login-headline {
   margin: 0;
   font-family: var(--font-display);
-  font-size: var(--fs-5);
+  font-size: var(--fs-6);
+  line-height: var(--leading-display);
   font-weight: 600;
   letter-spacing: var(--track-display);
   color: var(--lg-ink);
@@ -119,7 +133,9 @@
   height: var(--control-h);
   border: 1px solid var(--lg-hairline);
   border-radius: var(--r-2);
-  background: color-mix(in srgb, var(--lg-canvas) 70%, transparent);
+  /* A real fill tone (not a near-canvas tint) so the field reads as a well
+     to type into, not just a hairline outline on empty space. */
+  background: var(--lg-elevated);
   color: var(--lg-ink);
   font-family: var(--font-mono);
   letter-spacing: var(--type-code-track);
@@ -141,7 +157,7 @@
 
 .login-input:-webkit-autofill {
   -webkit-text-fill-color: var(--lg-ink);
-  -webkit-box-shadow: 0 0 0 1000px var(--lg-canvas) inset;
+  -webkit-box-shadow: 0 0 0 1000px var(--lg-elevated) inset;
   transition: background-color 9999s ease-out;
 }
 
