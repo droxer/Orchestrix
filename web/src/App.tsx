@@ -23,7 +23,7 @@ import {
   threadMessageOperationKey,
 } from "./lib/messageRouting";
 import { mentionCandidates } from "./lib/mentions";
-import { applyTheme, readLanguage, readSidenavExpanded, readTheme, readThreadSpaceWidth, readTokens, selectedEmployeeKey, writeLanguage, writeSidenavExpanded, writeTheme, writeThreadSpaceWidth } from "./lib/appStorage";
+import { applyTheme, readLanguage, readSidenavExpanded, readTheme, readThreadListWidth, readThreadSpaceWidth, readTokens, selectedEmployeeKey, writeLanguage, writeSidenavExpanded, writeTheme, writeThreadListWidth, writeThreadSpaceWidth } from "./lib/appStorage";
 import { canUseLocalControlPanel } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
 import { useAuthSession } from "./hooks/useAuthSession";
@@ -65,6 +65,7 @@ import { useStableValue } from "./hooks/useStableValue";
 import { useUrlSearchState } from "./hooks/useUrlSearchState";
 import { validatedReturnTo } from "./lib/appRoute";
 import { clampSpaceWidth, SPACE_WIDTH_DEFAULT } from "./lib/threadSpace";
+import { clampThreadListWidth, THREAD_LIST_WIDTH_DEFAULT } from "./lib/threadList";
 import { showThreadChrome } from "./lib/projectPage";
 
 const AdminPage = lazy(() => import("./components/AdminPage").then((m) => ({ default: m.AdminPage })));
@@ -154,6 +155,8 @@ export function App() {
   const [threadListHidden, setThreadListHidden] = useState(false);
   const [spaceWidth, setSpaceWidth] = useState(SPACE_WIDTH_DEFAULT);
   const [spaceResizing, setSpaceResizing] = useState(false);
+  const [threadListWidth, setThreadListWidth] = useState(THREAD_LIST_WIDTH_DEFAULT);
+  const [threadListResizing, setThreadListResizing] = useState(false);
   const [handoffAgentId, setHandoffAgentId] = useState<string>("");
   const [handoffNote, setHandoffNote] = useState("");
   const [isRunning, setIsRunning] = useState(false);
@@ -546,6 +549,7 @@ export function App() {
     // so touching localStorage during the first render mismatches hydration.
     setSidenavExpanded(readSidenavExpanded());
     setSpaceWidth(clampSpaceWidth(readThreadSpaceWidth() ?? SPACE_WIDTH_DEFAULT));
+    setThreadListWidth(clampThreadListWidth(readThreadListWidth() ?? THREAD_LIST_WIDTH_DEFAULT));
   }, [mounted]);
 
   // Persisted on toggle rather than in an effect on `sidenavExpanded`: the
@@ -817,6 +821,12 @@ export function App() {
     const clamped = clampSpaceWidth(width);
     setSpaceWidth(clamped);
     if (commit) writeThreadSpaceWidth(clamped);
+  }
+
+  function handleThreadListResize(width: number, commit: boolean) {
+    const clamped = clampThreadListWidth(width);
+    setThreadListWidth(clamped);
+    if (commit) writeThreadListWidth(clamped);
   }
 
   async function renameThread(session: RelaySession) {
@@ -1214,6 +1224,8 @@ export function App() {
       threadSpaceWidth={spaceWidth}
       threadSpaceResizing={spaceResizing}
       threadListHidden={threadListHidden}
+      threadListWidth={threadListWidth}
+      threadListResizing={threadListResizing}
       mobileChatChrome={threadChromeVisible ? {
         artifactCount: visibleArtifacts.length,
         spaceOpen: spaceVisible,
@@ -1314,6 +1326,9 @@ export function App() {
             spaceArtifactId={spaceArtifactId}
             spaceWidth={spaceWidth}
             threadListHidden={threadListHidden}
+            threadListWidth={threadListWidth}
+            onThreadListResize={handleThreadListResize}
+            onThreadListResizeActive={setThreadListResizing}
             onOpenArtifacts={handleOpenThreadSpace}
             onToggleSpace={toggleThreadSpace}
             onCloseSpace={closeThreadSpace}

@@ -164,6 +164,7 @@
   "thread": {
     "search_placeholder": "搜索对话…",
     "search_label": "搜索对话",
+    "resize_label": "调整对话列表宽度",
     "connect_to": "连接到 @{{name}}",
     "no_nodes": "尚无节点。输入名称以连接。",
     "no_employee_selected": "未选择员工",

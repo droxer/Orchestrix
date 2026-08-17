@@ -2,15 +2,50 @@
 
 .thread-panel {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--line-1);
+  /* Shell zone role (see --surface-list in palette.css): the list panel is a
+     distinct elevation step between rail and canvas in both registers. */
+  background: var(--surface-list);
+}
+
+.thread-panel-inner {
+  display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: var(--sp-3);
   min-width: 0;
   min-height: 0;
   padding: var(--sp-4) 0 0;
-  border-right: 1px solid var(--line-1);
-  /* Shell zone role (see --surface-list in palette.css): the list panel is a
-     distinct elevation step between rail and canvas in both registers. */
-  background: var(--surface-list);
+}
+
+.thread-panel-resize {
+  position: relative;
+  width: var(--sp-1-5);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.thread-panel-resize::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: calc(var(--sp-1) - 1px);
+  width: 2px;
+  background: transparent;
+  transition: background var(--t-fast) var(--ease);
+}
+
+.thread-panel-resize:hover::after,
+.thread-panel-resize:active::after {
+  background: var(--line-strong);
+}
+
+.thread-panel-resize:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .conversation-header {

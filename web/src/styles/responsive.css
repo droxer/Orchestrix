@@ -44,6 +44,10 @@
     display: none;
   }
 
+  .thread-panel-resize {
+    display: none;
+  }
+
   .mobile-topbar--chat {
     grid-template-columns: 1fr 1fr var(--touch-target);
   }
@@ -421,6 +425,9 @@
 
   .thread-panel {
     border-right: 0;
+  }
+
+  .thread-panel-inner {
     padding: var(--sp-3) 0 0;
   }
 

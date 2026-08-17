@@ -1,13 +1,31 @@
 import type { Dispatch, SetStateAction } from "react";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionAdd, ActionCompose, ChevronDownIcon, WorkspaceFolder } from "./icons";
 import { ThreadRow, type ThreadItem } from "./ThreadRow";
 import { groupThreads } from "../lib/threadGroups";
 import { projectThreadBuckets } from "../lib/threads";
+import {
+  clampThreadListWidth,
+  maxThreadListWidth,
+  THREAD_LIST_WIDTH_DEFAULT,
+  THREAD_LIST_WIDTH_MAX,
+  THREAD_LIST_WIDTH_MIN,
+} from "../lib/threadList";
 import type { DaemonNodeMonitorRecord, ProjectRecord, RelaySession } from "../types";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
+
+const KEYBOARD_RESIZE_STEP = 16;
+
+/** The chat column, measured to work out how much width the list may still
+ *  take. Read straight from the DOM rather than threaded down as a prop: the
+ *  grid — not React — owns the column's real width. */
+function chatWidth(): number | null {
+  if (typeof document === "undefined") return null;
+  const chat = document.getElementById("chat-panel");
+  return chat ? chat.getBoundingClientRect().width : null;
+}
 
 // The logged-in employee's own threads. Each row is a session; the list
 // is owner-scoped by the backend, so it only ever shows the current employee's
@@ -27,6 +45,9 @@ export function ThreadListPanel({
   onNewThread,
   onRenameThread,
   onCloseThread,
+  width,
+  onResize,
+  onResizeActive,
 }: {
   directoryMode: "threads" | "projects";
   threads: ThreadItem[];
@@ -42,9 +63,77 @@ export function ThreadListPanel({
   onNewThread: (projectId?: string | null) => void;
   onRenameThread: (session: RelaySession) => void;
   onCloseThread: (sessionId: string) => void;
+  width: number;
+  onResize: (width: number, commit: boolean) => void;
+  onResizeActive: (active: boolean) => void;
 }) {
   const { t } = useTranslation();
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
+
+  // A drag registers listeners outside React; this releases them if the panel
+  // unmounts mid-gesture, which would otherwise leak the listeners and strand
+  // the shell in its resizing state.
+  const releaseDragRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => releaseDragRef.current?.(), []);
+
+  const startResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const handle = event.currentTarget;
+    const startX = event.clientX;
+    // Ceiling fixed at gesture start: the chat column shrinks as the drag
+    // proceeds, so re-measuring per move would let the list walk past it.
+    const max = maxThreadListWidth(width, chatWidth());
+    handle.setPointerCapture(event.pointerId);
+    onResizeActive(true);
+
+    // The list sits left of the chat column, so dragging right (positive
+    // delta) grows it — the mirror of the space panel's leftward drag.
+    const widthAt = (clientX: number) => clampThreadListWidth(width + (clientX - startX), max);
+    const move = (moveEvent: PointerEvent) => onResize(widthAt(moveEvent.clientX), false);
+    const finish = (finalX: number | null) => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+      handle.removeEventListener("pointercancel", cancel);
+      releaseDragRef.current = null;
+      if (finalX !== null) onResize(widthAt(finalX), true);
+      onResizeActive(false);
+    };
+    const up = (upEvent: PointerEvent) => finish(upEvent.clientX);
+    // A cancelled gesture (system takeover, touch interruption) never fires
+    // pointerup — without this the shell keeps its resizing state forever.
+    const cancel = () => finish(null);
+
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+    handle.addEventListener("pointercancel", cancel);
+    releaseDragRef.current = () => finish(null);
+  }, [onResize, onResizeActive, width]);
+
+  const resizeByKeyboard = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    const max = maxThreadListWidth(width, chatWidth());
+    if (event.key === "Home") {
+      event.preventDefault();
+      onResize(clampThreadListWidth(THREAD_LIST_WIDTH_DEFAULT, max), true);
+      return;
+    }
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const delta = event.key === "ArrowRight" ? KEYBOARD_RESIZE_STEP : -KEYBOARD_RESIZE_STEP;
+    onResize(clampThreadListWidth(width + delta, max), true);
+  }, [onResize, width]);
+
+  // A window that narrows while the list is at a custom width can push the
+  // chat column under its floor; give the room back rather than leaving the
+  // conversation squeezed. Only ever shrinks — maxThreadListWidth is a
+  // ceiling, not a target.
+  useEffect(() => {
+    const onWindowResize = () => {
+      const max = maxThreadListWidth(width, chatWidth());
+      if (width > max) onResize(max, false);
+    };
+    window.addEventListener("resize", onWindowResize);
+    return () => window.removeEventListener("resize", onWindowResize);
+  }, [onResize, width]);
 
   const hierarchy = projectThreadBuckets(threads, projects);
 
@@ -101,6 +190,7 @@ export function ThreadListPanel({
 
   return (
     <aside id="thread-panel" className="thread-panel" aria-label={t("nav.threads")} tabIndex={-1}>
+      <div className="thread-panel-inner">
       <div className="conversation-header">
         <div className="conversation-heading">
           <h1>
@@ -218,6 +308,19 @@ export function ThreadListPanel({
           )
         ) : null}
       </section>
+      </div>
+      <div
+        className="thread-panel-resize"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={t("thread.resize_label")}
+        aria-valuenow={width}
+        aria-valuemin={THREAD_LIST_WIDTH_MIN}
+        aria-valuemax={THREAD_LIST_WIDTH_MAX}
+        tabIndex={0}
+        onPointerDown={startResize}
+        onKeyDown={resizeByKeyboard}
+      />
     </aside>
   );
 }

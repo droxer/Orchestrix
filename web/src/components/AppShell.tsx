@@ -52,6 +52,8 @@ type AppShellProps = {
   threadSpaceWidth: number;
   threadSpaceResizing: boolean;
   threadListHidden: boolean;
+  threadListWidth: number;
+  threadListResizing: boolean;
   mobileChatChrome: MobileChatChrome | null;
   user: CurrentUser;
   onLogout: () => void;
@@ -97,6 +99,8 @@ export function AppShell({
   threadSpaceWidth,
   threadSpaceResizing,
   threadListHidden,
+  threadListWidth,
+  threadListResizing,
   mobileChatChrome,
   user,
   onLogout,
@@ -196,7 +200,8 @@ export function AppShell({
       data-space={threadSpaceOpen ? "open" : undefined}
       data-space-resizing={threadSpaceResizing || undefined}
       data-threadlist={threadSpaceOpen && !threadListHidden ? "open" : undefined}
-      style={{ "--space-w": `${threadSpaceWidth}px` } as CSSProperties}
+      data-threadlist-resizing={threadListResizing || undefined}
+      style={{ "--space-w": `${threadSpaceWidth}px`, "--thread-w": `${threadListWidth}px` } as CSSProperties}
     >
       <a className="skip-link" href={skipLinkHref}>{t("skip_to_content")}</a>
 
