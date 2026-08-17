@@ -19,7 +19,8 @@ Relay uses project-local env files at each runtime boundary:
 
 - `backend/.env`: Python backend settings, migration database URL, and optional
   task scheduler tuning (`RELAY_TASK_SCHEDULER_ENABLED`,
-  `RELAY_TASK_SCHEDULER_INTERVAL_SECONDS`, `RELAY_TASK_SCHEDULER_MAX_DISPATCHES`).
+  `RELAY_TASK_SCHEDULER_INTERVAL_SECONDS`, `RELAY_TASK_SCHEDULER_MAX_DISPATCHES`,
+  `RELAY_TASK_SCHEDULER_TIMEZONE`).
 - `web/.env.local`: Next.js development proxy settings.
 - `packages/relay-core/.env`: shared TypeScript runtime and agent credential
   defaults.
@@ -203,6 +204,13 @@ override the backend URL for one run:
 make web RELAY_BACKEND_URL=http://127.0.0.1:9000
 ```
 
+Reconcile managed computers (only needed when testing managed-node
+provisioning):
+
+```bash
+make supervisor
+```
+
 Stop Relay and BoxLite processes:
 
 ```bash
@@ -322,17 +330,20 @@ from events.
 backend/relay/cli.py                          relay binary entrypoint
 backend/relay/app.py                          FastAPI backend application
 backend/relay/core/                           models, env, ids, logging, storage config
-backend/relay/persistence/                    event-sourced session/task/daemon stores
+backend/relay/persistence/                    event-sourced session/task/daemon/agent/team/
+                                              project stores; persistence/stores.py re-exports
 backend/relay/security/auth.py                auth store and JWT helpers
-backend/relay/services/controller.py          session mutation controller
-backend/relay/services/daemon.py              daemon registry and run dispatch
-backend/relay/services/task_scheduler.py      routine promotion and assigned-task dispatch
-backend/relay/services/chat_integrations.py   chat integration store and helpers
-backend/relay/api/                            HTTP routes (tasks, sessions, daemon nodes,
-                                              sandboxes, auth, admin, chat, web)
-backend/relay/controller.py                   compatibility re-export of services/controller
-backend/relay/daemon.py                       compatibility re-export of services/daemon
-backend/relay/stores.py                       compatibility re-export of persistence/stores
+backend/relay/sessions/controller.py          session mutation controller
+backend/relay/sessions/bridge.py              session continuity and handoff
+backend/relay/daemon_registry/node_backend.py daemon admission and run dispatch
+backend/relay/daemon_registry/registry.py     daemon registry
+backend/relay/tasks/scheduler.py              routine promotion and assigned-task dispatch
+backend/relay/chat/integrations.py            chat integration glue
+backend/relay/services/                       narrower runtime services (agent routing,
+                                              managed nodes, computer limits, task/team dispatch)
+backend/relay/api/                            HTTP routes split by domain (tasks, sessions,
+                                              daemon nodes, sandboxes, auth, admin, chat, web,
+                                              agents, managed nodes, teams, projects)
 backend/migrations/                           Alembic backend storage migrations
 packages/relay-core/src/index.ts              shared protocol and agent runtime exports
 packages/relay-core/src/daemon-protocol.ts    TypeScript backend protocol types
@@ -358,11 +369,10 @@ web/                                          Next.js web frontend
 ```
 
 Keep backend runtime code in `backend/relay/` (`core/`, `persistence/`,
-`security/`, `services/`, and `api/`), TypeScript protocol/client exports in
-`packages/relay-core/src/`, daemon execution code in `packages/relay-daemon/`,
-and frontend code in `web/`. Top-level backend modules such as `controller.py`,
-`daemon.py`, and `stores.py` are compatibility re-exports; prefer the nested
-package paths for new work.
+`security/`, `sessions/`, `daemon_registry/`, `tasks/`, `chat/`, `services/`,
+and `api/`), TypeScript protocol/client exports in `packages/relay-core/src/`,
+daemon execution code in `packages/relay-daemon/`, and frontend code in
+`web/`.
 
 ## Testing
 

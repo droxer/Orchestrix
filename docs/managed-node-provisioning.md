@@ -140,7 +140,7 @@ controller instance can resume reconciliation.
 | `id` | UUID | Stable idempotency key across provider retries. |
 | `displayName` | string | Operator-facing name. |
 | `employeeId` | UUID, nullable | Owner for dedicated nodes; null for pooled nodes. |
-| `assignmentMode` | enum | `dedicated`, `pooled`, or `shared`. |
+| `assignmentMode` | enum | `dedicated`, `pooled`, or `shared`. Only `dedicated` is currently accepted (`MANAGED_NODE_ASSIGNMENT_MODES` in `backend/relay/services/managed_nodes.py`); `pooled`/`shared` are reserved for the assignment-policy work below. |
 | `provider` | string | Provider adapter name, initially `local-process`. |
 | `providerConfigRef` | string, nullable | Reference to server-side provider configuration; never embedded credentials. |
 | `profile` | string | Named capacity/runtime profile such as `standard`. |
@@ -410,6 +410,8 @@ PATCH  /api/v1/admin/managed-nodes/{id}
 DELETE /api/v1/admin/managed-nodes/{id}
 POST   /api/v1/admin/managed-nodes/{id}/attempts
 GET    /api/v1/admin/managed-nodes/{id}/attempts
+POST   /api/v1/admin/managed-nodes/{id}/recover
+DELETE /api/v1/admin/managed-nodes/{id}/runtime
 DELETE /api/v1/admin/managed-nodes/{id}/record
 ```
 

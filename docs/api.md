@@ -44,6 +44,8 @@ route. `/` is replaced with `/threads`.
 | `/api/v1/threads` | Session-backed threads, events, artifacts, decisions, handoffs |
 | `/api/v1/tasks` | Backlog and routine resources, assignment, pickups, runs |
 | `/api/v1/agents`, `/api/v1/teams` | Current-user agents and teams |
+| `/api/v1/admin/agents`, `/api/v1/admin/agent-placements` | Admin logical-agent and placement CRUD |
+| `/api/v1/agent-runs` | Ad-hoc agent-targeted run dispatch |
 | `/api/v1/projects` | Computer-bound project rosters and shared-workspace rooms |
 | `/api/v1/sandboxes`, `/api/v1/daemon-nodes` | Execution-plane observations and commands |
 | `/api/v1/artifacts`, `/api/v1/workspace` | Generated artifacts and workspace reads |
@@ -134,6 +136,32 @@ exclusive.
 Task/thread creation accepts `projectId`. Project dispatch rejects Computer,
 team, or non-member overrides; the backend resolves the fixed roster and the
 current daemon instance for the project's stable Computer identity.
+
+## Agent and node workspace reads
+
+Agents and daemon nodes expose the same workspace-read shape used by projects:
+
+```text
+GET /api/v1/agents/{agentId}/workspace/files?path={relativePath}
+GET /api/v1/agents/{agentId}/workspace/file?path={relativePath}
+GET /api/v1/admin/daemon-nodes/{nodeId}/workspace/files?path={relativePath}
+GET /api/v1/admin/daemon-nodes/{nodeId}/workspace/file?path={relativePath}
+```
+
+Admin logical-agent and placement management:
+
+```text
+GET    /api/v1/admin/agents
+POST   /api/v1/admin/agents
+GET    /api/v1/admin/agents/{agentId}
+PATCH  /api/v1/admin/agents/{agentId}
+DELETE /api/v1/admin/agents/{agentId}
+GET    /api/v1/admin/agent-placements?agentId=&nodeId=
+POST   /api/v1/admin/agents/{agentId}/placements
+PATCH  /api/v1/admin/agent-placements/{placementId}
+DELETE /api/v1/admin/agent-placements/{placementId}
+POST   /api/v1/agent-runs
+```
 
 Daemon runtimes renew their backend-advertised liveness lease independently of
 command polling:

@@ -77,14 +77,19 @@ ask the user whether to run `codegraph init -i`.
 - Chat gateway and provider adapters: `packages/relay-chat/src/`.
 - Python backend implementation modules: `backend/relay/` — organized as
   `core/` (models, environment, ids, storage config), `persistence/` (event
-  stores), `security/` (auth), and `services/` (controller, daemon registry,
-  task scheduler, chat integrations). Top-level modules such as
-  `controller.py`, `daemon.py`, and `stores.py` re-export the nested packages
-  for compatibility.
+  stores), `security/` (auth, rate limiting), `sessions/` (session mutation
+  controller, continuity, handoff), `daemon_registry/` (registration,
+  admission/dispatch, scheduling), `tasks/` (routine scheduler), `chat/`
+  (provider integrations), and `services/` (narrower runtime services: agent
+  binding/creation/routing, computer limits, managed nodes, task/team
+  dispatch, workspace queries).
 - Python backend HTTP routes: `backend/relay/api/` (split by domain —
   `admin_routes.py`, `auth_routes.py`, `chat_routes.py`,
   `daemon_node_routes.py`, `sandbox_routes.py`, `session_routes.py`,
-  `task_routes.py`, `web_routes.py`).
+  `task_routes.py`, `web_routes.py`, and newer domain modules
+  `agent_routes.py`, `agent_workspace_routes.py`, `collaboration_routes.py`,
+  `managed_node_routes.py`, `node_workspace_routes.py`,
+  `profile_image_routes.py`, `project_routes.py`, `team_routes.py`).
 - Tests: Python backend tests under `backend/tests/`, TypeScript package tests
   under `packages/*/tests/`, and web tests under `web/tests/`.
 - Package manager: npm.
@@ -147,20 +152,19 @@ Key modules:
   backend, polls for commands, owns the sandbox, and runs agent CLIs.
 - `packages/relay-daemon/src/sandbox-session.ts`: sandbox session lifecycle and
   agent readiness preflight (`ensureAgentReady`).
-- `backend/relay/services/controller.py`: session mutation controller
-  (`backend/relay/controller.py` re-exports).
-- `backend/relay/persistence/`: event-sourced session, task, and daemon stores
-  (`backend/relay/stores.py`, `session_store.py`, `task_store.py`, and
-  `daemon_store.py` re-export).
-- `backend/relay/services/daemon.py`: daemon registry and backend run dispatch
-  (`backend/relay/daemon.py` re-exports).
-- `backend/relay/services/task_scheduler.py`: background scheduler that
+- `backend/relay/sessions/controller.py`: session mutation controller.
+- `backend/relay/persistence/`: event-sourced session, task, daemon, agent,
+  placement, team, and project stores (`session_store.py`, `task_store.py`,
+  `daemon_store.py`, `agent_store.py`, `employee_agent_store.py`,
+  `agent_placement_store.py`, `team_store.py`, `project_store.py`).
+- `backend/relay/daemon_registry/node_backend.py`: daemon admission and
+  backend run dispatch (with `registry.py` and `scheduling.py`).
+- `backend/relay/tasks/scheduler.py`: background scheduler that
   promotes due routines and dispatches assigned tasks to ready daemon nodes.
   Controlled by `RELAY_TASK_SCHEDULER_ENABLED` (default on),
   `RELAY_TASK_SCHEDULER_INTERVAL_SECONDS`, and
   `RELAY_TASK_SCHEDULER_MAX_DISPATCHES`.
-- `backend/relay/security/auth.py`: auth store and JWT helpers
-  (`backend/relay/auth.py` re-exports).
+- `backend/relay/security/auth.py`: auth store and JWT helpers.
 - `backend/relay/api/admin_routes.py`: admin control-panel routes — users,
   departments, node assignment, agent management, and dashboard data
   (KPI tiles, fleet health, activity feed, token usage).

@@ -24,12 +24,9 @@
 - [`agent-facing-product-design.md`](agent-facing-product-design.md) 负责面向员工的智能体模型和词汇边界。
 - [`system-architecture.md`](system-architecture.md) 负责目标架构和战略技术选择。
 - [`implementation-plan.md`](implementation-plan.md) 将目标架构转换为服务边界、数据模型、API、运行流程和实施阶段。
-- [`agent-first-runtime-design.md`](agent-first-runtime-design.md) 与 [`agent-first-runtime-migration.md`](agent-first-runtime-migration.md) 负责逻辑智能体运行时设计及其迁移状态。
-- [`composer-agent-mentions-design.md`](composer-agent-mentions-design.md) 负责
-  已批准但尚未实现的输入框 `@` 提及设计（英文）。
+- [`agent-first-runtime-design.md`](agent-first-runtime-design.md) 负责逻辑智能体运行时设计。
 - [`managed-node-provisioning.md`](managed-node-provisioning.md) 负责托管计算机的期望状态、注册、协调和供应商生命周期。
 - [`node-heartbeats.md`](node-heartbeats.md) 负责执行平面的存活租约。
-- [`backend-low-latency-scalability-plan.md`](backend-low-latency-scalability-plan.md) 负责多副本低延迟与可扩展性方案。
 - [`chat-integrations.md`](chat-integrations.md) 负责供应商配置、身份映射、命令、安全和运维；[`relay-chat` 软件包说明](../packages/relay-chat/README.md)仅描述软件包边界。
 - [`relay-daemon` 说明](../packages/relay-daemon/README.md)负责守护进程环境和交付契约。
 

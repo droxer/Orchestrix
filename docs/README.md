@@ -37,17 +37,12 @@ document.
   and strategic technology choices.
 - [`implementation-plan.md`](implementation-plan.md) translates that target
   into service boundaries, data models, APIs, runtime flows, and phases.
-- [`agent-first-runtime-design.md`](agent-first-runtime-design.md) and
-  [`agent-first-runtime-migration.md`](agent-first-runtime-migration.md) own the
-  logical-agent runtime design and its rollout status.
-- [`composer-agent-mentions-design.md`](composer-agent-mentions-design.md) owns
-  the approved, not-yet-implemented `@`-mention composer design.
+- [`agent-first-runtime-design.md`](agent-first-runtime-design.md) owns the
+  logical-agent runtime design.
 - [`managed-node-provisioning.md`](managed-node-provisioning.md) owns managed
   computer desired state, enrollment, reconciliation, and provider lifecycle.
 - [`node-heartbeats.md`](node-heartbeats.md) owns the execution-plane liveness
   lease.
-- [`backend-low-latency-scalability-plan.md`](backend-low-latency-scalability-plan.md)
-  owns the multi-replica latency and scalability plan.
 - [`chat-integrations.md`](chat-integrations.md) owns provider setup, identity
   mapping, commands, security, and operations. The
   [`relay-chat` package README](../packages/relay-chat/README.md) stays limited

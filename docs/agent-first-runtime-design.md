@@ -13,9 +13,6 @@ by logical Agent, stable Computer identity, and Computer-affine team dispatch
 are also implemented. Artifact transfer, placement reconciliation, broader
 named-agent clients, and compatibility retirement remain rollout work.
 
-Implementation is staged in
-[agent-first-runtime-migration.md](agent-first-runtime-migration.md).
-
 ## Summary
 
 Employees should work with named agents. They should not need to understand
