@@ -44,16 +44,18 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
   return (
     <main className="login-screen" data-mode="login">
       <section className="login-card" aria-labelledby="login-headline">
-        <header className="login-brand">
-          <RelayMark width={28} height={28} />
-          <span className="login-wordmark">Relay</span>
-        </header>
+        <div className="login-identity">
+          <header className="login-brand">
+            <RelayMark width={28} height={28} />
+            <span className="login-wordmark">Relay</span>
+          </header>
 
-        <div className="login-intro">
-          <h1 id="login-headline" className="login-headline">
-            {t("login.kicker_attach")}
-          </h1>
-          <p className="login-lede">{t("login.lede")}</p>
+          <div className="login-intro">
+            <h1 id="login-headline" className="login-headline">
+              {t("login.kicker_attach")}
+            </h1>
+            <p className="login-lede">{t("login.lede")}</p>
+          </div>
         </div>
 
         <form className="login-form" onSubmit={(event) => void handleLogin(event)}>
