@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 
 import { taskAssigneeDisplayName, teamAvailability, teamReady } from "../src/lib/taskAssignment.js";
 import { teamMutationInput } from "../src/lib/teamForm.js";
-import { selectedTeamForWorkspace, teamWorkspaceAgentId } from "../src/lib/teamWorkspace.js";
+import { selectedTeamForWorkspace } from "../src/lib/teamWorkspace.js";
 
 describe("Agent team management", () => {
   it("keeps teams in employee agent management instead of standalone admin navigation", async () => {
@@ -28,11 +28,8 @@ describe("Agent team management", () => {
     assert.match(teamsSource, /<TeamWorkspacePage/);
     assert.match(agentDetailSource, /"profile", "activities"/);
     assert.doesNotMatch(agentDetailSource, /"workspace"|ThreadWorkspaceFiles|listAgentWorkspaceFiles|getAgentArtifacts|type: "artifact"/);
-    assert.match(teamWorkspaceSource, /"profile", "workspace", "activities"/);
-    assert.match(teamWorkspaceSource, /ThreadWorkspaceFiles/);
-    assert.match(teamWorkspaceSource, /fixedScope="shared"/);
-    assert.match(teamWorkspaceSource, /threads=\{briefQuery\.data\?\.sessions/);
-    assert.match(teamWorkspaceSource, /teamId=\{team\.id\}/);
+    assert.match(teamWorkspaceSource, /"profile", "activities"/);
+    assert.doesNotMatch(teamWorkspaceSource, /"workspace"|ThreadWorkspaceFiles|teamWorkspaceAgentId/);
     assert.match(threadWorkspaceFilesSource, /threadId: selectedThreadId/);
     assert.doesNotMatch(teamWorkspaceSource, /getTeamArtifacts|TeamArtifacts/);
     assert.match(teamWorkspaceSource, /getWorkspaceBrief\(\{ teamId: team\.id \}/);
@@ -163,22 +160,5 @@ describe("Agent team management", () => {
     assert.equal(selectedTeamForWorkspace(teams, null), null);
     assert.equal(selectedTeamForWorkspace(teams, "team-research")?.id, "team-research");
     assert.equal(selectedTeamForWorkspace(teams, "team-missing"), null);
-  });
-
-  it("uses an available team member when the lead cannot read the shared workspace", () => {
-    assert.equal(teamWorkspaceAgentId({
-      leadAgentId: "lead",
-      members: [
-        { id: "lead", displayName: "Lead", executorKind: "codex", enabled: true, availability: "offline" },
-        { id: "support", displayName: "Support", executorKind: "claude", enabled: true, availability: "busy" },
-      ],
-    }), "support");
-    assert.equal(teamWorkspaceAgentId({
-      leadAgentId: "lead",
-      members: [
-        { id: "lead", displayName: "Lead", executorKind: "codex", enabled: true, availability: "ready" },
-        { id: "support", displayName: "Support", executorKind: "claude", enabled: true, availability: "ready" },
-      ],
-    }), "lead");
   });
 });

@@ -13,7 +13,6 @@ import { agentLabel } from "../lib/plan";
 import { describeAgentPlacements } from "../lib/agentPlacements";
 import { teamAvailability } from "../lib/taskAssignment";
 import { teamMutationInput } from "../lib/teamForm";
-import { teamWorkspaceAgentId } from "../lib/teamWorkspace";
 import type { AgentTeam } from "../types";
 import { ActionEdit, AdminDelete } from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
@@ -23,8 +22,7 @@ import { IdentityMonogram } from "./IdentityMonogram";
 import { TeamMark } from "./TeamMark";
 import { TeamMemberOption } from "./TeamMemberOption";
 import { ProfileImage, ProfileImagePicker } from "./ProfileImagePicker";
-import { ActivitiesSkeleton, WorkspaceActivities, WorkspaceEmpty, WorkspaceError } from "./workspace/WorkspacePrimitives";
-import { ThreadWorkspaceFiles } from "./ThreadWorkspaceFiles";
+import { ActivitiesSkeleton, WorkspaceActivities, WorkspaceError } from "./workspace/WorkspacePrimitives";
 import { RecordBand, type RecordFact } from "./workspace/RecordBand";
 import { StatusPill } from "./StatusPill";
 import { truncateId } from "../lib/adminHelpers";
@@ -36,9 +34,9 @@ import { useDialogs } from "@/components/ui/DialogProvider";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-type TeamPageTab = "profile" | "workspace" | "activities";
+type TeamPageTab = "profile" | "activities";
 
-const TEAM_PAGE_TABS: readonly TeamPageTab[] = ["profile", "workspace", "activities"];
+const TEAM_PAGE_TABS: readonly TeamPageTab[] = ["profile", "activities"];
 const TEAM_BRIEF_POLL_MS = 3000;
 
 function parseTeamTab(value: string | null): TeamPageTab {
@@ -499,9 +497,7 @@ export function TeamWorkspacePage({
     enabled: pageTab !== "profile",
     refetchInterval: pageTab === "activities" ? TEAM_BRIEF_POLL_MS : false,
   });
-  const workspaceAgentId = teamWorkspaceAgentId(team);
-
-  /* The band is the record's read-only spine, identical on all three tabs —
+  /* The band is the record's read-only spine, identical on both tabs —
      the same rule the agent record follows: facts live here and no tab panel
      may restate them. Every field comes off the team record itself.
 
@@ -580,7 +576,7 @@ export function TeamWorkspacePage({
                 onClick={() => setPageTab(tab)}
                 onKeyDown={(event) => movePageTab(event, TEAM_PAGE_TABS[index - 1] ?? TEAM_PAGE_TABS.at(-1)!, TEAM_PAGE_TABS[index + 1] ?? TEAM_PAGE_TABS[0])}
               >
-                {tab === "profile" ? t("workspace.tab_profile") : tab === "workspace" ? t("workspace.tab_workspace") : t("workspace.tab_activities")}
+                {tab === "profile" ? t("workspace.tab_profile") : t("workspace.tab_activities")}
                 {tab === "activities" && briefQuery.data?.metrics.sessionCount ? <span className="workspace-page-tab-count tnum">{briefQuery.data.metrics.sessionCount}</span> : null}
               </button>
             ))}
@@ -589,25 +585,11 @@ export function TeamWorkspacePage({
       />
       <RecordBand facts={bandFacts} label={t("workspace.band_team_label")} />
 
-      {/* One body shell for all three tabs, matching the agent record — it
+      {/* One body shell for both tabs, matching the agent record — it
           owns the container query the profile dossier grid reads. */}
       <div className="workspace-body">
       {pageTab === "profile" ? (
         <TeamProfile team={team} employeeId={employeeId} onDeleted={onDeleted} />
-      ) : pageTab === "workspace" ? (
-        <div className="workspace-inspect" role="tabpanel" id="team-page-panel-workspace" aria-labelledby="team-page-tab-workspace">
-          {workspaceAgentId ? (
-            <ThreadWorkspaceFiles
-              agentId={workspaceAgentId}
-              teamId={team.id}
-              threads={briefQuery.data?.sessions ?? []}
-              fixedScope="shared"
-              emptyMark={<TeamMark size={18} />}
-            />
-          ) : (
-            <WorkspaceEmpty title={t("teams.no_workspace")} mark={<TeamMark size={18} />} announce />
-          )}
-        </div>
       ) : briefQuery.isLoading && !briefQuery.data ? (
         <ActivitiesSkeleton panelId="team-page-panel-activities" labelledBy="team-page-tab-activities" />
       ) : error || !briefQuery.data ? (

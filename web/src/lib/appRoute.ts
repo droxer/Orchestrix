@@ -112,7 +112,7 @@ export function hrefForRoute(route: AppRoute, sessionId?: string | null): string
 }
 
 const AGENT_TABS = new Set(["profile", "activities"]);
-const TEAM_TABS = new Set(["profile", "activities", "workspace"]);
+const TEAM_TABS = new Set(["profile", "activities"]);
 const PROJECT_TABS = new Set(["profile", "workspace", "activities"]);
 const AGENT_AVAILABILITY = new Set(["ready", "busy", "pending", "offline"]);
 
@@ -169,10 +169,6 @@ export function canonicalSearchForPath(pathname: string, search = ""): string {
     const requestedTab = source.get("tab");
     const tab = requestedTab && TEAM_TABS.has(requestedTab) ? requestedTab : "profile";
     if (tab !== "profile") target.set("tab", tab);
-    if (tab === "workspace") {
-      copyParam(source, target, "path");
-      copyParam(source, target, "item");
-    }
   }
 
   const encoded = target.toString();

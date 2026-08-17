@@ -461,7 +461,6 @@
     "enabled": "已启用",
     "disabled": "已停用",
     "no_agents": "你没有可添加的智能体。",
-    "no_workspace": "为团队添加成员后即可浏览其共享工作区。",
     "profile_title": "{{name}} 团队档案",
     "sections": "团队分区",
     "select_title": "选择一个团队",

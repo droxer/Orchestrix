@@ -461,7 +461,6 @@
     "enabled": "Enabled",
     "disabled": "Disabled",
     "no_agents": "You have no agents to add.",
-    "no_workspace": "Add a member to this team to browse its shared workspace.",
     "profile_title": "{{name}} team profile",
     "sections": "Team sections",
     "select_title": "Select a team",

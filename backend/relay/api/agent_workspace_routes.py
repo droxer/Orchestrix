@@ -72,25 +72,6 @@ def _thread_session(
         session = ctx.session_store.get_session(thread_id)
     except KeyError as error:
         raise HTTPException(404, "Thread not found.") from error
-    team_id = (request.query_params.get("teamId") or "").strip()
-    team_participates = False
-    if team_id:
-        if scope != "shared":
-            raise HTTPException(400, "teamId requires shared workspace scope.")
-        team = ctx.team_store.get_team(team_id)
-        actor = request_actor(request, ctx.auth_store)
-        if (
-            not team
-            or team.get("deletedAt")
-            or session.get("teamId") != team_id
-            or agent_id not in team.get("memberAgentIds", [])
-            or (
-                not actor["isAdmin"]
-                and team.get("ownerEmployeeId") != actor["employeeId"]
-            )
-        ):
-            raise HTTPException(404, "Team workspace thread not found.")
-        team_participates = True
     project_participates = False
     project_id = session.get("projectId")
     if project_id:
@@ -108,8 +89,7 @@ def _thread_session(
             )
         )
     participates = project_participates if project_id else (
-        team_participates
-        or session.get("ownerAgentId") == agent_id
+        session.get("ownerAgentId") == agent_id
         or any(
             run.get("logicalAgentId") == agent_id
             for run in session.get("agentRuns", [])
