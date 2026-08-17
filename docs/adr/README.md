@@ -18,3 +18,4 @@ sync with [`docs/implementation-plan.md`](../implementation-plan.md).
 | [ADR-014](014-agent-team-round-contracts.md) | Explicit, auditable agent-team round contracts |
 | [ADR-015](015-adaptive-agent-execution.md) | Adaptive agent execution by default |
 | [ADR-016](016-collaboration-conductor.md) | Event-sourced collaboration conductor as workflow authority |
+| [ADR-017](017-computer-bound-project-workspaces.md) | Computer-bound project workspaces |

@@ -1,28 +1,31 @@
 # Relay
 
-[English](README.md) | [简体中文](README.zh-CN.md)
-
 <p align="center">
   <img src="assets/brand/relay-logo.svg" alt="Relay logo" width="380">
 </p>
 
 <p align="center"><strong>Every Employee. Amplified.</strong></p>
 
-Relay is a local-first control plane for AI work. Employees can start threads, assign persistent tasks, schedule routines, and coordinate named AI agents and teams from one interface.
+<p align="center">
+  <a href="README.md">English</a> ·
+  <a href="README.zh-CN.md">简体中文</a>
+</p>
 
-Relay records identity, approvals, tasks, and history, and tracks which computer hosts each agent.
+Relay is a local-first control plane for AI work. Employees start threads, assign persistent tasks, schedule routines, and coordinate named AI agents and teams from one interface — while Relay records identity, approvals, and history, and tracks which computer hosts each agent.
 
-The Python backend never executes agents. Relay daemons run Claude Code, Codex, Pi, and Kimi on local or managed computers, inside BoxLite or a configured local environment.
+The Python backend never executes agents itself. Relay daemons run [Claude Code](https://github.com/anthropics/claude-code), Codex, Pi, and Kimi on local or managed computers, inside [BoxLite](https://github.com/boxlite-ai/boxlite) or a configured local environment.
 
 ## What you can do
 
-- Start a thread with an explicit agent and computer. The agent decides whether the goal needs an answer, investigation, workspace changes, validation, review, or a clarifying question. Stream tool output, approve decisions, cancel or retry work, and hand the thread to another agent.
-- Plan work in a backlog, schedule recurring routines, assign agents or teams, set due dates, and follow dispatch and event history.
-- Create named agents and teams with profiles, computer placement, workspace files, generated artifacts, and recent activity.
-- Create projects that bind a persistent shared workspace and an ordered roster of project agents to one computer, then run project conversations that share that workspace.
-- Enroll employee computers or reconcile managed computers while tracking health, capacity, command leases, and durable identity.
-- Connect Discord, Telegram, and Lark through one chat gateway that maps external identities and conversations to Relay.
-- Operate employees, agents, computers, fleet health, activity, and token usage from the administration area.
+| | |
+|---|---|
+| **Threads** | Start a thread with an explicit agent and computer. The agent decides whether the goal needs an answer, investigation, workspace changes, validation, review, or a clarifying question. Stream tool output, approve decisions, cancel or retry work, and hand the thread to another agent. |
+| **Tasks & routines** | Plan work in a backlog, schedule recurring routines, assign agents or teams, set due dates, and follow dispatch and event history. |
+| **Agents & teams** | Create named agents and teams with profiles, computer placement, workspace files, generated artifacts, and recent activity. |
+| **Projects** | Bind a persistent shared workspace and an ordered roster of project agents to one computer, then run project conversations that share that workspace. |
+| **Computers** | Enroll employee computers or reconcile managed computers while tracking health, capacity, command leases, and durable identity. |
+| **Chat gateway** | Connect Discord, Telegram, and Lark through one gateway that maps external identities and conversations to Relay. |
+| **Administration** | Operate employees, agents, computers, fleet health, activity, and token usage from one admin area. |
 
 ## Product snapshots
 
@@ -89,6 +92,15 @@ make stop               # stop Relay, daemon, supervisor, and BoxLite
 ```
 
 Use `make run-fresh` only after changing `dockerfile` or the BoxLite image contents.
+
+## Built with
+
+| Layer | Technology |
+|---|---|
+| Backend | [FastAPI](https://github.com/fastapi/fastapi), [SQLAlchemy](https://github.com/sqlalchemy/sqlalchemy), [Pydantic](https://github.com/pydantic/pydantic), [Alembic](https://github.com/sqlalchemy/alembic), [uv](https://github.com/astral-sh/uv) |
+| Web | [Next.js](https://github.com/vercel/next.js), [React](https://github.com/facebook/react), [Tailwind CSS](https://github.com/tailwindlabs/tailwindcss), [TanStack Query](https://github.com/TanStack/query), [Zustand](https://github.com/pmndrs/zustand) |
+| Sandboxing | [BoxLite](https://github.com/boxlite-ai/boxlite) |
+| Agents | [Claude Code](https://github.com/anthropics/claude-code), Codex, Pi, Kimi |
 
 ## Deployment
 
