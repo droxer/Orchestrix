@@ -84,7 +84,7 @@ describe("app pathname routes", () => {
     );
     assert.equal(
       canonicalBrowserUrl("/teams/team-1", "?tab=workspace&scope=shared&path=src&item=file%3Aa.ts"),
-      "/teams/team-1?tab=workspace&path=src&item=file%3Aa.ts",
+      "/teams/team-1",
     );
     assert.equal(
       canonicalBrowserUrl("/projects/project-1", "?tab=workspace&scope=shared&path=src&item=file%3Aa.ts"),

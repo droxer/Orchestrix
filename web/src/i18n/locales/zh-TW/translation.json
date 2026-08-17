@@ -460,7 +460,6 @@
     "enabled": "已啟用",
     "disabled": "已停用",
     "no_agents": "你沒有可加入的智能體。",
-    "no_workspace": "為團隊新增成員後即可瀏覽其共享工作區。",
     "profile_title": "{{name}} 團隊檔案",
     "sections": "團隊分區",
     "select_title": "選擇一個團隊",
