@@ -163,6 +163,7 @@
   "thread": {
     "search_placeholder": "搜尋對話…",
     "search_label": "搜尋對話",
+    "resize_label": "調整對話清單寬度",
     "connect_to": "連線到 @{{name}}",
     "no_nodes": "尚無節點。輸入名稱以連線。",
     "no_employee_selected": "未選取員工",

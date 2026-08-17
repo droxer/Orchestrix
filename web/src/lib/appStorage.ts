@@ -15,6 +15,7 @@ export const themeStorageKey = "relay-web.theme";
 export const languageStorageKey = "relay-web.language";
 export const sidenavExpandedKey = "relay-web.sidenavExpanded";
 export const threadSpaceWidthKey = "relay-web.threadSpaceWidth";
+export const threadListWidthKey = "relay-web.threadListWidth";
 
 export function readTokens(): TokenMap {
   if (typeof window === "undefined") return {};
@@ -69,6 +70,17 @@ export function readThreadSpaceWidth(): number | null {
 
 export function writeThreadSpaceWidth(width: number): void {
   if (typeof window !== "undefined") localStorage.setItem(threadSpaceWidthKey, String(width));
+}
+
+/** Dragged thread-list panel width in px, or null when never resized. */
+export function readThreadListWidth(): number | null {
+  if (typeof window === "undefined") return null;
+  const stored = Number(localStorage.getItem(threadListWidthKey));
+  return Number.isFinite(stored) && stored > 0 ? stored : null;
+}
+
+export function writeThreadListWidth(width: number): void {
+  if (typeof window !== "undefined") localStorage.setItem(threadListWidthKey, String(width));
 }
 
 /** Resolve the OS color-scheme preference; defaults to light off-DOM. */

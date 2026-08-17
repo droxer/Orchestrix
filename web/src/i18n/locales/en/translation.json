@@ -164,6 +164,7 @@
   "thread": {
     "search_placeholder": "Search threads…",
     "search_label": "Search threads",
+    "resize_label": "Resize thread list",
     "connect_to": "Connect to @{{name}}",
     "no_nodes": "No nodes yet. Type a name to connect.",
     "no_employee_selected": "No employee selected",

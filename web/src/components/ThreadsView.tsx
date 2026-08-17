@@ -67,6 +67,9 @@ export type ThreadsViewProps = {
   spaceArtifactId: string | null;
   spaceWidth: number;
   threadListHidden: boolean;
+  threadListWidth: number;
+  onThreadListResize: (width: number, commit: boolean) => void;
+  onThreadListResizeActive: (active: boolean) => void;
   onOpenArtifacts: (artifact?: RelayArtifact) => void;
   onToggleSpace: () => void;
   onCloseSpace: () => void;
@@ -141,6 +144,9 @@ export function ThreadsView({
   spaceArtifactId,
   spaceWidth,
   threadListHidden,
+  threadListWidth,
+  onThreadListResize,
+  onThreadListResizeActive,
   onOpenArtifacts,
   onToggleSpace,
   onCloseSpace,
@@ -225,6 +231,9 @@ export function ThreadsView({
         onNewThread={onNewThread}
         onRenameThread={onRenameThread}
         onCloseThread={onCloseThread}
+        width={threadListWidth}
+        onResize={onThreadListResize}
+        onResizeActive={onThreadListResizeActive}
       />
 
       {projectOverviewState === "ready" && selectedProject ? (
