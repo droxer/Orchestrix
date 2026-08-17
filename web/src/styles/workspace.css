@@ -941,9 +941,45 @@
   overflow: auto;
 }
 
-.workspace-preview-viewport.is-bleed .agent-prose {
+/* The image preview caps at 960px so it never blows up past a sane reading
+   size, but a wide/tall pane is often much bigger than that — left the image
+   pinned top-left with dead space on two sides, reading as "not fitting"
+   rather than "capped on purpose". Centering it in the available space makes
+   the cap read as framing instead of a layout bug. */
+.workspace-preview-viewport.is-bleed .artifact-viewer-body:has(> .artifact-image-preview) {
+  align-items: center;
+  justify-content: center;
+}
+
+/* Targets .doc-prose, the class the file preview actually renders: the preview
+   passes variant="document" to <Markdown>, so this rule read .agent-prose and
+   matched nothing — the document lost its padding and its centering and sat
+   flush against the pane's left edge with all the slack piled up on the right.
+   .agent-prose never appears inside this viewport.
+
+   The cap is `min(100%, …)`, not a bare measure: this pane is a whole-file
+   surface, not a chat column beside other content, so a fixed 72ch measure
+   left half of a wide pane empty and — because .md-table is bounded by the
+   prose column — permanently clipped a couple hundred px of table off into a
+   scroll region while the pane had room to show it. The 100% arm also keeps
+   the document from overflowing a pane narrower than the measure.
+
+   The ceiling is in rem, not ch: `ch` resolves against each element's own
+   font-size, so a ch cap written here (15px body) silently came out ~25%
+   narrower than the same number of ch in --measure-wide (declared on :root).
+   rem keeps the ceiling predictable.
+
+   `width: 100%` is load-bearing, not redundant with the cap. The parent is a
+   column flex container, so the document only fills the pane via
+   align-items: stretch — and `margin: 0 auto` (needed to centre it once the
+   ceiling binds) is an auto cross-axis margin, which suppresses stretch. Left
+   to stretch alone the box collapsed to fit-content, so how much of the pane a
+   file used depended on its longest line: a short document sat in a ~600px
+   column inside a 1400px pane. */
+.workspace-preview-viewport.is-bleed .doc-prose {
+  width: 100%;
   padding: var(--sp-6) var(--sp-7);
-  max-width: var(--measure-wide);
+  max-width: min(100%, 80rem);
   margin: 0 auto;
 }
 
@@ -965,17 +1001,6 @@
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
   overflow: hidden;
-}
-
-.code-view-toolbar--floating {
-  position: absolute;
-  top: var(--sp-3);
-  right: var(--sp-3);
-  z-index: 2;
-  margin: 0;
-  border: 1px solid var(--line-1);
-  box-shadow: var(--shadow-2);
-  background: var(--surface-3);
 }
 
 .code-view-toggle {

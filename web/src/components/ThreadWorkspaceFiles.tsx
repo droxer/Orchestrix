@@ -568,8 +568,11 @@ function FilePreview({
   return (
     <div className={`workspace-preview-viewport${bleed ? " is-bleed" : ""}`}>
       {renderable ? (
+        // Always in-flow, never floating: a floating variant made the toggle
+        // overlay the content in Rendered mode but sit in normal flow in
+        // Source mode, so the control visibly jumped position on toggle.
         <div
-          className={`code-view-toolbar${bleed ? " code-view-toolbar--floating" : ""}`}
+          className="code-view-toolbar"
           role="group"
           aria-label={t("workspace.view_mode")}
         >

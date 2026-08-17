@@ -174,7 +174,11 @@
 .md-body blockquote {
   margin: 0 0 var(--sp-4);
   padding: var(--sp-1) var(--sp-4);
-  border-left: 3px solid var(--line-1);
+  /* --ink-4, not --line-1: the hairline token sits at ~1.2:1 against the
+     preview surface in light theme — invisible, so a quoted block read as an
+     unstyled paragraph. --ink-4 is muted but keeps the bar above 3:1 in both
+     themes. */
+  border-left: 3px solid var(--ink-4);
   color: var(--ink-2);
   font-style: italic;
 }
