@@ -205,7 +205,7 @@ export function EmployeesView({
           ))}
         </div>
       ) : (
-        <div role="table" aria-label={t("admin.v2.nav_employees", { defaultValue: "Employees" })}>
+        <div role="table" data-density="compact" aria-label={t("admin.v2.nav_employees", { defaultValue: "Employees" })}>
           <div className="adm-emp-cols" role="row">
             <span className="adm-col-label" role="columnheader">{t("admin.col_employee")}</span>
             <span className="adm-col-label" role="columnheader">{t("admin.v2.col_computers")}</span>

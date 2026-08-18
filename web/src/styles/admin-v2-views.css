@@ -152,8 +152,8 @@
 }
 
 .adm-col-label {
-  font: var(--type-label-strong);
-  letter-spacing: var(--track-caps);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
   color: var(--ink-3);
 }
@@ -196,9 +196,9 @@
 }
 
 .adm-emp-name {
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
   margin: 0;
-  font: var(--type-heading);
-  letter-spacing: var(--type-heading-track);
   color: var(--ink-1);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -307,8 +307,8 @@
 }
 
 .adm-emp-metric-label {
-  font: var(--type-label-strong);
-  letter-spacing: var(--track-caps);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
   color: var(--ink-3);
 }
@@ -481,9 +481,9 @@
 }
 
 .adm-node-history-head h2 {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
   margin: 0;
-  font: var(--type-label-strong);
-  letter-spacing: var(--track-caps);
   text-transform: uppercase;
 }
 
@@ -548,7 +548,8 @@
 }
 
 .adm-node-history-identity strong {
-  font: var(--type-label-strong);
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
 }
 
 .adm-node-history-identity span,
@@ -622,8 +623,8 @@
 }
 
 .adm-emp-card-dept {
-  font: var(--type-label-strong);
-  letter-spacing: var(--track-caps);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -811,7 +812,7 @@
 
 .adm-node-card-employee-badge-text {
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
   white-space: nowrap;
   color: var(--ink-2);
@@ -901,7 +902,7 @@
   border: 1px solid transparent;
   border-radius: var(--r-1);
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -1040,7 +1041,8 @@
 }
 
 .adm-node-card-name {
-  font: var(--type-label-strong);
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
   color: var(--ink-1);
   max-width: 100%;
   overflow: hidden;
@@ -1142,6 +1144,8 @@
    glance without decoding the corner dot. Semantic hue stays on the dot;
    the label is ink, muted when offline. */
 .adm-presence-pill {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1-5);
@@ -1150,9 +1154,6 @@
   padding: 0 var(--sp-2);
   border: 1px solid var(--line-1);
   border-radius: var(--r-full);
-  font-size: var(--fs-1);
-  font-weight: 600;
-  letter-spacing: var(--track-caps);
   text-transform: uppercase;
   color: var(--ink-1);
 }
@@ -1459,12 +1460,12 @@
 }
 
 .adm-agent-toggle-name {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  font: var(--type-label-strong);
   text-transform: uppercase;
-  letter-spacing: var(--track-caps);
   color: var(--ink-1);
 }
 
@@ -2108,9 +2109,9 @@
 }
 
 .adm-settings-title {
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
   margin: 0;
-  font-size: var(--fs-3);
-  font-weight: 600;
   color: var(--ink-1);
 }
 

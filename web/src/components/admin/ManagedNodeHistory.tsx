@@ -78,7 +78,7 @@ export function ManagedNodeHistory({ nodes, onRecover, onDeletePermanently }: Ma
         <p>{t("admin.v2.history_description")}</p>
       </header>
 
-      <ul className="adm-node-history-list">
+      <ul className="adm-node-history-list" data-density="compact">
         {historical.map((node) => (
           <li key={node.id} className="adm-node-history-row">
             <span className="adm-node-history-icon" aria-hidden="true">

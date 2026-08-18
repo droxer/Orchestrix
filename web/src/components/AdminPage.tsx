@@ -440,7 +440,6 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
     <section
       id="admin-panel"
       className="admin-console adm-shell"
-      data-density="compact"
       data-admin-view={view}
       aria-label={viewTitle}
       tabIndex={-1}

@@ -121,7 +121,8 @@
   border: 0;
   background: transparent;
   color: var(--ink-1);
-  font: var(--type-label-strong);
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
@@ -244,7 +245,8 @@
 
 .team-profile-member-title strong {
   color: var(--ink-1);
-  font: var(--type-label-strong);
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
 }
 
 /* Lead rides the name as a quiet micro-caps marker — a bordered chip in a

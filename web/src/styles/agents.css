@@ -160,8 +160,8 @@
 .agents-roster-row-name {
   overflow: hidden;
   color: var(--ink-1);
-  font: var(--type-label-strong);
-  letter-spacing: var(--track-0);
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -326,7 +326,7 @@
 .agent-placement-badge-sandbox {
   flex: none;
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
   white-space: nowrap;
 }

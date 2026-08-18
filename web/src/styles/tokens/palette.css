@@ -244,7 +244,17 @@
 
   /* Type sizes — rem so browser font-size preference scales the UI
      (root pinned to 87.5% in base.css; 1rem = 14px at the default). */
-  /* The ladder is 11 / 13 / 14 / 15 / 17 / 20 / 22 / 32. Nothing sits closer
+  /* The ladder is 11 / 13 / 14 / 15 / 17 / 20 / 22 / 32.
+
+     Load-bearing rungs, by direct `var(--fs-N)` uses at the time of writing:
+     fs-2 76 · fs-3 46 · fs-1 15 · fs-4 9 · fs-heading 6 · fs-5 4 · fs-title 2 ·
+     fs-6 2 · fs-hero 1. Most sizing flows through the --type-* roles in
+     roles.css rather than these tokens directly, so a low count here does not
+     by itself mean a dead rung — but fs-5 (22) has no role at all and only four
+     hand-rolled consumers, which makes it the one genuinely doubtful step.
+     Recount before deleting anything; do not treat these numbers as current.
+
+     Nothing sits closer
      than 2px above --fs-4, because steps a single pixel apart cost a token and
      buy no visible hierarchy — the reader cannot tell 19 from 20, so the two
      roles that tried (KPI numerals at 19, in-message h1 at 18) read as noise in
@@ -461,10 +471,32 @@ html:lang(zh-TW) {
   --leading-loose: 1.5;
   --sp-row: var(--sp-2);
   /* Linear's dense lists run a 13px reading tier. The shift is expressed as a
-     scale substitution — the compact scope's --fs-4 becomes the standard
-     scope's --fs-3 — so `font: var(--type-body)` call sites pick it up with
-     no per-component override (custom properties resolve at the element, so
-     the :root role shorthand reads this scope's scale). Heading tiers are
-     untouched: density compresses rows, not hierarchy. */
+     scale substitution: the compact scope's --fs-4 becomes the standard scope's
+     --fs-3. Heading tiers are untouched — density compresses rows, not
+     hierarchy.
+
+     REDECLARING THE ROLES IS LOAD-BEARING, NOT REDUNDANT. A custom property is
+     substituted at the element where it is DECLARED, not where it is used: a
+     role declared on :root as `600 var(--fs-4)/1.4 …` has already resolved
+     --fs-4 against :root by the time it inherits down here, so overriding
+     --fs-4 alone does nothing to `font: var(--type-body)`. This block used to
+     claim the opposite ("custom properties resolve at the element, so the :root
+     role shorthand reads this scope's scale") and the compact scope was
+     therefore inert for every role — it only ever reached call sites that
+     spelled `font-size: var(--fs-4)` literally, of which the dense surfaces
+     have none. Restating each --fs-4-derived role here re-resolves it in this
+     scope, which is what makes the substitution real. Add a line whenever a new
+     role is built on --fs-4. */
   --fs-4: 0.9286rem;
+  --type-body: 400 var(--fs-4)/1.5 var(--font-sans);
+  --type-name: 600 var(--fs-4)/1.4 var(--font-sans);
+}
+
+/* CJK reading roles are looser; the compact scope must restate them too or a
+   dense Han list silently reverts to the standard 15px tier. */
+html:lang(zh-CN) [data-density="compact"],
+html:lang(zh-TW) [data-density="compact"],
+html:lang(zh-CN)[data-density="compact"],
+html:lang(zh-TW)[data-density="compact"] {
+  --type-body: 400 var(--fs-4)/1.7 var(--font-sans);
 }

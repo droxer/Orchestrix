@@ -168,7 +168,7 @@
 .record-band-label {
   color: var(--ink-4);
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
 }
 
@@ -290,7 +290,8 @@
   min-width: 0;
   overflow: hidden;
   color: var(--ink-1);
-  font: var(--type-label-strong);
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -368,7 +369,7 @@
   margin: 0;
   color: var(--ink-3);
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
 }
 
@@ -476,7 +477,7 @@
 .workspace-dossier-field-label {
   color: var(--ink-4);
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
 }
 

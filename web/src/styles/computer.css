@@ -183,13 +183,13 @@
 }
 
 .computer-card-section-title {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
   display: flex;
   align-items: center;
   gap: var(--sp-2);
   margin: 0 0 var(--sp-3);
   color: var(--ink-3);
-  font: var(--type-label-strong);
-  letter-spacing: var(--track-caps);
   text-transform: uppercase;
 }
 
