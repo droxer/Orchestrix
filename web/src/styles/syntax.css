@@ -1,62 +1,93 @@
-/* highlight.js token theme — mapped onto the Relay design tokens: olive ink
-   carries every token class, with weight and italics separating the roles,
-   while real per-language grammars classify tokens accurately. Applies
-   anywhere a `code.hljs` block is rendered (workspace file preview, Markdown
-   fences). */
+/* highlight.js token theme — five hues from tokens/palette.css (--code-*),
+   plus the olive ink ramp for everything that should recede. Structure, not
+   status: these colors exist only inside `code.hljs`, so they never compete
+   with --action / --live / --err in the surrounding chrome. Applies anywhere
+   a `code.hljs` block is rendered (workspace file preview, artifact source
+   view, Markdown fences in the thread transcript). */
 
 .hljs {
   color: var(--ink-1);
   background: transparent;
 }
 
-/* Keywords, types, and language built-ins: emphasized ink. */
+/* Keywords, types, and language built-ins. */
 .hljs-keyword,
 .hljs-built_in,
 .hljs-type,
-.hljs-literal,
 .hljs-selector-tag,
-.hljs-name {
-  color: var(--ink-1);
+.hljs-doctag,
+.hljs-meta .hljs-keyword {
+  color: var(--code-keyword);
   font-weight: 600;
 }
 
-/* Strings and string-like literals: running-text tone, italic. */
+/* Strings and string-like literals. */
 .hljs-string,
 .hljs-regexp,
 .hljs-char.escape_,
 .hljs-template-tag,
-.hljs-quote {
-  color: var(--ink-2);
-  font-style: italic;
+.hljs-subst,
+.hljs-quote,
+.hljs-addition,
+.hljs-selector-pseudo {
+  color: var(--code-string);
 }
 
-/* Numeric and symbolic literals: running-text tone, plain weight. */
+/* Numeric, boolean, and symbolic literals. */
 .hljs-number,
+.hljs-literal,
 .hljs-symbol,
 .hljs-bullet,
-.hljs-link {
-  color: var(--ink-2);
+.hljs-link,
+.hljs-selector-attr {
+  color: var(--code-number);
 }
 
-/* Comments and metadata: muted italic, recedes from the code. */
-.hljs-comment,
-.hljs-meta,
-.hljs-meta .hljs-keyword {
-  color: var(--ink-3);
-  font-style: italic;
-}
-
-/* Declarations, attributes, and tags: secondary copy tone. */
+/* Declarations — the names a reader scans for when skimming a file. */
 .hljs-title,
 .hljs-title.function_,
 .hljs-title.class_,
+.hljs-title.function_.invoke__,
 .hljs-section,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: var(--code-declaration);
+  font-weight: 600;
+}
+
+/* Attributes, properties, and the variables they hang off. */
 .hljs-attr,
 .hljs-attribute,
 .hljs-property,
 .hljs-variable,
+.hljs-variable.language_,
+.hljs-template-variable,
 .hljs-params,
 .hljs-tag {
+  color: var(--code-attribute);
+}
+
+/* Comments, metadata, and preprocessor lines recede into the ink ramp —
+   deliberately the only role with no hue of its own. */
+.hljs-comment,
+.hljs-meta,
+.hljs-meta .hljs-string {
+  color: var(--ink-3);
+  font-style: italic;
+}
+
+/* Diff lines inside a fence: added text joins the string hue, removed text
+   the keyword hue — the two ends of the ramp, so a patch reads at a glance
+   without introducing a sixth color. */
+.hljs-deletion {
+  color: var(--code-keyword);
+}
+
+/* Punctuation and operators stay plain ink so the hues above carry the
+   structure on their own. */
+.hljs-punctuation,
+.hljs-operator {
   color: var(--ink-2);
 }
 
@@ -66,12 +97,4 @@
 
 .hljs-strong {
   font-weight: 600;
-}
-
-.hljs-addition {
-  color: color-mix(in srgb, var(--ok) 75%, var(--ink-1));
-}
-
-.hljs-deletion {
-  color: color-mix(in srgb, var(--err) 75%, var(--ink-1));
 }

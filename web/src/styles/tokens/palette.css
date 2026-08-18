@@ -122,6 +122,25 @@
   --link-blue: #8ab0f5;
   --link-blue-strong: #b9ccf7;
 
+  /* Code tokens — the ONE place hue is allowed to carry structure rather
+     than meaning. Syntax highlighting is a reading aid, not a status: these
+     values never appear outside a `code.hljs` block (styles/syntax.css), so
+     they cannot compete with --action / --live / --err for a reader's
+     attention anywhere in the app chrome. Restrained and warmed toward the
+     olive register so a fence still reads as ink on paper rather than a
+     terminal dropped into the page.
+     Five roles, no more — keyword, string, number, declaration, attribute —
+     with comments left on --ink-3 so they recede. Every value clears AA
+     (4.5:1) as small text on the worst plane a fence lands on: --surface-2
+     (the fence fill) and --surface-3 (drawers, the artifact viewer).
+     Dark ratios on surface-2/3: keyword 5.4/4.9 · string 7.0/6.4 ·
+     number 7.8/7.0 · declaration 6.5/5.9 · attribute 7.1/6.4. */
+  --code-keyword: #e0906a;      /* keywords, built-ins, types */
+  --code-string: #a9c47c;       /* strings, regexps, quotes */
+  --code-number: #e3bf7a;       /* numbers, literals, symbols */
+  --code-declaration: #8fb8de;  /* function/class titles, sections */
+  --code-attribute: #c9b3d9;    /* attributes, properties, tags, variables */
+
   /* "One hue" is a claim about MEANING, not pigment, and the distinction
      matters because the codebase has one other source of hue and a reader
      who takes the rule literally will file it as a bug:
@@ -445,6 +464,16 @@ html[data-theme="light"] {
 
   --link-blue: #1d4ed8;
   --link-blue-strong: #1740ae;
+
+  /* Light code tokens — the same five roles inked for cream. Deepened, not
+     derived: the dark register's tints measure ~1.5:1 here. Ratios on
+     --surface-2/--surface-0: keyword 5.2/5.7 · string 5.8/6.2 ·
+     number 4.5/4.9 · declaration 6.7/7.3 · attribute 7.3/7.9. */
+  --code-keyword: #9c4221;
+  --code-string: #41601f;
+  --code-number: #8a5f06;
+  --code-declaration: #1f4f82;
+  --code-attribute: #5b3a75;
 
   --scrim: rgba(35, 37, 29, 0.55);
 }
