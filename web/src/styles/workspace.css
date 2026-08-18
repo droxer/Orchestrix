@@ -1036,7 +1036,19 @@
   color: var(--ink-1);
 }
 
+/* Column flex, not a plain block: inside a height-constrained parent (the
+   workspace preview pane lays this out as a flex item) the block box shrank
+   to the pane's height and `overflow: hidden` silently clipped everything
+   below the fold — the file could not be scrolled at all. As a column flex
+   container with `min-height: 0`, the box still shrinks to the pane, but the
+   constraint reaches .code-view-scroll, which becomes the scroller. Where the
+   parent does NOT constrain height (the artifact viewer, which scrolls its
+   own body) the box keeps its natural content height and nothing changes.
+   `overflow: hidden` stays for the border-radius clip. */
 .code-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   margin: 0;
   border: 1px solid var(--line-2);
   /* border-radius owned by atelier.css (--r-2, shared with
@@ -1056,7 +1068,9 @@
 .code-view-scroll {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  overflow-x: auto;
+  min-height: 0;
+  /* Both axes: a bounded .code-view makes this the vertical scroller too. */
+  overflow: auto;
   font-family: var(--font-mono);
   letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
