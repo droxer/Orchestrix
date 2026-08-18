@@ -110,7 +110,7 @@ export const NavChannels = withStandardStroke(Hash, "NavChannels");
 export const NavRoutine = withStandardStroke(CalendarClock, "NavRoutine");
 export const NavAgents = withStandardStroke(Bot, "NavAgents");
 // A team is a dispatch lead fanning out to members — the same idea the
-// bespoke TeamMark draws. `Users` stays with employees (actual people), so
+// bespoke team IdentityMark draws. `Users` stays with employees (actual people), so
 // the roster chip and the teams nav are no longer the same silhouette.
 export const NavTeams = withStandardStroke(Network, "NavTeams");
 export const NavPreferences = withStandardStroke(Settings, "NavPreferences");

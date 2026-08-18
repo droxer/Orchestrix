@@ -11,7 +11,7 @@ import type { CurrentUser } from "../types";
 import { ActionAdd } from "./icons";
 import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
-import { IdentityMonogram } from "./IdentityMonogram";
+import { IdentityMark } from "./IdentityMark";
 import { ProfileImage } from "./ProfileImagePicker";
 import { TeamDrawer } from "./admin/TeamDrawer";
 import { TeamWorkspacePage } from "./TeamWorkspacePage";
@@ -121,7 +121,7 @@ export function TeamsPage({
                           <ProfileImage
                             src={team.profileImageUrl}
                             alt=""
-                            fallback={<IdentityMonogram name={team.name} size={11} />}
+                            fallback={<IdentityMark kind="team" />}
                           />
                         </span>
                         <TableCell render={<span />} className="teams-list-identity">

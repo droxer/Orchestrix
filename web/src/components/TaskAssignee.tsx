@@ -1,19 +1,16 @@
-import type { CSSProperties } from "react";
 import type { LogicalAgentAvailability, RelayTaskListItem } from "../types";
 import { cn } from "@/lib/utils";
 import { AgentStateBadge } from "./AgentStateBadge";
-import { IdentityMonogram } from "./IdentityMonogram";
-import { identityHue } from "../lib/identity";
+import { IdentityMark } from "./IdentityMark";
 import { useTranslation } from "react-i18next";
 
 /**
- * Identity chip for a task's assignee: a hue-derived monogram avatar, the
- * owning employee handle, and — optionally — the assigned agent glyph.
+ * Identity chip for a task's assignee: the owning employee's initial, their
+ * handle, and — optionally — the assigned agent glyph.
  *
- * The avatar hue is derived deterministically from the name so the same
- * person keeps a stable color across the app. Colors are mixed against theme
- * tokens (transparent tint, `--ink-1` text) so the chip adapts to light
- * and dark themes without hard-coded lightness.
+ * The avatar is neutral: an initial on the chip surface, no per-name hue. The
+ * name beside it identifies the person, and colour stays reserved for live
+ * agent work.
  */
 
 function initialFor(name: string): string {
@@ -49,11 +46,7 @@ export function TaskAssignee({
     <span className="task-assignee" translate="no" data-unassigned={assigned ? "false" : "true"}>
       {assigneeIsSelf ? null : (
         <>
-          <span
-            className="task-assignee-avatar"
-            aria-hidden="true"
-            style={{ "--avatar-hue": identityHue(name) } as CSSProperties}
-          >
+          <span className="task-assignee-avatar" aria-hidden="true">
             {assigned ? initialFor(name) : null}
           </span>
           <span className="task-assignee-name">{name}</span>
@@ -102,7 +95,7 @@ export function TaskExecutionBadge({
     const label = `${t("teams.assignment_badge", { name })} · ${stateLabel}`;
     return (
       <span className={cn("agent-state", "agent-state--team", tone)} title={label}>
-        <IdentityMonogram name={name} size={9} />
+        <IdentityMark kind="team" />
         <span className="sr-only">{label}</span>
       </span>
     );

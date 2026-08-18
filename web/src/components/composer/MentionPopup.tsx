@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { MentionCandidate } from "../../lib/mentions";
-import { IdentityMonogram } from "../IdentityMonogram";
+import { IdentityMark } from "../IdentityMark";
 import { ProfileImage } from "../ProfileImagePicker";
 
 /** Id of the row the textarea points `aria-activedescendant` at. */
@@ -59,7 +59,7 @@ export function MentionPopup({ matches, activeIndex, onHover, onPick }: {
           <ProfileImage
             src={candidate.profileImageUrl}
             alt=""
-            fallback={<IdentityMonogram name={candidate.displayName} size={8} />}
+            fallback={<IdentityMark kind="agent" />}
             className="mention-option-mark"
           />
           <span translate="no">{candidate.displayName}</span>

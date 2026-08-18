@@ -102,30 +102,21 @@
      workforce glows, an idle one is bare.
 
      "The one colour" is a claim about MEANING, not about pigment, and the
-     distinction matters because the codebase has always had two other sources
-     of hue and a reader who takes the rule literally will file them as bugs:
+     distinction matters because the codebase has one other source of hue and
+     a reader who takes the rule literally will file it as a bug:
 
-       1. Identity hues — IdentityMonogram and TaskAssignee derive a per-name
-          hue procedurally (hsl(var(--avatar-hue) …) in profile-image.css and
-          backlog.css, each with a stylelint exemption). These encode *who*,
-          not *what is happening*, they are never read as state, and no fixed
-          token could express them because the hue is computed from the name.
-          The saturation/lightness, however, are fixed — declared once here so
-          profile-image.css and backlog.css stop hand-copying 70% 55%.
-       2. App icons — favicon.svg and both relay-mark.svg carry the accent,
-          because a grey chevron on a grey square is invisible at 16px.
+       App icons — favicon.svg and both relay-mark.svg carry the accent,
+       because a grey chevron on a grey square is invisible at 16px.
 
-     Neither is a status, so neither competes with --live for meaning. Any
-     THIRD source of colour is a bug.
+     That is not a status, so it does not compete with --live for meaning. Any
+     SECOND source of colour is a bug — identity marks used to be one, deriving
+     a per-name hue for agents and teams; they are now neutral class glyphs
+     (IdentityMark.tsx), which is why no stylelint exemption survives.
      10.94:1 on --surface-0, 10.36:1 on --surface-1. Do not brighten: the
      obvious lighter green #0f8a4e measures 4.14:1 and fails AA.
      Deliberately no --live-wash companion: a wash is a fill, and this colour
      is never a fill. Tint a ring (see pulse-ring) or an ink, nothing else. */
   --live: #3ee08a;
-
-  /* Identity hue companions — see the --live note above. */
-  --avatar-sat: 70%;
-  --avatar-light: 55%;
 
   /* ----- Pinned registers -----
      Surfaces that must NOT follow the active theme: the pre-auth login

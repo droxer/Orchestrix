@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, it } from "node:test";
-import { identityHue, identityMonogram } from "../src/lib/identity.js";
+import { identityMonogram } from "../src/lib/identity.js";
 
 describe("Profile images", () => {
   it("supports agent and team image upload, removal, and fallback marks", async () => {
@@ -17,17 +17,17 @@ describe("Profile images", () => {
     assert.match(apiSource, /deleteTeamProfileImage/);
     assert.match(pickerSource, /image\/png,image\/jpeg,image\/webp/);
     assert.match(pickerSource, /MAX_PROFILE_IMAGE_BYTES/);
-    // The default profile image is the name monogram on its identity hue —
-    // for agents and teams alike. The vendor/team glyphs are no longer the
-    // no-image fallback; they survive only where an executor kind, not a
-    // logical identity, is what the UI is naming.
+    // The default profile image is a class mark, not a name: every agent
+    // without an image wears the agent mark and every team wears the team
+    // mark, so the two are separable by silhouette alone. The vendor glyphs
+    // survive only where an executor kind, not a logical identity, is named.
     assert.match(agentProfileSource, /<ProfileImagePicker/);
-    assert.match(agentProfileSource, /fallback=\{<IdentityMonogram name=\{agent\.displayName\}/);
+    assert.match(agentProfileSource, /fallback=\{<IdentityMark kind="agent" \/>\}/);
     assert.match(teamProfileSource, /<ProfileImagePicker/);
-    assert.match(teamProfileSource, /fallback=\{<IdentityMonogram name=\{team\.name\}/);
+    assert.match(teamProfileSource, /fallback=\{<IdentityMark kind="team" \/>\}/);
   });
 
-  it("derives a stable monogram and hue from the display name", () => {
+  it("derives a stable monogram from the display name", () => {
     // Multi-word names abbreviate to initials; a single word takes its first
     // two characters so `claude` and `codex` stay distinguishable.
     assert.equal(identityMonogram("Growth Team"), "GT");
@@ -37,13 +37,6 @@ describe("Profile images", () => {
     assert.equal(identityMonogram("研究组"), "研究");
     assert.equal(identityMonogram("   "), "?");
 
-    // Same name → same hue on every surface and across reloads.
-    assert.equal(identityHue("Growth Team"), identityHue("Growth Team"));
-    assert.notEqual(identityHue("Growth Team"), identityHue("Support Team"));
-    for (const name of ["Growth Team", "claude-main", "研究组", ""]) {
-      const hue = identityHue(name);
-      assert.ok(Number.isInteger(hue) && hue >= 0 && hue < 360, `hue out of range for ${name}`);
-    }
   });
 
   it("gives every chat-panel agent surface the same profile image", async () => {
@@ -56,7 +49,7 @@ describe("Profile images", () => {
     // exactly like its label — so two agents sharing an executor kind never
     // wear each other's image.
     assert.match(messageBlock, /imageForAgentRun\(message, logicalAgentImages\)/);
-    assert.match(messageBlock, /fallback=\{<IdentityMonogram name=\{agentName\}/);
+    assert.match(messageBlock, /fallback=\{<IdentityMark kind="agent" \/>\}/);
     assert.doesNotMatch(messageBlock, /rail-node-agent[\s\S]{0,120}<AgentMark/);
 
     // The composer picker names one logical agent, so it reads profileImageUrl
@@ -75,14 +68,36 @@ describe("Profile images", () => {
     assert.match(chatCss, /\.msg-agent\.grouped \.rail-node-agent > \.profile-image/);
   });
 
-  it("keeps the monogram legible as a themed identity mark", async () => {
-    const css = await readFile(resolve("web/src/styles/profile-image.css"), "utf8");
-    const rule = css.match(/\.identity-monogram\s*\{([^}]*)\}/)?.[1] ?? "";
+  it("separates the agent and team default marks by silhouette, not colour", async () => {
+    const markSource = await readFile(resolve("web/src/components/IdentityMark.tsx"), "utf8");
 
-    // Tinted against surface tokens rather than a fixed lightness, so the
-    // mark adapts to both themes; --ink-1 keeps the letters readable.
-    assert.match(rule, /background:\s*color-mix\(in srgb, hsl\(var\(--avatar-hue/);
-    assert.match(rule, /color:\s*var\(--ink-1\)/);
-    assert.match(rule, /font-size:\s*var\(--monogram-size/);
+    // One primitive, two compositions: a lone dispatch node is an agent; the
+    // same node routing onward to two members is a team.
+    assert.match(markSource, /kind: "agent" \| "team"/);
+    assert.match(markSource, /AGENT_PATHS/);
+    assert.match(markSource, /TEAM_PATHS/);
+    // Neutral by construction: the mark inherits ink and never names a hue.
+    assert.match(markSource, /currentColor/);
+    assert.doesNotMatch(markSource, /identityHue|--avatar-hue|hsl\(/);
+  });
+
+  it("leaves no procedural identity hue anywhere in the palette", async () => {
+    const identitySource = await readFile(resolve("web/src/lib/identity.ts"), "utf8");
+    const profileCss = await readFile(resolve("web/src/styles/profile-image.css"), "utf8");
+    const backlogCss = await readFile(resolve("web/src/styles/backlog.css"), "utf8");
+    const paletteCss = await readFile(resolve("web/src/styles/tokens/palette.css"), "utf8");
+
+    // palette.css is the only colour source: with identity marks neutral,
+    // the two hand-rolled hsl() exemptions have nothing left to exempt.
+    assert.doesNotMatch(identitySource, /identityHue/);
+    for (const css of [profileCss, backlogCss]) {
+      assert.doesNotMatch(css, /--avatar-hue/);
+      assert.doesNotMatch(css, /stylelint-disable-next-line function-disallowed-list/);
+    }
+    assert.doesNotMatch(paletteCss, /--avatar-sat|--avatar-light/);
+
+    const rule = profileCss.match(/\.identity-mark\s*\{([^}]*)\}/)?.[1] ?? "";
+    assert.match(rule, /color:\s*var\(--ink-2\)/);
+    assert.match(rule, /background:\s*var\(--surface-2\)/);
   });
 });

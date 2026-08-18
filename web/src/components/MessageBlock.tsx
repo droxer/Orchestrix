@@ -8,7 +8,7 @@ import { MessageTurnActions } from "./MessageTurnActions";
 import type { AgentName } from "../types";
 import { AGENT_NAMES } from "../types";
 import { imageForAgentRun, labelForAgentRun, labelForExecutor } from "../lib/agentDisplayNames";
-import { IdentityMonogram } from "./IdentityMonogram";
+import { IdentityMark } from "./IdentityMark";
 import { ProfileImage } from "./ProfileImagePicker";
 import { formatCompactTokens } from "../lib/tokenUsage";
 import { parsePlanSteps, type PlanStep } from "../lib/plan";
@@ -211,7 +211,7 @@ export const MessageBlock = memo(function MessageBlock({
           <ProfileImage
             src={imageForAgentRun(message, logicalAgentImages)}
             alt=""
-            fallback={<IdentityMonogram name={agentName} size={8} />}
+            fallback={<IdentityMark kind="agent" />}
           />
         </span>
         <div className="turn-body">

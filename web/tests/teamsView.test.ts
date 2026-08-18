@@ -16,7 +16,7 @@ describe("Agent team management", () => {
     const agentDetailSource = await readFile(resolve("web/src/components/AgentDetailPage.tsx"), "utf8");
     const projectWorkspaceFilesSource = await readFile(resolve("web/src/components/ProjectWorkspaceFiles.tsx"), "utf8");
     const teamWorkspaceSource = await readFile(resolve("web/src/components/TeamWorkspacePage.tsx"), "utf8");
-    const teamMarkSource = await readFile(resolve("web/src/components/TeamMark.tsx"), "utf8");
+    const teamMarkSource = await readFile(resolve("web/src/components/IdentityMark.tsx"), "utf8");
     const sideNavSource = await readFile(resolve("web/src/components/SideNav.tsx"), "utf8");
     const drawerSource = await readFile(resolve("web/src/components/admin/TeamDrawer.tsx"), "utf8");
     const pickerSource = await readFile(resolve("web/src/components/task-board/TaskDrawer.tsx"), "utf8");
@@ -45,13 +45,13 @@ describe("Agent team management", () => {
     assert.match(teamWorkspaceSource, /className="team-profile-inline-form"/);
     assert.match(teamWorkspaceSource, /updateTeamMutation\.mutateAsync/);
     assert.match(teamWorkspaceSource, /deleteTeamMutation\.mutateAsync/);
-    assert.match(teamMarkSource, /Relay's default team identity mark/);
-    assert.match(teamMarkSource, /M12 1\.5 17 6\.5/);
+    assert.match(teamMarkSource, /Relay's default profile image for an agent or an agent team/);
+    assert.match(teamMarkSource, /M12 1\.5 18 7\.5/);
     assert.match(teamsSource, /className="teams-list-mark"/);
-    assert.match(teamWorkspaceSource, /<TeamMark/);
+    assert.match(teamWorkspaceSource, /<IdentityMark kind="team" variant="bare"/);
     // The assignment picker identifies a team by its profile image, whose
-    // default is the name monogram rather than the shared team glyph.
-    assert.match(pickerSource, /fallback=\{<IdentityMonogram name=\{team\.name\}/);
+    // default is the shared team glyph — the same mark the empty state draws.
+    assert.match(pickerSource, /fallback=\{<IdentityMark kind="team" \/>\}/);
     assert.match(sideNavSource, /data-nav="teams"/);
     assert.match(sideNavSource, /handleRouteClick\(event, "teams"\)/);
     assert.match(drawerSource, /memberAgentIds/);
