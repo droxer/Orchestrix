@@ -18,8 +18,7 @@ import { ActionEdit, AdminDelete } from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { OWNERSHIP_ICON } from "./AgentPlacementBadge";
 import { PageHeader } from "./PageHeader";
-import { IdentityMonogram } from "./IdentityMonogram";
-import { TeamMark } from "./TeamMark";
+import { IdentityMark } from "./IdentityMark";
 import { TeamMemberOption } from "./TeamMemberOption";
 import { ProfileImage, ProfileImagePicker } from "./ProfileImagePicker";
 import { ActivitiesSkeleton, WorkspaceActivities, WorkspaceError } from "./workspace/WorkspacePrimitives";
@@ -388,7 +387,7 @@ function TeamProfile({
             <ProfileImagePicker
               imageUrl={team.profileImageUrl}
               name={team.name}
-              fallback={<IdentityMonogram name={team.name} size={22} />}
+              fallback={<IdentityMark kind="team" />}
               editable
               disabled={busy}
               onUpload={uploadImage}
@@ -552,7 +551,7 @@ export function TeamWorkspacePage({
               <ProfileImage
                 src={team.profileImageUrl}
                 alt=""
-                fallback={<IdentityMonogram name={team.name} size={10} />}
+                fallback={<IdentityMark kind="team" />}
               />
             </span>
             {team.name}
@@ -604,7 +603,7 @@ export function TeamWorkspacePage({
           brief={briefQuery.data}
           panelId="team-page-panel-activities"
           labelledBy="team-page-tab-activities"
-          emptyMark={<TeamMark size={18} />}
+          emptyMark={<IdentityMark kind="team" variant="bare" size={18} />}
           onOpenThread={onOpenThread}
         />
       )}

@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { AgentTeam, EmployeeAgent } from "../../types";
-import { IdentityMonogram } from "../IdentityMonogram";
+import { IdentityMark } from "../IdentityMark";
 import { ProfileImage } from "../ProfileImagePicker";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger } from "@/components/ui/select";
 import { isEmployeeAgentRoutable } from "../../lib/agentDisplayNames";
@@ -68,7 +68,7 @@ export function AgentSelect({ logicalAgents, activeLogicalAgentId, onLogicalAgen
             <ProfileImage
               src={activeTeam.profileImageUrl}
               alt=""
-              fallback={<IdentityMonogram name={activeTeam.name} size={8} />}
+              fallback={<IdentityMark kind="team" />}
               className="chat-active-agent-mark"
             />
             <span className="chat-agent-select-name" translate="no">
@@ -80,7 +80,7 @@ export function AgentSelect({ logicalAgents, activeLogicalAgentId, onLogicalAgen
             <ProfileImage
               src={activeLogicalAgent.profileImageUrl}
               alt=""
-              fallback={<IdentityMonogram name={activeLogicalAgent.displayName} size={8} />}
+              fallback={<IdentityMark kind="agent" />}
               className="chat-active-agent-mark"
             />
             <span className="chat-agent-select-name" translate="no">
@@ -121,7 +121,7 @@ export function AgentSelect({ logicalAgents, activeLogicalAgentId, onLogicalAgen
                   <ProfileImage
                     src={team.profileImageUrl}
                     alt=""
-                    fallback={<IdentityMonogram name={team.name} size={8} />}
+                    fallback={<IdentityMark kind="team" />}
                     className="chat-agent-option-mark"
                   />
                   <span translate="no">{team.name}</span>
@@ -177,7 +177,7 @@ function agentOptions({ logicalAgents, t }: {
         <ProfileImage
           src={logicalAgent.profileImageUrl}
           alt=""
-          fallback={<IdentityMonogram name={logicalAgent.displayName} size={8} />}
+          fallback={<IdentityMark kind="agent" />}
           className="chat-agent-option-mark"
         />
         <span translate="no">{logicalAgent.displayName}</span>

@@ -10,7 +10,7 @@ import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { AgentMark } from "./AgentMark";
 import { AgentPlacementBadge } from "./AgentPlacementBadge";
 import { AgentProfilePanel } from "./AgentProfilePanel";
-import { IdentityMonogram } from "./IdentityMonogram";
+import { IdentityMark } from "./IdentityMark";
 import { PageHeader } from "./PageHeader";
 import { ProfileImage } from "./ProfileImagePicker";
 import { StatusPill } from "./StatusPill";
@@ -131,7 +131,7 @@ export function AgentDetailPage({
               <ProfileImage
                 src={agent.profileImageUrl}
                 alt=""
-                fallback={<IdentityMonogram name={agent.displayName} size={10} />}
+                fallback={<IdentityMark kind="agent" />}
               />
             </span>
             {agent.displayName}

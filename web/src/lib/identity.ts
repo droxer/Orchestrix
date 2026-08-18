@@ -1,10 +1,12 @@
 /**
- * Deterministic identity marks for entities that have no uploaded profile
+ * Deterministic monogram for entities that have no uploaded profile
  * image (agents, agent teams, task assignees).
  *
- * Both helpers are pure functions of the display name, so an identity keeps
- * the same monogram and the same hue everywhere it appears — and across
- * reloads — without storing anything server-side.
+ * A pure function of the display name, so an identity keeps the same monogram
+ * everywhere it appears — and across reloads — without storing anything
+ * server-side. Agents and teams no longer take a per-name mark at all: their
+ * default is the class glyph in IdentityMark.tsx. This stays for the human
+ * initials in EmployeeAvatar and the assignee chip.
  */
 
 /** Word boundaries used by handles (`growth.lead`, `claude-main`) and names. */
@@ -24,17 +26,4 @@ export function identityMonogram(name: string, maxLetters = 2): string {
     .slice(0, maxLetters)
     .map((part) => [...part][0]!.toUpperCase())
     .join("");
-}
-
-/**
- * Hue (0–359) derived from the name. Consumed as `--avatar-hue` by the CSS
- * that tints identity marks; the hue itself is the value, which is why those
- * rules are the sanctioned exception to the palette-token lint.
- */
-export function identityHue(name: string): number {
-  let hash = 0;
-  for (let i = 0; i < name.length; i += 1) {
-    hash = (hash * 31 + name.charCodeAt(i)) % 360;
-  }
-  return hash;
 }

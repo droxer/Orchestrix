@@ -23,7 +23,7 @@ import { ADMIN_AGENTS_KEY } from "../lib/adminHelpers";
 import { EMPLOYEE_AGENTS_QUERY_KEY } from "../hooks/useEmployeeAgents";
 import { formatRelativeTime, agentAvailabilityTone } from "./admin/helpers";
 import { TonePill } from "./StatusPill";
-import { IdentityMonogram } from "./IdentityMonogram";
+import { IdentityMark } from "./IdentityMark";
 import { AgentProfileEditor } from "./AgentProfileEditor";
 import { LegacyPersonalityEditor } from "./LegacyPersonalityEditor";
 import { PlacementList } from "./PlacementList";
@@ -345,7 +345,7 @@ export function AgentProfilePanel({
           <ProfileImagePicker
             imageUrl={agent.profileImageUrl}
             name={agent.displayName}
-            fallback={<IdentityMonogram name={agent.displayName} size={22} />}
+            fallback={<IdentityMark kind="agent" />}
             editable={canEditProfile}
             disabled={saving}
             onUpload={handleImageUpload}

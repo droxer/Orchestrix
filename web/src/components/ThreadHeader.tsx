@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import type { EmployeeAgent, RelaySession } from "../types";
 import { NavThreads } from "./icons";
 import { ArtifactNavButton } from "./ArtifactNavButton";
-import { IdentityMonogram } from "./IdentityMonogram";
+import { IdentityMark } from "./IdentityMark";
 import { ProfileImage } from "./ProfileImagePicker";
 import { Button } from "@/components/ui/button";
 
@@ -36,7 +36,7 @@ export function ThreadHeader({ activeSession, participants, artifactCount, space
               <ProfileImage
                 src={participant.profileImageUrl}
                 alt=""
-                fallback={<IdentityMonogram name={participant.displayName} size={8} />}
+                fallback={<IdentityMark kind="agent" />}
                 className="chat-participant-mark"
               />
               <span translate="no">{participant.displayName}</span>

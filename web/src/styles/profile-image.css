@@ -15,31 +15,30 @@
   object-fit: cover;
 }
 
-/* Default profile image for an agent or a team: the name's abbreviation on a
-   background tinted by a hue derived from that same name. It fills the whole
-   profile-image box so the neutral surface above is only ever seen behind a
-   glyph fallback. Hue is identity (which agent), never status — the readiness
-   pip on the surrounding chip stays the only status color. */
-.identity-monogram {
-  display: grid;
-  place-items: center;
+/* Default profile image for an agent or a team: the class mark, drawn in ink
+   on the neutral chip surface. It fills the whole profile-image box, and it
+   carries no hue at all — the mark says agent or team, the name beside it says
+   which one, and the readiness pip on the surrounding chip stays the only
+   colour on the chip. Padding keeps the glyph off the box edge at every size
+   the call sites use (16px chips through the 64px picker). */
+.identity-mark {
   width: 100%;
   height: 100%;
+  padding: 12%;
   border-radius: inherit;
-  /* stylelint-disable-next-line function-disallowed-list -- procedurally generated
-     per-identity hue (--avatar-hue, set inline by IdentityMonogram.tsx from the
-     display name); there is no fixed primitive to reference since the hue itself
-     is the value. Matches .task-assignee-avatar in backlog.css. */
-  background: color-mix(in srgb, hsl(var(--avatar-hue, 0) var(--avatar-sat) var(--avatar-light)) 22%, var(--surface-2));
-  /* stylelint-disable-next-line function-disallowed-list -- see above */
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, hsl(var(--avatar-hue, 0) var(--avatar-sat) var(--avatar-light)) 34%, transparent);
-  color: var(--ink-1);
-  font-family: var(--font-display);
-  font-size: var(--monogram-size, var(--fs-2));
-  font-weight: 600;
-  line-height: var(--leading-none);
-  letter-spacing: var(--track-display);
-  user-select: none;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line-1);
+  color: var(--ink-2);
+}
+
+/* Empty states frame the mark themselves, so the bare variant is the glyph
+   alone at its own size — same geometry, no chip. */
+.identity-mark[data-variant="bare"] {
+  width: auto;
+  height: auto;
+  padding: 0;
+  background: none;
+  box-shadow: none;
 }
 
 .profile-image-picker {

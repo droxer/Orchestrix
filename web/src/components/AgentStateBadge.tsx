@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type { AgentName, LogicalAgentAvailability } from "../types";
 import { AgentMark } from "./AgentMark";
-import { IdentityMonogram } from "./IdentityMonogram";
+import { IdentityMark } from "./IdentityMark";
 import { ProfileImage } from "./ProfileImagePicker";
 
 /**
@@ -70,7 +70,7 @@ export function AgentStateBadge({
         <ProfileImage
           src={imageUrl}
           alt=""
-          fallback={name ? <IdentityMonogram name={name} size={9} /> : null}
+          fallback={name ? <IdentityMark kind="agent" /> : null}
         />
       ) : (
         <AgentMark agent={agent} size={14} />

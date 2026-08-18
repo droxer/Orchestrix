@@ -35,7 +35,7 @@ import { Drawer } from "@/components/ui/Drawer";
 import { TaskDrawerArtifacts } from "./TaskDrawerArtifacts";
 import { AgentMark } from "../AgentMark";
 import { AgentStateBadge } from "../AgentStateBadge";
-import { IdentityMonogram } from "../IdentityMonogram";
+import { IdentityMark } from "../IdentityMark";
 import { NavAgents } from "../icons";
 import { ProfileImage } from "../ProfileImagePicker";
 import { cn } from "@/lib/utils";
@@ -100,7 +100,7 @@ function AssignmentOption({
   return (
     <span className="task-assignment-option">
       <span className={cn("agent-state", availabilityTone(availability))} role="img" aria-label={stateLabel} title={stateLabel}>
-        <ProfileImage src={team.profileImageUrl} alt="" fallback={<IdentityMonogram name={team.name} size={9} />} />
+        <ProfileImage src={team.profileImageUrl} alt="" fallback={<IdentityMark kind="team" />} />
       </span>
       <span className="task-assignment-option-copy">
         <span>{team.name}</span>
@@ -160,10 +160,10 @@ function AssignmentSummary({
           <ProfileImage
             src={agent.profileImageUrl}
             alt=""
-            fallback={<IdentityMonogram name={agent.displayName} size={15} />}
+            fallback={<IdentityMark kind="agent" />}
           />
         ) : (
-          <ProfileImage src={team?.profileImageUrl} alt="" fallback={team ? <IdentityMonogram name={team.name} size={15} /> : null} />
+          <ProfileImage src={team?.profileImageUrl} alt="" fallback={team ? <IdentityMark kind="team" /> : null} />
         )}
       </span>
       <span className="task-assignment-summary-body">

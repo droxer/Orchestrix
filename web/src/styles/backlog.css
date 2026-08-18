@@ -1553,12 +1553,8 @@
   font-weight: 600;
   line-height: var(--leading-none);
   color: var(--ink-1);
-  /* stylelint-disable-next-line function-disallowed-list -- procedurally generated
-     per-identity hue (--avatar-hue, set inline by TaskAssignee.tsx from the assignee's
-     name); there is no fixed primitive to reference since the hue itself is the value. */
-  background: color-mix(in srgb, hsl(var(--avatar-hue, 0) var(--avatar-sat) var(--avatar-light)) 16%, transparent);
-  /* stylelint-disable-next-line function-disallowed-list -- see above */
-  border: 1px solid color-mix(in srgb, hsl(var(--avatar-hue, 0) var(--avatar-sat) var(--avatar-light)) 42%, var(--line-1));
+  background: var(--surface-2);
+  border: 1px solid var(--line-1);
 }
 
 .task-assignee[data-unassigned="true"] .task-assignee-avatar {
