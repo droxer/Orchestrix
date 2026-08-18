@@ -486,10 +486,16 @@ html:lang(zh-TW) {
      spelled `font-size: var(--fs-4)` literally, of which the dense surfaces
      have none. Restating each --fs-4-derived role here re-resolves it in this
      scope, which is what makes the substitution real. Add a line whenever a new
-     role is built on --fs-4. */
+     role is built on --fs-4.
+
+     --type-body-sm shifts by the same one-rung substitution (--fs-3 → --fs-2):
+     it is the app's supporting-text tier (hints, meta lines, empty-state copy),
+     so a dense admin table would otherwise print its meta larger than the
+     13px names beside it. */
   --fs-4: 0.9286rem;
   --type-body: 400 var(--fs-4)/1.5 var(--font-sans);
   --type-name: 600 var(--fs-4)/1.4 var(--font-sans);
+  --type-body-sm: 400 var(--fs-2)/1.5 var(--font-sans);
 }
 
 /* CJK reading roles are looser; the compact scope must restate them too or a
@@ -499,4 +505,5 @@ html:lang(zh-TW) [data-density="compact"],
 html:lang(zh-CN)[data-density="compact"],
 html:lang(zh-TW)[data-density="compact"] {
   --type-body: 400 var(--fs-4)/1.7 var(--font-sans);
+  --type-body-sm: 400 var(--fs-2)/1.7 var(--font-sans);
 }

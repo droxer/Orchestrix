@@ -236,8 +236,8 @@
 }
 
 .pref-option-sub {
-  font: var(--type-label-strong);
-  font-weight: 400;
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
   line-height: var(--leading-snug);
 }

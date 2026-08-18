@@ -18,7 +18,9 @@ export function PageHeader({
   subtitle?: ReactNode;
   toolbar?: ReactNode;
   actions?: ReactNode;
-  titleVariant?: "default" | "display";
+  /** "display" is mono, for fixed UI nouns; "record" is sans, for a name the
+   *  user or an agent authored. See .page-header-title--display in shell.css. */
+  titleVariant?: "default" | "display" | "record";
   /** Heading level. Nested detail panes (team/agent detail under a roster)
    *  demote to "h2" so the roster title stays the single page h1. */
   titleAs?: "h1" | "h2" | "h3";
@@ -42,7 +44,9 @@ export function PageHeader({
               "page-header-title",
               titleVariant === "display"
                 ? "page-header-title--display"
-                : "page-header-title--inline",
+                : titleVariant === "record"
+                  ? "page-header-title--record"
+                  : "page-header-title--inline",
             )}
           >
             {title}

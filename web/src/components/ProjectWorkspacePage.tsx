@@ -292,7 +292,7 @@ export function ProjectWorkspacePage({
           </span>
         )}
         subtitle={t("project.page_subtitle", { count: project.members.length })}
-        titleVariant="display"
+        titleVariant="record"
         layout="stacked"
         actions={(
           <>

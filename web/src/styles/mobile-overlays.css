@@ -47,13 +47,9 @@
       var(--sp-4);
   }
 
-  .adm-drawer-title {
-    font-size: var(--fs-5);
-    letter-spacing: var(--track-display);
-  }
-
   .adm-drawer-sub {
-    font-size: var(--fs-2);
+    font: var(--type-body-sm);
+    letter-spacing: var(--type-body-sm-track);
     line-height: var(--leading-normal);
   }
 

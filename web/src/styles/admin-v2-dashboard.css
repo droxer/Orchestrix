@@ -88,12 +88,6 @@
   letter-spacing: var(--track-display);
 }
 
-/* Secondary tiles step down a full tier so the hero stays the only
-   display-scale numeral on the page. */
-.adm-dash-tile:not(.adm-dash-tile--hero) .adm-dash-tile-value {
-  font-size: var(--fs-6);
-}
-
 .adm-dash-tile-foot {
   display: flex;
   align-items: center;
@@ -105,7 +99,8 @@
 }
 
 .adm-dash-tile-hint {
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
 }
 
@@ -193,7 +188,8 @@
   flex-wrap: wrap;
   gap: var(--sp-2) var(--sp-4);
   color: var(--ink-3);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
 }
 
 .adm-token-legend span {
@@ -249,7 +245,8 @@
 
 .adm-dash-empty-copy {
   margin: 0;
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
   max-width: var(--measure-tight);
   background: var(--surface-1);
@@ -333,8 +330,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1-5);
-  font-size: var(--fs-2);
-  letter-spacing: var(--track-0);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
   margin: 0;
 }
@@ -406,9 +403,9 @@
 }
 
 .adm-dash-top-rank {
-  font-size: var(--fs-2);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
   color: var(--ink-4);
-  letter-spacing: var(--track-caps);
 }
 
 .adm-dash-top-meta {

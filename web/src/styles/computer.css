@@ -57,7 +57,8 @@
   max-width: 22rem;
   margin: 0;
   color: var(--ink-2);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   text-align: right;
 }
 
@@ -157,6 +158,7 @@
   margin: 0;
   color: var(--ink-3);
   font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
 }
 
 .computer-card-sep {
@@ -199,6 +201,7 @@
   border-radius: var(--r-full);
   color: var(--ink-3);
   font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
 }
 
 .computer-card-idle {
@@ -269,6 +272,7 @@ button.computer-run-open:hover {
 .computer-run-elapsed {
   color: var(--live);
   font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
 }
 
 /* ---- runtimes + facts ------------------------------------------------ */
@@ -372,6 +376,7 @@ button.computer-run-open:hover {
 .computer-runtime-version {
   color: var(--ink-3);
   font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
 }
 
 .computer-runtime-version {
@@ -400,6 +405,7 @@ button.computer-run-open:hover {
 .computer-fact dt {
   color: var(--ink-3);
   font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
 }
 
 .computer-fact dd {

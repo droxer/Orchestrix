@@ -210,7 +210,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-3);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
 }
 
@@ -236,7 +237,8 @@
   border-radius: var(--r-2);
   background: var(--surface-0);
   color: var(--ink-1);
-  font-size: var(--fs-2);
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
   cursor: pointer;
   transition: border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
 }
@@ -319,7 +321,8 @@
 }
 
 .adm-emp-ratio {
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
 }
 
 /* Dedicated actions cell — mirrors the Nodes list ACTIONS column: a quiet
@@ -500,6 +503,7 @@
   border-radius: var(--r-full);
   color: var(--ink-3);
   font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
   text-align: center;
 }
 
@@ -557,6 +561,7 @@
 .adm-node-history-row time {
   color: var(--ink-3);
   font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
 }
 
 /* The identity span carries the retired node's id — re-assert the code face
@@ -635,7 +640,8 @@
 
 .adm-emp-card-email {
   margin: 0;
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -962,7 +968,8 @@
 .adm-cred-hint {
   display: block;
   margin-top: var(--sp-0-5);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
   line-height: var(--leading-snug);
 }
@@ -1078,7 +1085,8 @@
 }
 
 .adm-node-card-handle {
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
   max-width: 100%;
   overflow: hidden;
@@ -1282,7 +1290,8 @@
   width: 100%;
   padding: var(--sp-3);
   color: var(--ink-3);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   border: 1px dashed var(--line-2);
   border-radius: var(--r-2);
   background: var(--surface-1);
@@ -1415,7 +1424,8 @@
 }
 
 .adm-agent-inventory-empty {
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
 }
 
@@ -1482,7 +1492,8 @@
   align-items: center;
   gap: var(--sp-2);
   flex: none;
-  font-size: var(--fs-2);
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
   color: var(--ink-3);
   cursor: pointer;
   user-select: none;
@@ -1507,7 +1518,8 @@
   margin-top: auto;
   padding-top: var(--sp-3);
   border-top: 1px solid var(--line-2);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
 }
 
 /* Queued-commands count is secondary meta, so it sits at the muted ink tier
@@ -1544,14 +1556,16 @@
 .adm-node-card-error {
   /* The card's flex gap already separates the error from the footer. */
   margin: 0;
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--err);
 }
 
 .adm-node-row-error {
   grid-column: 1 / -1;
   margin: 0;
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--err);
 }
 
@@ -1895,7 +1909,8 @@
 
 .adm-chat-integration-main span {
   color: var(--ink-3);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
 }
 
 .adm-chat-readiness {
@@ -1952,7 +1967,8 @@
 .adm-chat-callback small,
 .adm-chat-form > small {
   color: var(--ink-3);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   line-height: var(--leading-snug);
 }
 
@@ -2016,7 +2032,8 @@
 
 .adm-chat-rows small {
   color: var(--ink-3);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2117,7 +2134,8 @@
 
 .adm-settings-sub {
   margin: 0;
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
 }
 
@@ -2137,6 +2155,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1-5);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ok);
 }

@@ -137,7 +137,7 @@ export function AgentDetailPage({
             {agent.displayName}
           </span>
         )}
-        titleVariant="display"
+        titleVariant="record"
         titleAs="h2"
         layout="stacked"
         toolbar={(

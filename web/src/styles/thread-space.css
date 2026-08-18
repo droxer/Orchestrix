@@ -154,7 +154,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--ink-3);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
 }
 
 .thread-space-empty {
