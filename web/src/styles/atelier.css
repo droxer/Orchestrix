@@ -44,7 +44,6 @@
 .mobile-topbar-eyebrow {
   color: var(--ink-3);
   font: var(--type-micro);
-  font-weight: 500;
   letter-spacing: var(--track-0);
 }
 
@@ -180,7 +179,7 @@ html[data-theme="dark"] .transcript-inner:has(.transcript-empty) {
 
 .backlog-stat-value {
   font-family: var(--font-display);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: var(--track-display);
 }
 

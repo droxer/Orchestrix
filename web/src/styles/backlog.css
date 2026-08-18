@@ -47,10 +47,12 @@
   color: var(--ink-3);
 }
 
+/* Metric numerals are 700 across the app (--type-number, .adm-dash-*-value);
+   this was the one 600 in the set. */
 .backlog-stat-value {
   font-family: var(--font-display);
   font-size: var(--fs-3);
-  font-weight: 600;
+  font-weight: 700;
   line-height: var(--leading-none);
   letter-spacing: var(--track-display);
   font-feature-settings: "tnum" 1;

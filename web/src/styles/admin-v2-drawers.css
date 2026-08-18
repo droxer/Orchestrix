@@ -76,13 +76,13 @@
   color: var(--ink-3);
 }
 
+/* A drawer is subordinate to the page behind it, so its title takes the same
+   --type-title rung as a pane title rather than the 22px --fs-5 step above it,
+   which made the drawer the loudest thing on screen. */
 .adm-drawer-title {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--fs-5);
-  font-weight: 600;
-  letter-spacing: var(--track-display);
-  line-height: var(--leading-display);
+  font: var(--type-title);
+  letter-spacing: var(--type-title-track);
   color: var(--ink-1);
   overflow-wrap: anywhere;
 }
@@ -167,7 +167,8 @@
 
 .adm-form-hint {
   margin: 0;
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
   line-height: var(--leading-normal);
 }
@@ -177,7 +178,8 @@
   border-radius: var(--r-2);
   background: var(--surface-1);
   border: 1px solid var(--line-2);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
   line-height: var(--leading-normal);
 }
@@ -315,7 +317,8 @@
 }
 
 .adm-assign-operator-handle {
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
   line-height: var(--leading-display);
   word-break: break-all;
@@ -343,9 +346,9 @@
 }
 
 .adm-assign-nodes-count {
-  font-size: var(--fs-2);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
   color: var(--ink-3);
-  letter-spacing: var(--track-caps);
 }
 
 .adm-assign-node-list {
@@ -439,7 +442,8 @@
 }
 
 .adm-assign-node-path {
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
   word-break: break-all;
   line-height: var(--leading-snug);
@@ -495,7 +499,8 @@
 
 .adm-assign-empty-body {
   margin: 0;
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   line-height: var(--leading-normal);
   color: var(--ink-3);
 }
@@ -698,7 +703,8 @@
 }
 
 .adm-provision-preview-name {
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
 }
 
@@ -730,7 +736,8 @@
 
 .adm-provision-outcome-body {
   margin: 0;
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   line-height: var(--leading-normal);
   color: var(--ink-3);
 }
@@ -971,7 +978,8 @@
 
 .adm-cred-note {
   margin: var(--sp-4) 0 0;
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
   line-height: var(--leading-loose);
 }

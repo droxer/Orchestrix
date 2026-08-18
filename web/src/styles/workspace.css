@@ -61,7 +61,8 @@
 
 .workspace-page-tab-count {
   color: var(--ink-3);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
 }
 
 /* Segmented tabs — same segmented-control language as .backlog-view-toggle
@@ -298,7 +299,8 @@
 
 .workspace-pane-head > span {
   color: var(--ink-3);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
 }
 
 .workspace-pane-head-actions {
@@ -311,7 +313,8 @@
 
 .workspace-preview-file-type {
   color: var(--ink-3);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   text-transform: lowercase;
 }
 
@@ -375,7 +378,8 @@
 
 .workspace-activity-head > span {
   color: var(--ink-3);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
 }
 
 .workspace-activity-pick {
@@ -605,7 +609,8 @@
 .workspace-profile-id {
   margin: 0 0 var(--sp-4);
   color: var(--ink-3);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
 }
 
 /* Readiness pip: a standalone toned dot that carries availability at a glance.
@@ -720,7 +725,8 @@
 .workspace-files-bar .workspace-thread-select {
   max-width: 190px;
   min-height: 28px;
-  font-size: var(--fs-2);
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
 }
 
 /* Scope options share the segmented-control grammar of the page tabs —
@@ -817,7 +823,8 @@
   align-items: center;
   gap: var(--sp-1-5);
   color: var(--ink-3);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   white-space: nowrap;
 }
 
@@ -879,7 +886,8 @@
 
 .workspace-pick-meta {
   color: var(--ink-3);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   white-space: nowrap;
 }
 
@@ -902,7 +910,8 @@
   padding: 0 var(--sp-4);
   color: var(--ink-3);
   cursor: pointer;
-  font-size: var(--fs-2);
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
   text-align: left;
 }
 
@@ -1179,7 +1188,8 @@
 
 .artifacts-empty-date {
   color: var(--ink-4);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
 }
 
 /* Idle-presence pulse: the tile stays the neutral relay-empty avatar plate;
@@ -1389,7 +1399,7 @@
 }
 
 .agent-personality-document h1 {
-  font-size: var(--fs-heading);
+  font-size: var(--fs-title);
 }
 
 .agent-personality-document h2 {
@@ -1540,6 +1550,7 @@
 .agent-personality-editor-guide li small {
   color: var(--ink-3);
   font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
   line-height: var(--leading-normal);
 }
 
@@ -1599,6 +1610,7 @@
 .agent-personality-save-hint {
   color: var(--ink-3);
   font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
 }
 
 .agent-personality-save-hint {
@@ -1681,25 +1693,20 @@
   cursor: not-allowed;
 }
 
-/* The agent/team name is display-tier — mono, tracked, ink-1 — the same
-   register as conversation titles and KPI numerals. In the agent rail it
-   steps down: the page header already prints the name at display scale, and
-   a second display-tier copy one band below would fight it. */
-.workspace-dossier-rail .workspace-dossier-name-value {
-  font-family: var(--font-sans);
-  font-size: var(--fs-3);
-  font-weight: 500;
-  letter-spacing: var(--track-0);
-}
-
+/* The name field of the facts rail. It is a rail VALUE, not a title: the page
+   header already prints this name at display scale, so a second display-tier
+   copy one band below would fight it. It therefore rides the same
+   --type-body-sm size as its sibling .workspace-dossier-field-value and marks
+   itself as the identity field with weight alone.
+   The rail is the only place this class renders (verified against the DOM on
+   /teams/<id>); a second, mono display-tier rule for the non-rail case used to
+   sit here describing markup that does not exist. */
 .workspace-dossier-name-value {
   margin: 0;
   color: var(--ink-1);
-  font-family: var(--font-display);
-  font-size: var(--fs-title);
-  font-weight: 600;
-  letter-spacing: var(--track-display);
-  line-height: var(--leading-tight);
+  font: var(--type-body-sm);
+  font-weight: 500;
+  letter-spacing: var(--type-body-sm-track);
 }
 
 .workspace-dossier-rename-actions {

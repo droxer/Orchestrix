@@ -72,7 +72,6 @@
   gap: var(--sp-2);
   color: var(--ink-1);
   font: var(--type-title);
-  font-weight: 600;
   letter-spacing: var(--type-title-track);
 }
 
@@ -223,8 +222,8 @@
   min-width: 0;
   overflow: hidden;
   color: var(--ink-1);
-  font: var(--type-heading);
-  letter-spacing: var(--type-heading-track);
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

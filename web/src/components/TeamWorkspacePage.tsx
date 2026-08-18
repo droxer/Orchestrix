@@ -558,7 +558,7 @@ export function TeamWorkspacePage({
             {team.name}
           </span>
         )}
-        titleVariant="display"
+        titleVariant="record"
         titleAs="h2"
         layout="stacked"
         toolbar={(

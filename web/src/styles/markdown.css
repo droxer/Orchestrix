@@ -382,6 +382,7 @@ html:lang(zh-TW) .md-body blockquote {
   background: var(--surface-1);
   color: var(--ink-3);
   font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
   cursor: pointer;
   /* Chrome for a block the reader may only be skimming: it resolves on hover
      or keyboard focus, and never sits over the first line of code uninvited. */
@@ -451,7 +452,8 @@ html:lang(zh-TW) .md-body blockquote {
   padding-top: var(--sp-3);
   border-top: 1px solid var(--line-2);
   color: var(--ink-3);
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
 }
 
 .md-body section[data-footnotes] h2 {

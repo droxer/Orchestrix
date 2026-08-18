@@ -87,19 +87,23 @@
   text-align: center;
 }
 
+/* The display rung is 700 in --type-display; login hand-rolls the family
+   because it paints on the pinned --lg-* register, not because it is a
+   lighter tier. */
 .login-headline {
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--fs-6);
   line-height: var(--leading-display);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: var(--track-display);
   color: var(--lg-ink);
 }
 
 .login-lede {
   margin: 0;
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   line-height: var(--leading-loose);
   color: var(--lg-muted);
 }

@@ -146,7 +146,8 @@
   align-items: center;
   gap: var(--sp-1);
   margin-left: auto;
-  font-size: var(--fs-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
 }
 
@@ -415,9 +416,8 @@
 
 .msg-time {
   color: var(--ink-3);
-  font-family: var(--font-sans);
-  font-size: var(--fs-2);
-  font-weight: 500;
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   white-space: nowrap;
   grid-column: 3;
   grid-row: 1;
@@ -442,9 +442,6 @@
     grid-template-columns: 20px minmax(0, 1fr) auto;
   }
 
-.msg-time {
-    font-size: var(--fs-2);
-  }
 }
 
 /* A streaming turn breathes on the rail node so liveness reads even when the
