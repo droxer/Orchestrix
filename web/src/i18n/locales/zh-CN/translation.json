@@ -75,7 +75,8 @@
     "expand_sidebar": "展开侧栏",
     "more": "更多",
     "more_label": "更多入口",
-    "mobile_section": "Relay"
+    "mobile_section": "Relay",
+    "resize_label": "调整侧边栏宽度"
   },
   "project": {
     "projects": "项目",

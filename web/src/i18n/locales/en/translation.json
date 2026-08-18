@@ -75,7 +75,8 @@
     "expand_sidebar": "Expand sidebar",
     "more": "More",
     "more_label": "More destinations",
-    "mobile_section": "Relay"
+    "mobile_section": "Relay",
+    "resize_label": "Resize sidebar"
   },
   "project": {
     "projects": "Projects",

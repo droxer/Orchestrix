@@ -49,6 +49,7 @@
 
 /* During a drag the pointer owns the width; the track transition would
    rubber-band behind it. */
+.messenger-shell[data-sidenav-resizing="true"],
 .messenger-shell[data-space-resizing="true"],
 .messenger-shell[data-threadlist-resizing="true"] {
   transition: none;
