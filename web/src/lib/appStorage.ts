@@ -16,6 +16,7 @@ export const languageStorageKey = "relay-web.language";
 export const sidenavExpandedKey = "relay-web.sidenavExpanded";
 export const threadSpaceWidthKey = "relay-web.threadSpaceWidth";
 export const threadListWidthKey = "relay-web.threadListWidth";
+export const sidenavWidthKey = "relay-web.sidenavWidth";
 
 export function readTokens(): TokenMap {
   if (typeof window === "undefined") return {};
@@ -59,6 +60,19 @@ export function readSidenavExpanded(): boolean {
 
 export function writeSidenavExpanded(expanded: boolean): void {
   if (typeof window !== "undefined") localStorage.setItem(sidenavExpandedKey, expanded ? "1" : "0");
+}
+
+/** Dragged expanded-rail width in px, or null when never resized. Kept
+ *  separate from the collapse flag: the rail remembers how wide the user
+ *  made it across collapse/expand cycles. */
+export function readSidenavWidth(): number | null {
+  if (typeof window === "undefined") return null;
+  const stored = Number(localStorage.getItem(sidenavWidthKey));
+  return Number.isFinite(stored) && stored > 0 ? stored : null;
+}
+
+export function writeSidenavWidth(width: number): void {
+  if (typeof window !== "undefined") localStorage.setItem(sidenavWidthKey, String(width));
 }
 
 /** Dragged thread-space panel width in px, or null when never resized. */

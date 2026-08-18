@@ -206,6 +206,10 @@
 
   /* Shell */
   --sidenav-w: 72px;
+  /* Expanded-rail default. The shell restates this inline from the dragged
+     width (see lib/sidenav.ts for the min/max), so this value is what the
+     prerendered export shows before hydration — keep it equal to
+     SIDENAV_WIDTH_DEFAULT or the rail jumps on load. */
   --sidenav-w-open: 228px;
   --thread-w: 318px;
   /* Transcript/composer column cap. A layout width, not a reading measure:

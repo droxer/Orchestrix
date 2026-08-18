@@ -23,7 +23,8 @@ import {
   threadMessageOperationKey,
 } from "./lib/messageRouting";
 import { mentionCandidates } from "./lib/mentions";
-import { applyTheme, readLanguage, readSidenavExpanded, readTheme, readThreadListWidth, readThreadSpaceWidth, readTokens, selectedEmployeeKey, writeLanguage, writeSidenavExpanded, writeTheme, writeThreadListWidth, writeThreadSpaceWidth } from "./lib/appStorage";
+import { applyTheme, readLanguage, readSidenavExpanded, readSidenavWidth, readTheme, readThreadListWidth, readThreadSpaceWidth, readTokens, selectedEmployeeKey, writeLanguage, writeSidenavExpanded, writeSidenavWidth, writeTheme, writeThreadListWidth, writeThreadSpaceWidth } from "./lib/appStorage";
+import { clampSidenavWidth, SIDENAV_WIDTH_DEFAULT } from "./lib/sidenav";
 import { canUseLocalControlPanel } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
 import { useAuthSession } from "./hooks/useAuthSession";
@@ -135,6 +136,8 @@ export function App() {
   const [threadQuery, setThreadQuery] = useState("");
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [sidenavExpanded, setSidenavExpanded] = useState(false);
+  const [sidenavWidth, setSidenavWidth] = useState(SIDENAV_WIDTH_DEFAULT);
+  const [sidenavResizing, setSidenavResizing] = useState(false);
   const [theme, setTheme] = useState<Theme>("system");
   const [language, setLanguage] = useState<Language>("en");
   const [handoffOpen, setHandoffOpen] = useState(false);
@@ -550,6 +553,7 @@ export function App() {
     setSidenavExpanded(readSidenavExpanded());
     setSpaceWidth(clampSpaceWidth(readThreadSpaceWidth() ?? SPACE_WIDTH_DEFAULT));
     setThreadListWidth(clampThreadListWidth(readThreadListWidth() ?? THREAD_LIST_WIDTH_DEFAULT));
+    setSidenavWidth(clampSidenavWidth(readSidenavWidth() ?? SIDENAV_WIDTH_DEFAULT));
   }, [mounted]);
 
   // Persisted on toggle rather than in an effect on `sidenavExpanded`: the
@@ -821,6 +825,12 @@ export function App() {
     const clamped = clampSpaceWidth(width);
     setSpaceWidth(clamped);
     if (commit) writeThreadSpaceWidth(clamped);
+  }
+
+  function handleSidenavResize(width: number, commit: boolean) {
+    const clamped = clampSidenavWidth(width);
+    setSidenavWidth(clamped);
+    if (commit) writeSidenavWidth(clamped);
   }
 
   function handleThreadListResize(width: number, commit: boolean) {
@@ -1216,6 +1226,10 @@ export function App() {
       }}
       sidenavExpanded={sidenavExpanded}
       setSidenavExpanded={applySidenavExpanded}
+      sidenavWidth={sidenavWidth}
+      sidenavResizing={sidenavResizing}
+      onSidenavResize={handleSidenavResize}
+      onSidenavResizeActive={setSidenavResizing}
       prefsOpen={prefsOpen}
       setPrefsOpen={setPrefsOpen}
       skipLinkHref={skipLinkHref}

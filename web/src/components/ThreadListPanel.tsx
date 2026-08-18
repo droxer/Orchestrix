@@ -13,6 +13,7 @@ import {
   THREAD_LIST_WIDTH_MIN,
 } from "../lib/threadList";
 import type { DaemonNodeMonitorRecord, ProjectRecord, RelaySession } from "../types";
+import { useChatColumnResize } from "@/hooks/useChatColumnResize";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 
@@ -122,18 +123,16 @@ export function ThreadListPanel({
     onResize(clampThreadListWidth(width + delta, max), true);
   }, [onResize, width]);
 
-  // A window that narrows while the list is at a custom width can push the
-  // chat column under its floor; give the room back rather than leaving the
-  // conversation squeezed. Only ever shrinks — maxThreadListWidth is a
-  // ceiling, not a target.
-  useEffect(() => {
-    const onWindowResize = () => {
-      const max = maxThreadListWidth(width, chatWidth());
-      if (width > max) onResize(max, false);
-    };
-    window.addEventListener("resize", onWindowResize);
-    return () => window.removeEventListener("resize", onWindowResize);
-  }, [onResize, width]);
+  // Anything that narrows the chat column while the list is at a custom width
+  // can push it under its floor — a narrowed window, but equally an expanding
+  // side rail; give the room back rather than leaving the conversation
+  // squeezed. Only ever shrinks — maxThreadListWidth is a ceiling, not a
+  // target — and never commits, so a transient squeeze doesn't overwrite the
+  // width the user actually chose.
+  useChatColumnResize(useCallback(() => {
+    const max = maxThreadListWidth(width, chatWidth());
+    if (width > max) onResize(max, false);
+  }, [onResize, width]));
 
   const hierarchy = projectThreadBuckets(threads, projects);
 

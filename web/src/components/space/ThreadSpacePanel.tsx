@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { OverlayCloseButton } from "@/components/ui/OverlayCloseButton";
 import { useModalDrawer } from "@/hooks/useModalDrawer";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { useChatColumnResize } from "@/hooks/useChatColumnResize";
 
 /** Matches the breakpoint in responsive.css where the panel leaves the shell
  *  grid and covers the viewport. Below it the panel is a modal overlay and
@@ -123,20 +124,16 @@ export function ThreadSpacePanel({
     onResize(clampSpaceWidth(width + delta, max), true);
   }, [onResize, width]);
 
-  // A window that narrows while the panel is open can push the transcript
-  // under its floor; give the room back rather than leaving the conversation
-  // squeezed. Only ever shrinks — maxSpaceWidth is a ceiling, not a target.
-  useEffect(() => {
-    if (isOverlay) return;
-    const onWindowResize = () => {
-      const max = maxSpaceWidth(width, transcriptWidth());
-      // Not committed: a temporarily narrow window shouldn't overwrite the
-      // width the user actually chose.
-      if (width > max) onResize(max, false);
-    };
-    window.addEventListener("resize", onWindowResize);
-    return () => window.removeEventListener("resize", onWindowResize);
-  }, [isOverlay, onResize, width]);
+  // Anything that narrows the transcript while the panel is open can push it
+  // under its floor — a narrowed window, but equally an expanding side rail;
+  // give the room back rather than leaving the conversation squeezed. Only
+  // ever shrinks — maxSpaceWidth is a ceiling, not a target.
+  useChatColumnResize(useCallback(() => {
+    const max = maxSpaceWidth(width, transcriptWidth());
+    // Not committed: a temporary squeeze shouldn't overwrite the width the
+    // user actually chose.
+    if (width > max) onResize(max, false);
+  }, [onResize, width]), !isOverlay);
 
   return (
     <aside

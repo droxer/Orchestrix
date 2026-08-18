@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type Dispatch, type MouseEvent, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type MouseEvent, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -10,12 +10,30 @@ import { RelayMark } from "./RelayMark";
 import { commandShortcutLabel } from "../lib/shortcuts";
 import { Button } from "@/components/ui/button";
 import type { AppRoute } from "../lib/viewTypes";
+import {
+  clampSidenavWidth, maxSidenavWidth, SIDENAV_WIDTH_DEFAULT, SIDENAV_WIDTH_MAX, SIDENAV_WIDTH_MIN,
+} from "../lib/sidenav";
+
+/** Keyboard resize step, matching the thread rail's separator. */
+const KEYBOARD_RESIZE_STEP = 16;
+
+/** The chat column, measured to work out how much width the rail may still
+ *  take. Read straight from the DOM rather than threaded down as a prop: the
+ *  grid — not React — owns the column's real width. */
+function chatWidth(): number | null {
+  if (typeof document === "undefined") return null;
+  const chat = document.getElementById("chat-panel");
+  return chat ? chat.getBoundingClientRect().width : null;
+}
 
 // Left rail: brand, collapse toggle, route nav, settings/logout. Owns its own
 // collapsed-state hover tooltip (only shown while the rail is collapsed).
-export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigateRoute, hrefForRoute, isAdmin, prefsOpen, setPrefsOpen, onLogout, onOpenCommandMenu }: {
+export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, onResizeActive, route, onNavigateRoute, hrefForRoute, isAdmin, prefsOpen, setPrefsOpen, onLogout, onOpenCommandMenu }: {
   sidenavExpanded: boolean;
   setSidenavExpanded: (expanded: boolean) => void;
+  width: number;
+  onResize: (width: number, commit: boolean) => void;
+  onResizeActive: (active: boolean) => void;
   route: AppRoute;
   onNavigateRoute: (route: AppRoute) => void;
   hrefForRoute: (route: AppRoute) => string;
@@ -187,6 +205,58 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
     setMoreMenu(null);
     onNavigateRoute(nextRoute);
   }
+
+  // A drag registers listeners outside React; this releases them if the rail
+  // unmounts mid-gesture, which would otherwise leak the listeners and strand
+  // the shell in its resizing state.
+  const releaseDragRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => releaseDragRef.current?.(), []);
+
+  const startResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const handle = event.currentTarget;
+    const startX = event.clientX;
+    // Ceiling fixed at gesture start: the chat column shrinks as the drag
+    // proceeds, so re-measuring per move would let the rail walk past it.
+    const max = maxSidenavWidth(width, chatWidth());
+    handle.setPointerCapture(event.pointerId);
+    onResizeActive(true);
+
+    // The rail is the leftmost track, so dragging right (positive delta)
+    // grows it — same orientation as the thread list.
+    const widthAt = (clientX: number) => clampSidenavWidth(width + (clientX - startX), max);
+    const move = (moveEvent: PointerEvent) => onResize(widthAt(moveEvent.clientX), false);
+    const finish = (finalX: number | null) => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+      handle.removeEventListener("pointercancel", cancel);
+      releaseDragRef.current = null;
+      if (finalX !== null) onResize(widthAt(finalX), true);
+      onResizeActive(false);
+    };
+    const up = (upEvent: PointerEvent) => finish(upEvent.clientX);
+    // A cancelled gesture (system takeover, touch interruption) never fires
+    // pointerup — without this the shell keeps its resizing state forever.
+    const cancel = () => finish(null);
+
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+    handle.addEventListener("pointercancel", cancel);
+    releaseDragRef.current = () => finish(null);
+  }, [onResize, onResizeActive, width]);
+
+  const resizeByKeyboard = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    const max = maxSidenavWidth(width, chatWidth());
+    if (event.key === "Home") {
+      event.preventDefault();
+      onResize(clampSidenavWidth(SIDENAV_WIDTH_DEFAULT, max), true);
+      return;
+    }
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const delta = event.key === "ArrowRight" ? KEYBOARD_RESIZE_STEP : -KEYBOARD_RESIZE_STEP;
+    onResize(clampSidenavWidth(width + delta, max), true);
+  }, [onResize, width]);
 
   const moreActive = route === "admin";
   const channelsHint = `${t("nav.channels")} · ${t("nav.coming_soon")}`;
@@ -496,6 +566,24 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
           {navTooltip.text}
         </div>,
         document.body,
+      ) : null}
+      {/* Only the expanded rail is resizable — the collapsed rail is a fixed
+          icon column with nothing for a drag to reveal. Hidden at <=820px
+          with the other separators (responsive.css), where the shell is
+          single-column. */}
+      {sidenavExpanded ? (
+        <div
+          className="sidenav-resize"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={t("nav.resize_label")}
+          aria-valuenow={width}
+          aria-valuemin={SIDENAV_WIDTH_MIN}
+          aria-valuemax={SIDENAV_WIDTH_MAX}
+          tabIndex={0}
+          onPointerDown={startResize}
+          onKeyDown={resizeByKeyboard}
+        />
       ) : null}
     </aside>
   );

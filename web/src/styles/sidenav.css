@@ -353,6 +353,9 @@
   align-items: center;
   gap: var(--sp-3);
   width: 100%;
+  /* Lets the label's min-width:0 take effect: without it the row floors at
+     its content width and the ellipsis never engages. */
+  min-width: 0;
   height: var(--control-h);
   padding: 0 var(--sp-3);
   justify-content: flex-start;
@@ -377,7 +380,15 @@
   height: auto;
   padding: 0;
   margin: 0;
-  overflow: visible;
+  /* Truncate rather than clip. The rail is user-resizable and the labels are
+     translated, so a label wider than the track is normal, not exceptional —
+     with overflow:visible the panel's own overflow:hidden cut the glyph in
+     half instead of resolving to an ellipsis. min-width:0 is what actually
+     lets the flex item shrink below its content width. */
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   clip-path: none;
   white-space: nowrap;
   font: var(--type-label);
@@ -454,4 +465,43 @@
    bottom-tab media query in responsive.css re-shows it at equal specificity. */
 .sidenav-panel .sidenav-btn.sidenav-more-btn {
   display: none;
+}
+
+/* ── Rail resize separator ───────────────────────────────────────────
+   Expanded rail only (SideNav renders it conditionally) — the collapsed
+   rail is a fixed icon column with nothing for a drag to reveal. Absolute
+   rather than a flex sibling because .sidenav-panel is a column flex whose
+   children are full-width rows; the thread rail's handle can be a sibling
+   because that panel is a row. Same geometry and affordance as
+   .thread-panel-resize so the two edges behave identically. */
+.sidenav-resize {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--sp-1-5);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.sidenav-resize::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 2px;
+  background: transparent;
+  transition: background var(--t-fast) var(--ease);
+}
+
+.sidenav-resize:hover::after,
+.sidenav-resize:active::after {
+  background: var(--line-strong);
+}
+
+.sidenav-resize:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }

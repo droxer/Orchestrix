@@ -44,6 +44,10 @@ type AppShellProps = {
   onMobileViewChange: (view: MobileView) => void;
   sidenavExpanded: boolean;
   setSidenavExpanded: (expanded: boolean) => void;
+  sidenavWidth: number;
+  sidenavResizing: boolean;
+  onSidenavResize: (width: number, commit: boolean) => void;
+  onSidenavResizeActive: (active: boolean) => void;
   prefsOpen: boolean;
   setPrefsOpen: Dispatch<SetStateAction<boolean>>;
   skipLinkHref: string;
@@ -91,6 +95,10 @@ export function AppShell({
   onMobileViewChange,
   sidenavExpanded,
   setSidenavExpanded,
+  sidenavWidth,
+  sidenavResizing,
+  onSidenavResize,
+  onSidenavResizeActive,
   prefsOpen,
   setPrefsOpen,
   skipLinkHref,
@@ -198,10 +206,15 @@ export function AppShell({
       data-route={route}
       data-sidenav={sidenavExpanded ? "open" : "closed"}
       data-space={threadSpaceOpen ? "open" : undefined}
+      data-sidenav-resizing={sidenavResizing || undefined}
       data-space-resizing={threadSpaceResizing || undefined}
       data-threadlist={threadSpaceOpen && !threadListHidden ? "open" : undefined}
       data-threadlist-resizing={threadListResizing || undefined}
-      style={{ "--space-w": `${threadSpaceWidth}px`, "--thread-w": `${threadListWidth}px` } as CSSProperties}
+      style={{
+        "--sidenav-w-open": `${sidenavWidth}px`,
+        "--space-w": `${threadSpaceWidth}px`,
+        "--thread-w": `${threadListWidth}px`,
+      } as CSSProperties}
     >
       <a className="skip-link" href={skipLinkHref}>{t("skip_to_content")}</a>
 
@@ -271,6 +284,9 @@ export function AppShell({
       <SideNav
         sidenavExpanded={sidenavExpanded}
         setSidenavExpanded={setSidenavExpanded}
+        width={sidenavWidth}
+        onResize={onSidenavResize}
+        onResizeActive={onSidenavResizeActive}
         route={route}
         onNavigateRoute={onNavigateRoute}
         hrefForRoute={hrefForRoute}
