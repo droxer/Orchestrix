@@ -9,9 +9,11 @@
     },
     {
       "name": "web-worktree",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "-w", "web", "--", "-p", "5050"],
-      "port": 5050
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev"],
+      "cwd": "web",
+      "port": 5050,
+      "autoPort": true
     }
   ]
 }

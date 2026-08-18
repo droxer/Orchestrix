@@ -220,7 +220,10 @@ export function ThreadsView({
         computers={runtimeNodes}
         query={threadQuery}
         setQuery={setThreadQuery}
-        selectedSessionId={activeSession?.id}
+        /* No thread is on screen while a project overview or a route state
+           occupies the pane, so no thread row may claim selection — the
+           active session outlives the route that opened it. */
+        selectedSessionId={projectOverviewState === "hidden" ? activeSession?.id : undefined}
         selectedProjectId={selectedProjectId}
         onSelectThread={onSelectThread}
         onSelectProject={onSelectProject}

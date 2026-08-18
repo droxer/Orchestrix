@@ -421,12 +421,26 @@
     border-right: 0;
   }
 
+  /* The tab bar already names this surface, so the heading is dropped here —
+     which left the header as a full-height band holding nothing but its one
+     button, reading as a rendering fault. Rather than shrink that band, the
+     grid pulls the button up beside the search field and gives the row back
+     to the list. Relocation is done in CSS, not markup: the header keeps its
+     desktop structure and semantics, it just occupies a different cell. */
   .thread-panel-inner {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      "search action"
+      "list   list";
+    column-gap: var(--sp-2);
     padding: var(--sp-3) 0 0;
   }
 
   .conversation-header {
-    padding-inline: var(--sp-4);
+    grid-area: action;
+    min-height: 0;
+    padding: 0 var(--sp-4) 0 0;
   }
 
   .conversation-heading {
@@ -434,7 +448,12 @@
   }
 
   .conversation-search {
-    margin-inline: var(--sp-4);
+    grid-area: search;
+    margin-inline: var(--sp-4) 0;
+  }
+
+  .thread-panel-inner > .conversation-list {
+    grid-area: list;
   }
 
   .chat-header {

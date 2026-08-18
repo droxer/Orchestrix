@@ -6,6 +6,17 @@ import { ThreadRow, type ThreadItem } from "./ThreadRow";
 import { groupThreads } from "../lib/threadGroups";
 import { projectThreadBuckets } from "../lib/threads";
 import {
+  expandProject,
+  isProjectExpanded,
+  projectEmptyKey,
+  projectFolderSelection,
+  projectFolderTone,
+  readProjectExpansion,
+  toggleProjectExpansion,
+  writeProjectExpansion,
+  type ProjectExpansion,
+} from "../lib/projectDirectory";
+import {
   clampThreadListWidth,
   maxThreadListWidth,
   THREAD_LIST_WIDTH_DEFAULT,
@@ -69,7 +80,16 @@ export function ThreadListPanel({
   onResizeActive: (active: boolean) => void;
 }) {
   const { t } = useTranslation();
-  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
+  // Which folders are open, remembered across reloads. Read after mount
+  // rather than in the initializer: the export is prerendered, so touching
+  // localStorage during the first render mismatches hydration.
+  const [expansion, setExpansion] = useState<ProjectExpansion>({});
+  useEffect(() => setExpansion(readProjectExpansion()), []);
+
+  const applyExpansion = useCallback((next: ProjectExpansion) => {
+    setExpansion(next);
+    writeProjectExpansion(next);
+  }, []);
 
   // A drag registers listeners outside React; this releases them if the panel
   // unmounts mid-gesture, which would otherwise leak the listeners and strand
@@ -225,9 +245,9 @@ export function ThreadListPanel({
       </div>
       <SearchInput
         className="relay-search conversation-search"
-        label={t("thread.search_label")}
+        label={directoryMode === "projects" ? t("project.search_label") : t("thread.search_label")}
         name="thread-search"
-        placeholder={t("thread.search_placeholder")}
+        placeholder={directoryMode === "projects" ? t("project.search_placeholder") : t("thread.search_placeholder")}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
@@ -238,40 +258,51 @@ export function ThreadListPanel({
         aria-label={directoryMode === "projects" ? t("project.projects") : t("nav.threads")}
       >
         {directoryMode === "projects" ? hierarchy.projects.map(({ project, threads: projectThreads }) => {
-          const expanded = selectedProjectId === project.id || (!project.archivedAt && !collapsedProjects.has(project.id));
+          const expanded = isProjectExpanded(project, expansion);
           const computerLabel = computers.find((computer) => computer.id === project.computerId)?.displayName
             || project.computerId.replace(/^device:[^:]+:/, "");
           // A collapsed project hides its threads, so the row needs its own
           // signal for "something in here needs a look" — the same attn/run
           // vocabulary as a thread's own state pip, aggregated up one level.
           const projectGroups = groupThreads(projectThreads);
-          const projectState: "attn" | "run" | undefined = projectGroups.needsYou.length > 0
-            ? "attn"
-            : projectGroups.running.length > 0
-              ? "run"
-              : undefined;
+          const projectState = projectFolderTone({
+            needsYou: projectGroups.needsYou.length,
+            running: projectGroups.running.length,
+            expanded,
+          });
+          const emptyKey = projectEmptyKey({
+            threadCount: projectThreads.length,
+            hasQuery: query.trim().length > 0,
+          });
+          const selection = projectFolderSelection({
+            projectId: project.id,
+            selectedProjectId,
+            selectedSessionId,
+            threadIds: projectThreads.map((item) => item.session.id),
+          });
           return (
-          <section key={project.id} className={`project-folder${selectedProjectId === project.id ? " active" : ""}${project.archivedAt ? " archived" : ""}${expanded ? " expanded" : " collapsed"}`}>
+          <section key={project.id} className={`project-folder${selection ? ` ${selection}` : ""}${project.archivedAt ? " archived" : ""}${expanded ? " expanded" : " collapsed"}`}>
             <div className="project-folder-header">
               <button
                 type="button"
                 className="project-folder-toggle"
                 aria-label={t(expanded ? "project.collapse" : "project.expand", { project: project.name })}
                 aria-expanded={expanded}
-                onClick={() => setCollapsedProjects((current) => {
-                  const next = new Set(current);
-                  if (next.has(project.id)) next.delete(project.id); else next.add(project.id);
-                  return next;
-                })}
+                onClick={() => applyExpansion(toggleProjectExpansion(expansion, project))}
               >
                 <ChevronDownIcon size={14} />
               </button>
               <button
                 type="button"
                 className="project-folder-select"
-                aria-current={selectedProjectId === project.id ? "page" : undefined}
+                aria-current={selection === "selected" ? "page" : undefined}
                 title={`${project.name} · ${t("project.member_count", { count: project.members.length })} · ${computerLabel}`}
-                onClick={() => onSelectProject(project.id)}
+                onClick={() => {
+                  // Selecting opens the folder, but only as a normal explicit
+                  // choice — the chevron still collapses it afterwards.
+                  applyExpansion(expandProject(expansion, project.id));
+                  onSelectProject(project.id);
+                }}
               >
                 <span className="project-folder-icon">
                   <WorkspaceFolder size={15} aria-hidden="true" />
@@ -284,9 +315,9 @@ export function ThreadListPanel({
                 <span className="project-folder-count tnum">{projectThreads.length}</span>
               </button>
             </div>
-            {expanded ? <div className="project-folder-threads">
+            {expanded && (projectThreads.length > 0 || emptyKey) ? <div className="project-folder-threads">
                 {renderProjectThreads(projectThreads)}
-                {projectThreads.length === 0 ? <p className="project-folder-empty">{t("project.no_threads")}</p> : null}
+                {emptyKey ? <p className="project-folder-empty">{t(emptyKey)}</p> : null}
               </div> : null}
           </section>
         )}) : renderThreads(hierarchy.unclassified)}
