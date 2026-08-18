@@ -2,60 +2,18 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { RelayApiError } from "../src/api.js";
-import { isWorkspaceRetryableError, preferredWorkspaceThreadId, workspaceFilesEmptyState, workspaceHomeStatus } from "../src/lib/workspaceHome.js";
-
-describe("preferredWorkspaceThreadId", () => {
-  const threads = [{ id: "ses_new" }, { id: "ses_old" }];
-
-  it("keeps an explicitly selected available thread", () => {
-    assert.equal(preferredWorkspaceThreadId(threads, "ses_old"), "ses_old");
-  });
-
-  it("falls back to the newest available thread", () => {
-    assert.equal(preferredWorkspaceThreadId(threads, "missing"), "ses_new");
-    assert.equal(preferredWorkspaceThreadId([], "ses_old"), "");
-  });
-});
+import { isWorkspaceRetryableError, workspaceHomeStatus } from "../src/lib/workspaceHome.js";
 
 describe("workspaceHomeStatus", () => {
   it("shows the live chip with the serving node when the listing is live", () => {
-    assert.deepEqual(workspaceHomeStatus({ source: "live", nodeId: "sbx_alice" }, false), {
+    assert.deepEqual(workspaceHomeStatus({ source: "live", nodeId: "sbx_alice" }), {
       kind: "live",
       nodeId: "sbx_alice",
     });
-    // The node id is optional diagnostic metadata — live still renders without it.
-    assert.deepEqual(workspaceHomeStatus({ source: "live" }, false), { kind: "live", nodeId: null });
-  });
-
-  it("shows the snapshot banner first, collapsing to the chip once dismissed", () => {
-    assert.deepEqual(workspaceHomeStatus({ source: "snapshot" }, false), { kind: "snapshot-banner" });
-    assert.deepEqual(workspaceHomeStatus({ source: "snapshot" }, true), { kind: "snapshot-chip" });
   });
 
   it("shows nothing while the listing has not loaded", () => {
-    assert.deepEqual(workspaceHomeStatus(undefined, false), { kind: "none" });
-    assert.deepEqual(workspaceHomeStatus(undefined, true), { kind: "none" });
-  });
-
-  it("keeps the banner dismissal from leaking into the live state", () => {
-    assert.deepEqual(workspaceHomeStatus({ source: "live", nodeId: "sbx_alice" }, true), {
-      kind: "live",
-      nodeId: "sbx_alice",
-    });
-  });
-});
-
-describe("workspaceFilesEmptyState", () => {
-  it("uses the not-produced-yet copy with the artifact hint for snapshot homes", () => {
-    assert.deepEqual(workspaceFilesEmptyState("snapshot"), {
-      titleKey: "workspace.no_files_yet",
-      hintKey: "workspace.empty_files_snapshot_hint",
-    });
-  });
-
-  it("uses the plain empty copy without a hint for live and unloaded homes", () => {
-    assert.deepEqual(workspaceFilesEmptyState("live"), { titleKey: "workspace.no_files", hintKey: null });
-    assert.deepEqual(workspaceFilesEmptyState(undefined), { titleKey: "workspace.no_files", hintKey: null });
+    assert.deepEqual(workspaceHomeStatus(undefined), { kind: "none" });
   });
 });
 

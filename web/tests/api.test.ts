@@ -10,13 +10,11 @@ import {
   cancelRun,
   deleteTask,
   getWorkspaceBrief,
-  listAgentWorkspaceFiles,
   listProjectWorkspaceFiles,
   listArtifacts,
   listEmployeeAgents,
   listSessionSummaries,
   listTaskArtifacts,
-  readAgentWorkspaceFile,
   readProjectWorkspaceFile,
   reissueComputerToken,
   RelayApiError,
@@ -496,62 +494,6 @@ describe("apiJson", () => {
     assert.equal(requestedUrl, "/api/v1/workspace/brief?projectId=project%2F1");
   });
 
-  it("lists agent workspace files", async () => {
-    let requestedUrl = "";
-    globalThis.fetch = (async (input) => {
-      requestedUrl = String(input);
-      return new Response(JSON.stringify({
-        agentId: "agent_1",
-        source: "live",
-        path: "src/ui",
-        exists: true,
-        entries: [],
-        generatedAt: "2026-06-27T00:00:00Z",
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }) as typeof fetch;
-
-    const result = await listAgentWorkspaceFiles({
-      agentId: "agent_1",
-      threadId: "ses_1",
-      teamId: "team_1",
-      path: "src/ui",
-      scope: "shared",
-    });
-
-    assert.equal(result.agentId, "agent_1");
-    assert.equal(requestedUrl, "/api/v1/agents/agent_1/workspace/files?threadId=ses_1&teamId=team_1&path=src%2Fui&scope=shared");
-  });
-
-  it("reads a workspace file's content for the preview pane", async () => {
-    let requestedUrl = "";
-    globalThis.fetch = (async (input) => {
-      requestedUrl = String(input);
-      return new Response(JSON.stringify({
-        agentId: "agent_1",
-        source: "live",
-        path: "src/app.tsx",
-        exists: true,
-        isBinary: false,
-        bytes: 12,
-        content: "hello world\n",
-        truncated: false,
-        limitBytes: 262144,
-        generatedAt: "2026-06-27T00:00:00Z",
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }) as typeof fetch;
-
-    const result = await readAgentWorkspaceFile({ agentId: "agent_1", threadId: "ses_1", path: "src/app.tsx" });
-
-    assert.equal(result.content, "hello world\n");
-    assert.equal(result.isBinary, false);
-    assert.equal(requestedUrl, "/api/v1/agents/agent_1/workspace/file?path=src%2Fapp.tsx&threadId=ses_1");
-  });
 
   it("browses the persistent project workspace without a thread id", async () => {
     const requestedUrls: string[] = [];

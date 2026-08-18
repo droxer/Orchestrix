@@ -31,7 +31,7 @@ after(() => {
 });
 import { acquireBoxliteHomeLock } from "../src/box.js";
 import { agentWorkspaceSubpath } from "../src/agent-workspace.js";
-import { listAgentWorkspace, readAgentWorkspaceFile, WorkspaceReadError } from "../src/workspace-read.js";
+import { listWorkspace, readWorkspaceFile, WorkspaceReadError } from "../src/workspace-read.js";
 import { isMainModule } from "../src/cli.js";
 import { consumeRoundResult, ROUND_RESULT_RELATIVE_PATH } from "../src/round-result.js";
 import type { DaemonNodeCommand, DaemonNodeEvent, DaemonNodeRegistration, DaemonNodeRunCommand, StreamExecResult } from "relay-core";
@@ -2150,86 +2150,85 @@ test("generated-file scan skips sibling agent homes but keeps the running agent'
   assert.equal(unscoped.length, 4);
 });
 
-test("listAgentWorkspace confines files to an agent home and sorts directories first", () => {
+test("listWorkspace lists files relative to the provided root and sorts directories first", () => {
   const root = mkdtempSync(join(tmpdir(), "relay-ws-"));
   try {
-    const home = join(root, agentWorkspaceSubpath("agent_1"));
-    mkdirSync(join(home, "sub"), { recursive: true });
-    writeFileSync(join(home, "report.md"), "hello");
+    mkdirSync(join(root, "sub"), { recursive: true });
+    writeFileSync(join(root, "report.md"), "hello");
     writeFileSync(join(root, "outside.txt"), "secret");
 
-    const listing = listAgentWorkspace(root, "agent_1", "");
+    const listing = listWorkspace(root, "");
     assert.equal(listing.exists, true);
-    assert.deepEqual(listing.entries.map((entry) => [entry.name, entry.kind]), [["sub", "directory"], ["report.md", "file"]]);
-    assert.equal(listing.entries.every((entry) => !entry.path.includes("outside")), true);
-    assert.deepEqual(listAgentWorkspace(root, "agent_none", ""), { path: "", exists: false, entries: [] });
+    assert.deepEqual(listing.entries.map((entry) => [entry.name, entry.kind]), [["sub", "directory"], ["outside.txt", "file"], ["report.md", "file"]]);
+    assert.deepEqual(listWorkspace(root, "sub"), { path: "sub", exists: true, entries: [] });
+    assert.deepEqual(listWorkspace(root, "missing"), { path: "missing", exists: false, entries: [] });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("readAgentWorkspaceFile rejects escapes and caps text while identifying binary data", () => {
+test("readWorkspaceFile rejects escapes and caps text while identifying binary data", () => {
   const root = mkdtempSync(join(tmpdir(), "relay-ws-"));
+  const outsideRoot = mkdtempSync(join(tmpdir(), "relay-ws-out-"));
   try {
-    const home = join(root, agentWorkspaceSubpath("agent_1"));
-    mkdirSync(join(home, "sub"), { recursive: true });
-    writeFileSync(join(home, "small.txt"), "hello");
-    writeFileSync(join(home, "bin.dat"), Buffer.from([0, 1, 2]));
-    writeFileSync(join(home, "big.txt"), "x".repeat(64));
-    writeFileSync(join(root, "outside.txt"), "secret");
-    symlinkSync(root, join(home, "escape"));
+    mkdirSync(join(root, "sub"), { recursive: true });
+    writeFileSync(join(root, "small.txt"), "hello");
+    writeFileSync(join(root, "bin.dat"), Buffer.from([0, 1, 2]));
+    writeFileSync(join(root, "big.txt"), "x".repeat(64));
+    writeFileSync(join(outsideRoot, "outside.txt"), "secret");
+    symlinkSync(outsideRoot, join(root, "escape"));
 
-    assert.throws(() => readAgentWorkspaceFile(root, "agent_1", "../outside.txt"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "invalid-path");
-    assert.throws(() => readAgentWorkspaceFile(root, "agent_1", "/outside.txt"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "invalid-path");
-    assert.throws(() => readAgentWorkspaceFile(root, "agent_1", "escape/outside.txt"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "invalid-path");
-    assert.throws(() => readAgentWorkspaceFile(root, "agent_1", "sub"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "is-directory");
-    assert.throws(() => readAgentWorkspaceFile(root, "agent_1", "missing.txt"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "not-found");
-    assert.equal(Buffer.from(readAgentWorkspaceFile(root, "agent_1", "small.txt").contentBase64 ?? "", "base64").toString(), "hello");
-    assert.equal(readAgentWorkspaceFile(root, "agent_1", "bin.dat").isBinary, true);
+    assert.throws(() => readWorkspaceFile(root, "../outside.txt"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "invalid-path");
+    assert.throws(() => readWorkspaceFile(root, "/outside.txt"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "invalid-path");
+    assert.throws(() => readWorkspaceFile(root, "escape/outside.txt"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "invalid-path");
+    assert.throws(() => readWorkspaceFile(root, "sub"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "is-directory");
+    assert.throws(() => readWorkspaceFile(root, "missing.txt"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "not-found");
+    assert.equal(Buffer.from(readWorkspaceFile(root, "small.txt").contentBase64 ?? "", "base64").toString(), "hello");
+    assert.equal(readWorkspaceFile(root, "bin.dat").isBinary, true);
     // Binary bytes still ship (capped) so image/PDF previews can render.
-    assert.equal(readAgentWorkspaceFile(root, "agent_1", "bin.dat").contentBase64, Buffer.from([0, 1, 2]).toString("base64"));
-    const capped = readAgentWorkspaceFile(root, "agent_1", "big.txt", 16);
+    assert.equal(readWorkspaceFile(root, "bin.dat").contentBase64, Buffer.from([0, 1, 2]).toString("base64"));
+    const capped = readWorkspaceFile(root, "big.txt", 16);
     assert.equal(capped.truncated, true);
     assert.equal(Buffer.from(capped.contentBase64 ?? "", "base64").byteLength, 16);
     assert.equal(capped.bytes, 64);
   } finally {
     rmSync(root, { recursive: true, force: true });
+    rmSync(outsideRoot, { recursive: true, force: true });
   }
 });
 
-test("readAgentWorkspaceFile decodes UTF-16 and tolerates codepoints split by the read limit", () => {
+test("readWorkspaceFile decodes UTF-16 and tolerates codepoints split by the read limit", () => {
   const root = mkdtempSync(join(tmpdir(), "relay-ws-"));
   try {
-    const home = join(root, agentWorkspaceSubpath("agent_1"));
-    mkdirSync(home, { recursive: true });
-    writeFileSync(join(home, "utf16le.txt"), Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("héllo", "utf16le")]));
-    writeFileSync(join(home, "utf16be.txt"), Buffer.concat([Buffer.from([0xfe, 0xff]), Buffer.from("héllo", "utf16le").swap16()]));
-    writeFileSync(join(home, "emoji.txt"), "ab🙂cd");
-    writeFileSync(join(home, "invalid.txt"), Buffer.from([0x61, 0xc0, 0xaf, 0x62]));
+    mkdirSync(root, { recursive: true });
+    writeFileSync(join(root, "utf16le.txt"), Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("héllo", "utf16le")]));
+    writeFileSync(join(root, "utf16be.txt"), Buffer.concat([Buffer.from([0xfe, 0xff]), Buffer.from("héllo", "utf16le").swap16()]));
+    writeFileSync(join(root, "emoji.txt"), "ab🙂cd");
+    writeFileSync(join(root, "invalid.txt"), Buffer.from([0x61, 0xc0, 0xaf, 0x62]));
 
-    const le = readAgentWorkspaceFile(root, "agent_1", "utf16le.txt");
+    const le = readWorkspaceFile(root, "utf16le.txt");
     assert.equal(le.isBinary, false);
     assert.equal(Buffer.from(le.contentBase64 ?? "", "base64").toString("utf-8"), "héllo");
-    const be = readAgentWorkspaceFile(root, "agent_1", "utf16be.txt");
+    const be = readWorkspaceFile(root, "utf16be.txt");
     assert.equal(be.isBinary, false);
     assert.equal(Buffer.from(be.contentBase64 ?? "", "base64").toString("utf-8"), "héllo");
 
     // "ab🙂" is 6 bytes (🙂 = 4); a 5-byte limit splits the codepoint — still text.
-    const split = readAgentWorkspaceFile(root, "agent_1", "emoji.txt", 5);
+    const split = readWorkspaceFile(root, "emoji.txt", 5);
     assert.equal(split.isBinary, false);
     assert.equal(split.truncated, true);
     assert.equal(Buffer.from(split.contentBase64 ?? "", "base64").toString("utf-8"), "ab");
-    const whole = readAgentWorkspaceFile(root, "agent_1", "emoji.txt");
+    const whole = readWorkspaceFile(root, "emoji.txt");
     assert.equal(Buffer.from(whole.contentBase64 ?? "", "base64").toString("utf-8"), "ab🙂cd");
 
     // Genuinely invalid UTF-8 (overlong sequence) stays binary.
-    assert.equal(readAgentWorkspaceFile(root, "agent_1", "invalid.txt").isBinary, true);
+    assert.equal(readWorkspaceFile(root, "invalid.txt").isBinary, true);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("shared-scope workspace reads expose the node root but never escape it", () => {
+test("workspace reads expose the provided root but never escape it", () => {
   const root = mkdtempSync(join(tmpdir(), "relay-ws-shared-"));
   try {
     const home = join(root, agentWorkspaceSubpath("agent_1"));
@@ -2237,27 +2236,27 @@ test("shared-scope workspace reads expose the node root but never escape it", ()
     writeFileSync(join(root, "shared.md"), "team notes");
     writeFileSync(join(home, "private.md"), "mine");
 
-    const listing = listAgentWorkspace(root, undefined, "", "shared");
+    const listing = listWorkspace(root, "");
     assert.equal(listing.exists, true);
     assert.deepEqual(listing.entries.map((entry) => entry.name), ["agents", "shared.md"]);
-    const file = readAgentWorkspaceFile(root, undefined, "shared.md", undefined, "shared");
+    const file = readWorkspaceFile(root, "shared.md");
     assert.equal(Buffer.from(file.contentBase64 ?? "", "base64").toString(), "team notes");
-    // Personal homes stay reachable through the shared root — same computer, same workspace.
-    const nested = readAgentWorkspaceFile(root, "agent_1", `agents/${agentWorkspaceSubpath("agent_1").split("/").pop()}/private.md`, undefined, "shared");
+    // Agent homes are reachable through the shared root if a caller walks there.
+    const nested = readWorkspaceFile(root, `agents/${agentWorkspaceSubpath("agent_1").split("/").pop()}/private.md`);
     assert.equal(Buffer.from(nested.contentBase64 ?? "", "base64").toString(), "mine");
-    assert.throws(() => readAgentWorkspaceFile(root, undefined, "../escape.md", undefined, "shared"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "invalid-path");
-    assert.throws(() => listAgentWorkspace(root, undefined, ""), (error: unknown) => error instanceof WorkspaceReadError && error.code === "invalid-path");
+    assert.throws(() => readWorkspaceFile(root, "../escape.md"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "invalid-path");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("relay daemon serves agent-home workspace commands", async () => {
+test("relay daemon serves project workspace commands", async () => {
   const root = mkdtempSync(join(tmpdir(), "relay-ws-"));
-  const threadId = "ses_workspace_read";
-  const home = join(root, threadId, agentWorkspaceSubpath("agent_1"));
-  mkdirSync(home, { recursive: true });
-  writeFileSync(join(home, "report.md"), "hello");
+  const projectId = "prj_workspace_read";
+  const workspaceSubpath = "projects/prj_workspace_read";
+  const projectRoot = join(root, workspaceSubpath);
+  mkdirSync(projectRoot, { recursive: true });
+  writeFileSync(join(projectRoot, "report.md"), "hello");
   const stop = new AbortController();
   const events: DaemonNodeEvent[] = [];
   let registration: DaemonNodeRegistration | undefined;
@@ -2272,9 +2271,9 @@ test("relay daemon serves agent-home workspace commands", async () => {
       if (path === "/api/v1/daemon-node-registrations") { registration = await jsonBody<DaemonNodeRegistration>(init); return jsonResponse({ ok: true }); }
       if (path.endsWith("/commands")) {
         if (!served) { served = true; return jsonResponse({ commands: [
-          { id: "cmd_ls", type: "workspace.list", sessionId: threadId, workspaceLayout: "thread", agentId: "agent_1", path: "" },
-          { id: "cmd_read", type: "workspace.read", sessionId: threadId, workspaceLayout: "thread", agentId: "agent_1", path: "report.md" },
-          { id: "cmd_bad", type: "workspace.read", sessionId: threadId, workspaceLayout: "thread", agentId: "agent_1", path: "../escape" },
+          { id: "cmd_ls", type: "workspace.list", sessionId: projectId, workspaceLayout: "project", workspaceSubpath, path: "" },
+          { id: "cmd_read", type: "workspace.read", sessionId: projectId, workspaceLayout: "project", workspaceSubpath, path: "report.md" },
+          { id: "cmd_bad", type: "workspace.read", sessionId: projectId, workspaceLayout: "project", workspaceSubpath, path: "../escape" },
         ] }); }
         return jsonResponse({ commands: [] });
       }
@@ -2288,7 +2287,6 @@ test("relay daemon serves agent-home workspace commands", async () => {
   });
   rmSync(root, { recursive: true, force: true });
 
-  assert.equal(registration?.capabilities?.includes("workspace-read"), true);
   assert.equal(registration?.capabilities?.includes("workspace-read-shared"), true);
   const listing = events.find((event) => event.type === "workspace.listing");
   assert.ok(listing && listing.type === "workspace.listing");

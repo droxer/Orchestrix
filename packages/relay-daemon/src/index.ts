@@ -63,7 +63,6 @@ import {
   DAEMON_CAPABILITY_ROUND_RESULT,
   DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
   DAEMON_CAPABILITY_THREAD_WORKSPACES,
-  DAEMON_CAPABILITY_WORKSPACE_READ,
   DAEMON_CAPABILITY_WORKSPACE_READ_SHARED,
   DAEMON_NODE_PROTOCOL_VERSION,
   relayApiUrl,
@@ -279,7 +278,6 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     })),
     capabilities: [
       DAEMON_CAPABILITY_GENERATED_FILES,
-      DAEMON_CAPABILITY_WORKSPACE_READ,
       DAEMON_CAPABILITY_WORKSPACE_READ_SHARED,
       DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
       DAEMON_CAPABILITY_THREAD_WORKSPACES,
@@ -579,12 +577,8 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
           });
           activeRuns.get(command.commandId)?.controller.abort(command.reason);
         } else if (command.type === "workspace.list" || command.type === "workspace.read") {
-          const commandWorkspacePath = command.sessionId
-            ? (command.workspaceLayout === "thread"
-                ? threadWorkspaces.resolve(command.sessionId)
-                : command.workspaceLayout === "project"
-                  ? threadWorkspaces.resolveProject(command.sessionId, requiredProjectSubpath(command))
-                  : threadWorkspaces.nodeRoot(command.sessionId)).hostPath
+          const commandWorkspacePath = command.workspaceLayout === "project" && command.sessionId
+            ? threadWorkspaces.resolveProject(command.sessionId, requiredProjectSubpath(command)).hostPath
             : workspacePath;
           const event = workspaceCommandEvent(commandWorkspacePath, command);
           await postJsonWithRetry(fetchFn, relayApiUrl(backendUrl, `/daemon-nodes/${encodeURIComponent(sandboxId)}/events`), event, token, runtimeSignal).catch((error: unknown) => {

@@ -19,7 +19,6 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from .api import (
     admin_routes,
     agent_routes,
-    agent_workspace_routes,
     auth_routes,
     chat_routes,
     collaboration_routes,
@@ -366,7 +365,6 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
         agent_routes.router,
         team_routes.router,
         project_routes.router,
-        agent_workspace_routes.router,
         node_workspace_routes.router,
         admin_routes.router,
         chat_routes.router,

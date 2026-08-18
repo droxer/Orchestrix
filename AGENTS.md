@@ -87,7 +87,7 @@ ask the user whether to run `codegraph init -i`.
   `admin_routes.py`, `auth_routes.py`, `chat_routes.py`,
   `daemon_node_routes.py`, `sandbox_routes.py`, `session_routes.py`,
   `task_routes.py`, `web_routes.py`, and newer domain modules
-  `agent_routes.py`, `agent_workspace_routes.py`, `collaboration_routes.py`,
+  `agent_routes.py`, `collaboration_routes.py`,
   `managed_node_routes.py`, `node_workspace_routes.py`,
   `profile_image_routes.py`, `project_routes.py`, `team_routes.py`).
 - Tests: Python backend tests under `backend/tests/`, TypeScript package tests

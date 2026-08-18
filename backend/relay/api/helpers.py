@@ -264,22 +264,6 @@ def artifact_index_item(session: dict[str, Any], artifact: dict[str, Any]) -> di
     }
 
 
-def newest_agent_workspace_artifacts(session_store: Any, agent_id: str) -> list[dict[str, Any]]:
-    """Newest workspace-file artifact for every path owned by an agent."""
-    newest: dict[str, dict[str, Any]] = {}
-    for session in session_store.list_sessions():
-        if session.get("ownerAgentId") != agent_id:
-            continue
-        for artifact in workspace_artifacts(session):
-            if artifact.get("agentId") != agent_id:
-                continue
-            key = workspace_artifact_key(session, artifact)
-            current = newest.get(key)
-            if current is None or (artifact.get("createdAt") or "") >= (current.get("createdAt") or ""):
-                newest[key] = artifact_index_item(session, artifact)
-    return sorted(newest.values(), key=lambda item: item.get("createdAt") or "", reverse=True)
-
-
 def request_actor(request: Request, auth_store: Any) -> dict[str, Any]:
     chat_actor = request_chat_service_actor(request)
     if chat_actor:

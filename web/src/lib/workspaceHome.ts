@@ -1,39 +1,15 @@
-import type { AgentWorkspaceFilesResponse, AgentWorkspaceSource, WorkspaceBriefSession } from "../types.js";
+import type { ProjectWorkspaceFilesResponse } from "../types.js";
 
-export function preferredWorkspaceThreadId(
-  threads: Array<Pick<WorkspaceBriefSession, "id">>,
-  requestedThreadId: string,
-): string {
-  return threads.some((thread) => thread.id === requestedThreadId)
-    ? requestedThreadId
-    : threads[0]?.id ?? "";
-}
-
-/** What the Files pane header shows about the agent home's data source. */
+/** What the Files pane header shows about the workspace's data source. */
 export type WorkspaceHomeStatus =
   | { kind: "live"; nodeId: string | null }
-  | { kind: "snapshot-banner" }
-  | { kind: "snapshot-chip" }
   | { kind: "none" };
 
 export function workspaceHomeStatus(
-  files: (Pick<AgentWorkspaceFilesResponse, "source"> & { nodeId?: string | null }) | undefined,
-  bannerDismissed: boolean,
+  files: Pick<ProjectWorkspaceFilesResponse, "source" | "nodeId"> | undefined,
 ): WorkspaceHomeStatus {
   if (files?.source === "live") return { kind: "live", nodeId: files.nodeId ?? null };
-  if (files?.source === "snapshot") return bannerDismissed ? { kind: "snapshot-chip" } : { kind: "snapshot-banner" };
   return { kind: "none" };
-}
-
-/** i18n keys for the empty Files pane; snapshot homes get the artifact-history explainer. */
-export function workspaceFilesEmptyState(source: AgentWorkspaceSource | undefined): {
-  titleKey: "workspace.no_files_yet" | "workspace.no_files";
-  hintKey: "workspace.empty_files_snapshot_hint" | null;
-} {
-  if (source === "snapshot") {
-    return { titleKey: "workspace.no_files_yet", hintKey: "workspace.empty_files_snapshot_hint" };
-  }
-  return { titleKey: "workspace.no_files", hintKey: null };
 }
 
 /** Only a placement-unavailable (503) listing failure gets a retry button. */

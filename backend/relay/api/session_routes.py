@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import json
 import os
 import time
@@ -153,13 +152,6 @@ def employee_for_workspace_brief(
     if requested and requested != actor["employeeId"]:
         raise HTTPException(403, "Cannot read another employee's workspace.")
     return actor["employeeId"]
-
-
-def managed_agent_workspace_subpath(agent_id: str) -> Path:
-    encoded = (
-        base64.urlsafe_b64encode(agent_id.encode("utf-8")).decode("ascii").rstrip("=")
-    )
-    return Path("agents") / f"agent-{encoded}"
 
 
 def agent_supervisor_employee_id(agent: dict[str, Any]) -> str | None:

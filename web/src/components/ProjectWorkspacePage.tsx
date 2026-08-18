@@ -25,7 +25,7 @@ import { AgentStateBadge } from "./AgentStateBadge";
 import { ActionAdd, ActionCompose, ActionEdit, NavBack, WorkspaceFolder } from "./icons";
 import { PageHeader } from "./PageHeader";
 import { ProjectMemberEditor } from "./ProjectMemberEditor";
-import { ProjectWorkspaceFiles } from "./ThreadWorkspaceFiles";
+import { ProjectWorkspaceFiles } from "./ProjectWorkspaceFiles";
 import {
   ActivitiesSkeleton,
   WorkspaceActivities,
@@ -360,7 +360,7 @@ export function ProjectWorkspacePage({
           />
         ) : pageTab === "workspace" ? (
           <div className="workspace-inspect" role="tabpanel" id="project-page-panel-workspace" aria-labelledby="project-page-tab-workspace">
-            <ProjectWorkspaceFiles projectId={project.id} emptyMark={<ProjectMark />} />
+            <ProjectWorkspaceFiles projectId={project.id} />
           </div>
         ) : activitiesState === "loading" ? (
           <ActivitiesSkeleton panelId="project-page-panel-activities" labelledBy="project-page-tab-activities" />

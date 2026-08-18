@@ -14,7 +14,7 @@ describe("Agent team management", () => {
     const agentsSource = await readFile(resolve("web/src/components/AgentsPage.tsx"), "utf8");
     const teamsSource = await readFile(resolve("web/src/components/TeamsPage.tsx"), "utf8");
     const agentDetailSource = await readFile(resolve("web/src/components/AgentDetailPage.tsx"), "utf8");
-    const threadWorkspaceFilesSource = await readFile(resolve("web/src/components/ThreadWorkspaceFiles.tsx"), "utf8");
+    const projectWorkspaceFilesSource = await readFile(resolve("web/src/components/ProjectWorkspaceFiles.tsx"), "utf8");
     const teamWorkspaceSource = await readFile(resolve("web/src/components/TeamWorkspacePage.tsx"), "utf8");
     const teamMarkSource = await readFile(resolve("web/src/components/TeamMark.tsx"), "utf8");
     const sideNavSource = await readFile(resolve("web/src/components/SideNav.tsx"), "utf8");
@@ -30,7 +30,8 @@ describe("Agent team management", () => {
     assert.doesNotMatch(agentDetailSource, /"workspace"|ThreadWorkspaceFiles|listAgentWorkspaceFiles|getAgentArtifacts|type: "artifact"/);
     assert.match(teamWorkspaceSource, /"profile", "activities"/);
     assert.doesNotMatch(teamWorkspaceSource, /"workspace"|ThreadWorkspaceFiles|teamWorkspaceAgentId/);
-    assert.match(threadWorkspaceFilesSource, /threadId: selectedThreadId/);
+    assert.match(projectWorkspaceFilesSource, /listProjectWorkspaceFiles|readProjectWorkspaceFile/);
+    assert.doesNotMatch(projectWorkspaceFilesSource, /listAgentWorkspaceFiles|readAgentWorkspaceFile|threadId|WorkspaceFileScope/);
     assert.doesNotMatch(teamWorkspaceSource, /getTeamArtifacts|TeamArtifacts/);
     assert.match(teamWorkspaceSource, /getWorkspaceBrief\(\{ teamId: team\.id \}/);
     assert.doesNotMatch(agentDetailSource, /nav\.refresh|NavRefresh/);

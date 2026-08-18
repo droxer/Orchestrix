@@ -4,20 +4,15 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
-  listAgentWorkspaceFiles,
   listProjectWorkspaceFiles,
-  readAgentWorkspaceFile,
   readProjectWorkspaceFile,
 } from "../api";
 import type {
-  AgentWorkspaceFileResponse,
   WorkspaceFileEntry,
-  AgentWorkspaceFilesResponse,
   ProjectWorkspaceFileResponse,
   ProjectWorkspaceFilesResponse,
-  WorkspaceBriefSession,
 } from "../types";
-import { isWorkspaceRetryableError, preferredWorkspaceThreadId, workspaceFilesEmptyState, workspaceHomeStatus } from "../lib/workspaceHome";
+import { isWorkspaceRetryableError, workspaceHomeStatus } from "../lib/workspaceHome";
 import { ActionRemove, WorkspaceFile, WorkspaceFolder } from "./icons";
 import { compactDate } from "../lib/workspaceFormat";
 import {
@@ -28,28 +23,11 @@ import { Button } from "@/components/ui/button";
 import { CodeView, imageMimeForFile, isHtmlFile, isMarkdownFile, isPdfFile, isRenderableFile, languageForFile } from "./CodeView";
 import { Markdown } from "./Markdown";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type FileSelection = { path: string; name: string };
 
 const parseString = (value: string | null): string => value ?? "";
 
-/** Agent-private files vs the shared root inside the selected Thread workspace. */
-type WorkspaceFileScope = "personal" | "shared";
-const parseFileScope = (value: string | null): WorkspaceFileScope => value === "shared" ? "shared" : "personal";
-
-type WorkspaceListingResponse = AgentWorkspaceFilesResponse | ProjectWorkspaceFilesResponse;
-type WorkspacePreviewResponse = AgentWorkspaceFileResponse | ProjectWorkspaceFileResponse;
-type WorkspaceTarget =
-  | {
-      kind: "thread";
-      agentId: string;
-      teamId?: string;
-      threads: WorkspaceBriefSession[];
-      fixedScope?: WorkspaceFileScope;
-      refreshVersion: number;
-    }
-  | { kind: "project"; projectId: string; refreshVersion: number };
 
 function parentPath(path: string): string {
   const parts = path.split("/").filter(Boolean);
@@ -92,17 +70,6 @@ function PaneHeader({
   );
 }
 
-function SnapshotBanner({ onDismiss }: { onDismiss: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <div className="workspace-snapshot-banner" role="status">
-      <p className="workspace-snapshot-banner-text">{t("workspace.snapshot_banner")}</p>
-      <Button variant="ghost" type="button" className="workspace-snapshot-banner-dismiss h-auto" onClick={onDismiss}>
-        {t("workspace.dismiss")}
-      </Button>
-    </div>
-  );
-}
 
 function WorkspacePathBreadcrumb({
   path,
@@ -146,192 +113,62 @@ function WorkspacePathBreadcrumb({
   );
 }
 
-export function ThreadWorkspaceFiles({
-  agentId,
-  teamId,
-  threads = [],
-  fixedScope,
-  emptyMark,
-  refreshVersion = 0,
-}: {
-  agentId: string;
-  teamId?: string;
-  threads?: WorkspaceBriefSession[];
-  fixedScope?: WorkspaceFileScope;
-  emptyMark?: ReactNode;
-  refreshVersion?: number;
-}) {
-  return (
-    <WorkspaceFileBrowser
-      target={{
-        kind: "thread",
-        agentId,
-        teamId,
-        threads,
-        fixedScope,
-        refreshVersion,
-      }}
-      emptyMark={emptyMark}
-    />
-  );
-}
 
-/** Persistent shared project root; unlike a Thread workspace it has no scope
- * or Thread selector and is available before the first conversation exists. */
+/** Persistent shared project root; available before the first conversation exists. */
 export function ProjectWorkspaceFiles({
   projectId,
-  emptyMark,
   refreshVersion = 0,
 }: {
   projectId: string;
-  emptyMark?: ReactNode;
   refreshVersion?: number;
 }) {
   return (
     <WorkspaceFileBrowser
-      target={{ kind: "project", projectId, refreshVersion }}
-      emptyMark={emptyMark}
+      projectId={projectId}
+      refreshVersion={refreshVersion}
     />
   );
 }
 
 function WorkspaceFileBrowser({
-  target,
-  emptyMark,
+  projectId,
+  refreshVersion,
 }: {
-  target: WorkspaceTarget;
-  emptyMark?: ReactNode;
+  projectId: string;
+  refreshVersion: number;
 }) {
   const { t } = useTranslation();
   const [filePath, setFilePath] = useUrlSearchState("path", "", parseString, (value) => value || null);
   const [selectedKey, setSelectedKey] = useUrlSearchState("item", "", parseString, (value) => value || null);
-  const [requestedThreadId, setRequestedThreadId] = useUrlSearchState("thread", "", parseString, (value) => value || null);
-  const [selectableScope, setSelectableScope] = useUrlSearchState(
-    "scope",
-    "personal" as WorkspaceFileScope,
-    parseFileScope,
-    (value) => value === "personal" ? null : value,
-  );
-  const [snapshotBannerDismissed, setSnapshotBannerDismissed] = useState(false);
-  const threads = target.kind === "thread" ? target.threads : [];
-  const selectedThreadId = preferredWorkspaceThreadId(threads, requestedThreadId);
-  const fileScope = target.kind === "project" ? "shared" : target.fixedScope ?? selectableScope;
-  const targetKey = target.kind === "project"
-    ? `project:${target.projectId}`
-    : `thread:${target.agentId}:${target.teamId ?? ""}:${selectedThreadId}`;
   const selectedPath = selectedKey.startsWith("file:") ? selectedKey.slice(5) : "";
   const selected: FileSelection | null = selectedPath
     ? { path: selectedPath, name: selectedPath.split("/").at(-1) || selectedPath }
     : null;
   const fileQuery = useQuery({
-    queryKey: ["workspace-files", targetKey, fileScope, filePath, target.refreshVersion],
-    queryFn: ({ signal }): Promise<WorkspaceListingResponse> => target.kind === "project"
-      ? listProjectWorkspaceFiles({ projectId: target.projectId, path: filePath }, signal)
-      : listAgentWorkspaceFiles({
-          agentId: target.agentId,
-          threadId: selectedThreadId,
-          teamId: target.teamId,
-          path: filePath,
-          scope: fileScope === "shared" ? "shared" : undefined,
-        }, signal),
-    enabled: target.kind === "project" || Boolean(target.agentId && selectedThreadId),
+    queryKey: ["workspace-files", `project:${projectId}`, filePath, refreshVersion],
+    queryFn: ({ signal }): Promise<ProjectWorkspaceFilesResponse> =>
+      listProjectWorkspaceFiles({ projectId, path: filePath }, signal),
   });
   const contentQuery = useQuery({
-    queryKey: ["workspace-file", targetKey, fileScope, selectedPath, target.refreshVersion],
-    enabled: Boolean(selectedPath && (target.kind === "project" || (target.agentId && selectedThreadId))),
-    queryFn: ({ signal }): Promise<WorkspacePreviewResponse> => target.kind === "project"
-      ? readProjectWorkspaceFile({ projectId: target.projectId, path: selectedPath }, signal)
-      : readAgentWorkspaceFile({
-          agentId: target.agentId,
-          threadId: selectedThreadId,
-          teamId: target.teamId,
-          path: selectedPath,
-          scope: fileScope === "shared" ? "shared" : undefined,
-        }, signal),
+    queryKey: ["workspace-file", `project:${projectId}`, selectedPath, refreshVersion],
+    enabled: Boolean(selectedPath),
+    queryFn: ({ signal }): Promise<ProjectWorkspaceFileResponse> =>
+      readProjectWorkspaceFile({ projectId, path: selectedPath }, signal),
   });
-  const homeStatus = workspaceHomeStatus(fileQuery.data, snapshotBannerDismissed);
-
-  useEffect(() => {
-    setSnapshotBannerDismissed(false);
-  }, [targetKey, fileScope]);
+  const homeStatus = workspaceHomeStatus(fileQuery.data);
 
   function openDirectory(path: string): void {
     setFilePath(path);
     setSelectedKey("");
   }
 
-  function switchFileScope(next: WorkspaceFileScope): void {
-    if (next === fileScope) return;
-    setSelectableScope(next);
-    setFilePath("");
-    setSelectedKey("");
-  }
-
-  function threadLabel(threadId: string): string {
-    const thread = threads.find((candidate) => candidate.id === threadId);
-    return thread?.title?.trim() || thread?.taskGoal?.trim() || threadId;
-  }
-
-  function switchThread(next: string | null): void {
-    if (!next || next === selectedThreadId) return;
-    setRequestedThreadId(next);
-    setFilePath("");
-    setSelectedKey("");
-  }
-
-  if (target.kind === "thread" && !target.agentId) {
-    return <WorkspaceEmpty title={t("workspace.files_unavailable")} mark={emptyMark ?? <WorkspaceFile size={18} />} announce />;
-  }
-
   return (
     <div className={`workspace-panes${selected ? "" : " is-browse-only"}`}>
       <section className="workspace-pane workspace-pane-browse" aria-label={t("workspace.tab_files")}>
         <div className="workspace-tabpanel-files">
-          {/* One toolbar, not four stacked strips. Scope, location, thread, and
-              source are what you need before opening a file, so they share one
-              line. The thread picker stays in BOTH scopes because the shared
-              root and every Agent-private subdirectory belong to that Thread. */}
           <div className="workspace-files-bar">
-            {target.kind === "thread" && !target.fixedScope ? (
-              <span className="workspace-scope-options" role="radiogroup" aria-label={t("workspace.scope_label")}>
-                {(["personal", "shared"] as const).map((scopeOption) => (
-                  <Button
-                    key={scopeOption}
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="workspace-scope-chip"
-                    role="radio"
-                    data-active={fileScope === scopeOption ? "true" : "false"}
-                    aria-checked={fileScope === scopeOption}
-                    title={scopeOption === "personal" ? t("workspace.scope_personal_hint") : t("workspace.scope_shared_hint")}
-                    onClick={() => switchFileScope(scopeOption)}
-                  >
-                    {scopeOption === "personal" ? t("workspace.scope_personal") : t("workspace.scope_shared")}
-                  </Button>
-                ))}
-              </span>
-            ) : null}
             <WorkspacePathBreadcrumb path={filePath} onNavigate={openDirectory} />
             <div className="workspace-files-bar-end">
-              {target.kind === "thread" && threads.length ? (
-                <Select value={selectedThreadId} onValueChange={switchThread}>
-                  <SelectTrigger className="workspace-thread-select" aria-label={t("workspace.thread_label")}>
-                    {/* The label is passed explicitly: the items only register
-                        with Radix once the popover has been opened, so a bare
-                        <SelectValue /> printed the raw session id until the
-                        first interaction. */}
-                    <SelectValue>{threadLabel(selectedThreadId)}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {threads.map((thread) => (
-                      <SelectItem key={thread.id} value={thread.id}>
-                        {threadLabel(thread.id)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : null}
               {homeStatus.kind === "live" ? (
                 <span className="workspace-home-status" title={homeStatus.nodeId || undefined}>
                   <span className="workspace-status-pip tone-good" aria-hidden="true" />
@@ -339,23 +176,13 @@ function WorkspaceFileBrowser({
                   {homeStatus.nodeId ? <span className="workspace-home-node code">{homeStatus.nodeId}</span> : null}
                 </span>
               ) : null}
-              {homeStatus.kind === "snapshot-chip" ? (
-                <span className="workspace-home-status">
-                  <span className="workspace-status-pip tone-warn" aria-hidden="true" />
-                  {t("workspace.source_snapshot")}
-                </span>
-              ) : null}
             </div>
           </div>
-          {target.kind === "thread" && !target.fixedScope && fileScope === "personal" && homeStatus.kind === "snapshot-banner" ? (
-            <SnapshotBanner onDismiss={() => setSnapshotBannerDismissed(true)} />
-          ) : null}
           <FilesPane
             data={fileQuery.data}
             error={fileQuery.error}
             isLoading={fileQuery.isLoading}
             path={filePath}
-            scope={fileScope}
             selectedPath={selectedPath}
             onOpenDirectory={openDirectory}
             onSelectFile={(entry) => setSelectedKey(`file:${entry.path}`)}
@@ -404,17 +231,15 @@ function FilesPane({
   error,
   isLoading,
   path,
-  scope = "personal",
   selectedPath,
   onOpenDirectory,
   onSelectFile,
   onRetry,
 }: {
-  data?: WorkspaceListingResponse;
+  data?: ProjectWorkspaceFilesResponse;
   error: unknown;
   isLoading: boolean;
   path: string;
-  scope?: WorkspaceFileScope;
   selectedPath: string;
   onOpenDirectory: (path: string) => void;
   onSelectFile: (entry: WorkspaceFileEntry) => void;
@@ -422,8 +247,7 @@ function FilesPane({
 }) {
   const { t } = useTranslation();
   const entries = data?.entries ?? [];
-  const emptyState = workspaceFilesEmptyState(data?.source);
-  const sharedUnavailable = scope === "shared" && isWorkspaceRetryableError(error);
+  const sharedUnavailable = isWorkspaceRetryableError(error);
   const message = sharedUnavailable
     ? t("workspace.shared_unavailable")
     : error instanceof Error ? error.message : error ? String(error) : "";
@@ -460,8 +284,7 @@ function FilesPane({
         </ul>
       ) : (
         <WorkspaceEmpty
-          title={t(emptyState.titleKey)}
-          hint={emptyState.hintKey ? t(emptyState.hintKey) : undefined}
+          title={t("workspace.no_files")}
           mark={<WorkspaceFile size={18} />}
           announce
         />
@@ -514,7 +337,7 @@ function FilePreview({
   error,
 }: {
   name: string;
-  data?: WorkspacePreviewResponse;
+  data?: ProjectWorkspaceFileResponse;
   isLoading: boolean;
   error: unknown;
 }) {

@@ -1,5 +1,5 @@
 import { closeSync, lstatSync, openSync, readSync, readdirSync, realpathSync, statSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import { resolve, sep } from "node:path";
 
 import type {
   DaemonNodeEvent,
@@ -7,10 +7,7 @@ import type {
   DaemonWorkspaceErrorCode,
   DaemonWorkspaceListCommand,
   DaemonWorkspaceReadCommand,
-  DaemonWorkspaceScope,
 } from "relay-core";
-
-import { agentWorkspaceSubpath } from "./agent-workspace.js";
 
 const DEFAULT_READ_LIMIT_BYTES = 256 * 1024;
 
@@ -61,22 +58,14 @@ export class WorkspaceReadError extends Error {
   }
 }
 
-function scopeBase(workspaceRoot: string, agentId: string | undefined, scope: DaemonWorkspaceScope): string {
-  if (scope === "shared") return resolve(workspaceRoot);
-  if (!agentId) {
-    throw new WorkspaceReadError("invalid-path", "agentId is required for agent-home workspace reads.");
-  }
-  return resolve(workspaceRoot, agentWorkspaceSubpath(agentId));
-}
-
 function resolveInsideBase(home: string, relativePath: string): { path: string; target: string } {
   const requested = relativePath.trim();
   if (requested.startsWith("/")) {
-    throw new WorkspaceReadError("invalid-path", "Path must be relative to the agent workspace.");
+    throw new WorkspaceReadError("invalid-path", "Path must be relative to the workspace.");
   }
   const lexicalTarget = resolve(home, requested);
   if (lexicalTarget !== home && !lexicalTarget.startsWith(home + sep)) {
-    throw new WorkspaceReadError("invalid-path", "Path escapes the agent workspace.");
+    throw new WorkspaceReadError("invalid-path", "Path escapes the workspace.");
   }
   const path = relativeHomePath(home, lexicalTarget);
   try {
@@ -88,7 +77,7 @@ function resolveInsideBase(home: string, relativePath: string): { path: string; 
     const realHome = realpathSync(home);
     const realTarget = realpathSync(lexicalTarget);
     if (realTarget !== realHome && !realTarget.startsWith(realHome + sep)) {
-      throw new WorkspaceReadError("invalid-path", "Path escapes the agent workspace through a symbolic link.");
+      throw new WorkspaceReadError("invalid-path", "Path escapes the workspace through a symbolic link.");
     }
     return { path, target: realTarget };
   } catch (error) {
@@ -101,13 +90,11 @@ function relativeHomePath(home: string, target: string): string {
   return target === home ? "" : target.slice(home.length + 1).split(sep).join("/");
 }
 
-export function listAgentWorkspace(
+export function listWorkspace(
   workspaceRoot: string,
-  agentId: string | undefined,
   relativePath: string,
-  scope: DaemonWorkspaceScope = "agent-home",
 ): { path: string; exists: boolean; entries: DaemonWorkspaceEntry[] } {
-  const { path, target } = resolveInsideBase(scopeBase(workspaceRoot, agentId, scope), relativePath);
+  const { path, target } = resolveInsideBase(resolve(workspaceRoot), relativePath);
   let stats: ReturnType<typeof lstatSync>;
   try {
     stats = lstatSync(target);
@@ -119,7 +106,7 @@ export function listAgentWorkspace(
   for (const name of readdirSync(target)) {
     let info: ReturnType<typeof lstatSync>;
     try {
-      info = lstatSync(join(target, name));
+      info = lstatSync(resolve(target, name));
     } catch {
       continue;
     }
@@ -138,14 +125,12 @@ export function listAgentWorkspace(
   return { path, exists: true, entries };
 }
 
-export function readAgentWorkspaceFile(
+export function readWorkspaceFile(
   workspaceRoot: string,
-  agentId: string | undefined,
   relativePath: string,
   limitBytes = DEFAULT_READ_LIMIT_BYTES,
-  scope: DaemonWorkspaceScope = "agent-home",
 ): { path: string; bytes: number; isBinary: boolean; truncated: boolean; contentBase64?: string } {
-  const { path, target } = resolveInsideBase(scopeBase(workspaceRoot, agentId, scope), relativePath);
+  const { path, target } = resolveInsideBase(resolve(workspaceRoot), relativePath);
   let info: ReturnType<typeof lstatSync>;
   try {
     info = lstatSync(target);
@@ -189,27 +174,23 @@ export function workspaceCommandEvent(
   workspaceRoot: string,
   command: WorkspaceCommand,
 ): WorkspaceCommandEvent {
-  const scope = command.scope ?? "agent-home";
-  const identity = command.agentId ? { agentId: command.agentId } : {};
   try {
     if (command.type === "workspace.list") {
-      const listing = listAgentWorkspace(workspaceRoot, command.agentId, command.path, scope);
+      const listing = listWorkspace(workspaceRoot, command.path);
       return {
         type: "workspace.listing",
         commandId: command.id,
         ...(command.leaseId ? { leaseId: command.leaseId } : {}),
-        ...identity,
         path: listing.path,
         exists: listing.exists,
         entries: listing.entries,
       };
     }
-    const file = readAgentWorkspaceFile(workspaceRoot, command.agentId, command.path, undefined, scope);
+    const file = readWorkspaceFile(workspaceRoot, command.path, undefined);
     return {
       type: "workspace.file",
       commandId: command.id,
       ...(command.leaseId ? { leaseId: command.leaseId } : {}),
-      ...identity,
       path: file.path,
       bytes: file.bytes,
       isBinary: file.isBinary,
@@ -221,7 +202,6 @@ export function workspaceCommandEvent(
       type: "workspace.error",
       commandId: command.id,
       ...(command.leaseId ? { leaseId: command.leaseId } : {}),
-      ...identity,
       path: command.path,
       code: error instanceof WorkspaceReadError ? error.code : "io-error",
       message: error instanceof Error ? error.message : String(error),

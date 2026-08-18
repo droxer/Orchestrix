@@ -52,7 +52,6 @@ async def node_workspace_files(
         {
             "id": new_database_id(),
             "type": "workspace.list",
-            "scope": "shared",
             "path": path,
         },
     )
@@ -77,7 +76,6 @@ async def node_workspace_file(
         {
             "id": new_database_id(),
             "type": "workspace.read",
-            "scope": "shared",
             "path": path,
         },
     )

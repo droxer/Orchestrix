@@ -64,7 +64,6 @@ def _project_workspace_command(
     return {
         "id": command_id,
         "type": command_type,
-        "scope": "shared",
         # Project ids use the same validated database-id alphabet as sessions.
         # The daemon only uses this field as a routing identifier for project
         # layouts; workspaceSubpath selects the persistent project root.

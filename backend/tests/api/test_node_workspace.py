@@ -27,11 +27,10 @@ def test_admin_browses_node_shared_workspace(monkeypatch, tmp_path):
     app = create_app(tmp_path)
     client = TestClient(app)
     _bootstrap(client)
-    _register_node(app, capabilities=["workspace-read", "workspace-read-shared"])
+    _register_node(app, capabilities=["workspace-read-shared"])
 
     async def dispatch(_ctx, node, command):
         assert node["id"] == "node_1"
-        assert command["scope"] == "shared"
         assert "agentId" not in command
         if command["type"] == "workspace.list":
             return {"type": "workspace.listing", "path": "", "exists": True, "entries": [{"name": "shared.md", "path": "shared.md", "kind": "file", "bytes": 5, "updatedAt": "2026-07-19T00:00:00Z"}]}
@@ -57,7 +56,7 @@ def test_node_workspace_file_passes_binary_bytes_through(monkeypatch, tmp_path):
     app = create_app(tmp_path)
     client = TestClient(app)
     _bootstrap(client)
-    _register_node(app, capabilities=["workspace-read", "workspace-read-shared"])
+    _register_node(app, capabilities=["workspace-read-shared"])
     png = b"\x89PNG\r\n\x1a\n" + bytes(8)
 
     async def dispatch(_ctx, _node, _command):
@@ -79,7 +78,7 @@ def test_node_workspace_requires_admin(monkeypatch, tmp_path):
     app = create_app(tmp_path)
     admin = TestClient(app)
     _bootstrap(admin)
-    _register_node(app, capabilities=["workspace-read", "workspace-read-shared"])
+    _register_node(app, capabilities=["workspace-read-shared"])
     assert admin.post("/api/v1/admin/users", json={"username": "bob", "password": "userpass", "employeeId": "bob"}).status_code == 201
     bob = TestClient(app)
     assert bob.post("/api/v1/auth/login", json={"username": "bob", "password": "userpass"}).status_code == 200
@@ -91,7 +90,7 @@ def test_node_workspace_unavailable_without_shared_capability(monkeypatch, tmp_p
     app = create_app(tmp_path)
     client = TestClient(app)
     _bootstrap(client)
-    _register_node(app, capabilities=["workspace-read"])
+    _register_node(app, capabilities=[])
 
     response = client.get("/api/v1/admin/daemon-nodes/node_1/workspace/files")
     assert response.status_code == 503

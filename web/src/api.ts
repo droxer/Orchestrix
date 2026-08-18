@@ -59,13 +59,10 @@ import type {
   ThreadRecoveryInput,
   TasksResponse,
   WorkspaceBriefResponse,
-  AgentWorkspaceFilesResponse,
-  AgentWorkspaceFileResponse,
   NodeWorkspaceFilesResponse,
   NodeWorkspaceFileResponse,
   ProjectWorkspaceFilesResponse,
   ProjectWorkspaceFileResponse,
-  WorkspaceScope,
 } from "./types.js";
 import type { Language, Theme } from "./lib/appStorage.js";
 
@@ -598,29 +595,6 @@ export function getWorkspaceBrief(
   return apiJson<WorkspaceBriefResponse>(`/workspace/brief${query ? `?${query}` : ""}`, { signal });
 }
 
-export function listAgentWorkspaceFiles(
-  input: { agentId: string; threadId: string; teamId?: string; path?: string; scope?: WorkspaceScope },
-  signal?: AbortSignal,
-): Promise<AgentWorkspaceFilesResponse> {
-  const params = new URLSearchParams();
-  if (input.threadId) params.set("threadId", input.threadId);
-  if (input.teamId) params.set("teamId", input.teamId);
-  if (input.path) params.set("path", input.path);
-  if (input.scope && input.scope !== "agent-home") params.set("scope", input.scope);
-  const query = params.toString();
-  return apiJson<AgentWorkspaceFilesResponse>(`/agents/${encodeURIComponent(input.agentId)}/workspace/files${query ? `?${query}` : ""}`, { signal });
-}
-
-export function readAgentWorkspaceFile(
-  input: { agentId: string; threadId: string; teamId?: string; path: string; scope?: WorkspaceScope },
-  signal?: AbortSignal,
-): Promise<AgentWorkspaceFileResponse> {
-  const params = new URLSearchParams({ path: input.path });
-  if (input.threadId) params.set("threadId", input.threadId);
-  if (input.teamId) params.set("teamId", input.teamId);
-  if (input.scope && input.scope !== "agent-home") params.set("scope", input.scope);
-  return apiJson<AgentWorkspaceFileResponse>(`/agents/${encodeURIComponent(input.agentId)}/workspace/file?${params.toString()}`, { signal });
-}
 
 export function listProjectWorkspaceFiles(
   input: { projectId: string; path?: string },

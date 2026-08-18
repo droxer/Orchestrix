@@ -1188,7 +1188,6 @@ def test_project_workspace_browses_persistent_root_without_thread(
         ] == [
             {
                 "type": "workspace.list",
-                "scope": "shared",
                 "sessionId": project["id"],
                 "workspaceLayout": "project",
                 "workspaceSubpath": project["workspaceSubpath"],
@@ -1196,7 +1195,6 @@ def test_project_workspace_browses_persistent_root_without_thread(
             },
             {
                 "type": "workspace.read",
-                "scope": "shared",
                 "sessionId": project["id"],
                 "workspaceLayout": "project",
                 "workspaceSubpath": project["workspaceSubpath"],
@@ -1204,7 +1202,6 @@ def test_project_workspace_browses_persistent_root_without_thread(
             },
             {
                 "type": "workspace.read",
-                "scope": "shared",
                 "sessionId": project["id"],
                 "workspaceLayout": "project",
                 "workspaceSubpath": project["workspaceSubpath"],

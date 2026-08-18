@@ -189,40 +189,6 @@ export interface WorkspaceFileEntry {
   updatedAt: string;
 }
 
-export type AgentWorkspaceSource = "live" | "snapshot";
-
-/** Agent-private subdirectory vs shared root inside the same Thread workspace. */
-export type WorkspaceScope = "agent-home" | "shared";
-
-export interface AgentWorkspaceFilesResponse {
-  agentId: string;
-  scope?: WorkspaceScope;
-  source: AgentWorkspaceSource;
-  nodeId?: string;
-  threadId: string;
-  path: string;
-  exists: boolean;
-  entries: WorkspaceFileEntry[];
-  generatedAt: string;
-}
-
-export interface AgentWorkspaceFileResponse {
-  agentId: string;
-  scope?: WorkspaceScope;
-  source: AgentWorkspaceSource;
-  nodeId?: string;
-  threadId: string;
-  path: string;
-  exists: boolean;
-  isBinary: boolean;
-  bytes: number;
-  content: string | null;
-  /** Raw bytes (base64, capped at limitBytes) for binary previews — images, PDFs. */
-  contentBase64?: string | null;
-  truncated: boolean;
-  limitBytes: number;
-  generatedAt: string;
-}
 
 export interface ProjectWorkspaceFilesResponse {
   projectId: string;

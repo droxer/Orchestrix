@@ -137,13 +137,11 @@ Task/thread creation accepts `projectId`. Project dispatch rejects Computer,
 team, or non-member overrides; the backend resolves the fixed roster and the
 current daemon instance for the project's stable Computer identity.
 
-## Agent and node workspace reads
+## Daemon node workspace reads
 
-Agents and daemon nodes expose the same workspace-read shape used by projects:
+Daemon nodes expose the same workspace-read shape used by projects:
 
 ```text
-GET /api/v1/agents/{agentId}/workspace/files?path={relativePath}
-GET /api/v1/agents/{agentId}/workspace/file?path={relativePath}
 GET /api/v1/admin/daemon-nodes/{nodeId}/workspace/files?path={relativePath}
 GET /api/v1/admin/daemon-nodes/{nodeId}/workspace/file?path={relativePath}
 ```
