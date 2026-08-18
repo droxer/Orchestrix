@@ -1,16 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 64" role="img" aria-label="Relay" shape-rendering="geometricPrecision">
   <title>Relay</title>
-  <!-- Phosphor wordmark, light standalone asset. Monochrome by rule: colour is
-       reserved for live agent work. Lettering is JetBrains Mono 700 at -0.04em.
-       In-app chrome uses CSS tokens via RelayMark. -->
+  <!-- Fieldnotes wordmark, light standalone asset. Olive ink only by rule:
+       the wordmark never takes the action yellow. Lettering is IBM Plex Sans
+       700, untracked. In-app chrome uses CSS tokens via RelayMark. -->
   <g fill="none" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M8 14 L28 32 L8 50" stroke="#16181b"/>
-    <path d="M28 14 L48 32 L28 50" stroke="#16181b" opacity="0.45"/>
+    <path d="M8 14 L28 32 L8 50" stroke="#23251d"/>
+    <path d="M28 14 L48 32 L28 50" stroke="#23251d" opacity="0.45"/>
   </g>
   <text x="74" y="44"
-        font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+        font-family="'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif"
         font-size="42"
         font-weight="700"
-        letter-spacing="-1.68px"
-        fill="#16181b">Relay</text>
+        letter-spacing="0"
+        fill="#23251d">Relay</text>
 </svg>

@@ -20,9 +20,10 @@ const readWebSource = (rel: string) => readFileSync(path.join(repoRoot, "web", "
 
 describe("local typography assets", () => {
   it("ships real WOFF2 binaries for both application families", () => {
-    // Phosphor runs two families: JetBrains Mono covers the display tier and
-    // technical text, Geist carries prose and UI body copy.
-    for (const file of ["JetBrainsMono-Variable.woff2", "Geist-Variable.woff2"]) {
+    // Fieldnotes runs two families: IBM Plex Sans carries every role —
+    // reading, control, and display — and JetBrains Mono covers technical
+    // text only.
+    for (const file of ["IBMPlexSans-Variable.woff2", "JetBrainsMono-Variable.woff2"]) {
       const absolute = path.join(fontsDir, file);
       assert.ok(existsSync(absolute), `missing ${file}`);
       assert.ok(statSync(absolute).size > 1024, `${file} is not a materialized font binary`);
@@ -30,52 +31,78 @@ describe("local typography assets", () => {
     }
     const attributes = readFileSync(path.join(repoRoot, ".gitattributes"), "utf8");
     assert.doesNotMatch(attributes, /web\/src\/app\/fonts\/.*filter=lfs/);
+    assert.ok(existsSync(path.join(fontsDir, "OFL-IBMPlexSans.txt")), "missing IBM Plex Sans license");
     assert.ok(existsSync(path.join(fontsDir, "OFL-JetBrainsMono.txt")), "missing JetBrains Mono license");
   });
 
-  it("retires Mona Sans and Geist Mono rather than leaving them dormant", () => {
-    // One mono replaced two faces; leaving the old binaries in the tree would
-    // ship ~203 KB nobody loads.
-    for (const file of ["MonaSans-Variable.woff2", "GeistMono-Variable.woff2", "OFL-MonaSans.txt"]) {
+  it("retires Mona Sans, Geist, and Geist Mono rather than leaving them dormant", () => {
+    // Leaving the old binaries in the tree would ship ~203 KB nobody loads.
+    for (const file of ["MonaSans-Variable.woff2", "Geist-Variable.woff2", "GeistMono-Variable.woff2", "OFL-MonaSans.txt"]) {
       assert.ok(!existsSync(path.join(fontsDir, file)), `${file} should have been removed`);
     }
+    // No Geist reference may survive in the token layer, and the layout must
+    // load the Plex binary — a renamed stack pointing at a retired file is
+    // the same bug wearing a new name.
+    for (const file of ["styles/tokens/palette.css", "styles/tokens/roles.css", "styles/tokens/base.css", "styles/tokens/shadcn-bridge.css"]) {
+      const code = readWebSource(file).replace(/\/\*[\s\S]*?\*\//g, "");
+      assert.doesNotMatch(code, /Geist/, `${file} still references the retired Geist family`);
+    }
+    const layout = readWebSource("app/layout.tsx");
+    assert.match(layout, /src:\s*["']\.\/fonts\/IBMPlexSans-Variable\.woff2["']/);
+    assert.match(layout, /variable:\s*["']--font-app-sans["']/);
   });
 });
 
 describe("application typography roles", () => {
-  it("wires one mono family for both display and technical text", () => {
+  it("wires Plex for every reading and display role, mono for technical text only", () => {
     const layout = readWebSource("app/layout.tsx");
     const palette = readWebSource("styles/tokens/palette.css");
 
+    assert.match(layout, /src:\s*["']\.\/fonts\/IBMPlexSans-Variable\.woff2["']/);
+    assert.match(layout, /variable:\s*["']--font-app-sans["']/);
     assert.match(layout, /src:\s*["']\.\/fonts\/JetBrainsMono-Variable\.woff2["']/);
     assert.match(layout, /variable:\s*["']--font-app-mono["']/);
-    assert.doesNotMatch(layout, /MonaSans|--font-app-display|GeistMono|--font-geist-mono/);
+    assert.doesNotMatch(layout, /MonaSans|--font-app-display|Geist/);
 
-    assert.match(palette, /--font-display:\s*var\(--font-app-mono\),\s*["']JetBrains Mono["']/);
+    // The display tier is the SANS family at 700 with negative tracking —
+    // hierarchy comes from weight, not face. The mono is technical text only.
+    assert.match(palette, /--font-sans:\s*var\(--font-app-sans\),\s*["']IBM Plex Sans["']/);
+    assert.match(palette, /--font-display:\s*var\(--font-sans\);/);
     assert.match(palette, /--font-mono:\s*var\(--font-app-mono\),\s*["']JetBrains Mono["']/);
+    assert.doesNotMatch(
+      palette,
+      /--font-display:[^;]*(--font-app-mono|JetBrains|Mono)/,
+      "the display tier is no longer mono — it resolves to the Plex sans stack",
+    );
   });
 
-  it("gives the display tier mono weights and keeps code at 400", () => {
+  it("caps the display tier at 700 and keeps code at 400", () => {
     const roles = readWebSource("styles/tokens/roles.css");
 
-    // Display and technical share a face, so they are separated by weight:
-    // 700/600 for display, 400 for code (plus --ink-4 and no tracking).
+    // IBM Plex Sans Variable tops out at 700 and base.css disables font
+    // synthesis — an 800 declaration would silently render as 700, so the
+    // roles say 700 and let size + tracking carry the tier.
     assert.match(roles, /--type-display:\s+700[^;]+var\(--font-display\);/);
     assert.match(roles, /--type-title:\s+700[^;]+var\(--font-display\);/);
-    assert.match(roles, /--type-heading:\s+600[^;]+var\(--font-display\);/);
+    assert.match(roles, /--type-heading:\s+700[^;]+var\(--font-display\);/);
     assert.match(roles, /--type-number:\s+700[^;]+var\(--font-display\);/);
+    assert.doesNotMatch(roles, /--type-[a-z-]+:\s+800/, "no weight 800 exists in this system — Plex tops out at 700");
     assert.match(roles, /--type-code:\s+400[^;]+var\(--font-mono\);/);
     assert.match(roles, /--type-body:\s+400[^;]+var\(--font-sans\);/);
     assert.match(roles, /--type-label:\s+500[^;]+var\(--font-sans\);/);
   });
 
-  it("tracks the display tier and the reading tiers, and nothing by accident", () => {
+  it("tracks the display tier and sets the reading tiers solid", () => {
     const palette = readWebSource("styles/tokens/palette.css");
 
-    assert.match(palette, /--track-display:\s*-0\.04em;/);
-    assert.match(palette, /--track-body:\s*-0\.011em;/);
-    assert.match(palette, /--track-body-sm:\s*-0\.013em;/);
-    assert.match(palette, /--track-caps:\s*0\.03em;/);
+    // DESIGN.md reserves negative tracking for the display tier (-0.6px at
+    // 24px ≈ -0.025em); IBM Plex Sans is drawn wide and open, so body text
+    // and caps set solid. The zero-valued tokens are the design, not missing
+    // values — they keep the paired-track contract greppable.
+    assert.match(palette, /--track-display:\s*-0\.025em;/);
+    assert.match(palette, /--track-body:\s*0;/);
+    assert.match(palette, /--track-body-sm:\s*0;/);
+    assert.match(palette, /--track-caps:\s*0;/);
 
     // --track-tight was declared 0, so its name promised a tightening it never
     // applied and its single consumer meant --track-0 all along. A token whose
@@ -138,8 +165,12 @@ describe("application typography roles", () => {
   });
 
   it("applies display tracking at every display-tier rule", () => {
-    // Display text without --track-display renders as spaced-out code, and a
-    // second letter-spacing in the same rule silently overrides it.
+    // Display text without its paired track silently loses the tracking the
+    // role was designed with, and a second letter-spacing in the same rule
+    // silently overrides it. The contract is PRESENCE of the declaration, not
+    // a non-zero value: --type-display-track and --type-heading-track resolve
+    // to var(--track-0) = 0 by design, and the declaration must still be there
+    // so the pairing stays greppable.
     //
     // Two shapes count as display-tier and BOTH must be swept: the --type-*
     // shorthand roles, and rules that opt into `font-family: var(--font-display)`
@@ -185,8 +216,9 @@ describe("application typography roles", () => {
     const base = readWebSource("styles/tokens/base.css");
     const atelier = readWebSource("styles/atelier.css");
 
-    // JetBrains Mono has no Han coverage, so CJK display falls back to the sans
-    // stack — and the mono tracking must be neutralised or Han titles crush.
+    // IBM Plex Sans has no Han coverage, so CJK display falls back to the
+    // PingFang-first sans stack (Plex remains the Latin fallback inside it) —
+    // and the display tracking must be neutralised or Han titles crush.
     assert.match(
       palette,
       /html:lang\(zh-CN\)\s*\{[^}]*--font-sans:\s*"PingFang SC"[^;]+var\(--font-app-sans\)[^;]*;[^}]*--font-display:\s*var\(--font-sans\);/s,
@@ -212,8 +244,12 @@ describe("application typography roles", () => {
 
     // Agent output can be Chinese while the surrounding controls remain in
     // English, so glyph coverage cannot depend only on html:lang(zh-*).
-    for (const role of ["display", "sans", "mono"]) {
-      const family = root.match(new RegExp(`--font-${role}:\\s*([^;]+);`))?.[1] ?? "";
+    // --font-display aliases --font-sans, so resolve one level of indirection
+    // before checking the stack.
+    for (const role of ["sans", "display", "mono"]) {
+      let family = root.match(new RegExp(`--font-${role}:\\s*([^;]+);`))?.[1] ?? "";
+      const alias = family.match(/^var\(--font-([a-z-]+)\)$/)?.[1];
+      if (alias) family = root.match(new RegExp(`--font-${alias}:\\s*([^;]+);`))?.[1] ?? "";
       assert.match(family, /"PingFang SC"/, `${role} is missing the macOS CJK fallback`);
       assert.match(family, /"Microsoft YaHei/, `${role} is missing the Windows CJK fallback`);
       assert.match(family, /"Noto Sans/, `${role} is missing the Linux CJK fallback`);

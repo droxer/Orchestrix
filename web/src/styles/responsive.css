@@ -322,8 +322,8 @@
 
   /* Active tab reads as selected via three cues: full-strength ink label +
      icon (vs muted inactive), the soft accent tint, and the accent tick
-     above (.sidenav-btn.active::before). The accent stays the underline —
-     the text itself is high-contrast foreground, not the mid-tone green. */
+     above (.sidenav-btn.active::before). The accent stays the yellow tick —
+     the text itself is high-contrast foreground, not an action fill. */
   .sidenav-btn.active {
     color: var(--ink-1);
     background: var(--action-soft);

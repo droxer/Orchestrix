@@ -140,8 +140,8 @@ export function ComputerCard({
           ) : null}
         </h3>
         {activeRuns.length === 0 ? (
-          // No --live ink when nothing is working: the accent means "an agent
-          // is running right now" and must be absent at rest.
+          // No --live ink when nothing is working: the live yellow means "an
+          // agent is running right now" and must be absent at rest.
           <p className="computer-card-idle">{t("computer.idle")}</p>
         ) : (
           <ul className="computer-run-list">

@@ -1,13 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Relay" shape-rendering="geometricPrecision">
   <title>Relay</title>
-  <!-- Phosphor app-icon badge (light): paper field, light-register live green.
-       #3ee08a measures only ~2:1 on paper, so this asset uses the light
-       register's #0b7a45 (5.08:1) — see the spec's contrast table. Served as the
-       apple-touch-icon from app/layout.tsx. -->
-  <rect x="4" y="4" width="56" height="56" rx="15" fill="#f7f8f9"/>
-  <rect x="4" y="4" width="56" height="56" rx="15" fill="none" stroke="#e2e5e8" stroke-width="1"/>
+  <!-- Fieldnotes app-icon badge (light): cream field, hairline stroke, and the
+       register-invariant action yellow (#f7a501, --action) on the lead chevron.
+       Served as the apple-touch-icon from app/layout.tsx. -->
+  <rect x="4" y="4" width="56" height="56" rx="15" fill="#eeefe9"/>
+  <rect x="4" y="4" width="56" height="56" rx="15" fill="none" stroke="#bfc1b7" stroke-width="1"/>
   <g fill="none" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M22 20 L36 32 L22 44" stroke="#0b7a45"/>
-    <path d="M36 20 L50 32 L36 44" stroke="#16181b" opacity="0.45"/>
+    <path d="M22 20 L36 32 L22 44" stroke="#f7a501"/>
+    <path d="M36 20 L50 32 L36 44" stroke="#23251d" opacity="0.45"/>
   </g>
 </svg>

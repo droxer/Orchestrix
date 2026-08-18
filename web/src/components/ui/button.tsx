@@ -27,18 +27,16 @@ const buttonVariants = cva(
           "bg-(--control-fill) text-secondary-foreground hover:bg-(--control-fill-hover) aria-expanded:bg-(--control-fill-hover) aria-expanded:text-secondary-foreground",
         ghost:
           "hover:bg-(--control-fill-hover) hover:text-foreground aria-expanded:bg-(--control-fill-hover) aria-expanded:text-foreground",
-        /* Destructive is encoded by SHAPE, not hue. Phosphor allows exactly one
-           colour (--live), and --destructive/--err resolves to the same value as
-           --action, so a tinted wash would be indistinguishable from `ghost`.
+        /* Destructive is encoded by SHAPE, not hue. Fieldnotes keeps status
+           tones in the olive brightness hierarchy — --err is the loudest ink
+           step, not a colour of its own — so a tinted wash would read as
+           emphasis, not danger.
            Danger therefore reads through three non-chromatic signals: a visible
-           hairline ring where ghost has none, --err ink (a step brighter than
-           inherited body ink), and a full contrast inversion on hover/focus.
-           Same substitution StatusPill makes for its `bad` tone.
-           `text-on-primary` is the correct ink on an --err fill in both
-           registers: --err and --action share a value, so they share a contrast
-           partner. */
+           hairline ring where ghost has none, --err ink (the loudest step
+           above inherited body ink), and a full contrast inversion on hover/focus.
+           Same substitution StatusPill makes for its `bad` tone. */
         destructive:
-          "border-destructive/45 text-destructive hover:border-destructive hover:bg-destructive hover:text-on-primary focus-visible:border-destructive focus-visible:[outline:var(--focus-outline-danger)] focus-visible:[outline-offset:var(--focus-offset)]",
+          "border-destructive/45 text-destructive hover:border-destructive hover:bg-destructive hover:text-destructive-foreground focus-visible:border-destructive focus-visible:[outline:var(--focus-outline-danger)] focus-visible:[outline-offset:var(--focus-offset)]",
         /* Circular icon-only action — the retired thread.css icon recipe:
            ink-3 idle; a control wash + line-2 + ink-1 on hover. Always paired
            with the round `icon-r` (40px) / `icon-r-sm` (28px) sizes. `tinted`

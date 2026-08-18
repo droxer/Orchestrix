@@ -10,7 +10,7 @@ interface NodePresenceProps {
 }
 
 /**
- * Monochrome online/offline cue for a single computer. Online = a filled, calm
+ * Brightness-tier online/offline cue for a single computer. Online = a filled, calm
  * dot with a slow breathing halo (motion carries "alive"); offline = a static,
  * bright hollow ring ("dark / no signal", and bright so it catches the eye).
  * The animation is disabled under prefers-reduced-motion. Pass withLabel to

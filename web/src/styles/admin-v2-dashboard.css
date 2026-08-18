@@ -1,10 +1,10 @@
 /* =====================================================================
    Admin Dashboard  (adm-dash-* namespace)
 
-   The control room, read as one instrument. Phosphor rules apply in full:
-   the page is grey until something is working, and the single chromatic
-   role --live marks nodes that are running an agent RIGHT NOW — nowhere
-   else. Ready is not green, completed is not green; only "in flight" is.
+   The control room, read as one instrument. Fieldnotes rules apply in
+   full: the page is olive ink until something is working, and the live
+   yellow (--live) marks nodes that are running an agent RIGHT NOW —
+   nowhere else. Ready is calm, completed is calm; only "in flight" glows.
 
    Composition is a 2:1 editorial split rather than a uniform card grid:
    the wide column carries the two time-series, the rail carries the two
@@ -171,7 +171,7 @@
    it previously made Input the loudest mark on the entire page.
 
    The hairline stroke is the fix from #58 and is kept: adjacent steps of a
-   monochrome ramp merge into one flat band without it, so a segment boundary
+   brightness ramp merge into one flat band without it, so a segment boundary
    must be drawn rather than inferred from the fills. It matters more here,
    not less, because the ramp deliberately uses neighbouring ink steps. */
 .adm-token-seg {
@@ -254,20 +254,21 @@
 }
 
 /* ── Fleet health ─────────────────────────────────────────────────────
-   Five states have to be told apart in a 10px bar, and the Phosphor grey
-   ramp alone cannot do it — ready #7d848d against unknown #6b727b is one
-   step, and failed and stale resolve to the same --err. So each state is
-   double-encoded, exactly as StatusPill encodes "bad" by shape as well as
-   brightness:
+   Five states have to be told apart in a 10px bar, and the olive
+   brightness ramp alone cannot do it — ready (--ok) against unknown
+   (--ink-4) is one step apart, and failed and stale resolve to the same
+   --err. So each state is double-encoded, exactly as StatusPill encodes
+   "bad" by shape as well as brightness:
 
-     running  --live      the one accent, and the only legal use here
-     failed   --err       brightest ink, solid
+     running  --live      the live yellow, the only hue allowed here
+     failed   --err       loudest ink, solid
      stale    --warn      distinguished from failed by hatch texture
-     ready    --ok        calm mid grey
+     ready    --ok        calm mid tier
      unknown  --ink-4     dimmest
 
-   Data-viz exception to "hue is text/dot only, never fills": a bar segment
-   IS the datum. Canvas chrome elsewhere keeps status to text and dots. */
+   Data-viz exception to "status tone is text/dot only, never fills": a bar
+   segment IS the datum. Canvas chrome elsewhere keeps status to text and
+   dots. */
 .adm-dash-bar {
   display: flex;
   width: 100%;

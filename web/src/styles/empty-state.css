@@ -249,11 +249,73 @@ html[data-theme="dark"] .relay-bleed-mark {
   color: var(--ink-4);
 }
 
+/* ── Marginalia ───────────────────────────────────────────────────────
+   Field-notes vignettes (marginalia.tsx) sketched into the corner of an
+   empty state: pencil-olive strokes at low opacity, absolutely positioned
+   so they never perturb layout, and hidden below the mobile tier where the
+   measure is too narrow to host a margin. Strokes only — never --action /
+   --live yellow, which is reserved for actionable and live work. */
+
+.relay-empty-marginalia {
+  position: absolute;
+  top: var(--sp-5);
+  right: var(--sp-6);
+  color: var(--ink-3);
+  opacity: 0.6;
+  pointer-events: none;
+  user-select: none;
+}
+
+.relay-empty-marginalia > svg {
+  display: block;
+  width: 112px;
+  height: auto;
+}
+
+/* The transcript hero's chevron doodle leans into the corner like a margin
+   sketch, scaled up a touch to balance the display-tier title. */
+.transcript-empty .relay-empty-marginalia {
+  top: var(--sp-4);
+  right: var(--sp-4);
+  transform: rotate(3deg);
+}
+
+.transcript-empty .relay-empty-marginalia > svg {
+  width: 128px;
+}
+
+/* The board empty is left-aligned prose on backlog.css's own layout, which
+   declares no positioning — BoardEmpty adds .relay-marginalia-host to supply
+   the containing block without re-declaring backlog's selector (one
+   selector, one owning sheet). The doodle keeps the far lower corner, clear
+   of the copy. */
+.relay-marginalia-host {
+  position: relative;
+}
+
+.backlog-board-empty .relay-empty-marginalia {
+  top: auto;
+  right: var(--sp-7);
+  bottom: var(--sp-6);
+}
+
+@media (max-width: 820px) {
+  .relay-empty-marginalia {
+    display: none;
+  }
+}
+
 /* The hero earns a staged entrance; every other empty state renders settled. */
 @media (prefers-reduced-motion: no-preference) {
   .transcript-empty > * {
     --rise-from: var(--rise-sm);
     animation: rise var(--t-slow) var(--ease) both;
+  }
+
+  /* Marginalia renders settled in every motion preference — it is set
+     dressing, not a beat in the hero's entrance. */
+  .transcript-empty > .relay-empty-marginalia {
+    animation: none;
   }
 
   /* Delays follow the VISUAL order (kicker → avatar → title → blurb →

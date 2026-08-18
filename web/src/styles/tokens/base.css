@@ -27,14 +27,13 @@ html {
 
 /* overflow-x: hidden is a last-resort clip — reflow regressions must be
    caught at the 320px floor (WCAG 1.4.10), not papered over here. */
-/* Body tracking is set ONCE, here, and inherited. Reading text wants a little
-   negative tracking at UI sizes — Geist at 14-15px set at 0 reads noticeably
-   looser than the same size tightened, and the display tier was already being
-   tracked while the body it sat above was not. Applying it globally rather
-   than per-role is what makes it affordable: `font: var(--type-body)` cannot
-   carry letter-spacing, so a per-role approach would need a second declaration
-   at every reading call site in the app. Faces that must NOT be tightened —
-   the monospace column, tabular figures — opt back out via --track-0 below. */
+/* Body tracking is set ONCE, here, and inherited. In this system the value is
+   0 — IBM Plex Sans is drawn wide and open, and DESIGN.md sets every reading
+   role solid; only the 24px display tier tracks (-0.025em). The global hook
+   stays because `font: var(--type-body)` cannot carry letter-spacing, so if a
+   future face needs tightening this is the one place that can afford it.
+   Faces that must NEVER be tightened — the monospace column, tabular figures —
+   opt back out via --track-0 below. */
 html,
 body {
   min-width: 320px;

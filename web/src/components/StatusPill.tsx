@@ -35,10 +35,10 @@ export type TonePillProps = {
 };
 
 export function TonePill({ tone, label, live = false, title, className }: TonePillProps) {
-  // Bad states drop out of the brightness race: a bright --err fill is
-  // byte-identical to --action white and reads as "primary/selected" rather
-  // than "problem". Render the shared hollow ring (.dot-ring) instead — the
-  // same shape the node presence + node status dots use.
+  // Bad states drop out of the brightness race: --err resolves to the loudest
+  // ink step, so a solid dot in it reads as emphasis, not "problem". Render
+  // the shared hollow ring (.dot-ring) instead — the same shape the node
+  // presence + node status dots use.
   //
   // Live states are the one place a status dot earns --live, and palette.css
   // legislates the pairing: --live is legal only where --t-pulse is used, so

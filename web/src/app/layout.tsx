@@ -7,26 +7,28 @@ import "../styles.css";
 import { InlineScript } from "../components/InlineScript";
 import { Providers } from "./providers";
 
-// Phosphor typography: one mono family carries both the display tier and
-// technical text, and Geist stays quieter for dense UI and body copy. Display
-// vs. technical is separated by weight, tracking, and colour rather than by
-// face — 700 tight-tracked in --ink-1 for titles, names, and metrics; 400
-// untracked in --ink-4 for session IDs, logs, and code. Both are local
-// variable fonts to avoid layout drift.
+// Fieldnotes typography: IBM Plex Sans carries every role — reading, control,
+// and display — with hierarchy built from weight (400/500/600/700) rather
+// than face. JetBrains Mono remains for technical text only: session IDs,
+// logs, and code, set 400 untracked (DESIGN.md names it a near-perfect
+// substitute for Source Code Pro at body sizes). Both are local variable
+// fonts to avoid layout drift.
 //
-// The vendored WOFF2 is fontsource's latin subset of JetBrains Mono
-// (@fontsource-variable/jetbrains-mono 5.3.0, OFL-1.1, wght 100–800). Latin
+// The vendored WOFF2 is fontsource's latin subset of IBM Plex Sans
+// (@fontsource-variable/ibm-plex-sans 5.3.0, OFL-1.1, wght 100–700). Latin
 // covers U+00C0–00FF, so accented names render in-face; latin-ext glyphs fall
-// through to Geist by design rather than shipping a second file.
+// through to the system sans by design rather than shipping a second file.
+// The same arrangement holds for JetBrains Mono (fontsource 5.3.0, OFL-1.1,
+// wght 100–800).
 //
 // CJK stays system-first (PingFang / YaHei / etc. in palette.css). We do
 // not load Noto Sans SC/TC through next/font — those unicode-range chunks
 // balloon Turbopack compile and only matter on bare Linux.
 const appSans = localFont({
-  src: "./fonts/Geist-Variable.woff2",
+  src: "./fonts/IBMPlexSans-Variable.woff2",
   variable: "--font-app-sans",
   display: "swap",
-  weight: "100 900",
+  weight: "100 700",
   style: "normal",
 });
 

@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { RelayEmptyState } from "./RelayEmptyState";
 import { RelayMark } from "./RelayMark";
+import { RelayDoodleChevron } from "./marginalia";
 import { ActionPrompt } from "./icons";
 import { sendShortcutLabel } from "../lib/sendShortcut";
 
@@ -26,6 +27,7 @@ export function TranscriptEmpty({
     <RelayEmptyState
       className="transcript-empty"
       titleId="transcript-empty-headline"
+      marginalia={<RelayDoodleChevron />}
       kicker={(
         <span className="transcript-empty-kicker">
           <RelayMark width={11} height={11} />

@@ -50,10 +50,10 @@
   color: var(--ink-1);
   /* CONTENT, NOT CHROME. A thread name is written by a person or an agent and
      runs to a full sentence — "Fix billing export race condition on concurrent
-     invoice writes" set in the 20px mono display face read as a terminal log
-     line, not as the title of the document below it. --type-title keeps the
-     mono face for fixed UI nouns (Threads, Backlog, the wordmark), where it is
-     the Phosphor brand; content-derived strings take the sans sibling. */
+     invoice writes" set at the tightened 24px/700 display tier would shout
+     someone's words. --type-title keeps that tier for fixed UI nouns
+     (Threads, Backlog, the wordmark), where it reads as the Fieldnotes
+     brand; content-derived strings take the calmer sans role. */
   font: var(--type-title-content);
   letter-spacing: var(--type-title-content-track);
   line-height: var(--leading-normal);
@@ -345,7 +345,7 @@
    Scoped one level deeper than the bare .rail-node so they win over the
    atelier.css circle override regardless of import order.
 
-   You    → a round solid action-green avatar. Round reads as "a person"; the
+   You    → a round solid action-yellow avatar. Round reads as "a person"; the
             circle silhouette is the fast human-vs-machine tell.
    Agent  → a square tile carrying that agent's profile image — its upload, or
             the name monogram on its identity hue. The circle-vs-square

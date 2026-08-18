@@ -17,7 +17,7 @@
    retired — agent identity reads through the vendor glyph (AgentMark), page
    kickers stay ink-3 like every other route, and metrics stay grey. */
 
-/* Title + vendor mark — operational scale (Geist title-lg), not a hero plate. */
+/* Title + vendor mark — operational scale (display-tier title-lg), not a hero plate. */
 .workspace-header-title {
   display: inline-flex;
   align-items: center;
@@ -1699,7 +1699,7 @@
    --type-body-sm size as its sibling .workspace-dossier-field-value and marks
    itself as the identity field with weight alone.
    The rail is the only place this class renders (verified against the DOM on
-   /teams/<id>); a second, mono display-tier rule for the non-rail case used to
+   /teams/<id>); a second display-tier rule for the non-rail case used to
    sit here describing markup that does not exist. */
 .workspace-dossier-name-value {
   margin: 0;

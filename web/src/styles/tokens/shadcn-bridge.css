@@ -18,6 +18,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -133,7 +134,9 @@
   --accent: var(--surface-1); /* shadcn "accent" = subtle hover surface */
   --accent-foreground: var(--ink-1);
   --destructive: var(--err);
+  --destructive-foreground: var(--on-err);
   --border: var(--line-1);
   --input: var(--control-border);
-  --ring: var(--action);
+  --ring: var(--link); /* focus rings are link-blue: the yellow action fill
+                          measures 1.7:1 on cream, under the 3:1 indicator floor */
 }

@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 /* Card — shadcn's slot vocabulary (card / card-header / card-title /
-   card-description / card-action / card-content / card-footer) on Phosphor's
+   card-description / card-action / card-content / card-footer) on Fieldnotes'
    flat elevation model.
 
    Two deliberate departures from upstream shadcn:

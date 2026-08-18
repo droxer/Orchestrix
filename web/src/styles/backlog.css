@@ -383,8 +383,8 @@
 
 /* ── Agent-state chip — glyph carries identity, pip carries readiness ───
    The textual label ("claude · ready") lives in the title/aria-label so the
-   board stays scannable. Color is reserved for the readiness pip only; the
-   glyph chip is monochrome ink-on-neutral, matching .agent-avatar. */
+   board stays scannable. Status tone is reserved for the readiness pip only;
+   the glyph chip is ink-on-neutral, matching .agent-avatar. */
 .agent-state {
   position: relative;
   display: inline-grid;
@@ -405,7 +405,7 @@
 /* Pin the glyph color against admin-v2-views.css's bare `.tone-good`/
    `.tone-bad` text-color utility (used unscoped by count labels elsewhere),
    which loads later in the stylesheet and would otherwise win at equal
-   specificity and tint the vendor glyph (currentColor) green/red. The
+   specificity and tint the vendor glyph (currentColor) with a status tone. The
    readiness pip below is the ONLY thing allowed to carry status color —
    agent identity is shape, never hue. */
 .agent-state.tone-good,
@@ -1720,7 +1720,7 @@
 
   /* Give every secondary action a visible chip surface. On the dark canvas the
      ghost buttons (with a faint hairline) all but vanished — worse when
-     disabled — so they read as neither present nor tappable. The green primary
+     disabled — so they read as neither present nor tappable. The yellow primary
      (Start) keeps its own fill. */
   .backlog-row-actions button:not(.backlog-action-primary, [data-variant="icon"]) {
     background: var(--surface-1);

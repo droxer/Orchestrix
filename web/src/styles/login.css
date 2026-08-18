@@ -1,11 +1,14 @@
 /* =====================================================================
    Login screen
 
-   Minimal centered sign-in card on a flat dark canvas (no theme
-   preference loaded yet). Color is pinned: the local --lg-* names alias
-   the always-dark register in tokens/palette.css so the screen stays dark
-   whatever theme the operator has saved. Spacing, type scale, and radii
-   are theme-independent tokens and are used directly.
+   Minimal centered sign-in card on a flat dark canvas — the pre-auth
+   "cover" stays in the pinned dark-olive register (no theme preference
+   loaded yet). The local --lg-* names alias the always-dark register in
+   tokens/palette.css so the screen stays dark whatever theme the
+   operator has saved; the one thing shared with the post-auth product
+   is the register-invariant action yellow on the primary CTA. Spacing,
+   type scale, and radii are theme-independent tokens and are used
+   directly.
    ===================================================================== */
 
 .login-screen {
@@ -17,15 +20,14 @@
   --lg-muted: var(--dark-ink-soft);
   --lg-hairline: var(--dark-line);
   --lg-hairline-soft: var(--dark-line-soft);
-  /* Names --lg-steel/--lg-amber are historical; the values are neutral now. */
-  --lg-steel: var(--dark-ink);
-  --lg-steel-active: var(--dark-ink-strong);
-  --lg-on-steel: var(--dark-canvas); /* text-on-action (dark ink on the white fill) */
+  /* --lg-steel names the screen's action fill role (the name is kept from
+     the old local palette; the value is the register-invariant action
+     yellow, so the pre-auth CTA is the same control as post-auth). */
+  --lg-steel: var(--action);
+  --lg-steel-active: var(--action-hover);
+  --lg-on-steel: var(--on-action); /* text on the action fill */
   --lg-err: var(--dark-ink); /* error is the loud/bright tier — dots stay calm */
   --lg-accent: var(--lg-steel);
-  /* Pin the action color to the pre-auth white so RelayMark's lead
-     chevron stays neutral white even when the operator's saved theme is light. */
-  --action: var(--lg-steel);
 
   display: flex;
   align-items: center;
@@ -210,7 +212,7 @@
   border: none;
   border-radius: var(--r-2);
   background: var(--lg-accent);
-  color: var(--lg-on-steel);
+  color: var(--on-action);
   font: var(--type-label-strong);
   cursor: pointer;
   touch-action: manipulation;
@@ -222,12 +224,10 @@
 }
 
 .login-submit:disabled {
-  /* Label uses --lg-muted (neutral gray, not a lg-on-steel/lg-accent blend):
-     on-steel is dark ink for the white rest state, so blending it
-     toward the accent here collapsed text and background to the same
-     dark hue and made the label unreadable. A neutral muted gray stays
-     legible against the darkened white fill regardless of which direction
-     on-steel points in a given accent scheme. */
+  /* Label uses --lg-muted rather than --on-action: --on-action is dark ink
+     picked for the full-strength yellow fill, and on the 40% disabled wash
+     it would read as live text on a dimmed button. A neutral muted step
+     stays legible against the darkened fill and reads as "unavailable". */
   background: color-mix(in srgb, var(--lg-accent) 40%, var(--lg-canvas));
   color: var(--lg-muted);
   cursor: default;

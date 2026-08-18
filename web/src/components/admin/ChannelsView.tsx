@@ -54,7 +54,7 @@ function providerLabel(provider: ChatProvider): string {
   return provider[0].toUpperCase() + provider.slice(1);
 }
 
-/** Monochrome provider mark — silhouette carries identity without vendor chroma. */
+/** Ink-on-neutral provider mark — silhouette carries identity without vendor chroma. */
 function ProviderGlyph({ provider }: { provider: ChatProvider }) {
   if (provider === "telegram") {
     return (

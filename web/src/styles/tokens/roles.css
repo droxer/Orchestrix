@@ -1,4 +1,4 @@
-/* Graphite roles — aliases and composites over palette.css.
+/* Fieldnotes roles — aliases and composites over palette.css.
    Component CSS consumes these plus the palette scales; it never
    originates a value. */
 
@@ -6,12 +6,13 @@
   /* Info is not a color — neutral notice text. */
   --info: var(--ink-3);
 
-  /* Links. Anchors were reading --action, which is the *button fill* role: the
-     two resolve to the same value today, so the mistake was invisible, but it
-     meant "the colour of a primary button" and "the colour of a link" could
-     never be tuned apart. They are different jobs; give them different names. */
-  --link: var(--ink-1);
-  --link-hover: var(--action-hover);
+  /* Links take the system's second sanctioned hue, link blue — wayfinding
+     only, never a fill and never an action. The role names stay separate
+     from --action even though the two could never collide now (yellow pill
+     vs blue anchor): "the colour of the primary button" and "the colour of
+     a link" are different jobs with different names. */
+  --link: var(--link-blue);
+  --link-hover: var(--link-blue-strong);
 
   /* Elevation — flat design: planes are separated by hairlines, not drop
      shadows. shadow-1 (bordered surfaces) carries no lift; shadow-2
@@ -77,13 +78,9 @@
      in one register and darken in the other, which is the direction a raised
      control wants in each.
 
-     8% rest / 16% hover. The rest step started at 5%, which reproduced the
-     magnitude of the old --surface-1 → --surface-2 step it replaced; that step
-     was inherited, not chosen, and it left a secondary button sitting at
-     1.10:1 against its plane — present, but reading as a tint rather than as
-     something you can press. Measured across both registers on all three
-     planes, 8%/16% puts the resting fill at 1.17–1.26:1 against its plane and
-     the hover step at 1.19–1.29:1 against that rest — perceptible everywhere,
+     8% rest / 16% hover. Measured across both registers on all three planes,
+     8%/16% puts the resting fill at 1.17–1.26:1 against its plane and the
+     hover step at 1.19–1.29:1 against that rest — perceptible everywhere,
      while still reading as a flat, low-chrome control. */
   --control-fill: color-mix(in srgb, var(--ink-1) 8%, transparent);
   --control-fill-hover: color-mix(in srgb, var(--ink-1) 16%, transparent);
@@ -101,29 +98,25 @@
      out of scrollers, drawers, and clipped rows, so the old ring silently lost
      an edge wherever a focusable element sat against the boundary of its
      container. `outline` is never clipped by an ancestor's overflow, and it is
-     the one ring property forced-colors mode preserves — the media query below
-     used to exist purely to re-draw the ring that box-shadow could not carry
-     there, and now agrees with the default instead of replacing it.
+     the one ring property forced-colors mode preserves.
 
-     The offset replaces the old soft halo. A ring sitting flush against the
-     element needed a second translucent layer to separate it from the border;
-     a 2px gap does that job with one declaration and no colour mixing.
-
-     The danger ring cannot differ by COLOUR: --err and --action resolve to the
-     same value in both registers (that is the point of the monochrome status
-     ramp), so the two were previously identical down to the pixel and the
-     danger variant communicated nothing at all. It differs by SHAPE — dashed,
-     the same channel StatusPill uses to mark the bad tone hollow. */
+     The ring is LINK BLUE, not the action yellow: #f7a501 measures 1.7:1 on
+     the cream canvas, far under the 3:1 floor for focus indicators, while
+     --link clears 5.8:1 on every plane in both registers. This is the second
+     job the blue hue carries (the first is anchors). The danger ring cannot
+     differ by COLOUR either: --err and --ink-1 resolve to the same value in
+     both registers, so a colour-only danger ring would be pixel-identical to
+     an error-tone text. It differs by SHAPE — dashed, the same channel
+     StatusPill uses to mark the bad tone hollow. */
   --focus-w: 2px;
   --focus-offset: 2px;
-  --focus-outline: var(--focus-w) solid var(--action);
+  --focus-outline: var(--focus-w) solid var(--link);
   --focus-outline-danger: var(--focus-w) dashed var(--err);
 
-  /* Type roles — one mono carries the display tier and technical text; Geist
-     carries reading and control text. Display and technical are the same face,
-     separated by weight, tracking, and colour: display is 700/600 in --ink-1
-     with display tracking, while --type-code stays 400 untracked in --ink-4.
-     Mono needs more weight than a sans at the same size to hold its own.
+  /* Type roles — IBM Plex Sans carries every tier. Hierarchy comes from
+     WEIGHT, not face: the display tier is 700 with negative tracking,
+     reading is 400, emphasis steps through 500/600. The mono face is
+     technical text only, set 400 untracked.
 
      EVERY role ships a paired *-track token. The `font:` shorthand cannot carry
      letter-spacing, so a role applied as `font: var(--type-title)` silently
@@ -135,55 +128,63 @@
        font: var(--type-title);
        letter-spacing: var(--type-title-track);
 
-     The display tiers share --track-display; the reading tiers take the body
-     tracks, which base.css already applies globally — the tokens are restated
-     here so a role that overrides `font:` can restore its own tracking without
-     knowing which tier it belongs to. */
-  --type-display:      700 var(--fs-6)/1.15 var(--font-display);
-  --type-title:        700 var(--fs-title)/1.2  var(--font-display);
-  --type-heading:      600 var(--fs-heading)/1.3  var(--font-display);
+     Several paired tracks resolve to 0 — that is the design, not a missing
+     value: DESIGN.md sets only its 24px display tier tight (-0.6px ≈
+     -0.025em) and everything else solid. The tokens stay explicit so a role's
+     tracking is decided here, once, not re-derived at every call site. */
+  --type-display:      700 var(--fs-6)/1.5 var(--font-display);
+  /* DESIGN.md calls for 800 on the display tier, but IBM Plex Sans Variable
+     tops out at 700 and base.css disables font synthesis — an 800 declaration
+     would silently render as 700, so the roles say 700 and let size +
+     tracking carry the tier. */
+  --type-title:        700 var(--fs-5)/1.33  var(--font-display);
+  --type-heading:      700 var(--fs-heading)/1.5  var(--font-display);
   --type-body:         400 var(--fs-4)/1.5  var(--font-sans);
   --type-body-sm:      400 var(--fs-3)/1.5  var(--font-sans);
-  --type-label:        500 var(--fs-2)/1.4  var(--font-sans);
-  --type-label-strong: 600 var(--fs-2)/1.4  var(--font-sans);
-  --type-micro:        500 var(--fs-1)/1.4  var(--font-sans); /* + uppercase + --track-caps */
-  --type-number:       700 var(--fs-title)/1.4  var(--font-display); /* mono is already tabular; the declaration is kept as a no-op guard */
-  --type-code:         400 var(--fs-2)/1.5  var(--font-mono);
+  --type-label:        500 var(--fs-2)/1.5  var(--font-sans);
+  --type-label-strong: 600 var(--fs-2)/1.5  var(--font-sans);
+  --type-micro:        600 var(--fs-1)/1.33 var(--font-sans); /* + uppercase */
+  --type-number:       700 var(--fs-5)/1.33  var(--font-display);
+  /* Code sizes to the mono face's metrics, not the sans ladder: 14px is
+     DESIGN.md's code-sm and sits between fs-2 (13) and fs-3 (15) on purpose.
+     Mono advances are wider than sans at the same size, so the code role
+     runs a rung under body copy. */
+  --type-code:         400 1rem/1.43 var(--font-mono);
 
   /* ----- Content-origin roles -----
      The three roles above the label tier answer "how loud", but the app also
      needs to answer "who wrote this string". A fixed UI noun (Threads, Backlog)
-     and an agent-authored sentence are both titles, and setting both in the
-     mono display face made a 60-character thread name read as a terminal log
-     line. These roles split the question by ORIGIN rather than by size.
+     and an agent-authored sentence are both titles, and setting both at the
+     display weight made a 60-character thread name read as a headline. These
+     roles split the question by ORIGIN rather than by size.
 
      --type-name  the identity of the thing a row or card is ABOUT. It sits one
                   rung above --type-label-strong because a card title that
                   differs from its own description by weight alone does not
                   lead: 132 call sites had collapsed onto the 13px label tier
-                  while --type-body (15px) carried six. Names are the tier that
-                  had to come back up.
+                  while --type-body carried six. Names are the tier that had
+                  to come back up.
      --type-title-content
-                  a title whose text comes from a user or an agent. Same size as
-                  --type-title, sans face — --type-title keeps the mono display
-                  face for fixed UI nouns, where it reads as the Phosphor brand
-                  rather than as monospaced prose.
+                  a title whose text comes from a user or an agent. 20px/600,
+                  one step calmer than --type-title's 24px/700 — the display
+                  weight is reserved for fixed UI nouns, where it reads as the
+                  Fieldnotes brand rather than as shouting someone's words.
      Structural group labels are NOT a fourth role: --type-micro above already
-     documents itself as "+ uppercase + --track-caps", so it was the register
-     all along — the drift was that ten rules set caps at 13px instead and one
-     list surface (.conversation-group-label) set them in sentence case while
-     the structurally identical .backlog-lane-label set them in caps. Those are
+     documents itself as "+ uppercase", so it was the register all along — the
+     drift was that ten rules set caps at 13px instead and one list surface
+     (.conversation-group-label) set them in sentence case while the
+     structurally identical .backlog-lane-label set them in caps. Those are
      converged onto --type-micro + --type-micro-track rather than onto a new
      token. The .eyebrow and .page-header-kicker utilities deliberately stay
      SENTENCE CASE on the same size: they are generic containers for arbitrary
      translated copy, where forced uppercase is a localization hazard. That
      carve-out is pinned by typographyTokens.test.ts — do not "converge" it. */
-  --type-name:          600 var(--fs-4)/1.4 var(--font-sans);
-  --type-title-content: 600 var(--fs-title)/1.3 var(--font-sans);
+  --type-name:          600 var(--fs-4)/1.5 var(--font-sans);
+  --type-title-content: 600 var(--fs-title)/1.4 var(--font-sans);
 
-  --type-display-track:      var(--track-display);
-  --type-title-track:        var(--track-display);
-  --type-heading-track:      var(--track-display);
+  --type-display-track:      var(--track-0);       /* 36px display sets solid */
+  --type-title-track:        var(--track-display); /* the one tightened tier */
+  --type-heading-track:      var(--track-0);
   --type-number-track:       var(--track-display);
   --type-body-track:         var(--track-body);
   --type-body-sm-track:      var(--track-body-sm);

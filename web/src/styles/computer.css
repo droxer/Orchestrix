@@ -267,7 +267,7 @@ button.computer-run-open:hover {
   white-space: nowrap;
 }
 
-/* The one place the accent belongs on this surface: a counter that is
+/* The one place the live yellow belongs on this surface: a counter that is
    moving because an agent is working right now. */
 .computer-run-elapsed {
   color: var(--live);

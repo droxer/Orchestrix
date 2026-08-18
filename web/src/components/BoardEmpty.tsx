@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { ActionCompose } from "./icons";
+import { RelayDoodleOrbit } from "./marginalia";
 
 // Shared empty-state for task boards (Backlog + Routine). Left-aligned,
 // inline with the page's normal content column — no centered icon block.
@@ -21,7 +22,10 @@ export function BoardEmpty({
   onClear?: () => void;
 }) {
   return (
-    <div className="backlog-board-empty">
+    <div className="backlog-board-empty relay-marginalia-host">
+      <span className="relay-empty-marginalia" aria-hidden="true">
+        <RelayDoodleOrbit />
+      </span>
       <h2 className="relay-empty-title">{title}</h2>
       <p className="backlog-board-empty-body relay-empty-body">{body}</p>
       {onCreate && createLabel ? (

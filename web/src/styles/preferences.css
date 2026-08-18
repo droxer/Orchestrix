@@ -274,17 +274,18 @@
   height: 2px;
 }
 
-/* Swatches preview the light/dark canvas + action color regardless of which
-   theme is active, so — unlike the rest of this file — they can't use the
-   register-varying --surface-0/--action. They read the pinned --dark-* /
-   --light-* register tokens in palette.css instead, which resolve to the
-   same values both registers use and stay in sync with them by definition. */
+/* Swatches preview the light/dark canvas regardless of which theme is
+   active, so — unlike the rest of this file — they can't use the
+   register-varying --surface-0. They read the pinned --dark-* / --light-*
+   register tokens in palette.css instead, which resolve to the same values
+   both registers use and stay in sync with them by definition. The action
+   dot can use --action directly: the yellow is register-invariant. */
 .pref-theme-swatch[data-tone="light"] {
   background: var(--light-canvas);
 }
 
 .pref-theme-swatch[data-tone="light"]::after {
-  background: var(--light-ink); /* light register's black action */
+  background: var(--action); /* the register-invariant action yellow */
 }
 
 .pref-theme-swatch[data-tone="dark"] {
@@ -293,7 +294,7 @@
 }
 
 .pref-theme-swatch[data-tone="dark"]::after {
-  background: var(--dark-ink); /* dark register's white action */
+  background: var(--action);
 }
 
 .pref-theme-swatch[data-tone="system"] {
@@ -302,9 +303,9 @@
 }
 
 .pref-theme-swatch[data-tone="system"]::after {
-  /* The action color is register-varying (black on light / white on
-     dark), so the split-gradient dot shows both, half per register. */
-  background: linear-gradient(90deg, var(--light-ink) 0 50%, var(--dark-ink) 50% 100%);
+  /* One dot, one yellow: --action is register-invariant, so the system
+     swatch needs no split gradient. */
+  background: var(--action);
 }
 
 /* ── Language badges ──────────────────────────────────────────────────────── */

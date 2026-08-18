@@ -19,10 +19,10 @@ import { useModalDrawer } from "@/hooks/useModalDrawer";
 import { ActionRemove } from "../icons";
 
 // Promise-based confirm/prompt that replaces the native window.confirm /
-// window.prompt. Those drop OS chrome into a precision/monochrome product and
-// can't carry the danger-tone treatment the design system defines. This keeps
-// call sites nearly identical — `if (!(await confirm({...}))) return;` — while
-// rendering an in-brand modal.
+// window.prompt. Those drop unstyled OS chrome into a token-driven product
+// and can't carry the danger-tone treatment the design system defines. This
+// keeps call sites nearly identical — `if (!(await confirm({...}))) return;` —
+// while rendering an in-brand modal.
 
 type ConfirmOptions = {
   title: string;

@@ -1,6 +1,6 @@
 # Relay Brand Assets
 
-These are the repository-facing Phosphor logo assets. The living color and
+These are the repository-facing Fieldnotes logo assets. The living color and
 typography contract is maintained in
 [`docs/design-system.md`](../../docs/design-system.md); do not duplicate its
 token table here.
@@ -8,10 +8,10 @@ token table here.
 ## Files
 
 - `relay-logo.svg` is the primary wordmark for documentation and other
-  standalone surfaces. It is monochrome and follows the viewer's light or dark
+  standalone surfaces. It is olive ink and follows the viewer's light or dark
   color scheme.
-- `relay-mark.svg` is the dark app-icon badge. Its lead chevron uses Phosphor's
-  bounded app-icon exception to the liveness color rule.
+- `relay-mark.svg` is the dark app-icon badge. Its lead chevron uses the
+  bounded app-icon exception to the one-hue rule (highlighter yellow).
 - `relay-logo-concept.png` is an early concept reference. Do not ship or embed
   it when an SVG is available.
 

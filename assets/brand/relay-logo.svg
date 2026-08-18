@@ -1,27 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 64" role="img" aria-label="Relay" shape-rendering="geometricPrecision">
   <title>Relay</title>
-  <!-- Phosphor wordmark. Monochrome by rule: colour is reserved for live agent
-       work, and a logo is never live. Lettering is JetBrains Mono 700 at -0.04em,
-       matching the app's display tier. -->
+  <!-- Fieldnotes wordmark. Olive ink by rule: the highlighter yellow is
+       reserved for actions and live agent work, and a logo is neither.
+       Lettering is IBM Plex Sans 700, matching the app's display tier. -->
   <style>
     :root {
       color-scheme: light dark;
-      --relay-ink: #16181b;
+      --relay-ink: #23251d;
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --relay-ink: #f2f4f6;
+        --relay-ink: #f1f1e8;
       }
     }
   </style>
   <g fill="none" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M8 14 L28 32 L8 50" stroke="var(--relay-ink, #16181b)"/>
-    <path d="M28 14 L48 32 L28 50" stroke="var(--relay-ink, #16181b)" opacity="0.45"/>
+    <path d="M8 14 L28 32 L8 50" stroke="var(--relay-ink, #23251d)"/>
+    <path d="M28 14 L48 32 L28 50" stroke="var(--relay-ink, #23251d)" opacity="0.45"/>
   </g>
   <text x="74" y="44"
-        font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+        font-family="'IBM Plex Sans', 'Avenir Next', 'Segoe UI Variable', 'Segoe UI', ui-sans-serif, system-ui, sans-serif"
         font-size="42"
         font-weight="700"
-        letter-spacing="-1.68px"
-        fill="var(--relay-ink, #16181b)">Relay</text>
+        letter-spacing="-1px"
+        fill="var(--relay-ink, #23251d)">Relay</text>
 </svg>

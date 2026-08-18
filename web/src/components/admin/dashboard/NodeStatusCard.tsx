@@ -17,13 +17,13 @@ interface NodeStatusCardProps {
   className?: string;
 }
 
-// Five states have to be distinguishable in an 8px bar. The Phosphor grey
+// Five states have to be distinguishable in an 8px bar. The olive brightness
 // ramp alone cannot do it — ready and unknown are one step apart — so each
 // tone is double-encoded by brightness and texture (see
 // admin-v2-dashboard.css). "running" takes --live: a node running an agent is
 // the one thing in Relay that is working right now, which is exactly what the
-// accent is reserved for. There is no "info" tone left; running used to carry
-// it and nothing else did.
+// live yellow is reserved for. There is no "info" tone left; running used to
+// carry it and nothing else did.
 type Tone = "live" | "good" | "bad" | "warn" | "muted";
 type Slot = { key: string; tone: Tone; count: number; share: number };
 

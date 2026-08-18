@@ -99,16 +99,30 @@ describe("UI primitive contracts", () => {
     assert.doesNotMatch(source, /ItemText className="[^"]*whitespace-nowrap/);
   });
 
-  it("encodes destructive by shape because --err and --action share a value", async () => {
+  it("encodes destructive by shape because --err and --ink-1 share a value", async () => {
     const palette = await readFile(resolve("web/src/styles/tokens/palette.css"), "utf8");
     const dark = palette.match(/:root\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
     const light = palette.match(/html\[data-theme="light"\]\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
 
     // This is the whole reason a destructive button cannot be a tint: in the
-    // Phosphor palette the danger tone IS the action tone. If a future palette
-    // gives --err its own value, revisit the shape encoding below.
-    assert.equal(cssHex(dark, "err"), cssHex(dark, "action"));
-    assert.equal(cssHex(light, "err"), cssHex(light, "action"));
+    // Fieldnotes palette the danger tone is the LOUD END of the ink ramp (the
+    // status tones are a brightness hierarchy of olive greys), so a
+    // translucent --err wash would be indistinguishable from neutral chrome.
+    // If a future palette gives --err its own hue, revisit the shape encoding
+    // below.
+    assert.equal(cssHex(dark, "err"), cssHex(dark, "ink-1"));
+    assert.equal(cssHex(light, "err"), cssHex(light, "ink-1"));
+
+    // The hover inversion pairs the --err fill with a DEDICATED on-tone,
+    // --on-err, declared per register (dark ink on the bright register's
+    // --err, bright ink on the dark register's). It cannot reuse
+    // --on-action: that token is register-invariant #23251d while --err
+    // flips polarity between registers, so the pairing measured 1:1 in the
+    // light register until --on-err existed.
+    for (const [name, block] of [["dark", dark], ["light", light]] as const) {
+      const ratio = contrast(cssHex(block, "on-err"), cssHex(block, "err"));
+      assert.ok(ratio >= 4.5, `${name} --on-err on --err is ${ratio.toFixed(2)}:1 — below the 4.5:1 floor`);
+    }
 
     const button = await readFile(resolve("web/src/components/ui/button.tsx"), "utf8");
     const destructive = button.match(/destructive:\s*\n?\s*"([^"]*)"/)?.[1] ?? "";
@@ -118,7 +132,7 @@ describe("UI primitive contracts", () => {
     // translucent fill, which would be indistinguishable from `ghost`.
     assert.match(destructive, /border-destructive/);
     assert.match(destructive, /hover:bg-destructive\b/);
-    assert.match(destructive, /hover:text-on-primary/);
+    assert.match(destructive, /hover:text-destructive-foreground/);
     assert.doesNotMatch(destructive, /(?:^|\s)bg-destructive\//);
   });
 

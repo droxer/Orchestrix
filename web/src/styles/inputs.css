@@ -143,8 +143,8 @@
   font-size: var(--fs-3);
 }
 
-/* Monochrome agent avatars. The precision system reserves color for
-   status, so agents are no longer tinted with vendor brand hues — the
+/* Ink-on-neutral agent avatars. Colour is reserved for action, live work,
+   and links, so agents are not tinted with vendor brand hues — the
    AgentMark glyph carries identity. All four render ink-on-neutral on a
    shared surface chip; differentiation is by glyph shape, not color. */
 .agent-avatar[data-agent="claude"],

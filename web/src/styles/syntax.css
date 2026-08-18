@@ -1,7 +1,8 @@
-/* highlight.js token theme — mapped onto the Relay design tokens to keep the
-   established monochrome-ink-plus-amber-numbers look while letting real
-   per-language grammars classify tokens accurately. Applies anywhere a
-   `code.hljs` block is rendered (workspace file preview, Markdown fences). */
+/* highlight.js token theme — mapped onto the Relay design tokens: olive ink
+   carries every token class, with weight and italics separating the roles,
+   while real per-language grammars classify tokens accurately. Applies
+   anywhere a `code.hljs` block is rendered (workspace file preview, Markdown
+   fences). */
 
 .hljs {
   color: var(--ink-1);

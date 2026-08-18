@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Relay" shape-rendering="geometricPrecision">
   <title>Relay</title>
-  <!-- Phosphor app-icon badge (dark): near-black field, live-green lead chevron.
-       Kept identical to web/public/favicon.svg — this tree had drifted to a
-       cobalt-era blue field. -->
-  <rect x="4" y="4" width="56" height="56" rx="15" fill="#101214"/>
+  <!-- Fieldnotes app-icon badge (dark): olive-charcoal tile + highlighter-yellow
+       lead chevron. The bounded app-icon exception to the one-hue rule — at
+       16px an olive chevron on an olive tile vanishes. -->
+  <rect x="4" y="4" width="56" height="56" rx="15" fill="#1f211a"/>
   <g fill="none" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M22 20 L36 32 L22 44" stroke="#3ee08a"/>
-    <path d="M36 20 L50 32 L36 44" stroke="#f2f4f6" opacity="0.45"/>
+    <path d="M22 20 L36 32 L22 44" stroke="#f7a501"/>
+    <path d="M36 20 L50 32 L36 44" stroke="#f1f1e8" opacity="0.45"/>
   </g>
 </svg>
