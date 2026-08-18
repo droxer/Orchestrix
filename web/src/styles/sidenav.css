@@ -417,7 +417,7 @@
   color: var(--ink-3);
   font: var(--type-micro);
   text-transform: uppercase;
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--type-micro-track);
   white-space: nowrap;
 }
 

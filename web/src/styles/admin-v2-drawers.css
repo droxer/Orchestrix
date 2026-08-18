@@ -148,8 +148,9 @@
 }
 
 .adm-form-legend {
-  font: var(--type-label-strong);
-  letter-spacing: var(--track-0);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
   color: var(--ink-3);
   padding: 0;
   margin-bottom: var(--sp-1);
@@ -251,9 +252,10 @@
 }
 
 .adm-drawer-section-title {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
   margin: 0;
-  font: var(--type-label-strong);
-  letter-spacing: var(--track-0);
   color: var(--ink-3);
 }
 
@@ -268,8 +270,9 @@
 
 .adm-assign-section-eyebrow,
 .adm-assign-operator-eyebrow {
-  font: var(--type-label-strong);
-  letter-spacing: var(--track-0);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
   color: var(--ink-3);
 }
 
@@ -423,7 +426,8 @@
 }
 
 .adm-assign-node-id {
-  font: var(--type-label-strong);
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
   color: var(--ink-1);
   word-break: break-all;
 }
@@ -447,9 +451,8 @@
 }
 
 .adm-assign-node-status {
-  font-size: var(--fs-1);
-  font-weight: 600;
-  letter-spacing: var(--track-caps);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
   color: var(--tone, var(--ink-3));
 }
@@ -484,8 +487,9 @@
 .adm-assign-empty > svg { margin-top: var(--sp-0-5); flex-shrink: 0; opacity: 0.7; }
 
 .adm-assign-empty-title {
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
   margin: 0 0 var(--sp-1);
-  font: var(--type-label-strong);
   color: var(--ink-1);
 }
 
@@ -517,9 +521,10 @@
 }
 
 .adm-provision-section-title {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
   margin: 0;
-  font: var(--type-label-strong);
-  letter-spacing: var(--track-0);
   color: var(--ink-3);
 }
 
@@ -627,8 +632,9 @@
 }
 
 .create-agent-runtime-option-name {
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
   overflow: hidden;
-  font: var(--type-label-strong);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -716,8 +722,8 @@
 }
 
 .adm-provision-outcome-label {
-  font: var(--type-label-strong);
-  letter-spacing: var(--track-caps);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
   color: var(--ink-1);
 }
@@ -870,9 +876,8 @@
 }
 
 .adm-placement-status {
-  font-size: var(--fs-1);
-  font-weight: 600;
-  letter-spacing: var(--track-caps);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
   color: var(--tone, var(--ink-3));
 }
@@ -915,8 +920,8 @@
 .adm-cred-row:last-of-type { border-bottom: none; }
 
 .adm-cred-label {
-  font: var(--type-label-strong);
-  letter-spacing: var(--track-caps);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
   color: var(--ink-3);
 }

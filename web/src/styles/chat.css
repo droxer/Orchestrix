@@ -48,11 +48,14 @@
   margin: 0;
   flex: 1 1 auto;
   color: var(--ink-1);
-  font: var(--type-title);
-  /* Reading line-height is kept — thread names wrap — but the old --track-0
-     opt-out is dropped: it existed because Mona's optical-size axis handled
-     display spacing, which a mono face does not. */
-  letter-spacing: var(--type-title-track);
+  /* CONTENT, NOT CHROME. A thread name is written by a person or an agent and
+     runs to a full sentence — "Fix billing export race condition on concurrent
+     invoice writes" set in the 20px mono display face read as a terminal log
+     line, not as the title of the document below it. --type-title keeps the
+     mono face for fixed UI nouns (Threads, Backlog, the wordmark), where it is
+     the Phosphor brand; content-derived strings take the sans sibling. */
+  font: var(--type-title-content);
+  letter-spacing: var(--type-title-content-track);
   line-height: var(--leading-normal);
   overflow: hidden;
   text-overflow: ellipsis;

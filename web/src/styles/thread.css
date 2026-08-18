@@ -458,8 +458,8 @@
 .conversation-name strong {
   min-width: 0;
   color: var(--ink-1);
-  font: var(--type-label-strong);
-  letter-spacing: var(--track-0);
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -633,8 +633,9 @@
   align-items: baseline;
   gap: var(--sp-2);
   padding: var(--sp-2) var(--page-gutter) var(--sp-1);
-  font: var(--type-label);
-  letter-spacing: var(--track-0);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
   color: var(--ink-3);
 }
 

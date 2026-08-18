@@ -315,8 +315,8 @@
    read as decoration, not information. */
 .backlog-lane-label {
   color: var(--ink-1);
-  font: var(--type-label);
-  letter-spacing: var(--track-caps);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
 }
 
@@ -622,8 +622,8 @@
   border: 0;
   background: transparent;
   color: var(--ink-1);
-  font: var(--type-label-strong);
-  letter-spacing: var(--track-0);
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
   text-align: left;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -879,7 +879,8 @@
 .task-assignment-option-copy > span:first-child {
   overflow: hidden;
   color: var(--ink-1);
-  font: var(--type-label-strong);
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -991,7 +992,8 @@
 .task-assignment-summary-title {
   overflow: hidden;
   color: var(--ink-1);
-  font: var(--type-label-strong);
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1367,7 +1369,7 @@
 
 .backlog-rows-head-cell {
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
   color: var(--ink-3);
 }
@@ -1468,8 +1470,8 @@
   border: 0;
   background: transparent;
   color: var(--ink-1);
-  font: var(--type-label-strong);
-  letter-spacing: var(--track-0);
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
   text-align: left;
   white-space: nowrap;
   overflow: hidden;

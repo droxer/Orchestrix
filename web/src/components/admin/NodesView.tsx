@@ -164,7 +164,7 @@ export function NodesView({ nodes, employees, storedTokens, layout, onLayoutChan
           })}
         </div>
       ) : (
-        <div role="table" aria-label={t("admin.v2.nav_nodes")}>
+        <div role="table" data-density="compact" aria-label={t("admin.v2.nav_nodes")}>
           <div className="adm-node-cols" role="row">
             <span className="adm-col-label" role="columnheader">{t("admin.v2.col_node")}</span>
             <span className="adm-col-label" role="columnheader">{t("admin.v2.col_employee")}</span>

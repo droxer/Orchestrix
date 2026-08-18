@@ -78,11 +78,22 @@ body {
    with data-slot) are excluded: this sheet sits in @layer relay after
    Tailwind's utilities layer, so an unqualified element selector would
    override their text-… and color utilities (dark-on-dark CTA in light theme).
-   Same exclusion as the border/background reset below. */
-button:not([data-slot]),
-input:not([data-slot]),
-textarea:not([data-slot]),
-select:not([data-slot]) {
+   Same exclusion as the border/background reset below.
+
+   WRAPPED IN :where() SO COMPONENT RULES WIN. `input:not([data-slot])` scores
+   0,1,1 — higher than any single-class selector — so this reset silently beat
+   every component rule that set a field's type. `.backlog-filter-search`,
+   `.command-input`, and `.dialog-input` each asked for --fs-4/15px and rendered
+   at the inherited 14px; the stylesheet said one thing and the browser did
+   another. This is the same failure the button note below documents, one
+   element further along. :where() zeroes the specificity, so a field with no
+   component rule still inherits exactly as before, while one that declares its
+   own type now gets it. The :not([data-slot]) guard still matters: layer order
+   (relay after utilities) is what beats Tailwind, not specificity. */
+:where(button:not([data-slot])),
+:where(input:not([data-slot])),
+:where(textarea:not([data-slot])),
+:where(select:not([data-slot])) {
   font: inherit;
   color: inherit;
 }
@@ -198,6 +209,27 @@ select:focus-visible {
   letter-spacing: var(--type-code-track);
 }
 
+/* Structural group label — the single register for "this names a section",
+   whether the section is a kanban lane, a thread group, a form fieldset, or a
+   dossier block, all on the --type-micro register.
+
+   There used to be three answers to this one question: this utility (micro,
+   sentence case, untracked), 22 hand-rolled uppercase micro-caps rules, and 10
+   hand-rolled uppercase rules at 13px. The disagreement was visible in the
+   product — .backlog-lane-label set its lanes in caps while
+   .conversation-group-label set the structurally identical thread groups in
+   sentence case. Those named rules converged onto --type-micro +
+   --type-micro-track, the caps register that role already documents itself as.
+
+   THIS UTILITY IS THE DELIBERATE EXCEPTION and keeps sentence case. It is a
+   GENERIC container for arbitrary, translated copy — forced uppercase there is
+   a localization hazard, and Han glyphs have no case to transform. The same
+   applies to .page-header-kicker. typographyTokens.test.ts pins both; do not
+   "converge" them into the caps register.
+
+   A group label is NOT a heading: it names a container, it does not introduce
+   prose. Markup that needs a real heading should use --type-heading instead of
+   shrinking an h2 down to the smallest rung in the ladder. */
 .eyebrow {
   margin: 0;
   color: var(--ink-3);

@@ -243,18 +243,26 @@ liveness surface changes.
 
 **JetBrains Mono** carries both `--font-display` (display, title, heading, and
 metric roles) and `--font-mono` (code-like content) — one family, two jobs.
-**Geist** (`--font-sans`) carries reading and control text. Ten roles:
+**Geist** (`--font-sans`) carries reading and control text. Twelve roles.
+
+The display face is chosen by **content origin, not by size**: a fixed UI noun
+(Threads, Backlog, the wordmark, a drawer title) takes the mono display tier,
+while a string written by a person or an agent takes its sans sibling. A
+60-character thread name set in 20px mono reads as a terminal log line, not as
+the title of the document beneath it.
 
 | Role | Spec | Paired track | Use |
 |---|---|---|---|
 | `--type-display` | 700 32/1.15 | `--track-display` | hero headline, admin metric values |
-| `--type-title` | 700 20/1.2 | `--track-display` | page + chat titles |
+| `--type-title` | 700 20/1.2 | `--track-display` | page titles and other fixed UI nouns (mono) |
 | `--type-heading` | 600 17/1.3 | `--track-display` | section heads, list labels, in-message h1 |
+| `--type-title-content` | 600 20/1.3 | `--track-body` | titles whose text comes from a user or agent (sans) |
 | `--type-body` | 400 15/1.5 | `--track-body` | prose, message bodies, inputs |
+| `--type-name` | 600 15/1.4 | `--track-body-sm` | the identity of the thing a row or card is about |
 | `--type-body-sm` | 400 14/1.5 | `--track-body-sm` | dense prose, captions |
 | `--type-label` | 500 13/1.4 | `--track-body-sm` | chrome labels, nav, metadata |
 | `--type-label-strong` | 600 13/1.4 | `--track-body-sm` | bold chrome, button labels |
-| `--type-micro` | 500 11/1.4 | `--track-caps` | eyebrows and compact metadata |
+| `--type-micro` | 500 11/1.4 | `--track-caps` | structural group labels (+ uppercase), badges, compact metadata |
 | `--type-number` | 700 20/1.4 | `--track-display` | metrics (mono is already tabular) |
 | `--type-code` | 400 13/1.5 | `--track-0` | commands, logs, IDs |
 
@@ -342,6 +350,14 @@ through to Geist by design rather than shipping a second file.
   only sanctioned sub-4px gaps — do not introduce 3px or 5px one-offs.
   `--sp-row` (12px, compact 8px via `[data-density="compact"]`) sets row
   rhythm; `--control-h` (40px) is the standard control height.
+- **Density:** `[data-density="compact"]` drops the reading tier to 13px for
+  genuinely dense surfaces (tables and list layouts) — not for card grids,
+  which keep the standard scale. Put the attribute on the dense container, not
+  the page. It overrides `--fs-4` **and restates every role built on it**
+  (`--type-body`, `--type-name`), because a custom property resolves `var()`
+  where it is *declared*: a role declared on `:root` has already resolved
+  `--fs-4` before it inherits into the scope, so overriding the size token
+  alone does nothing. Add a restatement whenever a new role uses `--fs-4`.
 - **Elevation:** the system is flat — planes separate by hairline, not lift.
   `--shadow-1` is `none` (bordered surfaces carry no drop); `--shadow-2`
   resolves to a single 1px ring so borderless floating chrome (drawers,

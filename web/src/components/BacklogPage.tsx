@@ -782,7 +782,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   }
 
   return (
-    <section id="backlog-panel" className="backlog-page" data-view={view} data-density="compact" aria-label={t("backlog.title")} tabIndex={-1}>
+    <section id="backlog-panel" className="backlog-page" data-view={view} aria-label={t("backlog.title")} tabIndex={-1}>
       <PageHeader
         kicker={t("nav.workspace")}
         title={t("backlog.title")}
@@ -821,7 +821,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
           );
         })()
       ) : view === "list" ? (
-        <div className="backlog-rows" role="table" aria-label={t("backlog.title")}>
+        <div className="backlog-rows" role="table" data-density="compact" aria-label={t("backlog.title")}>
           <div className="backlog-rows-head" role="row">
             <span className="backlog-rows-head-cell backlog-rows-head-dot" role="columnheader" />
             <span className="backlog-rows-head-cell backlog-rows-head-lead" role="columnheader">{t("backlog.col_task")}</span>
