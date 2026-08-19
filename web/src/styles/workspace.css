@@ -490,17 +490,6 @@
   font: var(--type-body-sm);
 }
 
-.workspace-dossier-role-select {
-  width: 100%;
-  min-height: 32px;
-  padding: 0 var(--sp-2);
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-2);
-  color: var(--ink-1);
-  font: var(--type-body-sm);
-}
-
 .workspace-dossier-stamp {
   margin: 0;
   padding-top: var(--sp-4);
@@ -1330,47 +1319,22 @@
   gap: var(--sp-3);
 }
 
-/* Section title — the display tier (mono title role), not an off-scale
-   sans with hand-picked weight/tracking. */
+/* Section title inside a tab panel. --type-title is the PAGE title role (24px
+   mono 700) — used here it printed louder than the agent's own name in the
+   header (--type-title-content, 20px sans 600) one band above. Takes the same
+   role as .workspace-pane-head h2 so all three tabs of the record agree. */
 .agent-personality-title-row h2 {
   margin: 0;
   color: var(--ink-1);
-  font: var(--type-title);
-  letter-spacing: var(--type-title-track);
-}
-
-.agent-personality-state {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1-5);
-  color: var(--ink-3);
-  font: var(--type-micro);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-}
-
-.agent-personality-state > span {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--r-full);
-  background: var(--ink-4);
-}
-
-/* "Ready" is a status, not an action — the grey hierarchy's calm tier,
-   same as tone-good on the status pills. */
-.agent-personality-state.is-defined {
-  color: var(--ok);
-}
-
-.agent-personality-state.is-defined > span {
-  background: var(--ok);
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
 }
 
 .agent-personality-help {
   max-width: var(--measure);
   color: var(--ink-3);
   font: var(--type-body-sm);
-  line-height: var(--leading-normal);
+  letter-spacing: var(--type-body-sm-track);
   text-wrap: pretty;
 }
 
@@ -1386,70 +1350,6 @@
   z-index: 1;
   padding: var(--sp-5) 0 0;
   border-top: 1px solid var(--line-2);
-  color: var(--ink-2);
-  font: var(--type-body-sm);
-  line-height: var(--leading-prose);
-  overflow-wrap: anywhere;
-}
-
-.agent-personality-document > :first-child {
-  margin-top: 0;
-}
-
-.agent-personality-document > :last-child {
-  margin-bottom: 0;
-}
-
-/* In-document headings — reading face, on-scale weights, subhead sizes so a
-   heading inside the prose never rivals the pane title. */
-.agent-personality-document h1,
-.agent-personality-document h2,
-.agent-personality-document h3 {
-  margin: var(--sp-5) 0 var(--sp-2);
-  color: var(--ink-1);
-  font-weight: 600;
-  letter-spacing: var(--track-0);
-  line-height: var(--leading-snug);
-}
-
-.agent-personality-document h1 {
-  font-size: var(--fs-title);
-}
-
-.agent-personality-document h2 {
-  font-size: var(--fs-heading);
-}
-
-.agent-personality-document h3 {
-  font-size: var(--fs-4);
-}
-
-.agent-personality-document p,
-.agent-personality-document ul,
-.agent-personality-document ol,
-.agent-personality-document blockquote {
-  margin: 0 0 var(--sp-3);
-}
-
-.agent-personality-document ul,
-.agent-personality-document ol {
-  padding-left: 1.15rem;
-}
-
-.agent-personality-document li + li {
-  margin-top: var(--sp-1);
-}
-
-.agent-personality-document blockquote {
-  padding-left: var(--sp-4);
-  border-left: 2px solid var(--line-1);
-  color: var(--ink-3);
-}
-
-.agent-personality-document code {
-  font-family: var(--font-mono);
-  letter-spacing: var(--type-code-track);
-  font-size: 0.92em;
 }
 
 .agent-personality-empty {
@@ -1468,10 +1368,8 @@
 
 .agent-personality-empty-lede {
   color: var(--ink-1);
-  font-size: var(--fs-4);
-  font-weight: 500;
-  letter-spacing: var(--track-0);
-  line-height: var(--leading-snug);
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
   text-wrap: balance;
 }
 
@@ -1479,14 +1377,14 @@
   margin-top: var(--sp-2);
   color: var(--ink-3);
   font: var(--type-body-sm);
-  line-height: var(--leading-normal);
+  letter-spacing: var(--type-body-sm-track);
   text-wrap: pretty;
 }
 
 .agent-personality-editor-guide ol {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  margin: var(--sp-6) 0 0;
+  margin: var(--sp-4) 0 0;
   padding: 0;
   border-top: 1px solid var(--line-2);
   list-style: none;
@@ -1540,19 +1438,15 @@
 .agent-personality-editor-guide {
   padding: var(--sp-4);
   border: 1px solid var(--line-2);
-  border-radius: var(--r-1);
-  background: color-mix(in srgb, var(--surface-1) 76%, transparent);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
 }
 
 .agent-personality-editor-guide > p {
   margin: 0;
   color: var(--ink-2);
   font: var(--type-body-sm);
-  line-height: var(--leading-normal);
-}
-
-.agent-personality-editor-guide ol {
-  margin-top: var(--sp-4);
+  letter-spacing: var(--type-body-sm-track);
 }
 
 .agent-personality-editor-guide li div {
@@ -1637,7 +1531,7 @@
   gap: var(--sp-2);
 }
 
-@media (max-width: 719px) {
+@media (max-width: 820px) {
   .agent-personality-card {
     padding: var(--sp-5);
   }
@@ -1648,10 +1542,6 @@
 
   .agent-personality-edit-action {
     align-self: flex-start;
-  }
-
-  .agent-personality-document {
-    padding-left: 0;
   }
 
   .agent-personality-editor-guide ol {
@@ -1733,7 +1623,8 @@
   margin: 0 0 var(--sp-3);
   color: var(--ink-3);
   font: var(--type-micro);
-  letter-spacing: var(--track-0);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
 }
 
 /* ---- loading skeleton + error -------------------------------------- */
