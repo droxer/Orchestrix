@@ -133,6 +133,9 @@ export function App() {
   // Team picked in the composer while staging a brand-new thread; cleared the
   // moment an existing thread opens or the pick is sent.
   const [pendingThreadTeamId, setPendingThreadTeamId] = useState<string | null>(null);
+  // A project thread talks to the whole roster by default; picking one member
+  // in the composer narrows the round to them until the roster is picked again.
+  const [projectRoomTarget, setProjectRoomTarget] = useState(true);
   const [threadQuery, setThreadQuery] = useState("");
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [sidenavExpanded, setSidenavExpanded] = useState(false);
@@ -389,6 +392,11 @@ export function App() {
   const projectDispatchDisabled = Boolean(
     activeProject && (activeProject.archivedAt || !activeProject.enabled),
   );
+  // Narrowing a round to one member is a per-thread choice, not a standing
+  // preference: opening another thread (or another project) starts at the room.
+  useEffect(() => {
+    setProjectRoomTarget(true);
+  }, [activeProject?.id, activeSession?.id]);
   const effectiveSelectableLogicalAgents = useMemo(() => {
     if (!activeProject) return selectableLogicalAgents;
     const agentsById = new Map(logicalAgents.map((agent) => [agent.id, agent]));
@@ -899,13 +907,16 @@ export function App() {
       : undefined;
     let goal = raw;
     let newThreadAgentIds: string[] | undefined;
+    // A project round addresses the whole roster unless the composer (or a
+    // mention) names one member — the backend expands whichever it is given.
+    const projectRoomRound = Boolean(activeProject) && projectRoomTarget;
     // A mention overrides the footer selection. Team messages intentionally
     // default to the room; every single-agent message requires one valid
     // footer selection and never fails open to the room.
     const messageAddress = resolveThreadMessageAddress({
       text: raw,
       candidates: threadMentionCandidates,
-      defaultAgentId: activeProject || pendingTeam || activeSession?.teamId
+      defaultAgentId: projectRoomRound || pendingTeam || activeSession?.teamId
         ? undefined
         : activeLogicalAgentId,
     });
@@ -922,7 +933,7 @@ export function App() {
     // Participant availability is a creation concern. Continued threads send
     // semantic intent to the conductor, which resolves the room against live
     // membership and placement state on the server.
-    if (!sessionId && !pendingTeam && !activeProject) {
+    if (!sessionId && !pendingTeam) {
       newThreadAgentIds = messageAddress.addressAgentIds;
     }
     // Echo the turn immediately. For a continued session we mint the message id
@@ -973,7 +984,9 @@ export function App() {
             ...(activeProject ? { projectId: activeProject.id } : {}),
             ...(!activeProject && selectedThreadNodeId ? { daemonNodeId: selectedThreadNodeId } : {}),
             ...(activeProject
-              ? {}
+              ? newThreadAgentIds!.length
+                ? { assignments: newThreadAgentIds!.map((agentId) => ({ agentId })) }
+                : {}
               : pendingTeam
               ? { teamId: pendingTeam.id }
               : {
@@ -1026,8 +1039,12 @@ export function App() {
   const handleCancelRun = useStableEvent(() => { void cancelActiveRun(); });
   const handleRetryAgent = useStableEvent((agent: AgentName, agentId?: string) => { void retryAgentMessage(agent, agentId); });
   const handleOpenThreadSpace = useStableEvent((artifact?: RelayArtifact) => openThreadSpace(artifact));
+  const handleProjectRoomPicked = useStableEvent(() => {
+    setProjectRoomTarget(true);
+  });
   const handleLogicalAgentPicked = useStableEvent((agent: EmployeeAgent) => {
     setPendingThreadTeamId(null);
+    setProjectRoomTarget(false);
     setActiveLogicalAgentId(agent.id);
     setActiveAgent(agent.executorKind);
   });
@@ -1354,6 +1371,9 @@ export function App() {
             selectedEmployee={selectedEmployee}
             initializingThread={requiresRuntimeSelection}
             projectName={activeProject?.name}
+            projectRoom={activeProject ? { memberCount: effectiveSelectableLogicalAgents.length } : null}
+            projectRoomSelected={projectRoomTarget}
+            onProjectRoomPicked={handleProjectRoomPicked}
             projectReadOnly={projectDispatchDisabled}
             runtimeNodes={threadComputers}
             runtimeNodeId={selectedThreadNodeId}

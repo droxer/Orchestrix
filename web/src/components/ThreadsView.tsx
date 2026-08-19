@@ -81,6 +81,10 @@ export type ThreadsViewProps = {
   selectedEmployee: string;
   initializingThread: boolean;
   projectName?: string;
+  /** The project's roster offered as one composer target. */
+  projectRoom?: { memberCount: number } | null;
+  projectRoomSelected?: boolean;
+  onProjectRoomPicked?: () => void;
   projectReadOnly?: boolean;
   runtimeNodes: DaemonNodeMonitorRecord[];
   runtimeNodeId: string | null;
@@ -158,6 +162,9 @@ export function ThreadsView({
   selectedEmployee,
   initializingThread,
   projectName,
+  projectRoom,
+  projectRoomSelected,
+  onProjectRoomPicked,
   projectReadOnly,
   runtimeNodes,
   runtimeNodeId,
@@ -407,6 +414,9 @@ export function ThreadsView({
           selectedEmployee={selectedEmployee}
           initializingThread={initializingThread}
           projectName={projectName}
+          projectRoom={projectRoom}
+          projectRoomSelected={projectRoomSelected}
+          onProjectRoomPicked={onProjectRoomPicked}
           readOnly={projectReadOnly}
           runtimeNodes={runtimeNodes}
           runtimeNodeId={runtimeNodeId}

@@ -39,6 +39,10 @@ const ComposerView = forwardRef<ComposerHandle, {
   initializingThread: boolean;
   /** A project room owns its Computer and roster, so neither is editable here. */
   projectName?: string;
+  /** The project's roster as one target: the round runs every member. */
+  projectRoom?: { memberCount: number } | null;
+  projectRoomSelected?: boolean;
+  onProjectRoomPicked?: () => void;
   /** Archived or disabled projects remain readable but cannot start another round. */
   readOnly?: boolean;
   runtimeNodes: DaemonNodeMonitorRecord[];
@@ -55,7 +59,7 @@ const ComposerView = forwardRef<ComposerHandle, {
   mentionCandidates?: MentionCandidate[];
   onSend: () => void;
   onCancelRun: () => void;
-}>(function Composer({ logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, teams, activeTeamId, onTeamPicked, teamLocked, activeAgentDisplayName, selectedEmployee, initializingThread, projectName, readOnly = false, runtimeNodes, runtimeNodeId, selectedRuntimeNode, activeRuntimeNode, onRuntimeNodeChange, running, mentionCandidates = [], onSend, onCancelRun }, ref) {
+}>(function Composer({ logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, teams, activeTeamId, onTeamPicked, teamLocked, activeAgentDisplayName, selectedEmployee, initializingThread, projectName, projectRoom = null, projectRoomSelected = false, onProjectRoomPicked, readOnly = false, runtimeNodes, runtimeNodeId, selectedRuntimeNode, activeRuntimeNode, onRuntimeNodeChange, running, mentionCandidates = [], onSend, onCancelRun }, ref) {
   const { t } = useTranslation();
   const composer = useComposer();
   const {
@@ -75,6 +79,9 @@ const ComposerView = forwardRef<ComposerHandle, {
   const addressedLogicalAgentId = activeTeamId
     ? null
     : parsed.addressAgentIds[0] ?? null;
+  // A mention names one member, so it narrows a project round away from the
+  // roster exactly the way picking that member in the footer would.
+  const roomSelected = projectRoomSelected && !addressedLogicalAgentId;
   const highlightRef = useRef<HTMLDivElement | null>(null);
   const mentions = useMentionAutocomplete({
     text: composerText,
@@ -94,13 +101,21 @@ const ComposerView = forwardRef<ComposerHandle, {
   };
   // Picking a team addresses the whole roster, so a leftover mention naming one
   // agent would quietly narrow the round back down to them.
+  const dropMentions = () => {
+    if (parsed.mentions.length === 0) return;
+    const start = parsed.mentions[0].start;
+    const end = parsed.mentions[parsed.mentions.length - 1].end;
+    setComposerText(`${composerText.slice(0, start)}${composerText.slice(end).trimStart()}`);
+  };
   const pickTeam = (team: AgentTeam) => {
-    if (parsed.mentions.length > 0) {
-      const start = parsed.mentions[0].start;
-      const end = parsed.mentions[parsed.mentions.length - 1].end;
-      setComposerText(`${composerText.slice(0, start)}${composerText.slice(end).trimStart()}`);
-    }
+    dropMentions();
     onTeamPicked?.(team);
+  };
+  // Same reason as a team: a leftover mention would quietly narrow a round the
+  // author just aimed at the whole project roster.
+  const pickRoom = () => {
+    dropMentions();
+    onProjectRoomPicked?.();
   };
   const sendShortcutTitle = useMemo(
     () => t("composer.send_shortcut", { shortcut: sendShortcutLabel() }),
@@ -216,19 +231,20 @@ const ComposerView = forwardRef<ComposerHandle, {
               ) : activeRuntimeNode ? (
                 <ThreadRuntimeReadout node={activeRuntimeNode} />
               ) : null}
-              {!projectName ? (
-                <AgentSelect
-                  logicalAgents={logicalAgents}
-                  activeLogicalAgentId={addressedLogicalAgentId ?? activeLogicalAgentId}
-                  onLogicalAgentPicked={pickLogicalAgent}
-                  teams={teams}
-                  activeTeamId={activeTeamId}
-                  onTeamPicked={pickTeam}
-                  teamLocked={teamLocked}
-                  teamOptionsEnabled={initializingThread}
-                  running={running}
-                />
-              ) : null}
+              <AgentSelect
+                logicalAgents={logicalAgents}
+                activeLogicalAgentId={addressedLogicalAgentId ?? activeLogicalAgentId}
+                onLogicalAgentPicked={pickLogicalAgent}
+                teams={projectName ? [] : teams}
+                activeTeamId={projectName ? null : activeTeamId}
+                onTeamPicked={pickTeam}
+                teamLocked={teamLocked}
+                teamOptionsEnabled={initializingThread && !projectName}
+                room={projectName ? projectRoom : null}
+                roomSelected={roomSelected}
+                onRoomPicked={pickRoom}
+                running={running}
+              />
             </div>
             <div className="composer-footer-right">
               {/* One mounted element for send↔stop so keyboard focus survives
