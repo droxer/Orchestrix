@@ -75,35 +75,45 @@
   font: var(--type-label);
 }
 
+/* Same rhythm as .conversation-list: rounded rows separated by a 2px gutter
+   and inset from the panel edge. This is what replaced the per-row hairline —
+   the wash then reads as a discrete object instead of a full-bleed stripe. */
 .agents-roster-list {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-0-5);
   margin: 0;
-  padding: 0;
+  padding: var(--sp-1) var(--sp-2) var(--sp-4);
   list-style: none;
   overflow-y: auto;
 }
 
-/* Availability accent, reused from the roster row's left rail marker. */
-.agents-roster-row[data-availability="ready"] { --row-accent: var(--ok); }
-.agents-roster-row[data-availability="busy"] { --row-accent: var(--info); }
-.agents-roster-row[data-availability="pending"] { --row-accent: var(--warn); }
-.agents-roster-row[data-availability="offline"] { --row-accent: var(--ink-4); }
-
+/* A roster row is the same object as a thread row and a backlog row — a
+   selectable list item — so it wears the same shell: no border, --r-2, and a
+   wash. There is no availability accent here: AgentStateBadge's pip already
+   encodes availability by tone AND shape (offline is a hollow ring) with
+   sr-only text, at this row's leading edge. The old --row-accent left border
+   was a third copy of that signal, and it only ever painted on the selected
+   row — which is why nobody read it as status. Deleting it frees the left
+   rail for selection, the app-wide meaning. */
 .agents-roster-row {
+  position: relative;
   display: flex;
   width: 100%;
   min-width: 0;
-  border-left: 2px solid transparent;
-  border-bottom: 1px solid var(--line-2);
-  padding: var(--sp-3);
-  transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+  border: 0;
+  border-radius: var(--r-2);
+  overflow: hidden;
+  padding: var(--sp-row) var(--sp-3);
+  transition: background var(--t-fast) var(--ease);
 }
 
 .agents-roster-row-select {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
+  align-items: center;
   gap: var(--sp-2);
   flex: 1;
   min-width: 0;
@@ -122,14 +132,23 @@
   background: var(--row-hover);
 }
 
-/* Selection reads as the action-soft wash everywhere else in the app
-   (conversation-row.active, backlog-filter-chip, adm-fleet-chip.active) —
-   match that here instead of a neutral gray fill, so "selected" and
-   "available" stay two independent signals: action-soft is the selection
-   state, --row-accent on the left border is the availability status. */
+/* Selection is the action-soft wash plus a 2px left accent bar — the same
+   contract as .conversation-row.active, so selection looks identical on the
+   thread rail and the agent roster. Status never touches this rail. */
 .agents-roster-row[data-selected="true"] {
   background: var(--action-soft);
-  border-left-color: var(--row-accent, var(--action));
+}
+
+.agents-roster-row[data-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  /* Inset holds the bar at ~55% of the row height, matching the thread rail. */
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  border-radius: calc(var(--r-1) / 2);
+  background: var(--action);
 }
 
 .agents-roster-row:focus-within {
@@ -140,13 +159,14 @@
 .agents-roster-row-badge {
   display: flex;
   align-items: center;
-  padding-top: var(--sp-0-5);
 }
 
 .agents-roster-row-main {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-0-5);
+  /* 2px between a name and its meta line sat below the supporting-text
+     rhythm used everywhere else in the app. */
+  gap: var(--sp-1);
   min-width: 0;
 }
 
@@ -166,11 +186,10 @@
   white-space: nowrap;
 }
 
-/* Status pill sits flush right, aligned with the title line; it must not
-   compress — the name column ellipsizes first. */
+/* Status pill sits flush right; it must not compress — the name column
+   ellipsizes first. Vertical alignment comes from the grid's align-items. */
 .agents-roster-row-status {
   flex: none;
-  align-self: center;
 }
 
 .agents-roster-row-meta {
@@ -199,9 +218,11 @@
   align-items: center;
   gap: var(--sp-1);
   color: var(--ink-3);
+  /* Was hand-rolled --fs-1/11px inline with --type-label/13px computer names —
+     two sizes in one meta line. One role now; mono is kept deliberately (a
+     runtime is a technical identifier) with its paired --type-code-track. */
+  font: var(--type-label);
   font-family: var(--font-mono);
-  font-size: var(--fs-1);
-  font-weight: 500;
   letter-spacing: var(--type-code-track);
 }
 
