@@ -177,12 +177,6 @@ html[data-theme="dark"] .transcript-inner:has(.transcript-empty) {
   box-shadow: none;
 }
 
-.backlog-stat-value {
-  font-family: var(--font-display);
-  font-weight: 700;
-  letter-spacing: var(--track-display);
-}
-
 /* Node cards use admin-v2-views.css for tone rail, radius, and raised fill. */
 
 .workspace-pick:hover {
@@ -241,9 +235,9 @@ html[data-theme="dark"] .transcript-inner:has(.transcript-empty) {
   }
 
   .mobile-topbar-title {
-    font-family: var(--font-display);
+    /* Chrome title, not a display tier: semibold sans, set solid. */
     font-weight: 600;
-    letter-spacing: var(--track-display);
+    letter-spacing: var(--track-0);
   }
 
   .mobile-topbar button.active {

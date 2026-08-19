@@ -93,17 +93,16 @@
 }
 
 /* In-message heading ladder stays under the 20px conversation title so a
-   content heading never visually rivals the page title: 17 / 15 / 14. The
-   ladder lost a rung when the 16px and 18px steps were retired from the scale
-   (they sat 1px from their neighbours and bought no hierarchy). h3 and below
-   now share the body size and separate by weight, which is how the rest of the
-   system already distinguishes roles inside one size. */
-.md-body h1 { font-size: var(--fs-heading); font-weight: 700; } /* 17px — the top rung needs weight, not just 2px over h2 */
-.md-body h2 { font-size: var(--fs-4); } /* 15px */
+   content heading never visually rivals the page title: 18 / 16 / 15. The
+   transcript body is 15px, so h2 sits one rung above body and h3 and below
+   share the body size, separating by weight (600 vs 400) — which is how the
+   rest of the system already distinguishes roles inside one size. */
+.md-body h1 { font-size: var(--fs-heading); font-weight: 700; } /* 18px — the top rung needs weight, not just 2px over h2 */
+.md-body h2 { font-size: var(--fs-4); } /* 16px */
 .md-body h3,
 .md-body h4,
 .md-body h5,
-.md-body h6 { font-size: var(--fs-3); } /* 14px */
+.md-body h6 { font-size: var(--fs-3); } /* 15px — body size, weight carries the rung */
 
 .md-body ul,
 .md-body ol {
@@ -513,11 +512,11 @@ html:lang(zh-TW) .md-body blockquote {
 }
 
 .doc-prose h1 { font-size: var(--fs-title); } /* 20px */
-.doc-prose h2 { font-size: var(--fs-heading); } /* 17px */
+.doc-prose h2 { font-size: var(--fs-heading); } /* 18px */
 .doc-prose h3,
 .doc-prose h4,
 .doc-prose h5,
-.doc-prose h6 { font-size: var(--fs-4); } /* 15px */
+.doc-prose h6 { font-size: var(--fs-4); } /* 16px — the document body size, weight carries the rung */
 
 /* A document h1 is the artifact's own title line — give it the rule that a
    chat turn cannot afford, since there it would compete with the thread name. */

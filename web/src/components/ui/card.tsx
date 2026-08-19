@@ -88,13 +88,13 @@ function CardTitle({
     defaultTagName: "h3",
     props: mergeProps<"h3">(
       {
-        // --type-heading role values: size/weight are text-lg/font-semibold,
-        // tracking is --type-heading-track (= --track-display). The role's
-        // leading is 1.3, but palette.css has no 1.3 leading token
-        // (--leading-tight is 1.15), so leading-tight stays — do not invent
-        // a token for it.
+        // Card title — DESIGN.md's heading-sm-mixed tier (18px / 600 / solid),
+        // not the display tier: only the 24px rung tracks tight, and
+        // font-display aliases the sans the card already inherits. leading-tight
+        // (1.15) is single-line card chrome; palette.css has no 1.56 token and
+        // a wrapped card title does not need document leading.
         className: cn(
-          "m-0 font-display text-lg leading-tight font-semibold tracking-(--track-display) text-ink",
+          "m-0 text-lg leading-tight font-semibold tracking-(--track-0) text-ink",
           className
         ),
       },

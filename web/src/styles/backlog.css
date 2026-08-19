@@ -48,13 +48,13 @@
 }
 
 /* Metric numerals are 700 across the app (--type-number, .adm-dash-*-value);
-   this was the one 600 in the set. */
+   this was the one 600 in the set. At 15px it sets solid — tightening is
+   reserved for the 24px rung. */
 .backlog-stat-value {
-  font-family: var(--font-display);
   font-size: var(--fs-3);
   font-weight: 700;
   line-height: var(--leading-none);
-  letter-spacing: var(--track-display);
+  letter-spacing: var(--track-0);
   font-feature-settings: "tnum" 1;
   font-variant-numeric: tabular-nums;
   color: var(--ink-1);
