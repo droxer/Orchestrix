@@ -376,7 +376,46 @@ def _agent_with_placements(ctx: AppContextDep, agent: dict[str, Any]) -> dict[st
         **agent,
         "availability": availability,
         "placements": placements,
+        "skills": _agent_skills(ctx, agent, placements),
     }
+
+
+def _agent_skills(
+    ctx: AppContextDep, agent: dict[str, Any], placements: list[dict[str, Any]]
+) -> list[dict[str, str]]:
+    """The skills this agent's runtime actually has on the computers it runs on.
+
+    Skills are node-reported inventory rather than a stored agent field, so they
+    are resolved on read from each placement's live node and deduped across
+    placements by namespace/name.
+    """
+    executor_kind = agent.get("executorKind")
+    if not executor_kind:
+        return []
+    node_ids = {
+        placement["runtimeNodeId"]
+        for placement in placements
+        if placement.get("runtimeNodeId")
+    }
+    if not node_ids:
+        return []
+    skills: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for node in ctx.registry.monitor_nodes():
+        if node["id"] not in node_ids:
+            continue
+        inventory = node.get("agentInventory") or {}
+        entry = inventory.get(executor_kind) or {}
+        for skill in entry.get("skills") or []:
+            name = skill.get("name")
+            if not name:
+                continue
+            key = (skill.get("namespace") or "", name)
+            if key in seen:
+                continue
+            seen.add(key)
+            skills.append(skill)
+    return sorted(skills, key=lambda skill: (skill.get("namespace") or "", skill["name"]))
 
 
 def _placement_view(ctx: AppContextDep, placement: dict[str, Any]) -> dict[str, Any]:

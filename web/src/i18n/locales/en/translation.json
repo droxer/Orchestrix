@@ -1278,6 +1278,8 @@
     }
   },
   "agents_page": {
+    "skills_title": "Skills",
+    "skills_empty": "No skills installed on this agent's computer.",
     "title": "Agents",
     "sub_one": "{{count}} assigned",
     "sub_other": "{{count}} assigned",
