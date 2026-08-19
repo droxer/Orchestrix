@@ -11,13 +11,15 @@
   background: var(--surface-list);
 }
 
+/* Header, filter band, list — the agent roster's column exactly. No gap and
+   no top padding: each band is separated by its own bottom hairline, not by
+   a gutter, which is what makes the rail's horizons line up with the chat
+   and thread-space headers beside it. */
 .thread-panel-inner {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  gap: var(--sp-3);
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
-  padding: var(--sp-4) 0 0;
 }
 
 .thread-panel-resize {
@@ -48,40 +50,11 @@
   outline-offset: var(--focus-offset);
 }
 
-.conversation-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-4);
-  min-height: var(--header-h);
-  padding: 0 var(--page-gutter);
-  /* Continues the chat/thread-space header horizon at y=64 so all three panes
-     break on the same hairline; search stays in the second grid row. */
-  border-bottom: 1px solid var(--line-1);
-}
-
-.conversation-heading {
-  display: flex;
-  align-items: center;
-}
-
-.conversation-heading h1 {
-  margin: 0;
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--sp-2);
-  color: var(--ink-1);
-  font: var(--type-title);
-  letter-spacing: var(--type-title-track);
-}
-
-.conversation-heading-count {
-  color: var(--ink-3);
-  font-size: var(--fs-2);
-  font-weight: 500;
-}
-
-.conversation-header button {
+/* The rail's header is the shared <PageHeader> (shell.css) and its filter
+   band is .list-filter-bar (inputs.css); only the two icon actions below are
+   the rail's own, because a 318px column has no room for a text CTA. Scoped
+   by id so the plate never leaks onto another route's page header. */
+#thread-panel .page-header-actions button {
   display: grid;
   place-items: center;
   width: 36px;
@@ -92,26 +65,14 @@
   background: transparent;
 }
 
-.conversation-header button:hover {
+#thread-panel .page-header-actions button:hover {
   color: var(--ink-1);
   background: var(--surface-2);
   border-color: var(--line-2);
 }
 
-.conversation-header-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-1);
-}
-
-.conversation-search {
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  background: var(--surface-2);
-  margin: 0 var(--page-gutter);
-  align-self: start;
-}
-
 .conversation-list {
+  flex: 1;
   min-height: 0;
   overflow-y: auto;
   display: flex;
@@ -119,6 +80,19 @@
   gap: var(--sp-0-5);
   padding: var(--sp-1) var(--sp-2) var(--sp-4);
   border-top: 0;
+}
+
+/* The <ul> that actually holds rows — one per attention group in threads
+   mode, one per folder in projects mode. Same rhythm as
+   .agents-roster-list: rounded rows separated by a 2px gutter. */
+.conversation-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-0-5);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 /* Applied only in projects directory mode (ThreadListPanel gates the class
@@ -313,7 +287,7 @@
 
 /* Selection and unread-style attention pull the title back to full ink —
    the step down marks "subordinate", not "unimportant". */
-.project-folder-threads .conversation-row.active .conversation-name strong {
+.project-folder-threads .conversation-row[data-selected="true"] .conversation-name strong {
   color: var(--ink-1);
 }
 
@@ -323,7 +297,7 @@
   gap: var(--sp-2);
 }
 
-.project-folder-threads .conversation-row.active::after {
+.project-folder-threads .conversation-row[data-selected="true"]::after {
   top: 8px;
   bottom: 8px;
 }
@@ -381,8 +355,8 @@
   display: flex;
   align-items: stretch;
   width: 100%;
-  content-visibility: auto;
-  /* Estimate matches the row floor: 2×--sp-row padding + one line (~44px). */
+  /* .list-virtual supplies content-visibility; only the reserved height is
+     row-specific — the floor is 2×--sp-row padding + one line (~44px). */
   contain-intrinsic-size: auto 44px;
   border: 0;
   border-radius: var(--r-2);
@@ -417,13 +391,14 @@
   background: var(--row-hover);
 }
 
-.conversation-row.active {
+.conversation-row[data-selected="true"] {
   background: var(--action-soft);
 }
 
-/* Active row reads as selected: a soft wash + a 2px left accent bar —
-   selection is calm, action is loud (one flat hierarchy). */
-.conversation-row.active::after {
+/* Selected row reads as selected: a soft wash + a 2px left accent bar —
+   selection is calm, action is loud (one flat hierarchy). Keyed on
+   data-selected, the same contract as .agents-roster-row and .teams-list-row. */
+.conversation-row[data-selected="true"]::after {
   content: "";
   position: absolute;
   left: 0;
@@ -436,31 +411,10 @@
   background: var(--action);
 }
 
+/* <RelayEmptyState> in a 318px rail: the component's --sp-8/--sp-7 padding
+   is sized for a full pane and would leave the title two words wide here. */
 .conversation-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--sp-3);
-  margin: 0;
-  padding: var(--page-gutter);
-  color: var(--ink-3);
-  font-size: var(--fs-3);
-  line-height: var(--leading-normal);
-}
-
-.conversation-empty p {
-  margin: 0;
-}
-
-/* Routes the empty pane to the one action that fills it — a text button in
-   the reading face, not full chrome, so the dead pane stays quiet. */
-.conversation-empty-action {
-  padding: 0;
-  color: var(--link);
-  font: var(--type-label-strong);
-}
-.conversation-empty-action:hover {
-  color: var(--link-hover);
+  padding: var(--sp-6) var(--sp-4);
 }
 
 .conversation-copy {
@@ -614,8 +568,8 @@
 /* "New conversation" is the primary entry point for starting fresh work as the
    current employee — a 36px ink plate, mirroring the composer send button
    (design-system.md §Operational components). Tight --r-2, not a pill.
-   Scoped under .conversation-header to outrank the round `header button` rule. */
-.conversation-header .conversation-new-btn {
+   Outranks the ghost plate above by carrying one more class. */
+#thread-panel .page-header-actions .conversation-new-btn {
   display: grid;
   place-items: center;
   width: 36px;
@@ -629,15 +583,15 @@
   transition: background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
 }
 
-.conversation-header .conversation-new-btn:hover {
+#thread-panel .page-header-actions .conversation-new-btn:hover {
   background: var(--action-hover);
 }
 
-.conversation-header .conversation-new-btn:active {
+#thread-panel .page-header-actions .conversation-new-btn:active {
   transform: translateY(0.5px);
 }
 
-.conversation-header .conversation-new-btn:focus-visible {
+#thread-panel .page-header-actions .conversation-new-btn:focus-visible {
   outline: var(--focus-outline);
   outline-offset: var(--focus-offset);
 }
@@ -648,7 +602,7 @@
   font: var(--type-label);
 }
 
-.conversation-row.active .conversation-stamp {
+.conversation-row[data-selected="true"] .conversation-stamp {
   color: var(--ink-3);
 }
 

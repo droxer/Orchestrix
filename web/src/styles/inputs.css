@@ -64,6 +64,48 @@
   outline-offset: var(--focus-offset);
 }
 
+/* List filter band — the header strip a list rail wears under its PageHeader
+   (agent roster, thread rail). Distinct from .relay-search on purpose: that
+   is a standalone FIELD (filled, bordered, inset), while this is a BAND that
+   spans the rail and is separated by the same hairline as the header above
+   it. The input inside is bare, so the band — not a pill floating in it —
+   is what the eye reads as the filter row. */
+.list-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  border-bottom: 1px solid var(--line-1);
+  padding: var(--sp-2) var(--sp-3);
+}
+
+.list-filter-search {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  color: var(--ink-3);
+}
+
+.list-filter-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: var(--sp-1) 0;
+  color: var(--ink-1);
+  font: var(--type-body-sm);
+}
+
+.list-filter-search input::placeholder {
+  color: var(--ink-3);
+}
+
+.list-filter-search input:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
+}
+
 .employee-avatar,
 .agent-avatar {
   display: grid;

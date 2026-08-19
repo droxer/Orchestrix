@@ -428,6 +428,7 @@
      to the list. Relocation is done in CSS, not markup: the header keeps its
      desktop structure and semantics, it just occupies a different cell. */
   .thread-panel-inner {
+    display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas:
@@ -437,19 +438,25 @@
     padding: var(--sp-3) 0 0;
   }
 
-  .conversation-header {
+  /* Stripped of its title the header is no longer a header horizon, so it
+     gives up the shared band's fill and hairline too — otherwise the row
+     reads as a header band wrapped around one button. */
+  #thread-panel .page-header {
     grid-area: action;
     min-height: 0;
     padding: 0 var(--sp-4) 0 0;
+    border-bottom: 0;
+    background: transparent;
   }
 
-  .conversation-heading {
+  #thread-panel .page-header-lead {
     display: none;
   }
 
-  .conversation-search {
+  #thread-panel .list-filter-bar {
     grid-area: search;
-    margin-inline: var(--sp-4) 0;
+    padding: 0 0 0 var(--sp-4);
+    border-bottom: 0;
   }
 
   .thread-panel-inner > .conversation-list {

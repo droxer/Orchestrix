@@ -59,12 +59,12 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose, state }
   }
 
   return (
-    <div className={`conversation-row ${selected ? "active" : ""}`.trimEnd()}>
+    <li className="conversation-row list-virtual" data-selected={selected ? "true" : "false"}>
       <Button variant="ghost"
         className="conversation-row-inner"
         type="button"
         aria-label={rowLabel}
-        aria-current={selected ? "true" : undefined}
+        aria-current={selected ? "page" : undefined}
         onClick={() => onSelect(session.id)}
       >
         <span className="conversation-copy">
@@ -118,6 +118,6 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose, state }
           </Button>
         ) : null}
       </span>
-    </div>
+    </li>
   );
 }

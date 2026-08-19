@@ -2,6 +2,8 @@ import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionAdd, ActionCompose, ChevronDownIcon, WorkspaceFolder } from "./icons";
+import { PageHeader } from "./PageHeader";
+import { RelayEmptyState } from "./RelayEmptyState";
 import { ThreadRow, type ThreadItem } from "./ThreadRow";
 import { groupThreads } from "../lib/threadGroups";
 import { projectThreadBuckets } from "../lib/threads";
@@ -169,16 +171,20 @@ export function ThreadListPanel({
           <span>{section.label}</span>
           <span className="conversation-group-count tnum">{section.items.length}</span>
         </div>
-        {section.items.map((item) => (
-          <ThreadRow
-            key={item.session.id}
-            item={item}
-            selected={selectedSessionId === item.session.id}
-            onSelect={onSelectThread}
-            onRename={onRenameThread}
-            onClose={onCloseThread}
-          />
-        ))}
+        {/* Rows are <li>s, so each group carries its own list. The group label
+            names it rather than sitting inside it — a heading is not a row. */}
+        <ul className="conversation-rows" aria-label={section.label}>
+          {section.items.map((item) => (
+            <ThreadRow
+              key={item.session.id}
+              item={item}
+              selected={selectedSessionId === item.session.id}
+              onSelect={onSelectThread}
+              onRename={onRenameThread}
+              onClose={onCloseThread}
+            />
+          ))}
+        </ul>
       </div>
     ) : null);
   };
@@ -194,63 +200,65 @@ export function ThreadListPanel({
       ...groups.running.map((item) => ({ item, state: "run" as const })),
       ...groups.idle.map((item) => ({ item, state: "idle" as const })),
     ];
-    return flat.map(({ item, state }) => (
-      <ThreadRow
-        key={item.session.id}
-        item={item}
-        state={state}
-        selected={selectedSessionId === item.session.id}
-        onSelect={onSelectThread}
-        onRename={onRenameThread}
-        onClose={onCloseThread}
-      />
-    ));
+    return (
+      <ul className="conversation-rows">
+        {flat.map(({ item, state }) => (
+          <ThreadRow
+            key={item.session.id}
+            item={item}
+            state={state}
+            selected={selectedSessionId === item.session.id}
+            onSelect={onSelectThread}
+            onRename={onRenameThread}
+            onClose={onCloseThread}
+          />
+        ))}
+      </ul>
+    );
   };
 
   return (
     <aside id="thread-panel" className="thread-panel" aria-label={t("nav.threads")} tabIndex={-1}>
       <div className="thread-panel-inner">
-      <div className="conversation-header">
-        <div className="conversation-heading">
-          <h1>
-            {directoryMode === "projects" ? t("project.projects") : t("nav.threads")}
-            <small className="tnum conversation-heading-count">
-              {directoryMode === "projects" ? hierarchy.projects.length : threads.length}
-            </small>
-          </h1>
-        </div>
-        <div className="conversation-header-actions">
-          {directoryMode === "projects" ? (
-            <Button variant="ghost"
-              type="button"
-              className="conversation-project-btn"
-              aria-label={t("project.create")}
-              title={t("project.create")}
-              onClick={onCreateProject}
-            >
-              <ActionAdd size={16} />
-            </Button>
-          ) : (
-            <Button variant="ghost"
-              type="button"
-              className="conversation-new-btn"
-              aria-label={t("thread.new_thread")}
-              title={t("thread.new_thread")}
-              onClick={() => onNewThread(null)}
-            >
-              <ActionCompose size={16} />
-            </Button>
-          )}
-        </div>
-      </div>
-      <SearchInput
-        className="relay-search conversation-search"
-        label={directoryMode === "projects" ? t("project.search_label") : t("thread.search_label")}
-        name="thread-search"
-        placeholder={directoryMode === "projects" ? t("project.search_placeholder") : t("thread.search_placeholder")}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
+      {/* Same frame as every other list rail: PageHeader over a
+          .list-filter-bar band, each carrying its own hairline. */}
+      <PageHeader
+        title={directoryMode === "projects" ? t("project.projects") : t("nav.threads")}
+        count={directoryMode === "projects" ? hierarchy.projects.length : threads.length}
+        titleVariant="display"
+        actions={directoryMode === "projects" ? (
+          <Button variant="ghost"
+            type="button"
+            className="conversation-project-btn"
+            aria-label={t("project.create")}
+            title={t("project.create")}
+            onClick={onCreateProject}
+          >
+            <ActionAdd size={16} />
+          </Button>
+        ) : (
+          <Button variant="ghost"
+            type="button"
+            className="conversation-new-btn"
+            aria-label={t("thread.new_thread")}
+            title={t("thread.new_thread")}
+            onClick={() => onNewThread(null)}
+          >
+            <ActionCompose size={16} />
+          </Button>
+        )}
       />
+      <div className="list-filter-bar">
+        <SearchInput
+          className="list-filter-search"
+          iconSize={14}
+          label={directoryMode === "projects" ? t("project.search_label") : t("thread.search_label")}
+          name="thread-search"
+          placeholder={directoryMode === "projects" ? t("project.search_placeholder") : t("thread.search_placeholder")}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
       <section
         // project-directory widens the row gap for folder blocks; in threads
         // mode the list must keep conversation-list's tight single-line gap.
@@ -322,20 +330,24 @@ export function ThreadListPanel({
           </section>
         )}) : renderThreads(hierarchy.unclassified)}
         {(directoryMode === "projects" ? hierarchy.projects.length === 0 : threads.length === 0) ? (
-          query.trim() ? (
-            <p className="conversation-empty">{t("thread.no_matches")}</p>
-          ) : (
-            <div className="conversation-empty">
-              <p>{directoryMode === "projects" ? t("project.no_projects") : t("thread.no_threads")}</p>
-              <button
+          // The rail is too narrow for a doodle, so the vignette is dropped;
+          // a filtered-empty list offers no create action, because creating
+          // would not answer the question the query asked.
+          <RelayEmptyState
+            className="conversation-empty"
+            marginalia={null}
+            title={query.trim()
+              ? t("thread.no_matches")
+              : directoryMode === "projects" ? t("project.no_projects") : t("thread.no_threads")}
+            actions={query.trim() ? undefined : (
+              <Button
                 type="button"
-                className="conversation-empty-action"
                 onClick={() => (directoryMode === "projects" ? onCreateProject() : onNewThread(null))}
               >
                 {directoryMode === "projects" ? t("project.create") : t("thread.new_thread")}
-              </button>
-            </div>
-          )
+              </Button>
+            )}
+          />
         ) : null}
       </section>
       </div>

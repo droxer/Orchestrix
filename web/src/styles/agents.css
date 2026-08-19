@@ -25,41 +25,9 @@
   background: var(--surface-0);
 }
 
-.agents-roster-filter {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  border-bottom: 1px solid var(--line-1);
-  padding: var(--sp-2) var(--sp-3);
-}
-
-.agents-roster-search-wrap {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: var(--sp-1);
-  min-width: 0;
-  color: var(--ink-3);
-}
-
-.agents-roster-search {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  padding: var(--sp-1) 0;
-  color: var(--ink-1);
-  font: var(--type-body-sm);
-}
-
-.agents-roster-search::placeholder {
-  color: var(--ink-3);
-}
-
-.agents-roster-search:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
+/* The roster's filter band is .list-filter-bar / .list-filter-search
+   (inputs.css) — shared with the thread rail. Only the availability select
+   below is the roster's own control. */
 
 /* Now a <FilterSelect>; the primitive owns the border, radius, and focus ring.
    This roster filter stays deliberately dense (28px on a --surface-2 fill) —

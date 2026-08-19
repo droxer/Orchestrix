@@ -73,10 +73,9 @@ function RosterFilterBar({
   const { t } = useTranslation();
 
   return (
-    <div className="agents-roster-filter" role="group" aria-label={t("agents_page.filters")}>
+    <div className="list-filter-bar" role="group" aria-label={t("agents_page.filters")}>
       <SearchInput
-        className="agents-roster-search-wrap"
-        inputClassName="agents-roster-search"
+        className="list-filter-search"
         iconSize={14}
         label={t("agents_page.search_label")}
         name="agents-query"
