@@ -3,7 +3,6 @@
    ===================================================================== */
 
 /* Headings: prefer balanced line breaks to prevent widows */
-.conversation-heading h1,
 .pref-header-text h2,
 .login-headline,
 .adm-auth-title,
@@ -43,7 +42,6 @@
 /* Large operational collections stay cheap without changing DOM semantics or
    keyboard order. The browser skips paint/layout for off-screen records and
    reserves a representative row/card height to prevent scroll jumps. */
-.conversation-row,
 .workspace-pick-list > li,
 .workspace-file-pick,
 .backlog-task,
@@ -104,8 +102,7 @@
   .decision-bar button,
   .handoff-actions button,
   .dialog-actions [data-slot="button"],
-  .conversation-header button,
-  .conversation-header .conversation-new-btn,
+  #thread-panel .page-header-actions button,
   .chat-header [data-variant="icon"],
   .send-button,
   .backlog-filter-chip,
@@ -195,8 +192,7 @@
     height: var(--touch-target);
   }
 
-  .conversation-header button,
-  .conversation-header .conversation-new-btn,
+  #thread-panel .page-header-actions button,
   .chat-header [data-variant="icon"],
   .send-button,
   .backlog-task-actions .backlog-action-icon,
