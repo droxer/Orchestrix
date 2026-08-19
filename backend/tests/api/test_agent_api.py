@@ -3090,3 +3090,132 @@ def test_binding_status_is_reported_over_the_wire_and_survives_computer_loss(
     after_by_id = {agent["id"]: agent for agent in after}
     assert agent_id in after_by_id, "agent must stay on the roster once its computer is gone"
     assert after_by_id[agent_id]["bindingStatus"] == "computer_gone"
+
+
+def test_agent_view_lists_skills_installed_for_its_runtime(monkeypatch) -> None:
+    """Skills are node-reported, so an agent shows only the ones installed for
+    its own runtime on the computer it is placed on."""
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                    "displayName": "Alice",
+                },
+            ).status_code
+            == 201
+        )
+        node = app.state.registry.register(
+            {
+                "sandboxId": "node_alice",
+                "employeeId": "alice",
+                "workspaceId": "machine-alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "nodeLocation": "employee-device",
+                "protocolVersion": 1,
+                "supportedAgents": ["claude", "codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+                "agentInventory": {
+                    "claude": {
+                        "skills": [
+                            {
+                                "name": "brainstorming",
+                                "namespace": "superpowers",
+                                "description": "Ideas.",
+                            },
+                            {"name": "tdd"},
+                        ],
+                        "mcpServers": [],
+                    },
+                    "codex": {"skills": [{"name": "rescue"}], "mcpServers": []},
+                },
+            }
+        )
+        created = client.post(
+            "/api/v1/admin/agents",
+            json={
+                "supervisorEmployeeId": "alice",
+                "displayName": "Researcher",
+                "executorKind": "claude",
+                "defaultRole": "planner",
+                "computerId": computer_id(node),
+            },
+        )
+        assert created.status_code == 201, created.text
+        agent_id = created.json()["agent"]["id"]
+        _place_if_needed(client, agent_id, "node_alice")
+
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
+            ).status_code
+            == 200
+        )
+        response = client.get("/api/v1/agents")
+
+        assert response.status_code == 200, response.text
+        agent = next(
+            item for item in response.json()["agents"] if item["id"] == agent_id
+        )
+        assert agent["skills"] == [
+            {"name": "tdd"},
+            {
+                "name": "brainstorming",
+                "namespace": "superpowers",
+                "description": "Ideas.",
+            },
+        ]
+
+
+def test_agent_without_placement_reports_no_skills(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                    "displayName": "Alice",
+                },
+            ).status_code
+            == 201
+        )
+        computer = _birth_computer_id(client, "alice", "claude")
+        created = client.post(
+            "/api/v1/admin/agents",
+            json={
+                "supervisorEmployeeId": "alice",
+                "displayName": "Researcher",
+                "executorKind": "claude",
+                "defaultRole": "planner",
+                "computerId": computer,
+            },
+        )
+        assert created.status_code == 201, created.text
+
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
+            ).status_code
+            == 200
+        )
+        response = client.get("/api/v1/agents")
+
+        assert response.status_code == 200, response.text
+        assert response.json()["agents"][0]["skills"] == []

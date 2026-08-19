@@ -325,8 +325,10 @@
 }
 
 .adm-assign-operator-name {
+  /* DESIGN.md's 18px mixed-case tier (heading-sm-mixed) is 600 — at 500 the
+     drawer subject sat LIGHTER than the 16px/600 name role beneath it. */
   font-size: var(--fs-heading);
-  font-weight: 500;
+  font-weight: 600;
   color: var(--ink-1);
 }
 
@@ -691,7 +693,7 @@
 
 .adm-provision-preview-handle {
   font-size: var(--fs-heading);
-  font-weight: 500;
+  font-weight: 600;
   color: var(--ink-1);
   line-height: var(--leading-display);
   word-break: break-all;

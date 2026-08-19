@@ -1765,3 +1765,35 @@
     animation: none;
   }
 }
+
+/* ---- agent skills ---------------------------------------------------
+   Node-reported inventory printed as a read-only list on the agent record:
+   the qualified skill id in mono (it is an identifier, like the record's
+   other technical facts), its one-line description as supporting text. */
+
+.agent-skill-list {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-skill {
+  display: grid;
+  gap: var(--sp-0-5);
+  min-width: 0;
+}
+
+.agent-skill-name {
+  color: var(--ink-1);
+  font-size: var(--fs-2);
+  letter-spacing: var(--type-code-track);
+  overflow-wrap: anywhere;
+}
+
+.agent-skill-description {
+  color: var(--ink-3);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+}

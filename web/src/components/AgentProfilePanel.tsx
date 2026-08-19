@@ -313,6 +313,7 @@ export function AgentProfilePanel({
   const owner = employees.find((employee) => employee.id === agent.employeeId);
   const ownerDisplay = owner ? owner.displayName : `@${agent.employeeId}`;
   const placementDescriptions = describeAgentPlacements(agent.placements);
+  const skills = agent.skills ?? [];
   const isDetail = variant === "detail";
 
   if (isDetail) {
@@ -376,6 +377,29 @@ export function AgentProfilePanel({
           {canEditProfile && error ? (
             <p className="adm-form-error" role="alert">{t("admin.v2.action_failed", { message: error })}</p>
           ) : null}
+        </div>
+
+        {/* What this agent can actually do on its computer. Node-reported, so
+            it is read-only here: installing a skill happens on the machine,
+            not in the record. */}
+        <div className="adm-drawer-section agent-dossier-skills">
+          <p className="workspace-dossier-section-title">{t("agents_page.skills_title")}</p>
+          {skills.length === 0 ? (
+            <p className="adm-cred-empty">{t("agents_page.skills_empty")}</p>
+          ) : (
+            <ul className="agent-skill-list">
+              {skills.map((skill) => (
+                <li key={`${skill.namespace ?? ""}/${skill.name}`} className="agent-skill">
+                  <span className="agent-skill-name code" translate="no">
+                    {skill.namespace ? `${skill.namespace}/${skill.name}` : skill.name}
+                  </span>
+                  {skill.description ? (
+                    <span className="agent-skill-description">{skill.description}</span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Management lives at the foot of the record — it acts on the whole

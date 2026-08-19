@@ -540,6 +540,9 @@ export interface EmployeeAgent {
   skillPolicy: Record<string, unknown>;
   toolPolicy: Record<string, unknown>;
   modelPolicy: Record<string, unknown>;
+  /** Skills installed for this agent's runtime on the computers it runs on.
+      Node-reported inventory resolved on read, never a stored agent field. */
+  skills?: DaemonAgentSkill[];
   enabled: boolean;
   version: number;
   availability: LogicalAgentAvailability;

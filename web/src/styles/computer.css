@@ -139,10 +139,10 @@
   min-width: 0;
   overflow: hidden;
   color: var(--ink-1);
-  font-family: var(--font-display);
-  font-size: var(--fs-4);
-  font-weight: 600;
-  letter-spacing: var(--track-display);
+  /* A card subject is the name role, not the display tier: 16px/600 sets
+     solid — only the 24px rung tracks tight. */
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
   line-height: var(--leading-tight);
   text-overflow: ellipsis;
   white-space: nowrap;

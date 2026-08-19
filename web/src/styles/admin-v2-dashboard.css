@@ -451,10 +451,11 @@
 }
 
 .adm-dash-top-count {
-  font-family: var(--font-display);
+  /* A 15px numeral is not the display tier — weight and tabular figures
+     carry it; tightening is reserved for the 24px rung. */
   font-size: var(--fs-3);
   font-weight: 700;
-  letter-spacing: var(--track-display);
+  letter-spacing: var(--track-0);
   color: var(--ink-1);
   font-feature-settings: "tnum" 1;
   font-variant-numeric: tabular-nums;
@@ -501,7 +502,10 @@
   }
 
   .adm-dash-tile:not(.adm-dash-tile--hero) .adm-dash-tile-value {
+    /* Dropped onto the 24px rung the numeral joins the number tier
+       (--type-number), whose tracking is the tightened --track-display. */
     font-size: var(--fs-5);
+    letter-spacing: var(--track-display);
   }
 
   /* Compact viewports drop a card to the `compact` padding tier. Scoped to

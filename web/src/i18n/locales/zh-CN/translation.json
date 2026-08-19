@@ -1276,6 +1276,8 @@
     }
   },
   "agents_page": {
+    "skills_title": "技能",
+    "skills_empty": "该智能体的电脑上未安装技能。",
     "title": "智能体",
     "sub_one": "已分配 {{count}} 个",
     "sub_other": "已分配 {{count}} 个",
