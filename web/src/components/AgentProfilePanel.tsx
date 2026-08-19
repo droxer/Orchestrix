@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ComponentProps } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
@@ -41,22 +41,6 @@ export interface AgentProfilePanelProps {
   onAgentDeleted?: (agentId: string) => void;
   /** Reports unsaved rename/personality drafts so parents can guard navigation. */
   onDirtyChange?: (dirty: boolean) => void;
-}
-
-function DossierIconButton({
-  children,
-  className = "",
-  ...props
-}: ComponentProps<"button">) {
-  return (
-    <Button variant="ghost"
-      type="button"
-      className={`workspace-dossier-icon-btn${className ? ` ${className}` : ""}`}
-      {...props}
-    >
-      {children}
-    </Button>
-  );
 }
 
 export function AgentProfilePanel({

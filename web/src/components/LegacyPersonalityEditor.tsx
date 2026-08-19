@@ -2,9 +2,9 @@
 
 import { useEffect, useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { ActionEdit } from "./icons";
+import { Markdown } from "./Markdown";
+import { TonePill } from "./StatusPill";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -59,12 +59,12 @@ export function LegacyPersonalityEditor({
         <div className="agent-personality-title-block">
           <div className="agent-personality-title-row">
             <h2 id={titleId}>{t("agents_page.personality_title")}</h2>
-            <span className={`agent-personality-state${hasCustomPersonality ? " is-defined" : ""}`}>
-              <span aria-hidden="true" />
-              {hasCustomPersonality
+            <TonePill
+              tone={hasCustomPersonality ? "good" : "neutral"}
+              label={hasCustomPersonality
                 ? t("agents_page.personality_defined")
                 : t("agents_page.personality_default")}
-            </span>
+            />
           </div>
           <span id={helpId} className="agent-personality-help">
             {t("agents_page.personality_help")}
@@ -182,7 +182,7 @@ export function LegacyPersonalityEditor({
         </div>
       ) : hasCustomPersonality ? (
         <article className="agent-personality-document">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{savedValue}</ReactMarkdown>
+          <Markdown text={savedValue} variant="document" />
         </article>
       ) : (
         <div className="agent-personality-empty">
