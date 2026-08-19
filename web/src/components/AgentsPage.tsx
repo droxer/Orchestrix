@@ -195,8 +195,8 @@ function RosterRow({
             </span>
           </span>
           {/* Explicit live status only when it adds information — "ready" is
-              the default healthy state, already carried by the row accent and
-              the glyph pip. Busy / Pending / Offline still get named. */}
+              the default healthy state, already carried by the badge pip.
+              Busy / Pending / Offline still get named. */}
           {agent.enabled && agent.availability !== "ready" ? (
             <span className="agents-roster-row-status">
               <StatusPill value={agent.availability} />

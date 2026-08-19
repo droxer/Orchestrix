@@ -397,7 +397,6 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  gap: var(--sp-3);
   flex: 1;
   min-width: 0;
   /* One-line rows (state pip + name + stamp): the floor is two row-pad steps
@@ -467,7 +466,6 @@
 .conversation-copy {
   min-width: 0;
   display: grid;
-  gap: var(--sp-1);
 }
 
 .conversation-topline {
