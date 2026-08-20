@@ -57,7 +57,7 @@ describe("composer agent selection", () => {
     const app = await readFile(resolve("web/src/App.tsx"), "utf8");
     assert.match(
       app,
-      /resolveThreadMessageAddress\(\{[\s\S]*?defaultAgentId: activeProject \|\| pendingTeam \|\| activeSession\?\.teamId[\s\S]*?: activeLogicalAgentId/,
+      /resolveThreadMessageAddress\(\{[\s\S]*?defaultAgentId: projectRoomRound \|\| pendingTeam \|\| activeSession\?\.teamId[\s\S]*?: activeLogicalAgentId/,
     );
     assert.match(app, /addressAgentIds: messageAddress\.addressAgentIds/);
     assert.match(app, /projectId: activeProject\.id/);
@@ -100,6 +100,38 @@ describe("composer agent selection", () => {
     assert.match(composer, /replaceAddressRun\(composerText, parsed\.mentions, agent\.displayName\)/);
     assert.match(composer, /onLogicalAgentPicked=\{pickLogicalAgent\}/);
     assert.match(composer, /onTeamPicked=\{pickTeam\}/);
+  });
+
+  it("offers a project thread its whole roster and each member", async () => {
+    const select = await readFile(resolve("web/src/components/composer/AgentSelect.tsx"), "utf8");
+    const composer = await readFile(resolve("web/src/components/composer/Composer.tsx"), "utf8");
+
+    // The picker survives in a project room instead of being replaced by the
+    // project chip: the roster is one option above its members.
+    assert.match(select, /composer\.project_room/);
+    assert.match(select, /composer\.project_members_group/);
+    assert.match(select, /onRoomPicked/);
+    assert.match(composer, /room=\{projectName \? projectRoom : null\}/);
+    // A project room has no team of its own, so team options stay out of it.
+    assert.match(composer, /teamOptionsEnabled=\{initializingThread && !projectName\}/);
+  });
+
+  it("narrows a project round to the picked member and widens it back", async () => {
+    const app = await readFile(resolve("web/src/App.tsx"), "utf8");
+    const composer = await readFile(resolve("web/src/components/composer/Composer.tsx"), "utf8");
+
+    // Room target means "no default agent", which the backend expands to the
+    // whole roster; a picked member routes the round to them alone.
+    assert.match(app, /const projectRoomRound = Boolean\(activeProject\) && projectRoomTarget/);
+    assert.match(app, /handleProjectRoomPicked[\s\S]*?setProjectRoomTarget\(true\)/);
+    assert.match(app, /handleLogicalAgentPicked[\s\S]*?setProjectRoomTarget\(false\)/);
+    // A new project thread carries the narrowed roster as assignments.
+    assert.match(
+      app,
+      /activeProject\s*\?\s*newThreadAgentIds!\.length\s*\?\s*\{ assignments: newThreadAgentIds!\.map/,
+    );
+    // A mention outranks the room pick, exactly as it outranks an agent pick.
+    assert.match(composer, /const roomSelected = projectRoomSelected && !addressedLogicalAgentId/);
   });
 
   it("closes the `@` list once a name is accepted", async () => {
