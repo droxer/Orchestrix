@@ -203,26 +203,12 @@ html[data-theme="dark"] .transcript-inner:has(.transcript-empty) {
   border-radius: var(--r-2);
 }
 
-.adm-drawer-head,
-.pref-header,
-.adm-drawer-body,
-.pref-body {
-  border-color: var(--line-2);
-}
-
-.adm-form-section,
-.adm-assign-node,
-.adm-placement-item,
-.adm-agent-toggle-item {
-  border-color: var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-1);
-}
-
-.adm-copy-pill {
-  background: var(--action);
-  color: var(--on-action);
-}
+/* Drawer/overlay chrome (.adm-drawer-*, .adm-form-section, .adm-assign-node,
+   .adm-placement-item, .adm-agent-toggle-item, .adm-copy-pill, .pref-*) is
+   owned by admin-v2-drawers.css / admin-v2-views.css / preferences.css — this
+   sheet previously re-chromed them from here (softened header hairlines,
+   re-filled form sections, duplicated the copy pill), which violated the
+   ownership rule above and forked the drawer grammar in two files. */
 
 /* The login screen owns its entire look in login.css (pinned pre-auth
    palette, serif headline, underline inputs) — do not re-wash it here. */

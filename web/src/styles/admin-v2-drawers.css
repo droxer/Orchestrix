@@ -1,11 +1,3 @@
-/* ── Empty states ─────────────────────────────────────────────────── */
-.adm-empty-body {
-  margin: 0;
-  font-size: var(--fs-3);
-  line-height: var(--leading-normal);
-  color: var(--ink-3);
-}
-
 /* ── Drawers ──────────────────────────────────────────────────────── */
 /* Backdrop positioning/scrim/entrance come from .overlay-backdrop (always
    paired in Drawer.tsx); this class only right-aligns the panel and layers it. */
@@ -71,7 +63,7 @@
 .adm-drawer-kicker {
   margin: 0 0 var(--sp-1);
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
   color: var(--ink-3);
 }
@@ -89,8 +81,8 @@
 
 .adm-drawer-sub {
   margin: 0;
-  font-size: var(--fs-3);
-  font-family: var(--font-sans);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
   overflow-wrap: anywhere;
 }
@@ -115,14 +107,9 @@
   flex-direction: column;
 }
 
-.adm-drawer-close {
-  color: var(--ink-2);
-}
-
-.adm-drawer-close:hover {
-  background: var(--control-fill-hover);
-  color: var(--ink-1);
-}
+/* The close affordance is the shared .overlay-close (overlay.css) — one
+   geometry, color, and hover for every overlay. A drawer-local copy used to
+   live here with a one-step-louder resting ink; that fork is retired. */
 
 /* ── Forms (drawer + auth) ────────────────────────────────────────── */
 .adm-form {
@@ -385,7 +372,9 @@
   padding: var(--sp-3) var(--sp-4);
   background: var(--surface-0);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-1);
+  /* List-row container, not a chip: the 6px container rung, matching
+     .team-member-options / .task-assignment-summary / .pref-option-list. */
+  border-radius: var(--r-2);
   cursor: pointer;
   text-align: left;
   font: inherit;
@@ -850,7 +839,7 @@
   padding: var(--sp-3) var(--sp-4);
   background: var(--surface-0);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-1);
+  border-radius: var(--r-2);
 }
 
 /* No remove action to anchor on the right (e.g. a non-admin viewer) — drop

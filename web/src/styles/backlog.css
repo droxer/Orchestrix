@@ -828,6 +828,7 @@
 .task-assignment-field > label {
   color: var(--ink-2);
   font: var(--type-label);
+  letter-spacing: var(--type-label-track);
 }
 
 .task-assignment-field > [data-slot="select-trigger"] {
@@ -890,6 +891,7 @@
 .task-assignment-option-copy > span:last-child {
   color: var(--ink-3);
   font: var(--type-label);
+  letter-spacing: var(--type-label-track);
   text-transform: capitalize;
 }
 
@@ -1004,6 +1006,7 @@
 .task-assignment-summary-hint {
   color: var(--ink-3);
   font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
 }
 
 .task-assignment-summary-hint {
@@ -1038,6 +1041,7 @@
   padding-inline: var(--sp-1);
   color: var(--ink-3);
   font: var(--type-label);
+  letter-spacing: var(--type-label-track);
 }
 
 @media (max-width: 480px) {
@@ -1058,7 +1062,7 @@
   flex-direction: column;
   gap: var(--sp-2);
   padding: var(--sp-3);
-  border: 1px solid color-mix(in srgb, var(--line-1) 80%, transparent);
+  border: 1px solid var(--line-2);
   border-radius: var(--r-2);
   background: var(--surface-1);
 }
@@ -1073,6 +1077,7 @@
   margin: 0;
   color: var(--ink-3);
   font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
 }
 
 /* .adm-form-actions-leading moved next to .adm-form-actions in
@@ -1088,7 +1093,7 @@
 .task-drawer-artifacts {
   margin-top: var(--sp-4);
   padding-top: var(--sp-4);
-  border-top: 1px solid color-mix(in srgb, var(--line-1) 80%, transparent);
+  border-top: 1px solid var(--line-2);
 }
 
 .task-drawer-artifacts-title {
@@ -1098,17 +1103,20 @@
   margin: 0 0 var(--sp-3);
   color: var(--ink-1);
   font: var(--type-label);
+  letter-spacing: var(--type-label-track);
 }
 
 .task-drawer-artifacts-count {
   color: var(--ink-3);
   font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
 }
 
 .task-drawer-artifacts-empty {
   margin: 0;
   color: var(--ink-4);
   font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
 }
 
 .task-drawer-artifact-list {
@@ -1139,6 +1147,7 @@
   background: none;
   color: var(--ink-1);
   font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   text-align: left;
   cursor: pointer;
 }
@@ -1160,12 +1169,14 @@
   flex: none;
   color: var(--ink-3);
   font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
 }
 
 .task-drawer-artifact-download {
   flex: none;
   color: var(--ink-3);
   font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   text-decoration: underline;
   text-underline-offset: 2px;
 }

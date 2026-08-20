@@ -148,7 +148,7 @@ export function Drawer({
           <OverlayCloseButton
             label={closeLabel}
             onClick={onClose}
-            className="overlay-close adm-drawer-close"
+            className="overlay-close"
           />
         </header>
         <div className={`adm-drawer-body${bodyClassName ? ` ${bodyClassName}` : ""}`}>{children}</div>

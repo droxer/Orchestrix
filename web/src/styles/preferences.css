@@ -61,6 +61,7 @@
 .pref-header-sub {
   color: var(--ink-3);
   font: var(--type-label);
+  letter-spacing: var(--type-label-track);
 }
 
 .pref-close {
@@ -96,6 +97,7 @@
   border-radius: var(--r-1);
   background: transparent;
   font: var(--type-label);
+  letter-spacing: var(--type-label-track);
   color: var(--ink-2);
   text-align: left;
   cursor: pointer;
@@ -206,7 +208,9 @@
 }
 
 .pref-option-row.selected {
-  background: color-mix(in srgb, var(--action) 10%, transparent);
+  /* The shared selectable list-row recipe (--action-soft wash + leading
+     accent bar), same as .adm-assign-node.selected and the sidenav. */
+  background: var(--action-soft);
   box-shadow: var(--accent-bar);
 }
 
@@ -232,6 +236,7 @@
 
 .pref-option-label {
   font: var(--type-label);
+  letter-spacing: var(--type-label-track);
   color: var(--ink-1);
 }
 

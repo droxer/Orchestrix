@@ -259,13 +259,14 @@
   flex: none;
   color: var(--action);
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
 }
 
 .team-profile-member-copy small {
   color: var(--ink-3);
   font: var(--type-label);
+  letter-spacing: var(--type-label-track);
 }
 
 /* Same meta voice as the picker row: kind · home computer on one quiet

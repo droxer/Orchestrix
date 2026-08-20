@@ -58,6 +58,7 @@
   gap: var(--sp-1-5);
   color: var(--ink-3);
   font: var(--type-label-strong);
+  letter-spacing: var(--type-label-strong-track);
   overflow: hidden;
   white-space: nowrap;
 }
@@ -66,6 +67,7 @@
   min-width: 0;
   color: var(--ink-1);
   font: var(--type-label-strong);
+  letter-spacing: var(--type-label-strong-track);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -76,7 +78,7 @@
   align-items: center;
   color: var(--ink-3);
   font: var(--type-label);
-  letter-spacing: var(--track-0);
+  letter-spacing: var(--type-label-track);
   white-space: nowrap;
 }
 
@@ -307,6 +309,7 @@
   background: transparent;
   color: var(--ink-1);
   font: var(--type-label);
+  letter-spacing: var(--type-label-track);
 }
 
 .artifact-index-search input:focus-visible {
@@ -334,6 +337,7 @@
   background: transparent;
   color: var(--ink-3);
   font: var(--type-label-strong);
+  letter-spacing: var(--type-label-strong-track);
   cursor: pointer;
   transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
 }
@@ -373,11 +377,15 @@
 }
 
 .artifact-index-row:hover {
-  background: var(--surface-3);
+  background: var(--row-hover);
 }
 
 .artifact-index-row.is-active {
+  /* Selected-row recipe: recessed well + the shared leading accent bar.
+     Hover previously jumped to --surface-3 — two steps ABOVE the strip's
+     --surface-1 — and outshouted the selected row at --surface-2. */
   background: var(--surface-2);
+  box-shadow: var(--accent-bar);
 }
 
 .artifact-index-row:focus-visible {
@@ -407,6 +415,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font: var(--type-label);
+  letter-spacing: var(--type-label-track);
   color: var(--ink-1);
 }
 
@@ -414,6 +423,7 @@
   padding: var(--sp-4);
   color: var(--ink-3);
   font: var(--type-label);
+  letter-spacing: var(--type-label-track);
 }
 
 /* Preview pane */
@@ -445,6 +455,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font: var(--type-label-strong);
+  letter-spacing: var(--type-label-strong-track);
   color: var(--ink-1);
 }
 
@@ -466,6 +477,7 @@
   background: transparent;
   color: var(--ink-2);
   font: var(--type-label-strong);
+  letter-spacing: var(--type-label-strong-track);
   text-decoration: none;
   cursor: pointer;
   white-space: nowrap;
@@ -496,6 +508,7 @@
   height: 100%;
   color: var(--ink-3);
   font: var(--type-label);
+  letter-spacing: var(--type-label-track);
 }
 
 /* Viewer status (reused by ArtifactBody loading/error states) */

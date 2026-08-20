@@ -47,12 +47,6 @@
       var(--sp-4);
   }
 
-  .adm-drawer-sub {
-    font: var(--type-body-sm);
-    letter-spacing: var(--type-body-sm-track);
-    line-height: var(--leading-normal);
-  }
-
   .adm-drawer-body {
     padding: var(--sp-4);
     padding-bottom: max(env(safe-area-inset-bottom), var(--sp-4));
@@ -88,8 +82,7 @@
     flex-basis: 100%;
   }
 
-  .overlay-close,
-  .adm-drawer-close {
+  .overlay-close {
     width: var(--touch-target);
     height: var(--touch-target);
   }

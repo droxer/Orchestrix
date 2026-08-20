@@ -67,6 +67,7 @@
 .dialog-message {
   margin: 0;
   font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-2);
   overflow-wrap: anywhere;
 }
@@ -117,6 +118,7 @@
   color: var(--ink-1);
   box-shadow: var(--shadow-2);
   font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   line-height: var(--leading-normal);
   animation: rise var(--t-fast) var(--ease) both;
 }

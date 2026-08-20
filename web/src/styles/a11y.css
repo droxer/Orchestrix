@@ -116,7 +116,6 @@
   .adm-copy-pill,
   .adm-form-actions [data-slot="button"],
   .overlay-close,
-  .adm-drawer-close,
   .adm-chat-rows button,
   .relay-search,
   .adm-search,
@@ -198,7 +197,6 @@
   .backlog-task-actions .backlog-action-icon,
   .backlog-row-actions .backlog-action-icon,
   .overlay-close,
-  .adm-drawer-close,
   .adm-chat-rows button {
     width: var(--touch-target);
     height: var(--touch-target);
