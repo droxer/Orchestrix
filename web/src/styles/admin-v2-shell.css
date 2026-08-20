@@ -93,8 +93,7 @@
 }
 
 @media (max-width: 640px) {
-  .adm-view-toggle-label,
-  .adm-command-onboard-label {
+  .adm-view-toggle-label {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -132,10 +131,6 @@
   .adm-view-toggle-btn {
     width: 32px;
     padding: 0;
-  }
-
-  .adm-command-onboard {
-    padding-inline: var(--sp-3);
   }
 }
 

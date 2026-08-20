@@ -7,7 +7,7 @@ import { useNodeMetrics } from "../hooks/useNodeMetrics";
 import { useTranslation } from "react-i18next";
 import { useMutationError } from "../hooks/useMutationError";
 import { Button } from "@/components/ui/button";
-import { ActionAddPerson, AdminNode, NavRefresh } from "./icons";
+import { ActionAdd } from "./icons";
 import { getOrgSettings, deleteControlPanelDaemonNode, deleteControlPanelEmployee, deleteManagedNode, getAuthStatus, getMe, listManagedNodes, permanentlyDeleteManagedNode, recoverManagedNode, RelayApiError, unassignControlPanelDaemonNode, updateComputerDisplayName, updateControlPanelDaemonNodeDisabledAgents, updateManagedNodeDisplayName } from "../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
@@ -87,7 +87,6 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
   // Absent while the query is in flight; only a definite false hides the
   // controls, so a slow answer does not flash them away.
   const canEditEmployees = orgSettingsQuery.data?.capabilities?.employeeEdits !== false;
-  const [manualRefreshPending, setManualRefreshPending] = useState(false);
   const setAdminView = useRelayStore((state) => state.setAdminView);
   const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
   const [editEmployeeId, setEditEmployeeId] = useState<string | null>(null);
@@ -388,17 +387,6 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
     }
   }
 
-  async function handleManualRefresh() {
-    if (manualRefreshPending) return;
-    setManualRefreshPending(true);
-    try {
-      if (view === "nodes") await Promise.all([refetch(), managedNodesQuery.refetch()]);
-      else await refetch();
-    } finally {
-      setManualRefreshPending(false);
-    }
-  }
-
   if (!authChecked) {
     return (
       <section className="admin-console adm-bare">
@@ -464,37 +452,33 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
                 </span>
               </span>
             ) : null}
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              aria-label={t("nav.refresh")}
-              aria-busy={manualRefreshPending}
-              disabled={manualRefreshPending}
-              onClick={() => void handleManualRefresh()}
-            >
-              <NavRefresh size={16} className={manualRefreshPending ? "spin" : undefined} />
-            </Button>
+            {/* No manual refresh: the view polls on its own (useAdminNodes),
+                so the button was chrome for a job already done. */}
             {view === "employees" ? (
               <Button
                 type="button"
-                className="adm-command-onboard"
+                variant="ghost"
+                // The shared list-header create affordance — a plain ghost
+                // plus; the header's view toggle already names what is being
+                // added, so a labelled plate restated it at amber volume.
+                className="page-header-icon-action"
                 onClick={() => setAddEmployeeOpen(true)}
                 aria-label={t("admin.v2.add_employee_cta")}
+                title={t("admin.v2.add_employee_cta")}
               >
-                <ActionAddPerson size={16} aria-hidden="true" />
-                <span className="adm-command-onboard-label">{t("admin.v2.add_employee_cta")}</span>
+                <ActionAdd size={16} aria-hidden="true" />
               </Button>
             ) : null}
             {view === "nodes" ? (
               <Button
                 type="button"
-                className="adm-command-onboard"
+                variant="ghost"
+                className="page-header-icon-action"
                 onClick={() => setAddNodeOpen(true)}
                 aria-label={t("admin.v2.add_node_cta")}
+                title={t("admin.v2.add_node_cta")}
               >
-                <AdminNode size={16} aria-hidden="true" />
-                <span className="adm-command-onboard-label">{t("admin.v2.add_node_cta")}</span>
+                <ActionAdd size={16} aria-hidden="true" />
               </Button>
             ) : null}
           </>

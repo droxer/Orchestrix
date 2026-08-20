@@ -295,7 +295,7 @@
   --fs-4: 1.1429rem; /* 16px — body */
   --fs-heading: 1.2857rem; /* 18px — section headings, in-message h1 */
   --fs-title: 1.4286rem;   /* 20px — conversation / pane titles, content titles */
-  --fs-5: 1.7143rem; /* 24px — display-lg: page display tier, KPI numerals */
+  --fs-5: 1.7143rem; /* 24px — display-lg: KPI numerals, hero support tiers */
   --fs-6: 2.5714rem; /* 36px — display-xl: hero headline */
   /* Hero display numeral — the dashboard's single oversized KPI. A clamp,
      not a rung: it tracks the viewport between 36px and 44px and never

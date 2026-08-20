@@ -121,8 +121,9 @@
   border: 0;
   background: transparent;
   color: var(--ink-1);
-  font: var(--type-name);
-  letter-spacing: var(--type-name-track);
+  /* Same 13px/600 list-rail identity as the agent roster and thread rail. */
+  font: var(--type-label-strong);
+  letter-spacing: var(--type-label-strong-track);
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
@@ -144,6 +145,7 @@
   overflow: hidden;
   color: var(--ink-3);
   font: var(--type-body-sm);
+  font-size: var(--fs-1); /* compact metadata rung under the 13px title */
   letter-spacing: var(--type-body-sm-track);
   text-overflow: ellipsis;
   white-space: nowrap;

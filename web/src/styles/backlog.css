@@ -1228,23 +1228,6 @@
     flex-shrink: 0;
   }
 
-  .task-board-create-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
-
-  .task-board-create-btn {
-    width: 44px;
-    padding-inline: 0;
-  }
-
   /* The inline "·" separators aren't wrap-safe — at phone width the row breaks
      mid-list and strands a dot at a line end. Drop the pseudo-separators and
      lay the four metrics out as an even two-up grid instead. */

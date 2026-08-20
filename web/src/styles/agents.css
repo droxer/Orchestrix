@@ -148,8 +148,10 @@
 .agents-roster-row-name {
   overflow: hidden;
   color: var(--ink-1);
-  font: var(--type-name);
-  letter-spacing: var(--type-name-track);
+  /* Same 13px/600 list-rail identity as the thread rail — 15px semibold
+     names read too loud in a 318px roster, CJK more so. */
+  font: var(--type-label-strong);
+  letter-spacing: var(--type-label-strong-track);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -168,6 +170,8 @@
   gap: var(--sp-1-5);
   color: var(--ink-3);
   font: var(--type-label);
+  font-size: var(--fs-1); /* compact metadata rung — 12px under a 13px name */
+  letter-spacing: var(--type-label-track);
   white-space: nowrap;
 }
 
@@ -186,10 +190,12 @@
   align-items: center;
   gap: var(--sp-1);
   color: var(--ink-3);
-  /* Was hand-rolled --fs-1/11px inline with --type-label/13px computer names —
-     two sizes in one meta line. One role now; mono is kept deliberately (a
-     runtime is a technical identifier) with its paired --type-code-track. */
+  /* One size for the whole meta line — the runtime rides the same 12px
+     compact-metadata rung as the computer names beside it. Mono is kept
+     deliberately (a runtime is a technical identifier) with its paired
+     --type-code-track. */
   font: var(--type-label);
+  font-size: var(--fs-1);
   font-family: var(--font-mono);
   letter-spacing: var(--type-code-track);
 }

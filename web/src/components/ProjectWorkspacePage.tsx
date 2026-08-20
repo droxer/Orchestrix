@@ -22,7 +22,7 @@ import {
 import { truncateId, formatRelativeTime } from "../lib/adminHelpers";
 import type { DaemonNodeMonitorRecord, EmployeeAgent, ProjectMember, ProjectRecord } from "../types";
 import { AgentStateBadge } from "./AgentStateBadge";
-import { ActionAdd, ActionCompose, ActionEdit, NavBack, WorkspaceFolder } from "./icons";
+import { ActionAdd, ActionEdit, NavBack, WorkspaceFolder } from "./icons";
 import { PageHeader } from "./PageHeader";
 import { ProjectMemberEditor } from "./ProjectMemberEditor";
 import { ProjectWorkspaceFiles } from "./ProjectWorkspaceFiles";
@@ -309,13 +309,15 @@ export function ProjectWorkspacePage({
             {actions.newThread ? (
               <Button
                 type="button"
-                size="sm"
+                variant="ghost"
+                // The shared list-header create affordance — a plain ghost
+                // plus, same as every other list header.
+                className="page-header-icon-action"
                 onClick={onNewThread}
                 aria-label={t("project.new_thread", { project: project.name })}
+                title={t("project.new_thread_short")}
               >
-                <ActionCompose size={14} aria-hidden="true" />
-                <span className="project-new-thread-label-wide">{t("project.new_thread", { project: project.name })}</span>
-                <span className="project-new-thread-label-compact">{t("project.new_thread_short")}</span>
+                <ActionAdd size={16} aria-hidden="true" />
               </Button>
             ) : null}
           </>

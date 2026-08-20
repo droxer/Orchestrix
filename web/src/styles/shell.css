@@ -166,6 +166,38 @@
   gap: var(--sp-2);
 }
 
+/* The list pages' one create affordance — a ghost icon button, never a text
+   CTA: the header already says what the list is, so a labelled "New X" plate
+   restates it at amber volume. Born as the project rail's add button; now
+   shared by threads, backlog, routines, agents, and teams so "new" looks
+   identical on every list. Icon is always ActionAdd at 16px. */
+.page-header-icon-action {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: var(--control-h-sm);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-2);
+  color: var(--ink-3);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease);
+}
+
+.page-header-icon-action:hover {
+  color: var(--ink-1);
+  background: var(--surface-2);
+  border-color: var(--line-2);
+}
+
+.page-header-icon-action:active {
+  transform: translateY(0.5px);
+}
+
 .page-header-actions--stacked {
   padding-top: 2px;
 }

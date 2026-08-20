@@ -86,11 +86,16 @@ export function ComputerPage({
     ? t("computer.limit_reached", { used: computersUsed, limit: computerLimit })
     : null;
 
-  const connectCta = (size: "default" | "sm") => (
+  const connectCta = (size: "default" | "sm", variant: "default" | "outline" = "default") => (
     <div className="computer-connect-cta">
+      {/* The header CTA takes the quiet outline tier — the amber fill is
+          reserved for the empty state, where connecting is the page's one
+          move. The usage readout (2/3) and limit reason stay attached to the
+          action either way. */}
       <Button
         type="button"
         size={size}
+        variant={variant}
         onClick={() => setConnectDrawerOpen(true)}
         disabled={atLimit}
         title={limitHint ?? undefined}
@@ -170,7 +175,7 @@ export function ComputerPage({
         count={t("computer.count", { count: myNodes.length })}
         titleVariant="display"
         layout="stacked"
-        actions={connectCta("sm")}
+        actions={connectCta("sm", "outline")}
       />
       {/* The shell clips its children, so the roster needs its own scroll
           container — see computer.css. */}

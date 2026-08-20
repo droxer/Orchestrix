@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { describe, it } from "node:test";
 
 describe("Admin page refresh stability", () => {
-  it("keeps background polling from changing the refresh control", async () => {
+  it("keeps background polling from flashing page chrome", async () => {
     const adminPageSource = await readFile(resolve("web/src/components/AdminPage.tsx"), "utf8");
     const nodesSource = await readFile(resolve("web/src/hooks/useAdminNodes.ts"), "utf8");
     const relayDataSource = await readFile(resolve("web/src/hooks/useRelayData.ts"), "utf8");
@@ -12,8 +12,10 @@ describe("Admin page refresh stability", () => {
     assert.doesNotMatch(adminPageSource, /\bisFetching\b/);
     assert.doesNotMatch(nodesSource, /\bisFetching\b/);
     assert.doesNotMatch(relayDataSource, /\bisFetching\b/);
-    assert.match(adminPageSource, /disabled=\{manualRefreshPending\}/);
-    assert.match(adminPageSource, /className=\{manualRefreshPending \? "spin" : undefined\}/);
+    // The admin console polls on its own (useAdminNodes), so it carries no
+    // manual refresh button — the shared isRefreshing state drives the
+    // backlog/routine headers only.
+    assert.doesNotMatch(adminPageSource, /manualRefreshPending/);
     assert.doesNotMatch(adminPageSource, /useUrlSearchState/);
     assert.match(relayDataSource, /const \[manualRefreshPending, setManualRefreshPending\] = useState\(false\)/);
   });

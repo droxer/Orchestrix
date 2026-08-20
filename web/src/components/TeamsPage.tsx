@@ -70,9 +70,17 @@ export function TeamsPage({
           titleVariant="display"
           layout="stacked"
           actions={(
-            <Button type="button" size="sm" onClick={() => setAddTeam(true)}>
-              <ActionAdd size={15} aria-hidden="true" />
-              <span>{t("teams.add")}</span>
+            // The shared list-header create affordance — a ghost plus, same
+            // as the projects/threads rail.
+            <Button
+              variant="ghost"
+              type="button"
+              className="page-header-icon-action"
+              aria-label={t("teams.add")}
+              title={t("teams.add")}
+              onClick={() => setAddTeam(true)}
+            >
+              <ActionAdd size={16} aria-hidden="true" />
             </Button>
           )}
         />
@@ -87,6 +95,9 @@ export function TeamsPage({
               className="teams-table"
               columns="minmax(0, 1fr) auto"
               aria-label={t("teams.title")}
+              // A roster table is a dense list surface: names drop to 15px and
+              // the member sub-line to 13px, matching the agent roster rail.
+              data-density="compact"
             >
               <TableHeader>
                 <TableHead>{t("teams.name")}</TableHead>

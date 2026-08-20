@@ -36,7 +36,7 @@ describe("Agent team management", () => {
     assert.match(teamWorkspaceSource, /getWorkspaceBrief\(\{ teamId: team\.id \}/);
     assert.doesNotMatch(agentDetailSource, /nav\.refresh|NavRefresh/);
     assert.doesNotMatch(teamWorkspaceSource, /nav\.refresh|NavRefresh/);
-    assert.match(teamsSource, /actions=\{\(\s*<Button type="button" size="sm" onClick=\{\(\) => setAddTeam\(true\)\}/);
+    assert.match(teamsSource, /className="page-header-icon-action"[\s\S]*?onClick=\{\(\) => setAddTeam\(true\)\}/);
     assert.match(teamsSource, /open=\{!teamId && addTeam\}/);
     assert.match(agentsSource, /<RosterFilterBar/);
     assert.doesNotMatch(agentsSource, /isDetailRoute/);

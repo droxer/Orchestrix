@@ -73,7 +73,8 @@ export function LegacyPersonalityEditor({
         {editable && !editing ? (
           <Button
             type="button"
-            variant={hasCustomPersonality ? "outline" : "default"}
+            // Always the quiet outline tier — mirrors AgentProfileEditor.
+            variant="outline"
             size="sm"
             className="agent-personality-edit-action"
             onClick={onStartEdit}

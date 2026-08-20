@@ -8,6 +8,7 @@ import { useDialogs } from "@/components/ui/DialogProvider";
 import type { AgentName, CurrentUser, EmployeeAgent, LogicalAgentAvailability } from "../types";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { AgentMark } from "./AgentMark";
+import { ActionAdd } from "./icons";
 import { StatusPill, TonePill } from "./StatusPill";
 import { AgentDetailPage } from "./AgentDetailPage";
 import { PageHeader } from "./PageHeader";
@@ -304,8 +305,17 @@ export function AgentsPage({
           layout="stacked"
           actions={
             currentUser.employeeId ? (
-              <Button size="cta" type="button" onClick={() => setCreateOpen(true)}>
-                {t("agents_page.create_action")}
+              // The shared list-header create affordance — a ghost plus, same
+              // as the projects/threads rail.
+              <Button
+                variant="ghost"
+                type="button"
+                className="page-header-icon-action"
+                aria-label={t("agents_page.create_action")}
+                title={t("agents_page.create_action")}
+                onClick={() => setCreateOpen(true)}
+              >
+                <ActionAdd size={16} aria-hidden="true" />
               </Button>
             ) : null
           }
@@ -328,7 +338,10 @@ export function AgentsPage({
             body={activeAgents.length === 0 ? t("agents_page.empty_body") : t("agents_page.empty_filtered_body")}
           />
         ) : (
-          <ul className="agents-roster-list" aria-label={t("agents_page.title")}>
+          // Compact density: a 318px roster rail is a list layout, so names
+          // sit one rung down (16 → 15px) beside their 13px meta — the same
+          // treatment the backlog and admin tables already get.
+          <ul className="agents-roster-list" data-density="compact" aria-label={t("agents_page.title")}>
             {visibleAgents.map((agent) => (
               <RosterRow
                 key={agent.id}

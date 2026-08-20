@@ -320,7 +320,8 @@
   white-space: nowrap;
 }
 
-/* Primary assign plate — mirrors conversation-new-btn (36px ink plate). */
+/* Primary assign plate — a 36px amber plate, the one place "commit" still
+   earns the action fill now that list headers all carry the ghost plus. */
 .send-button {
   display: grid;
   place-items: center;

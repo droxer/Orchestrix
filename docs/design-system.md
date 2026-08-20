@@ -267,7 +267,7 @@ weight reads as a headline shouting someone's words.
 | Role | Spec | Paired track | Use |
 |---|---|---|---|
 | `--type-display` | 700 36/1.5 | `--track-0` | hero headline, admin metric values |
-| `--type-title` | 700 24/1.33 | `--track-display` | page titles and other fixed UI nouns |
+| `--type-title` | 700 20/1.33 | `--track-display` | page titles and other fixed UI nouns |
 | `--type-heading` | 700 18/1.5 | `--track-0` | section heads, list labels, in-message h1 |
 | `--type-title-content` | 600 20/1.4 | `--track-body` | titles whose text comes from a user or agent |
 | `--type-body` | 400 16/1.5 | `--track-body` | prose, message bodies, inputs |

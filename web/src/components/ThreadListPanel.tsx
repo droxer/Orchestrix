@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionAdd, ActionCompose, ChevronDownIcon, WorkspaceFolder } from "./icons";
+import { ActionAdd, ChevronDownIcon, WorkspaceFolder } from "./icons";
 import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
 import { ThreadRow, type ThreadItem } from "./ThreadRow";
@@ -178,6 +178,7 @@ export function ThreadListPanel({
             <ThreadRow
               key={item.session.id}
               item={item}
+              tone={section.tone}
               selected={selectedSessionId === item.session.id}
               onSelect={onSelectThread}
               onRename={onRenameThread}
@@ -206,7 +207,8 @@ export function ThreadListPanel({
           <ThreadRow
             key={item.session.id}
             item={item}
-            state={state}
+            tone={state}
+            layout="nested"
             selected={selectedSessionId === item.session.id}
             onSelect={onSelectThread}
             onRename={onRenameThread}
@@ -218,7 +220,10 @@ export function ThreadListPanel({
   };
 
   return (
-    <aside id="thread-panel" className="thread-panel" aria-label={t("nav.threads")} tabIndex={-1}>
+    // Compact density: the rail is a list layout, so thread and project names
+    // sit one rung down (16 → 15px) against their 13px meta — the same
+    // treatment the agent roster and teams table get.
+    <aside id="thread-panel" className="thread-panel" aria-label={t("nav.threads")} tabIndex={-1} data-density="compact">
       <div className="thread-panel-inner">
       {/* Same frame as every other list rail: PageHeader over a
           .list-filter-bar band, each carrying its own hairline. */}
@@ -226,27 +231,22 @@ export function ThreadListPanel({
         title={directoryMode === "projects" ? t("project.projects") : t("nav.threads")}
         count={directoryMode === "projects" ? hierarchy.projects.length : threads.length}
         titleVariant="display"
-        actions={directoryMode === "projects" ? (
-          <Button variant="ghost"
-            type="button"
-            className="conversation-project-btn"
-            aria-label={t("project.create")}
-            title={t("project.create")}
-            onClick={onCreateProject}
-          >
-            <ActionAdd size={16} />
-          </Button>
-        ) : (
-          <Button variant="ghost"
-            type="button"
-            className="conversation-new-btn"
-            aria-label={t("thread.new_thread")}
-            title={t("thread.new_thread")}
-            onClick={() => onNewThread(null)}
-          >
-            <ActionCompose size={16} />
-          </Button>
-        )}
+        actions={(() => {
+          // One ghost plus for both modes — the shared list-header create
+          // affordance (.page-header-icon-action, shell.css).
+          const createLabel = directoryMode === "projects" ? t("project.create") : t("thread.new_thread");
+          return (
+            <Button variant="ghost"
+              type="button"
+              className="page-header-icon-action"
+              aria-label={createLabel}
+              title={createLabel}
+              onClick={directoryMode === "projects" ? onCreateProject : () => onNewThread(null)}
+            >
+              <ActionAdd size={16} />
+            </Button>
+          );
+        })()}
       />
       <div className="list-filter-bar">
         <SearchInput

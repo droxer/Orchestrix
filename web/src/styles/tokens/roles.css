@@ -137,7 +137,12 @@
      tops out at 700 and base.css disables font synthesis — an 800 declaration
      would silently render as 700, so the roles say 700 and let size +
      tracking carry the tier. */
-  --type-title:        700 var(--fs-5)/1.33  var(--font-display);
+  /* Page titles sit at 20px, not the source system's 24: the app's headers
+     live directly above 13px list rows, and a 24px/700 noun over a 13px
+     rail read as a billboard over an index. 20px keeps the tier separation
+     from --type-heading (18) without the shout. --type-number keeps fs-5 —
+     KPI numerals earn the larger size in a way page nouns do not. */
+  --type-title:        700 var(--fs-title)/1.33  var(--font-display);
   --type-heading:      700 var(--fs-heading)/1.5  var(--font-display);
   --type-body:         400 var(--fs-4)/1.5  var(--font-sans);
   --type-body-sm:      400 var(--fs-3)/1.5  var(--font-sans);
@@ -165,10 +170,11 @@
                   while --type-body carried six. Names are the tier that had
                   to come back up.
      --type-title-content
-                  a title whose text comes from a user or an agent. 20px/600,
-                  one step calmer than --type-title's 24px/700 — the display
-                  weight is reserved for fixed UI nouns, where it reads as the
-                  Fieldnotes brand rather than as shouting someone's words.
+                  a title whose text comes from a user or an agent. Same 20px
+                  rung as --type-title, one weight calmer (600 vs 700) and
+                  solid-tracked — the tightened display weight is reserved for
+                  fixed UI nouns, where it reads as the Fieldnotes brand
+                  rather than as shouting someone's words.
      Structural group labels are NOT a fourth role: --type-micro above already
      documents itself as "+ uppercase", so it was the register all along — the
      drift was that ten rules set caps at 13px instead and one list surface

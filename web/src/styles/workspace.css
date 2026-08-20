@@ -1319,10 +1319,11 @@
   gap: var(--sp-3);
 }
 
-/* Section title inside a tab panel. --type-title is the PAGE title role (24px
-   mono 700) — used here it printed louder than the agent's own name in the
-   header (--type-title-content, 20px sans 600) one band above. Takes the same
-   role as .workspace-pane-head h2 so all three tabs of the record agree. */
+/* Section title inside a tab panel. --type-title is the PAGE title role
+   (700, tight-tracked) — used here it printed louder than the agent's own
+   name in the header (--type-title-content, 20px sans 600) one band above.
+   Takes the same role as .workspace-pane-head h2 so all three tabs of the
+   record agree. */
 .agent-personality-title-row h2 {
   margin: 0;
   color: var(--ink-1);

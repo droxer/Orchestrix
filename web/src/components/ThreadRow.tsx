@@ -1,7 +1,9 @@
 import { ActionEdit, ActionRemove, NodeOffline } from "./icons";
 import { useTranslation } from "react-i18next";
 import type { RelaySession } from "../types";
-import { canDeleteThread, threadLabel, type ThreadItem } from "../lib/threads";
+import { canDeleteThread, sessionAgents, threadLabel, type ThreadItem } from "../lib/threads";
+import { agentLabel } from "../lib/plan";
+import { AgentMark } from "./AgentMark";
 import { Button } from "@/components/ui/button";
 
 export type { ThreadItem };
@@ -27,39 +29,88 @@ function relativeTime(iso: string | undefined, locale: string): string {
   return formatter.format(-Math.round(day / 365), "year");
 }
 
+type ThreadTone = "attn" | "run" | "idle";
+
 type ThreadRowProps = {
   item: ThreadItem;
   selected: boolean;
   onSelect: (sessionId: string) => void;
   onRename?: (session: RelaySession) => void;
   onClose?: (sessionId: string) => void;
-  /** Projects-directory mode: the flat list has no group headers, so the row
-      carries its own state pip (and speaks the state in its aria-label). */
-  state?: "attn" | "run" | "idle";
+  /** The row's attention tone, from the same groupThreads partition either
+      mode runs. Full rows speak it as a status line; nested rows (no group
+      headers above them) carry it as their own pip. */
+  tone: ThreadTone;
+  /** "full" — the threads rail's two-line row: title + stamp over a status /
+      agent meta line. "nested" — a project folder's single-line sub-row:
+      pip + title + stamp, subordinate to the folder name. */
+  layout?: "full" | "nested";
 };
 
-export function ThreadRow({ item, selected, onSelect, onRename, onClose, state }: ThreadRowProps) {
+export function ThreadRow({ item, selected, onSelect, onRename, onClose, tone, layout = "full" }: ThreadRowProps) {
   const { t, i18n } = useTranslation();
   const { session } = item;
   const label = threadLabel(session);
   const stamp = relativeTime(session.updatedAt, i18n.language);
   const offlineLabel = item.nodeOffline ? t("thread.node_offline") : "";
-  const stateLabel = state
-    ? state === "attn"
+  const stateLabel =
+    tone === "attn"
       ? t("thread.group_needs_you")
-      : state === "run"
+      : tone === "run"
         ? t("thread.group_running")
-        : t("thread.group_idle")
-    : "";
+        : t("thread.group_idle");
   const rowLabel = [label, offlineLabel, stateLabel, stamp].filter(Boolean).join(" · ");
   const deleteEnabled = canDeleteThread(item);
+
+  // The meta line's status text. A live run names its agent; a thread
+  // waiting on a decision or one that ended badly says so outright. Settled
+  // (completed / merely idle) threads stay silent — the group header above
+  // them already says "idle", and restating it on every row is noise.
+  const runningAgent = item.runningAgent ?? (session.status === "running" ? session.currentAgent : undefined);
+  const status: { text: string; tone: "attn" | "run" | "err" } | null =
+    tone === "run"
+      ? {
+          tone: "run",
+          text: runningAgent
+            ? t("thread.agent_working", { agent: agentLabel(runningAgent) })
+            : t("thread.group_running"),
+        }
+      : tone === "attn"
+        ? { tone: "attn", text: t("thread.statuses.waiting_for_human") }
+        : session.status === "failed"
+          ? { tone: "err", text: t("thread.statuses.failed") }
+          : session.status === "cancelled"
+            ? { tone: "err", text: t("thread.statuses.cancelled") }
+            : null;
+
+  // Who has worked the thread, as a mark cluster — the row's only identity
+  // beyond its title. The cluster is decorative: the running agent is named
+  // in the status text, and the full set reads from the title tooltip.
+  const agents = sessionAgents(session);
+  const agentsTitle = agents.map(agentLabel).join(", ");
+  const hasMeta = Boolean(status) || agents.length > 0;
 
   function handleClose() {
     onClose?.(session.id);
   }
 
+  const offlineMark = item.nodeOffline ? (
+    <span
+      className="conversation-offline"
+      role="img"
+      aria-label={offlineLabel}
+      title={offlineLabel}
+    >
+      <NodeOffline size={12} />
+    </span>
+  ) : null;
+
   return (
-    <li className="conversation-row list-virtual" data-selected={selected ? "true" : "false"}>
+    <li
+      className={`conversation-row list-virtual${layout === "nested" ? " nested" : ""}`}
+      data-selected={selected ? "true" : "false"}
+      data-tone={tone}
+    >
       <Button variant="ghost"
         className="conversation-row-inner"
         type="button"
@@ -69,21 +120,17 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose, state }
       >
         <span className="conversation-copy">
           <span className="conversation-topline">
-            {state ? (
-              <span className="conversation-state-dot" data-tone={state} aria-hidden="true" />
+            {/* Nested rows have no group header above them, so each carries
+                its own state pip; full rows speak state in the meta line. */}
+            {layout === "nested" ? (
+              <span className="conversation-state-dot" data-tone={tone} aria-hidden="true" />
             ) : null}
             <span className="conversation-name">
               <strong>{label}</strong>
-              {item.nodeOffline ? (
-                <span
-                  className="conversation-offline"
-                  role="img"
-                  aria-label={offlineLabel}
-                  title={offlineLabel}
-                >
-                  <NodeOffline size={12} />
-                </span>
-              ) : null}
+              {/* The offline badge rides the title in both layouts: it is a
+                  property of the thread itself, and the name line survives
+                  the hover swap that hides the timestamp. */}
+              {offlineMark}
             </span>
             {stamp ? (
               <span className="conversation-stamp tnum">
@@ -91,6 +138,23 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose, state }
               </span>
             ) : null}
           </span>
+          {layout === "full" && hasMeta ? (
+            <span className="conversation-subline">
+              {status ? (
+                <span className="conversation-status" data-tone={status.tone}>
+                  <span className="conversation-state-dot" data-tone={status.tone} aria-hidden="true" />
+                  <span>{status.text}</span>
+                </span>
+              ) : null}
+              {agents.length > 0 ? (
+                <span className="conversation-agents" title={agentsTitle} aria-hidden="true">
+                  {agents.map((agent) => (
+                    <AgentMark key={agent} agent={agent} size={12} />
+                  ))}
+                </span>
+              ) : null}
+            </span>
+          ) : null}
         </span>
       </Button>
       <span className="conversation-row-actions">
