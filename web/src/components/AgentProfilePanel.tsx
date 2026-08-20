@@ -481,7 +481,7 @@ export function AgentProfilePanel({
               }}
               disabled={saving}
             />
-            <Button variant="ghost"
+            <Button variant="default"
               type="button"
               className="adm-copy-pill"
               onClick={() => void handleRenameSave()}
@@ -505,7 +505,7 @@ export function AgentProfilePanel({
           <div className="adm-cred-value-line">
             <span className="adm-cred-value" translate="no">{agent.displayName}</span>
             {canEditProfile ? (
-              <Button variant="ghost"
+              <Button variant="default"
                 type="button"
                 className="adm-copy-pill"
                 onClick={startRename}

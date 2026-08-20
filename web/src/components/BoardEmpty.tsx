@@ -29,7 +29,9 @@ export function BoardEmpty({
       <h2 className="relay-empty-title">{title}</h2>
       <p className="backlog-board-empty-body relay-empty-body">{body}</p>
       {onCreate && createLabel ? (
-        <Button size="sm" onClick={onCreate}>
+        // The board's one move earns the full 40px default tier — same as
+        // every other empty-state primary; the clear action stays demoted.
+        <Button onClick={onCreate}>
           <ActionCompose size={14} />
           {createLabel}
         </Button>

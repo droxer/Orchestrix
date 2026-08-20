@@ -28,9 +28,17 @@ export function ChannelsPage() {
         layout="stacked"
         actions={
           hasChannels ? (
-            <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-              <ActionAdd size={15} aria-hidden="true" />
-              <span>{t("admin.v2.chat_create")}</span>
+            // The shared list-header create affordance — a ghost plus, same
+            // as every other list page; the header already names the list.
+            <Button
+              type="button"
+              variant="ghost"
+              className="page-header-icon-action"
+              aria-label={t("admin.v2.chat_create")}
+              title={t("admin.v2.chat_create")}
+              onClick={() => setCreateOpen(true)}
+            >
+              <ActionAdd size={16} aria-hidden="true" />
             </Button>
           ) : null
         }

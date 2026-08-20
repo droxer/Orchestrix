@@ -21,7 +21,9 @@ export function CredCopyRow({ label, value, copyLabel, copied, onCopy, hint }: C
       {hint ? <span className="adm-cred-hint">{hint}</span> : null}
       <div className="adm-cred-value-line">
         <code className="adm-cred-value code">{value}</code>
-        <Button variant="ghost"
+        {/* Filled amber pill — `default`, not ghost: the class paints the
+            plate, so the variant prop names what is actually rendered. */}
+        <Button variant="default"
           type="button"
           className={`adm-copy-pill ${copied ? "copied" : ""}`}
           onClick={onCopy}
