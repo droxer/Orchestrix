@@ -94,7 +94,7 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
             </p>
           )}
 
-          <Button variant="default" type="submit" className="login-submit" loading={isLoading} loadingLabel={t("login.loading")}>
+          <Button variant="default" size="cta" type="submit" className="login-submit w-full" loading={isLoading} loadingLabel={t("login.loading")}>
             {t("login.sign_in")}
           </Button>
         </form>

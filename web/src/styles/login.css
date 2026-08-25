@@ -28,6 +28,12 @@
   --lg-on-steel: var(--on-action); /* text on the action fill */
   --lg-err: var(--dark-ink); /* error is the loud/bright tier — dots stay calm */
   --lg-accent: var(--lg-steel);
+  /* The canvas is pinned dark whatever theme is saved, so the shared focus
+     ring must bind to the dark register's ink here — the theme-register
+     --link it defaults to would sit dark-on-dark under a saved light
+     theme. Binding the variable (not a per-control override) keeps every
+     login control on the shared --focus-outline mechanism. */
+  --focus-outline: var(--focus-w) solid var(--lg-ink);
 
   display: flex;
   align-items: center;
@@ -199,22 +205,13 @@
   translate: 0 2px;
 }
 
+/* Palette-only overrides on the shared Button (variant="default" size="cta"
+   w-full): geometry (40px, --r-2, px-4), typography (14px/600), the loading
+   glyph, and the focus ring all come from the primitive — this block only
+   re-paints the plate in the pinned pre-auth register. */
 .login-submit {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-2);
-  width: 100%;
-  height: var(--control-h);
-  padding-inline: var(--sp-4);
-  border: none;
-  border-radius: var(--r-2);
   background: var(--lg-accent);
   color: var(--on-action);
-  font: var(--type-label-strong);
-  cursor: pointer;
-  touch-action: manipulation;
-  transition: background var(--t-fast) var(--ease);
 }
 
 .login-submit:hover:not(:disabled) {
@@ -228,12 +225,9 @@
      stays legible against the darkened fill and reads as "unavailable". */
   background: color-mix(in srgb, var(--lg-accent) 40%, var(--lg-canvas));
   color: var(--lg-muted);
-  cursor: default;
-}
-
-.login-submit:focus-visible {
-  outline: 2px solid var(--lg-ink);
-  outline-offset: 2px;
+  /* The wash is the disabled signal — cancel the primitive's opacity-50 so
+     the label keeps the --lg-muted contrast it was picked for. */
+  opacity: 1;
 }
 
 /* ---------- Foot ------------------------------------------------------ */
