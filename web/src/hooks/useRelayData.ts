@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { listDaemonNodes, listProjects, listSandboxes, listSessionSummaries, listTasks } from "../api";
 import type { DaemonNodeMonitorRecord, ProjectRecord, RelaySession, RelayTaskSummary, SandboxRecord } from "../types";
-import type { ProjectCollectionStatus } from "../lib/projectPage";
+import { queryCollectionStatus, type ProjectCollectionStatus } from "../lib/projectPage";
 import { mergeSessionSummaries } from "../lib/sessionPollMerge";
 import { RELAY_POLL_INTERVALS_MS } from "../lib/relayPolling";
 
@@ -114,26 +114,24 @@ export function useRelayData(
   const sessions = sessionsQuery.data ?? [];
   const tasks = tasksQuery.data ?? [];
   const projects = projectsQuery.data ?? [];
-  const projectsStatus: ProjectCollectionStatus = projectsQuery.isError
-    ? "error"
-    : projectsQuery.isPending || (!projectsQuery.isFetchedAfterMount && projectsQuery.fetchStatus === "fetching")
-      ? "loading"
-      : "ready";
+  const projectsStatus: ProjectCollectionStatus = queryCollectionStatus(projectsQuery);
   const projectsError = projectsQuery.error instanceof Error
     ? projectsQuery.error.message
     : projectsQuery.error
       ? String(projectsQuery.error)
       : "";
 
-  // When disabled (e.g. logged out) drop cached rows so the UI clears at once,
-  // matching the previous reset-to-empty behavior.
+  // When disabled (e.g. logged out) drop cached rows so the UI clears at once.
+  // resetQueries, NOT setQueryData: seeding [] counts as data written after
+  // mount, so React Query then reports isPending false and isFetchedAfterMount
+  // true for a request still in flight — which made every collection read
+  // "ready" mid-fetch and turned the loading states built on it into dead code.
+  // Resetting returns each query to a genuinely unfetched state; the `?? []`
+  // fallbacks below still clear the UI to empty exactly as before, and nothing
+  // refetches because this only runs while the queries are disabled.
   useEffect(() => {
     if (!enabled) {
-      queryClient.setQueryData(SANDBOXES_KEY, []);
-      queryClient.setQueryData(NODES_KEY, []);
-      queryClient.setQueryData(SESSIONS_KEY, []);
-      queryClient.setQueryData(TASKS_KEY, []);
-      queryClient.setQueryData(PROJECTS_KEY, []);
+      void queryClient.resetQueries({ queryKey: RELAY_KEY });
     }
   }, [enabled, queryClient]);
 

@@ -224,6 +224,9 @@ export function ThreadsView({
         directoryMode={directoryMode}
         threads={filteredThreads}
         projects={projects}
+        projectsStatus={projectsStatus}
+        projectsError={projectsError}
+        onRetryProjects={onRetryProjects}
         computers={runtimeNodes}
         query={threadQuery}
         setQuery={setThreadQuery}

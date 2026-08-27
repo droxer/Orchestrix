@@ -10,6 +10,7 @@ import { projectThreadBuckets } from "../lib/threads";
 import {
   expandProject,
   isProjectExpanded,
+  projectDirectoryState,
   projectEmptyKey,
   projectFolderSelection,
   projectFolderTone,
@@ -26,6 +27,7 @@ import {
   THREAD_LIST_WIDTH_MIN,
 } from "../lib/threadList";
 import type { DaemonNodeMonitorRecord, ProjectRecord, RelaySession } from "../types";
+import type { ProjectCollectionStatus } from "../lib/projectPage";
 import { useChatColumnResize } from "@/hooks/useChatColumnResize";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
@@ -48,6 +50,9 @@ export function ThreadListPanel({
   directoryMode,
   threads,
   projects,
+  projectsStatus,
+  projectsError,
+  onRetryProjects,
   computers,
   query,
   setQuery,
@@ -66,6 +71,12 @@ export function ThreadListPanel({
   directoryMode: "threads" | "projects";
   threads: ThreadItem[];
   projects: ProjectRecord[];
+  /** The projects query's state, the same one the detail pane resolves its
+   *  loading / error / not-found panes from. The rail must not answer "no
+   *  projects yet" for a fetch that has not finished or has failed. */
+  projectsStatus: ProjectCollectionStatus;
+  projectsError: string;
+  onRetryProjects: () => void;
   computers: DaemonNodeMonitorRecord[];
   query: string;
   setQuery: Dispatch<SetStateAction<string>>;
@@ -157,6 +168,11 @@ export function ThreadListPanel({
   }, [onResize, width]));
 
   const hierarchy = projectThreadBuckets(threads, projects);
+  const directoryState = projectDirectoryState({
+    projectCount: hierarchy.projects.length,
+    collectionStatus: projectsStatus,
+    hasQuery: query.trim().length > 0,
+  });
 
   const renderThreads = (items: ThreadItem[]) => {
     const groups = groupThreads(items);
@@ -329,22 +345,55 @@ export function ThreadListPanel({
               </div> : null}
           </section>
         )}) : renderThreads(hierarchy.unclassified)}
-        {(directoryMode === "projects" ? hierarchy.projects.length === 0 : threads.length === 0) ? (
-          // The rail is too narrow for a doodle, so the vignette is dropped;
-          // a filtered-empty list offers no create action, because creating
-          // would not answer the question the query asked.
+        {/* The rail is too narrow for a doodle, so the vignette is dropped;
+            a filtered-empty list offers no create action, because creating
+            would not answer the question the query asked. */}
+        {directoryMode === "projects" ? (
+          // Loading and error are their own answers here, matching the detail
+          // pane beside it — an unfinished or failed fetch is not an empty
+          // account, and offering "Create project" for one is a lie.
+          directoryState === "loading" ? (
+            <div className="route-loading" role="status" aria-live="polite">
+              {t("project.loading")}
+            </div>
+          ) : directoryState === "error" ? (
+            <RelayEmptyState
+              className="conversation-empty"
+              marginalia={null}
+              title={t("project.load_failed")}
+              body={projectsError || t("project.load_failed_body")}
+              actions={(
+                <Button type="button" variant="outline" onClick={onRetryProjects}>
+                  {t("workspace.retry")}
+                </Button>
+              )}
+            />
+          ) : directoryState === "filtered-empty" ? (
+            <RelayEmptyState
+              className="conversation-empty"
+              marginalia={null}
+              title={t("thread.no_matches")}
+            />
+          ) : directoryState === "empty" ? (
+            <RelayEmptyState
+              className="conversation-empty"
+              marginalia={null}
+              title={t("project.no_projects")}
+              actions={(
+                <Button type="button" onClick={() => onCreateProject()}>
+                  {t("project.create")}
+                </Button>
+              )}
+            />
+          ) : null
+        ) : threads.length === 0 ? (
           <RelayEmptyState
             className="conversation-empty"
             marginalia={null}
-            title={query.trim()
-              ? t("thread.no_matches")
-              : directoryMode === "projects" ? t("project.no_projects") : t("thread.no_threads")}
+            title={query.trim() ? t("thread.no_matches") : t("thread.no_threads")}
             actions={query.trim() ? undefined : (
-              <Button
-                type="button"
-                onClick={() => (directoryMode === "projects" ? onCreateProject() : onNewThread(null))}
-              >
-                {directoryMode === "projects" ? t("project.create") : t("thread.new_thread")}
+              <Button type="button" onClick={() => onNewThread(null)}>
+                {t("thread.new_thread")}
               </Button>
             )}
           />

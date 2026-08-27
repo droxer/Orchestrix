@@ -4,6 +4,7 @@ import { describe, it, beforeEach } from "node:test";
 import {
   expandProject,
   isProjectExpanded,
+  projectDirectoryState,
   projectEmptyKey,
   projectFolderSelection,
   projectFolderTone,
@@ -202,5 +203,59 @@ describe("project folder empty line", () => {
   // "No threads in this project yet" is false here — it has threads, none match.
   it("explains an empty result under an active search", () => {
     assert.equal(projectEmptyKey({ threadCount: 0, hasQuery: true }), "project.no_matching_threads");
+  });
+});
+
+/* The rail shows the same collection the project detail pane does, and that
+   pane already distinguishes loading / error / not-found. The rail used to
+   collapse all three into "No projects yet · Create project", so a slow or
+   failed fetch invited the user to create a project they may well already
+   have. */
+describe("projectDirectoryState", () => {
+  const ready = { projectCount: 2, collectionStatus: "ready" as const, hasQuery: false };
+
+  it("renders the folders whenever there are any", () => {
+    assert.equal(projectDirectoryState(ready), "ready");
+  });
+
+  // Poll refetches re-enter "loading" with the rail already populated; blanking
+  // the folders to a spinner every few seconds would be worse than the bug.
+  it("keeps a populated rail through a background refetch", () => {
+    assert.equal(projectDirectoryState({ ...ready, collectionStatus: "loading" }), "ready");
+    assert.equal(projectDirectoryState({ ...ready, collectionStatus: "error" }), "ready");
+  });
+
+  it("says it is loading rather than offering to create", () => {
+    assert.equal(
+      projectDirectoryState({ projectCount: 0, collectionStatus: "loading", hasQuery: false }),
+      "loading",
+    );
+  });
+
+  it("reports a failed fetch instead of an empty roster", () => {
+    assert.equal(
+      projectDirectoryState({ projectCount: 0, collectionStatus: "error", hasQuery: false }),
+      "error",
+    );
+  });
+
+  // A failure is the honest answer even mid-search: the query did not empty
+  // the list, the request did.
+  it("prefers the failure over the search explanation", () => {
+    assert.equal(
+      projectDirectoryState({ projectCount: 0, collectionStatus: "error", hasQuery: true }),
+      "error",
+    );
+  });
+
+  it("separates a filtered-empty rail from a genuinely empty one", () => {
+    assert.equal(
+      projectDirectoryState({ projectCount: 0, collectionStatus: "ready", hasQuery: true }),
+      "filtered-empty",
+    );
+    assert.equal(
+      projectDirectoryState({ projectCount: 0, collectionStatus: "ready", hasQuery: false }),
+      "empty",
+    );
   });
 });

@@ -133,3 +133,29 @@ export function scopeProjectActivities(
     tasks: brief.tasks.filter((task) => task.projectId === projectId),
   };
 }
+
+/** Whether a polled collection query is loading, failed, or settled.
+ *
+ *  Kept off the call site because the flags are subtle: `isPending` only
+ *  covers a query with no data at all, so a query holding cached rows that is
+ *  mid-flight on its first real fetch reads as settled unless the
+ *  fetchedAfterMount check catches it. A poll refetch of already-settled data
+ *  is deliberately NOT loading — the rail keeps its rows rather than blanking
+ *  to a spinner every interval.
+ *
+ *  This is only trustworthy while nothing writes into the query cache by hand:
+ *  setQueryData stamps dataUpdatedAt, which makes isFetchedAfterMount report
+ *  true for a request that has not come back. See the logged-out reset in
+ *  useRelayData, which must clear through resetQueries for that reason. */
+export function queryCollectionStatus(
+  { isError, isPending, isFetchedAfterMount, fetchStatus }: {
+    isError: boolean;
+    isPending: boolean;
+    isFetchedAfterMount: boolean;
+    fetchStatus: "fetching" | "paused" | "idle";
+  },
+): ProjectCollectionStatus {
+  if (isError) return "error";
+  if (isPending || (!isFetchedAfterMount && fetchStatus === "fetching")) return "loading";
+  return "ready";
+}
