@@ -193,7 +193,9 @@ def test_task_create_update_and_retired_claim_next(monkeypatch) -> None:
         )
 
 
-def test_task_list_summary_view_is_compact_and_keeps_default_contract(monkeypatch) -> None:
+def test_task_list_summary_view_is_compact_and_keeps_default_contract(
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
@@ -260,9 +262,10 @@ def test_routine_create_defaults_next_run_when_omitted(monkeypatch) -> None:
             return cls(2026, 7, 7)
 
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
-    monkeypatch.setattr(task_routes, "date", FixedDate)
     with TemporaryDirectory() as root:
-        client = TestClient(create_app(root))
+        app = create_app(root)
+        app.state.today = FixedDate.today
+        client = TestClient(app)
         _bootstrap_admin(client)
         _create_user(client, "alice", employee_id="alice")
 
@@ -342,15 +345,12 @@ def test_manual_routine_start_uses_the_scheduler_calendar(monkeypatch) -> None:
 
     async def dispatch(*args, run_date: date, **kwargs):
         observed["run_date"] = run_date
-        return None
 
     monkeypatch.setattr(task_routes, "dispatch_routine_occurrence", dispatch)
     ctx = SimpleNamespace(today=lambda: date(2026, 7, 7))
 
     asyncio.run(
-        task_routes.start_routine_occurrence_on_ready_node(
-            ctx, {}, {}, agent=None
-        )
+        task_routes.start_routine_occurrence_on_ready_node(ctx, {}, {}, agent=None)
     )
 
     assert observed["run_date"] == date(2026, 7, 7)
@@ -363,9 +363,10 @@ def test_routine_cadence_change_and_reenable_recalculate_next_run(monkeypatch) -
             return cls(2026, 7, 7)
 
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
-    monkeypatch.setattr(task_routes, "date", FixedDate)
     with TemporaryDirectory() as root:
-        client = TestClient(create_app(root))
+        app = create_app(root)
+        app.state.today = FixedDate.today
+        client = TestClient(app)
         _bootstrap_admin(client)
         _create_user(client, "alice", employee_id="alice")
         agent = _create_agent(client, "alice")
@@ -476,9 +477,7 @@ def test_assigned_backlog_waits_for_scheduler_and_start_can_dispatch_manually(
 
         agent = _create_agent(client, "alice", node_id="sbx_alice")
         assert (
-            client.app.state.agent_placement_store.list_placements(
-                agent_id=agent["id"]
-            )
+            client.app.state.agent_placement_store.list_placements(agent_id=agent["id"])
             != []
         )
 
@@ -749,8 +748,7 @@ def test_task_start_runs_multi_agent_adaptive_pipeline(
         assert task.json()["status"] == "done"
         assert task.json()["linkedSessionIds"] == [session_id]
         assert all(
-            item["message"] != "Discussion started."
-            for item in task.json()["activity"]
+            item["message"] != "Discussion started." for item in task.json()["activity"]
         )
 
 
@@ -954,9 +952,7 @@ def test_agent_selected_review_work_uses_normal_task_completion(monkeypatch) -> 
         started = client.post(
             f"/api/v1/tasks/{created.json()['id']}/runs",
             json={
-                "assignments": [
-                    {"agentId": agent["id"], "agent": "codex"}
-                ],
+                "assignments": [{"agentId": agent["id"], "agent": "codex"}],
             },
         )
         assert started.status_code == 202
@@ -998,9 +994,10 @@ def test_agentless_routine_cannot_start_as_team_discussion(monkeypatch) -> None:
         def today(cls) -> date:
             return cls(2026, 6, 26)
 
-    monkeypatch.setattr(task_routes, "date", FixedDate)
     with TemporaryDirectory() as root:
-        client = TestClient(create_app(root))
+        app = create_app(root)
+        app.state.today = FixedDate.today
+        client = TestClient(app)
         _bootstrap_admin(client)
         _create_user(client, "alice", employee_id="alice")
         registered = client.post(
@@ -1111,9 +1108,10 @@ def test_routine_start_dispatches_occurrence_not_definition(monkeypatch) -> None
         def today(cls) -> date:
             return cls(2026, 6, 26)
 
-    monkeypatch.setattr(task_routes, "date", FixedDate)
     with TemporaryDirectory() as root:
-        client = TestClient(create_app(root))
+        app = create_app(root)
+        app.state.today = FixedDate.today
+        client = TestClient(app)
         _bootstrap_admin(client)
         _create_user(client, "alice", employee_id="alice")
         registered = client.post(

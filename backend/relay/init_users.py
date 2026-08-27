@@ -11,17 +11,32 @@ from .security.auth import auth_store_from_env
 
 def main(argv: list[str] | None = None) -> int:
     load_backend_env()
-    parser = argparse.ArgumentParser(prog="python -m relay.init_users", description="Create an initial Relay user.")
-    parser.add_argument("--data-dir", default=os.environ.get("RELAY_DATA_DIR") or str(DEFAULT_RELAY_DATA_DIR))
+    parser = argparse.ArgumentParser(
+        prog="python -m relay.init_users", description="Create an initial Relay user."
+    )
+    parser.add_argument(
+        "--data-dir",
+        default=os.environ.get("RELAY_DATA_DIR") or str(DEFAULT_RELAY_DATA_DIR),
+    )
     parser.add_argument("--username", default="admin")
-    parser.add_argument("--password", default="admin")
+    parser.add_argument(
+        "--password",
+        default=os.environ.get("RELAY_INITIAL_ADMIN_PASSWORD"),
+        help="Initial password (or set RELAY_INITIAL_ADMIN_PASSWORD).",
+    )
     parser.add_argument("--role", choices=["admin", "user"], default="admin")
     parser.add_argument("--email", default=None)
     parser.add_argument("--employee-id", default=None)
     parser.add_argument("--department-id", default="administration")
     parser.add_argument("--department-name", default="Administration")
-    parser.add_argument("--only-if-empty", action="store_true", help="Skip creation when any user already exists.")
+    parser.add_argument(
+        "--only-if-empty",
+        action="store_true",
+        help="Skip creation when any user already exists.",
+    )
     args = parser.parse_args(argv)
+    if not args.password:
+        parser.error("--password is required (or set RELAY_INITIAL_ADMIN_PASSWORD).")
 
     store = auth_store_from_env(args.data_dir)
     if args.only_if_empty and store.has_users():

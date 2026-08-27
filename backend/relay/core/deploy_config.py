@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import os
 import re
+from ipaddress import ip_network
 
 SameSite = str
 
@@ -136,16 +137,43 @@ def bind_port(default: int = 8790) -> int:
             try:
                 return int(value)
             except ValueError as error:
-                raise RuntimeError(f"{name} must be an integer, got {value!r}.") from error
+                raise RuntimeError(
+                    f"{name} must be an integer, got {value!r}."
+                ) from error
     return default
 
 
 def trust_proxy_headers() -> bool:
     """Honor ``X-Forwarded-Proto``/``X-Forwarded-For`` from the platform edge.
 
-    Enabled by default: Relay is deployed behind a load balancer far more often
-    than it is exposed directly, and without it every request looks like plain
-    ``http`` from ``127.0.0.1``. Set ``RELAY_TRUST_PROXY_HEADERS=0`` when the
-    server is directly reachable, where a client could forge these headers.
+    Disabled by default because a directly reachable client can forge forwarded
+    headers. Deployments behind a load balancer must enable this explicitly and
+    configure ``RELAY_FORWARDED_ALLOW_IPS`` with the proxy addresses or CIDRs.
     """
-    return _flag("RELAY_TRUST_PROXY_HEADERS", default=True)
+    return _flag("RELAY_TRUST_PROXY_HEADERS")
+
+
+def forwarded_allow_ips() -> str:
+    """Comma-separated trusted proxy IP addresses/CIDRs for Uvicorn.
+
+    A wildcard would make client identity and request scheme attacker-controlled,
+    so it is never accepted even when proxy header support is explicitly enabled.
+    """
+    raw = _env("RELAY_FORWARDED_ALLOW_IPS")
+    if not raw:
+        raise RuntimeError(
+            "RELAY_FORWARDED_ALLOW_IPS is required when "
+            "RELAY_TRUST_PROXY_HEADERS is enabled."
+        )
+    proxies = [value.strip() for value in raw.split(",") if value.strip()]
+    if "*" in proxies:
+        raise RuntimeError("RELAY_FORWARDED_ALLOW_IPS cannot contain '*'.")
+    for proxy in proxies:
+        try:
+            ip_network(proxy, strict=False)
+        except ValueError as error:
+            raise RuntimeError(
+                "RELAY_FORWARDED_ALLOW_IPS entries must be IP addresses or CIDRs; "
+                f"got {proxy!r}."
+            ) from error
+    return ",".join(proxies)

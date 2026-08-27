@@ -6,7 +6,6 @@ import stat
 import time
 from concurrent.futures import ThreadPoolExecutor
 from tempfile import TemporaryDirectory
-from uuid import UUID
 
 import pytest
 from fastapi import HTTPException
@@ -102,7 +101,7 @@ def test_database_auth_store_persists_users_and_hashes_session_tokens() -> None:
 
 
 def test_database_auth_store_normalizes_human_readable_ids_before_uuid_queries() -> None:
-    normalize = getattr(auth_module, "normalize_database_id")
+    normalize = auth_module.normalize_database_id
 
     assert normalize("alice") is None
     generated = normalize("550E8400-E29B-41D4-A716-446655440000")

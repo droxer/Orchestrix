@@ -262,13 +262,14 @@ The administration API (`/api/v1/admin/*`) requires an admin session. For local
 development, initialize the first admin explicitly with the helper script:
 
 ```bash
-script/init_users.sh
+script/init_users.sh --password 'choose-a-strong-password'
 ```
 
-By default this creates `admin` / `admin` with the `admin` role and binds it to
-employee `admin` in department `administration`. Pass `--username`,
-`--password`, `--role`, `--email`, `--employee-id`, `--department-id`, or
-`--department-name` to create a different initial user.
+By default this creates user `admin` with the `admin` role and binds it to
+employee `admin` in department `administration`. A password must be supplied
+with `--password` or `RELAY_INITIAL_ADMIN_PASSWORD`; there is no built-in
+password. Pass `--username`, `--role`, `--email`, `--employee-id`,
+`--department-id`, or `--department-name` to customize the initial user.
 
 For a token-gated bootstrap instead, set `RELAY_ADMIN_TOKEN` and create the
 first admin explicitly:

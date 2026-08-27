@@ -5,9 +5,8 @@ from tempfile import TemporaryDirectory
 from uuid import UUID
 
 import pytest
-
-from relay.security.auth import DatabaseUserAuthStore, UserAuthStore
 from relay.init_users import main
+from relay.security.auth import DatabaseUserAuthStore, UserAuthStore
 
 
 def test_init_users_script_creates_default_admin(capsys, monkeypatch) -> None:

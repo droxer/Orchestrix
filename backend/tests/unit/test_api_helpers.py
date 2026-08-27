@@ -4,9 +4,8 @@ import asyncio
 
 import pytest
 from fastapi import HTTPException
-from starlette.requests import Request
-
 from relay.api.helpers import assignment_list, json_body
+from starlette.requests import Request
 
 
 def test_json_body_translates_client_disconnect_to_http_error() -> None:

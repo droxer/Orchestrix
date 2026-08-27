@@ -4,8 +4,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from relay.persistence.agent_placement_store import DatabaseAgentPlacementStore
-from relay.persistence.agent_placement_store import LocalAgentPlacementStore
+from relay.persistence.agent_placement_store import (
+    DatabaseAgentPlacementStore,
+    LocalAgentPlacementStore,
+)
 from relay.persistence.agent_store import DatabaseAgentStore, LocalAgentStore
 from relay.persistence.daemon_store import DatabaseDaemonStore, LocalDaemonStore
 from relay.persistence.team_store import DatabaseTeamStore, LocalTeamStore
