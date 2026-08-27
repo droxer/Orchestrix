@@ -282,6 +282,9 @@
   background: var(--surface-0);
 }
 
+/* Static identity monogram, aria-hidden and never pressable — so it wears the
+   neutral avatar recipe (.adm-node-avatar: surface fill, ink text, hairline),
+   not the cobalt action fill, which pressable things own. */
 .adm-assign-avatar {
   display: inline-flex;
   align-items: center;
@@ -289,8 +292,9 @@
   width: var(--control-h);
   height: var(--control-h);
   border-radius: var(--r-full);
-  background: var(--action);
-  color: var(--on-action);
+  background: var(--surface-2);
+  border: 1px solid var(--line-1);
+  color: var(--ink-1);
   font: var(--type-label-strong);
   letter-spacing: var(--type-label-strong-track);
   flex-shrink: 0;
@@ -392,7 +396,7 @@
 }
 
 .adm-assign-node-input:focus-visible + .adm-assign-node {
-  border-color: var(--action);
+  border-color: var(--link);
   outline: var(--focus-outline);
   outline-offset: var(--focus-offset);
 }
@@ -603,7 +607,7 @@
 
 .create-agent-runtime-option:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: var(--opacity-disabled);
 }
 
 .create-agent-runtime-mark {
@@ -618,7 +622,8 @@
 }
 
 .create-agent-runtime-option.is-selected .create-agent-runtime-mark {
-  border-color: color-mix(in srgb, var(--action) 45%, var(--line-1));
+  --tone: var(--action);
+  border-color: var(--tone-line);
   color: var(--action);
 }
 
@@ -683,10 +688,9 @@
 }
 
 .adm-provision-preview-handle {
-  font-size: var(--fs-heading);
-  font-weight: 600;
+  font: var(--type-heading);
+  letter-spacing: var(--type-heading-track);
   color: var(--ink-1);
-  line-height: var(--leading-display);
   word-break: break-all;
 }
 
@@ -799,7 +803,7 @@
 
 .adm-profile-segment-input:disabled + .adm-profile-segment-btn {
   cursor: default;
-  opacity: 0.55;
+  opacity: var(--opacity-disabled);
 }
 
 .adm-profile-segment-btn.active,
@@ -906,7 +910,7 @@
 }
 
 .adm-placement-remove:disabled {
-  opacity: 0.5;
+  opacity: var(--opacity-disabled);
   cursor: progress;
 }
 

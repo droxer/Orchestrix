@@ -218,7 +218,7 @@ describe("Meta commerce palette tokens", () => {
       "#eeefe9", "#fcfcfa", "#e5e7e0", // cream canvas + planes
       "#f1f1e8", "#d0d1c2", "#a8a999", "#9e9f8f", // olive ink ramp
       "#a0a192", "#c6c7b8", "#616257", "#55564d", // olive brightness-hierarchy status
-      "#ffc233", // the yellow --live (its light-register twin #8a5f06 survives as --code-number)
+      "#ffc233", // the yellow --live (its light-register twin #895e05 survives as --code-number)
     ];
     for (const value of dead) {
       assert.ok(!paletteCode.includes(value), `palette.css still declares ${value}`);

@@ -97,7 +97,7 @@ export function NodeCard({
           </span>
         </div>
         {showStatusPill ? (
-          <TonePill tone={tone} label={statusLabel} live={tone === "info"} />
+          <TonePill tone={tone} label={statusLabel} live={status === "running" || status === "busy"} />
         ) : null}
       </header>
 

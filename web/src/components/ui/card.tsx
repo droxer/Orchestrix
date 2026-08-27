@@ -88,13 +88,12 @@ function CardTitle({
     defaultTagName: "h3",
     props: mergeProps<"h3">(
       {
-        // Card title — the source system's subtitle-lg tier (18px / 700 / solid),
-        // not the display tier: only the 24px rung tracks tight, and
-        // font-display aliases the sans the card already inherits. leading-tight
-        // (1.15) is single-line card chrome; palette.css has no 1.56 token and
-        // a wrapped card title does not need document leading.
+        // Card title — the source system's subtitle-lg tier, worn as the
+        // --type-heading role (700 / 18px / --leading-heading): not the display
+        // tier — only the 24px rung tracks tight, and font-display aliases the
+        // sans the card already inherits.
         className: cn(
-          "m-0 text-lg leading-tight font-bold tracking-(--track-0) text-ink",
+          "m-0 text-lg leading-(--leading-heading) font-bold tracking-(--track-0) text-ink",
           className
         ),
       },

@@ -173,6 +173,18 @@
     height: 32px;
   }
 
+  /* Two more small controls take the same documented 32px WCAG 2.5.8 tier as
+     the conversation row actions above rather than the 44px floor: the
+     reasoning expander is a ~20px inline toggle whose full bump would bend
+     the thinking block's baseline rhythm, and the fence copy button is
+     hover-revealed on fine pointers and pinned visible on touch — the same
+     posture as the row actions. */
+  .agent-thinking-toggle,
+  .md-fence-copy {
+    min-width: 32px;
+    min-height: 32px;
+  }
+
   .artifact-index-btn {
     width: var(--touch-target);
     height: var(--touch-target);

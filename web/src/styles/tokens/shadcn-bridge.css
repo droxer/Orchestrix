@@ -49,7 +49,8 @@
   /* ---- Scale guards ----
      Everything below OVERRIDES a stock Tailwind scale. Deleting an unused step
      does not remove the utility, it hands it back to Tailwind's default — so
-     `rounded-xl` would silently become 0.75rem (12px), off the 4/6/10/14 ramp,
+     `rounded-xl` would silently become 0.75rem (12px), off the 4/8/16/24/32
+     ramp,
      and `text-2xl` would become 1.5rem, off the type scale. These blocks are
      therefore kept COMPLETE on purpose; an unused row here is a guard, not
      dead weight, and the usage argument that removed the two colour aliases

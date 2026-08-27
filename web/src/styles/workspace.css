@@ -574,7 +574,7 @@
 .workspace-profile .adm-cred-label {
   color: var(--ink-3);
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
 }
 
@@ -804,7 +804,7 @@
 .workspace-path-segment.is-current {
   color: var(--ink-1);
   cursor: default;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .workspace-home-status {
@@ -1467,7 +1467,7 @@
   min-height: 28px;
   color: var(--ink-3);
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
 }
 
@@ -1596,7 +1596,7 @@
 }
 
 .workspace-dossier-icon-btn:disabled {
-  opacity: 0.5;
+  opacity: var(--opacity-disabled);
   cursor: not-allowed;
 }
 

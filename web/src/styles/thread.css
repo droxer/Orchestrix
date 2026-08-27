@@ -658,14 +658,8 @@
   }
 }
 
-/* Coarse pointers get the full touch-target hit area; desktop stays 24px. */
-@media (pointer: coarse) {
-  .conversation-rename-btn,
-  .conversation-remove-btn {
-    width: var(--touch-target);
-    height: var(--touch-target);
-  }
-}
+/* Coarse-pointer sizing is owned by a11y.css, which pins these buttons to
+   the documented 32px WCAG 2.5.8 tier — and loads last, so it wins. */
 
 .conversation-stamp {
   flex-shrink: 0;

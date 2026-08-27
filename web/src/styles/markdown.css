@@ -49,7 +49,7 @@
 }
 
 .md-body strong {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .md-body em {
@@ -78,7 +78,7 @@
 .md-body h6 {
   color: var(--ink-1);
   font-family: var(--font-sans);
-  font-weight: 600;
+  font-weight: 700;
   line-height: var(--leading-snug);
   letter-spacing: var(--track-0);
 }
@@ -95,7 +95,7 @@
 /* In-message heading ladder stays under the 20px conversation title so a
    content heading never visually rivals the page title: 18 / 16 / 15. The
    transcript body is 15px, so h2 sits one rung above body and h3 and below
-   share the body size, separating by weight (600 vs 400) — which is how the
+   share the body size, separating by weight (700 vs 400) — which is how the
    rest of the system already distinguishes roles inside one size. */
 .md-body h1 { font-size: var(--fs-heading); font-weight: 700; } /* 18px — the top rung needs weight, not just 2px over h2 */
 .md-body h2 { font-size: var(--fs-4); } /* 16px */
@@ -242,7 +242,7 @@ html:lang(zh-TW) .md-body blockquote {
 
 .md-body thead th {
   color: var(--ink-3);
-  font-weight: 600;
+  font-weight: 700;
   border-bottom-color: var(--line-1);
 }
 
@@ -291,7 +291,7 @@ html:lang(zh-TW) .md-body blockquote {
   margin-bottom: var(--sp-1);
   color: var(--ink-4);
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
 }
 
@@ -459,7 +459,7 @@ html:lang(zh-TW) .md-body blockquote {
   margin: 0 0 var(--sp-2);
   color: var(--ink-3);
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
 }
 

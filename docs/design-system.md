@@ -156,7 +156,7 @@ Dark register / light register:
 | `--ink-3` | `#b6bec6` | `#444950` | secondary labels |
 | `--ink-4` | `#a4adb6` | `#556170` | timestamps, meta, disabled |
 | `--line-1` | `#2c3a43` | `#ced0d4` | structural hairline |
-| `--line-2` | `#1f2b32` | `#dee3e9` | soft hairline |
+| `--line-2` | `#1f2b32` | `#d6dce3` | soft hairline |
 | `--action` | `#0064e0` | `#0064e0` | actions, selection, brand — register-invariant |
 | `--action-hover` | `#0457cb` | `#0457cb` | pressed / active — register-invariant |
 | `--action-soft` | 15% soft-cobalt wash | 12% cobalt wash | selection wash, active nav |
@@ -184,8 +184,8 @@ The **zone** surfaces run the other way from dark. Dark builds the shell up
 from the canvas (lift means lighter there); light cannot copy that, because a
 near-white rail beside a cloud canvas makes the app's *chrome* the brightest
 thing on screen and leaves the content sheet reading as the recessed part. So
-in light the shell recedes — `--surface-rail` `#e6ebf1` < `--surface-list`
-`#eaeef4` < canvas — and lightness order becomes rail < list < canvas < card <
+in light the shell recedes — `--surface-rail` `#e2e7ed` < `--surface-list`
+`#e8ecf2` < canvas — and lightness order becomes rail < list < canvas < card <
 drawer, the same order the eye should travel. A search field or hover well
 recedes from white and emerges from black; that inversion is correct, and only
 `--surface-2` does it.
@@ -887,3 +887,13 @@ in progress* — no "an agent is running right now" state — because a commerce
 page has nothing that runs. `--live`, the pulse cadences, and the `StateMark`
 shape vocabulary are Relay additions built on the one accent the source leaves
 unspent.
+
+A second addition covers *status proportions*, which the source system's
+data-viz vocabulary has no grammar for. Fleet utilisation bars
+(`admin-v2-dashboard.css`) therefore paint their segments in solid status
+tones — `--live`, `--err`, `--ok`, a `--warn` hatch — because a bar segment IS
+the datum, not canvas chrome; the "status is text/dot only, never fills" rule
+still holds everywhere else. The artifact diff viewer (`artifact.css`) makes
+the same kind of content-display exception: add/del rows carry 16%
+`--ok`/`--err` background washes, the universal diff grammar no token rule
+needed to invent.

@@ -138,8 +138,11 @@
 }
 
 .teams-list-row[data-selected="true"] .teams-list-mark {
-  background: color-mix(in srgb, var(--action) 14%, var(--surface-2));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--action) 28%, var(--line-1));
+  /* Selection roles, not hand-mixes: --action-soft is the one selection wash,
+     --tone-line the one accent-edge strength (35% reads on a 1px hairline). */
+  --tone: var(--action);
+  background: var(--action-soft);
+  box-shadow: inset 0 0 0 1px var(--tone-line);
 }
 
 .teams-list-row:focus-within {

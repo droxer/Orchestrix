@@ -315,7 +315,7 @@
   min-width: 6ch;
   overflow: hidden;
   color: var(--ink-1);
-  font-weight: 600;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

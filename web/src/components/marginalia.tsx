@@ -4,9 +4,10 @@
 // layer, so the rules are strict:
 //
 //   - Strokes only — no fills, no gradients, geometricPrecision throughout.
-//   - Olive ink ONLY (currentColor / var(--ink-3) / var(--ink-4)). Yellow
-//     (--action / --live) is reserved for actionable and live work by
-//     system rule; a mascot must never spend it.
+//   - Neutral ink ONLY (currentColor / var(--ink-3) / var(--ink-4)). The
+//     accent hues (--action cobalt, --live purple) are reserved for
+//     actionable and live work by system rule; a mascot must never spend
+//     them.
 //   - Decorative: every vignette is aria-hidden and unfocusable, and the
 //     empty-state CSS positions them absolutely so they never shift layout.
 //   - No animation, in any motion preference.
