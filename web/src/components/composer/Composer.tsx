@@ -250,9 +250,15 @@ const ComposerView = forwardRef<ComposerHandle, {
             <div className="composer-footer-right">
               {/* One mounted element for send↔stop so keyboard focus survives
                   the run starting; the glyph cross-fades instead. */}
+              {/* Button's default size carries h-(--control-h) and px-6, which
+                  would stretch the plate into a wide oval; the size overrides
+                  ride the same className so tailwind-merge drops the defaults
+                  and the documented control-h-sm disc survives. */}
               <Button variant="default"
                 type={running ? "button" : "submit"}
-                className={running ? "send-button send-button-cancel" : "send-button"}
+                className={running
+                  ? "send-button send-button-cancel h-(--control-h-sm) w-(--control-h-sm) px-0"
+                  : "send-button h-(--control-h-sm) w-(--control-h-sm) px-0"}
                 disabled={!running && (
                   sendPending
                   || readOnly
