@@ -52,7 +52,7 @@
      runs to a full sentence — "Fix billing export race condition on concurrent
      invoice writes" set at the tightened 24px/700 display tier would shout
      someone's words. --type-title keeps that tier for fixed UI nouns
-     (Threads, Backlog, the wordmark), where it reads as the Fieldnotes
+     (Threads, Backlog, the wordmark), where it reads as the brand's
      brand; content-derived strings take the calmer sans role. */
   font: var(--type-title-content);
   letter-spacing: var(--type-title-content-track);
@@ -569,7 +569,7 @@
   height: var(--sp-6);
   padding: 0 var(--sp-2);
   border: 1px solid transparent;
-  border-radius: var(--r-2);
+  border-radius: var(--r-full);
   background: transparent;
   color: var(--ink-3);
   font: var(--type-label);

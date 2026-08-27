@@ -53,15 +53,14 @@ const tokenIn = (register: string, name: string): string => {
   return value;
 };
 
-/** Max RGB channel spread — the near-neutrality measure for the olive
- *  greys. An olive tone keeps r ≈ g ≥ b within a tight band; a chromed
- *  status (a green ok, a red err) blows the spread open. */
-function channelSpread(hex: string): number {
-  const channels = [0, 1, 2].map((i) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16));
-  return Math.max(...channels) - Math.min(...channels);
+/** RGB channels, so a hue can be asserted as a RELATIONSHIP (green leads,
+ *  red leads, blue trails) rather than pinned to a hex that says nothing
+ *  about whether the tone still reads as its meaning. */
+function channels(hex: string): [number, number, number] {
+  return [0, 1, 2].map((i) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16)) as [number, number, number];
 }
 
-describe("Fieldnotes palette tokens", () => {
+describe("Meta commerce palette tokens", () => {
   it("declares both registers: dark on :root, cream on html[data-theme=light]", () => {
     assert.match(palette, /:root\s*\{/);
     for (const name of ["--surface-0", "--ink-1", "--live", "--link-blue"]) {
@@ -70,26 +69,42 @@ describe("Fieldnotes palette tokens", () => {
     }
   });
 
-  it("makes --action register-invariant highlighter yellow", () => {
-    // The one saturated hue in the system is the SAME value on both canvases;
-    // the light register retunes only the hover and the wash.
-    assert.match(darkRegister, /--action:\s*#f7a501;/);
+  it("makes --action the source system's cobalt, register-invariant down to the pressed state", () => {
+    // The primary action is the same cobalt on both canvases, and so is its
+    // pressed state: white clears AA on both fills, so neither register needs
+    // its own. Only the soft callout tint retunes per register.
+    assert.match(darkRegister, /--action:\s*#0064e0;/);
     assert.doesNotMatch(lightRegister, /--action:\s*#/, "light register must not redeclare --action — it is register-invariant");
-    assert.match(darkRegister, /--on-action:\s*#23251d;/);
+    assert.match(darkRegister, /--on-action:\s*#ffffff;/);
     assert.doesNotMatch(lightRegister, /--on-action:\s*#/, "--on-action is register-invariant too");
-    assert.match(lightRegister, /--action-hover:\s*#[0-9a-f]{6};/, "light register retunes the hover toward the ink");
-    assert.match(lightRegister, /--action-soft:\s*color-mix\(in srgb, #f7a501 \d+%, transparent\);/);
+    assert.match(darkRegister, /--action-hover:\s*#0457cb;/, "the pressed state is the source system's primary-deep");
+    assert.doesNotMatch(lightRegister, /--action-hover:\s*#/, "the pressed state is register-invariant too");
+    assert.match(lightRegister, /--action-soft:\s*color-mix\(in srgb, #[0-9a-f]{6} \d+%, transparent\);/);
   });
 
-  it("keeps --on-action legible on the fill and its hover in both registers", () => {
-    // --action and --on-action are register-invariant (declared once, on
-    // :root); only the hover retunes per register.
-    const onAction = tokenIn(darkRegister, "--on-action");
-    const action = tokenIn(darkRegister, "--action");
-    assert.ok(contrast(onAction, action) >= 4.5, `--on-action on --action is ${contrast(onAction, action).toFixed(2)}:1`);
+  it("keeps the source system's black marketing pill available as its own token", () => {
+    // The source system runs two primary buttons: cobalt inside the commerce
+    // flow, black on marketing surfaces. Relay is in-product, so cobalt is the
+    // action — but the black pill survives as --ink-button for the pre-auth and
+    // landing chrome, and it MUST be register-varying or it disappears into the
+    // dark canvas.
+    const darkFill = tokenIn(darkRegister, "--ink-button");
+    const lightFill = tokenIn(lightRegister, "--ink-button");
+    assert.notEqual(darkFill, lightFill, "a black pill on the dark canvas is invisible — invert it");
+    assert.equal(lightFill, "#000000", "the light register takes the source system's ink-button verbatim");
     for (const [label, register] of [["dark", darkRegister], ["light", lightRegister]] as const) {
-      const ratio = contrast(onAction, tokenIn(register, "--action-hover"));
-      assert.ok(ratio >= 4.5, `${label} --on-action on --action-hover is ${ratio.toFixed(2)}:1 — below the 4.5:1 floor`);
+      const ratio = contrast(tokenIn(register, "--on-ink-button"), tokenIn(register, "--ink-button"));
+      assert.ok(ratio >= 4.5, `${label} --on-ink-button on --ink-button is ${ratio.toFixed(2)}:1`);
+    }
+  });
+
+  it("keeps --on-action legible on the fill and its pressed state", () => {
+    // The whole action triple is register-invariant (declared once, on :root),
+    // so one measurement covers both canvases.
+    const onAction = tokenIn(darkRegister, "--on-action");
+    for (const fill of ["--action", "--action-hover"]) {
+      const ratio = contrast(onAction, tokenIn(darkRegister, fill));
+      assert.ok(ratio >= 4.5, `--on-action on ${fill} is ${ratio.toFixed(2)}:1 — below the 4.5:1 floor`);
     }
   });
 
@@ -122,18 +137,25 @@ describe("Fieldnotes palette tokens", () => {
     assert.equal(declared(darkRegister, "--light-ink"), declared(lightRegister, "--ink-1"));
   });
 
-  it("marks live work in the highlighter family, legible as small text in both registers", () => {
-    // Fieldnotes merges Phosphor's two chromatic roles into one hue: the yellow
-    // that fills the primary CTA also marks live work, separated by channel
-    // (filled pill = action, pulsing dot/ring/timer = live). Assert the hue
-    // family (r > g > b), not an exact hex — and the AA floor, because an
-    // elapsed timer set in --live is legible, not decorative.
+  it("marks live work in the Oculus purple, legible as small text in both registers", () => {
+    // The source system sanctions exactly two accents beyond the neutrals: cobalt and
+    // Oculus purple. Cobalt is spoken for by the primary action, so liveness
+    // takes the purple and can never be mistaken for "press this". Assert the
+    // hue family (blue and red lead, green trails), not an exact hex — and the
+    // AA floor, because an elapsed timer set in --live is legible, not
+    // decorative.
     for (const [label, register] of [["dark", darkRegister], ["light", lightRegister]] as const) {
       const live = tokenIn(register, "--live");
-      const [r, g, b] = [0, 1, 2].map((i) => parseInt(live.slice(1 + i * 2, 3 + i * 2), 16));
-      assert.ok(r > g && g > b, `${label} --live ${live} left the yellow/gold family (r > g > b required)`);
+      const [r, g, b] = channels(live);
+      assert.ok(b > g && r > g, `${label} --live ${live} left the purple family (b > g and r > g required)`);
       const ratio = contrast(live, tokenIn(register, "--surface-0"));
       assert.ok(ratio >= 4.5, `${label} --live on --surface-0 is ${ratio.toFixed(2)}:1 — below the 4.5:1 floor`);
+    }
+    // And it must not collapse into the action: two blues would put "working"
+    // and "click me" in the same channel.
+    for (const [label, register] of [["dark", darkRegister], ["light", lightRegister]] as const) {
+      const live = channels(tokenIn(register, "--live"));
+      assert.ok(live[0] > 96, `${label} --live has no red left in it — it has drifted into the cobalt action`);
     }
   });
 
@@ -166,32 +188,37 @@ describe("Fieldnotes palette tokens", () => {
     }
   });
 
-  it("keeps status tones near-neutral olive greys, so no one re-chromes status", () => {
-    // The old guard asserted the WHOLE palette was grey; Fieldnotes legalises
-    // exactly two hues (highlighter yellow, link blue) by design. The inverse
-    // guard still holds where it matters: ok/warn/err are a brightness
-    // hierarchy of olive greys (loud = bright in dark, loud = dark in light),
-    // never a green/red/amber traffic light. The spread bar is 24 — the
-    // declared tones measure ≤15; a chromed status measures 60+.
+  it("keeps status on the source system's semantic hues, each still reading as its meaning", () => {
+    // Status here is chromatic by design — the source system publishes a green
+    // success, an amber warning, and a red critical — so the guard is that
+    // each tone still reads as ITS hue after the deepening that AA forced on
+    // the light register. Relationships, not hexes: a green whose red channel
+    // has crept past its green is no longer a green.
     for (const [label, register] of [["dark", darkRegister], ["light", lightRegister]] as const) {
-      for (const tone of ["--ok", "--warn", "--err"]) {
-        const value = tokenIn(register, tone);
-        const spread = channelSpread(value);
-        assert.ok(spread <= 24, `${label} ${tone} ${value} has channel spread ${spread} — status was re-chromed`);
-      }
+      const [okR, okG, okB] = channels(tokenIn(register, "--ok"));
+      assert.ok(okG > okR && okG > okB, `${label} --ok is no longer a green`);
+      const [warnR, warnG, warnB] = channels(tokenIn(register, "--warn"));
+      assert.ok(warnR > warnG && warnG > warnB, `${label} --warn is no longer an amber`);
+      const [errR, errG, errB] = channels(tokenIn(register, "--err"));
+      assert.ok(errR > errG && errR > errB, `${label} --err is no longer a red`);
+      // The three must stay distinguishable from each other as hues, not just
+      // as brightnesses — colour is the whole channel here.
+      assert.notEqual(tokenIn(register, "--ok"), tokenIn(register, "--warn"));
+      assert.notEqual(tokenIn(register, "--warn"), tokenIn(register, "--err"));
     }
     // Info is not a color — neutral notice text aliased to the ink ramp.
     const roles = readStyle("tokens/roles.css");
     assert.match(roles, /--info:\s*var\(--ink-3\);/);
   });
 
-  it("no Phosphor-era values remain in palette.css", () => {
+  it("no Fieldnotes-era values remain in palette.css", () => {
     const dead = [
-      "#0b0d0f", "#22262b", // old dark canvas / elevated
-      "#f2f4f6", "#c9ced4", "#a6adb5", // old dark ink ramp + white action
-      "#f1f3f5", "#16181b", "#101214", // old light canvas, black action, on-action
-      "#8f96a0", "#b2b9c1", "#484f57", "#5a6169", // old grey status tones
-      "#3ee08a", "#0b7a45", "#0f8a4e", // the greens — --live is yellow now
+      "#f7a501", "#ffb61a", "#dd9001", // the highlighter yellow action + hovers
+      "#23251d", "#1f211a", "#262820", "#2d2f27", "#34362b", // olive canvas + surfaces
+      "#eeefe9", "#fcfcfa", "#e5e7e0", // cream canvas + planes
+      "#f1f1e8", "#d0d1c2", "#a8a999", "#9e9f8f", // olive ink ramp
+      "#a0a192", "#c6c7b8", "#616257", "#55564d", // olive brightness-hierarchy status
+      "#ffc233", // the yellow --live (its light-register twin #8a5f06 survives as --code-number)
     ];
     for (const value of dead) {
       assert.ok(!paletteCode.includes(value), `palette.css still declares ${value}`);
@@ -201,7 +228,7 @@ describe("Fieldnotes palette tokens", () => {
 
 const login = readStyle("login.css");
 
-describe("Fieldnotes login palette", () => {
+describe("pre-auth login palette", () => {
   it("pins the pre-auth ramp via the always-dark register tokens", () => {
     // The --lg-* names alias palette.css's pinned register rather than
     // re-declaring its hexes, so the two can never drift apart.
@@ -214,12 +241,10 @@ describe("Fieldnotes login palette", () => {
     assert.match(login, /\.login-error \{[^}]*var\(--lg-err\)/s);
   });
 
-  it("lets the register-invariant yellow CTA reach pre-auth", () => {
-    // Phosphor pinned --action to the pre-auth white on .login-screen so the
-    // sign-in button stayed neutral. Fieldnotes' CTA is the highlighter yellow
-    // in EVERY context — it is the brand's single hue — so the override is
-    // gone and the login CTA aliases :root's action tokens like everything
-    // else. Guard the declaration so the pin cannot drift back in.
+  it("lets the register-invariant cobalt CTA reach pre-auth", () => {
+    // The primary action is one cobalt in EVERY context, pre-auth included, so
+    // login.css aliases :root's action tokens rather than pinning its own
+    // sign-in colour. Guard the declaration so the pin cannot drift back in.
     const loginCode = login.replace(/\/\*[\s\S]*?\*\//g, "");
     assert.doesNotMatch(loginCode, /--action\s*:/, "login.css must not override --action; the yellow CTA reaches pre-auth");
     assert.match(login, /--lg-steel:\s*var\(--action\);/);
@@ -241,7 +266,7 @@ describe("Fieldnotes login palette", () => {
 
 const preferences = readStyle("preferences.css");
 
-describe("Fieldnotes theme-picker swatches", () => {
+describe("theme-picker swatches", () => {
   it("mirrors the two registers through the pinned tokens", () => {
     // Swatches must show both registers at once, so the canvas can't use the
     // theme-varying --surface-0 — they read the pinned tokens, which stay in
@@ -250,22 +275,20 @@ describe("Fieldnotes theme-picker swatches", () => {
     assert.match(preferences, /\.pref-theme-swatch\[data-tone="dark"\] \{\s*background: var\(--dark-canvas\);/);
   });
 
-  it("shows one register-invariant yellow strip, not a per-register split", () => {
-    // Phosphor's action color was register-varying (white on dark, black on
-    // light), so the swatch strip split a gradient half per register. The
-    // Fieldnotes action is the SAME highlighter yellow on both canvases, so
-    // every swatch strip is simply var(--action) and the split is gone.
+  it("shows one register-invariant cobalt strip, not a per-register split", () => {
+    // The action is the SAME cobalt on both canvases, so every swatch strip is
+    // simply var(--action) and the per-register gradient split is gone.
     for (const tone of ["light", "dark", "system"]) {
       assert.match(
         preferences,
         new RegExp(`\\.pref-theme-swatch\\[data-tone="${tone}"\\]::after \\{[^}]*background: var\\(--action\\);`, "s"),
-        `${tone} swatch strip must be the register-invariant --action yellow`,
+        `${tone} swatch strip must be the register-invariant --action cobalt`,
       );
     }
     assert.doesNotMatch(
       preferences,
       /linear-gradient\(90deg, var\(--light-ink\) 0 50%, var\(--dark-ink\) 50% 100%\)/,
-      "the split-ink strip was a Phosphor artifact — one yellow serves both registers",
+      "the split-ink strip was a Phosphor artifact — one cobalt serves both registers",
     );
   });
 
@@ -392,22 +415,23 @@ describe("focus contract", () => {
     assert.deepEqual(shadowRings, [], "focus rings are outlines now — do not paint one as a box-shadow");
   });
 
-  it("distinguishes the danger ring by shape, because it cannot differ by colour", () => {
-    // --err and --ink-1 resolve to the SAME value in both registers (the bad
-    // tone is the loud end of the brightness hierarchy), so a colour-only
-    // danger ring would be pixel-identical to error-tone text. Colour is
-    // unavailable; shape is not.
+  it("distinguishes the danger ring by colour AND shape", () => {
+    // The critical red is its own hue now, so the danger ring can differ by
+    // colour — but it keeps the dashed stroke it wore through the monochrome
+    // era, because forced-colors mode drops the hue and the stroke style
+    // survives it.
     for (const register of [darkRegister, lightRegister]) {
-      assert.equal(
+      assert.notEqual(
         tokenIn(register, "--err"),
         tokenIn(register, "--ink-1"),
-        "if these ever diverge, the shape encoding below can be revisited"
+        "--err carries the source system's critical hue; it is no longer the loud end of the ink ramp"
       );
     }
     const normal = roles.match(/--focus-outline:\s*([^;]+);/)?.[1] ?? "";
     const danger = roles.match(/--focus-outline-danger:\s*([^;]+);/)?.[1] ?? "";
     assert.notEqual(danger, normal, "the danger ring must not be a copy of the normal ring");
-    assert.match(danger, /dashed/, "the danger ring differs by stroke style, not colour");
+    assert.match(danger, /--err/, "the danger ring is drawn in the critical tone");
+    assert.match(danger, /dashed/, "the stroke style is the channel that survives forced-colors mode");
   });
 });
 

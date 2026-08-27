@@ -8,6 +8,11 @@
   font-family: var(--font-sans);
   font-optical-sizing: auto;
   font-synthesis: none;
+  /* The source system switches ss01 and ss02 on together for every heading role and
+     treats them as a paired alternates package. Declared once at the root:
+     faces without the sets ignore it, so fencing the pair to headings would
+     buy nothing but a second place to forget one of them. */
+  font-feature-settings: var(--font-features);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
@@ -27,13 +32,14 @@ html {
 
 /* overflow-x: hidden is a last-resort clip — reflow regressions must be
    caught at the 320px floor (WCAG 1.4.10), not papered over here. */
-/* Body tracking is set ONCE, here, and inherited. In this system the value is
-   0 — IBM Plex Sans is drawn wide and open, and DESIGN.md sets every reading
-   role solid; only the 24px display tier tracks (-0.025em). The global hook
-   stays because `font: var(--type-body)` cannot carry letter-spacing, so if a
-   future face needs tightening this is the one place that can afford it.
-   Faces that must NEVER be tightened — the monospace column, tabular figures —
-   opt back out via --track-0 below. */
+/* Body tracking is set ONCE, here, and inherited. The source system tightens its
+   READING roles fractionally (-0.16px at 16px, -0.14px at 14px ≈ -0.01em) —
+   Optimistic VF is drawn for that snug-but-not-condensed setting — and leaves
+   the display tier and uppercase captions solid. The global hook is what makes
+   the tightening real, because `font: var(--type-body)` cannot carry
+   letter-spacing. Faces that must NEVER be tightened — the monospace column,
+   tabular figures, Han text — opt back out via --track-0 (or the CJK pin in
+   palette.css). */
 html,
 body {
   min-width: 320px;

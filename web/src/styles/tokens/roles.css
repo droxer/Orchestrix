@@ -1,4 +1,4 @@
-/* Fieldnotes roles — aliases and composites over palette.css.
+/* Meta commerce roles — aliases and composites over palette.css.
    Component CSS consumes these plus the palette scales; it never
    originates a value. */
 
@@ -6,20 +6,23 @@
   /* Info is not a color — neutral notice text. */
   --info: var(--ink-3);
 
-  /* Links take the system's second sanctioned hue, link blue — wayfinding
-     only, never a fill and never an action. The role names stay separate
-     from --action even though the two could never collide now (yellow pill
-     vs blue anchor): "the colour of the primary button" and "the colour of
-     a link" are different jobs with different names. */
+  /* Links take the source system's meta-link blue — wayfinding only, never a fill
+     and never an action. The role names stay separate from --action, and
+     here that separation is load-bearing rather than decorative: the action
+     is cobalt and an anchor is a quieter blue, so "the colour of the primary
+     button" and "the colour of a link" must never be spelled the same way. */
   --link: var(--link-blue);
   --link-hover: var(--link-blue-strong);
 
-  /* Elevation — flat design: planes are separated by hairlines, not drop
-     shadows. shadow-1 (bordered surfaces) carries no lift; shadow-2
-     (borderless floating chrome) resolves to a single 1px ring so menus,
-     drawers, and dialogs keep a crisp edge without faux depth. */
+  /* Elevation — the source system's three levels. Level 0 (cards, tiles) is flat:
+     rounding plus a hairline, and heavy shadows on a card are called out as
+     a mistake in the source system ("elevation is a commerce-flow signal,
+     not a marketing flourish"). Level 2 is the one published blur, carried
+     by chrome that genuinely floats — drawers, dialogs, menus, sticky
+     summaries — paired with a hairline ring so the edge stays crisp on
+     either register. */
   --shadow-1: none;
-  --shadow-2: 0 0 0 1px var(--line-1);
+  --shadow-2: 0 0 0 1px var(--line-1), var(--shadow-panel);
 
   /* Row wash under the pointer. A partial --surface-1 rather than the flat
      surface so the ruled hairlines stay visible through the hover. Was
@@ -44,7 +47,7 @@
   --tone-line: color-mix(in srgb, var(--tone, var(--ink-1)) 35%, transparent);
 
   /* Selected-row accent bar — the 2px inset marker down the leading edge of
-     the active item in a list or drawer section. */
+     the active item in a list or drawer section, in the cobalt action. */
   --accent-bar: inset 2px 0 0 var(--action);
 
   /* Badge halo — the 3px soft ring that lifts a status badge off a busy
@@ -100,23 +103,23 @@
      container. `outline` is never clipped by an ancestor's overflow, and it is
      the one ring property forced-colors mode preserves.
 
-     The ring is LINK BLUE, not the action yellow: #f7a501 measures 1.7:1 on
-     the cream canvas, far under the 3:1 floor for focus indicators, while
-     --link clears 5.8:1 on every plane in both registers. This is the second
-     job the blue hue carries (the first is anchors). The danger ring cannot
-     differ by COLOUR either: --err and --ink-1 resolve to the same value in
-     both registers, so a colour-only danger ring would be pixel-identical to
-     an error-tone text. It differs by SHAPE — dashed, the same channel
-     StatusPill uses to mark the bad tone hollow. */
+     The ring is LINK BLUE rather than the cobalt action, so a focused
+     primary button shows a ring that is visibly not more of its own fill;
+     --link clears 5.6:1 on every plane in both registers, well past the 3:1
+     indicator floor. The danger ring differs by BOTH colour (--err, the
+     critical red) and shape (dashed) — the shape half is kept from the
+     monochrome era because forced-colors mode drops the hue and the dashed
+     stroke survives it. */
   --focus-w: 2px;
   --focus-offset: 2px;
   --focus-outline: var(--focus-w) solid var(--link);
   --focus-outline-danger: var(--focus-w) dashed var(--err);
 
-  /* Type roles — IBM Plex Sans carries every tier. Hierarchy comes from
-     WEIGHT, not face: the display tier is 700 with negative tracking,
-     reading is 400, emphasis steps through 500/600. The mono face is
-     technical text only, set 400 untracked.
+  /* Type roles — one family carries every tier (Optimistic VF where it is
+     installed, the vendored IBM Plex Sans otherwise). Hierarchy comes from
+     WEIGHT and SIZE, not face: the source system's display and heading tiers are
+     500, its emphasis and control tiers are 700, and reading is 400. The
+     mono face is technical text only, set 400 untracked.
 
      EVERY role ships a paired *-track token. The `font:` shorthand cannot carry
      letter-spacing, so a role applied as `font: var(--type-title)` silently
@@ -129,31 +132,30 @@
        letter-spacing: var(--type-title-track);
 
      Several paired tracks resolve to 0 — that is the design, not a missing
-     value: DESIGN.md sets only its 24px display tier tight (-0.6px ≈
-     -0.025em) and everything else solid. The tokens stay explicit so a role's
-     tracking is decided here, once, not re-derived at every call site. */
-  --type-display:      700 var(--fs-6)/1.5 var(--font-display);
-  /* DESIGN.md calls for 800 on the display tier, but IBM Plex Sans Variable
-     tops out at 700 and base.css disables font synthesis — an 800 declaration
-     would silently render as 700, so the roles say 700 and let size +
-     tracking carry the tier. */
-  /* Page titles sit at 20px, not the source system's 24: the app's headers
-     live directly above 13px list rows, and a 24px/700 noun over a 13px
-     rail read as a billboard over an index. 20px keeps the tier separation
-     from --type-heading (18) without the shout. --type-number keeps fs-5 —
-     KPI numerals earn the larger size in a way page nouns do not. */
-  --type-title:        700 var(--fs-title)/1.33  var(--font-display);
-  --type-heading:      700 var(--fs-heading)/1.5  var(--font-display);
+     value: the source system tracks its READING roles (-0.16px at 16px, -0.14px at
+     14px ≈ -0.01em) and sets the display tier and the uppercase captions
+     solid. The tokens stay explicit so a role's tracking is decided here,
+     once, not re-derived at every call site. */
+  --type-display:      500 var(--fs-6)/1.17 var(--font-display);
+  /* The source system's display-lg is 48px/500 — the display weight in this system
+     is the MIDDLE of the ramp, not the top of it. Emphasis at reading sizes
+     runs heavier (700) than the headline tier does, which is the source
+     system's signature: size carries hierarchy, weight carries emphasis. */
+  /* Page titles sit at the source system's heading-sm (24px/500), the tier the
+     source system uses for card titles and feature-tile headers. The
+     36px heading-lg above it is reserved for KPI numerals and subsection
+     headlines, where an oversized figure is the point. */
+  --type-title:        500 var(--fs-title)/1.25 var(--font-display);
+  --type-heading:      700 var(--fs-heading)/1.44 var(--font-display);
   --type-body:         400 var(--fs-4)/1.5  var(--font-sans);
-  --type-body-sm:      400 var(--fs-3)/1.5  var(--font-sans);
-  --type-label:        500 var(--fs-2)/1.5  var(--font-sans);
-  --type-label-strong: 600 var(--fs-2)/1.5  var(--font-sans);
-  --type-micro:        600 var(--fs-1)/1.33 var(--font-sans); /* + uppercase */
-  --type-number:       700 var(--fs-5)/1.33  var(--font-display);
-  /* Code sizes to the mono face's metrics, not the sans ladder: 14px is
-     DESIGN.md's code-sm and sits between fs-2 (13) and fs-3 (15) on purpose.
-     Mono advances are wider than sans at the same size, so the code role
-     runs a rung under body copy. */
+  --type-body-sm:      400 var(--fs-2)/1.43 var(--font-sans);
+  --type-label:        500 var(--fs-2)/1.43 var(--font-sans);
+  --type-label-strong: 700 var(--fs-2)/1.43 var(--font-sans);
+  --type-micro:        700 var(--fs-1)/1.33 var(--font-sans); /* + uppercase */
+  --type-number:       500 var(--fs-5)/1.28 var(--font-display);
+  /* Code sizes to the mono face's metrics, not the sans ladder: 14px is the
+     body-sm rung, and mono advances are wider than sans at the same size, so
+     the code role runs a rung under body copy. */
   --type-code:         400 1rem/1.43 var(--font-mono);
 
   /* ----- Content-origin roles -----
@@ -163,33 +165,29 @@
      display weight made a 60-character thread name read as a headline. These
      roles split the question by ORIGIN rather than by size.
 
-     --type-name  the identity of the thing a row or card is ABOUT. It sits one
-                  rung above --type-label-strong because a card title that
-                  differs from its own description by weight alone does not
-                  lead: 132 call sites had collapsed onto the 13px label tier
-                  while --type-body carried six. Names are the tier that had
-                  to come back up.
+     --type-name  the identity of the thing a row or card is ABOUT —
+                  The source system's body-md-bold (16px/700), the exact role the
+                  source system uses for a variant name above its price. It
+                  sits one rung above --type-label-strong because a card title
+                  that differs from its own description by weight alone does
+                  not lead.
      --type-title-content
-                  a title whose text comes from a user or an agent. Same 20px
-                  rung as --type-title, one weight calmer (600 vs 700) and
-                  solid-tracked — the tightened display weight is reserved for
-                  fixed UI nouns, where it reads as the Fieldnotes brand
-                  rather than as shouting someone's words.
+                  a title whose text comes from a user or an agent. Same 24px
+                  rung as --type-title, one weight calmer (400 vs 500) —
+                  The source system's editorial-subhead move, where a lighter weight
+                  at a display size introduces visual rest rather than
+                  shouting someone's words back at them.
      Structural group labels are NOT a fourth role: --type-micro above already
-     documents itself as "+ uppercase", so it was the register all along — the
-     drift was that ten rules set caps at 13px instead and one list surface
-     (.conversation-group-label) set them in sentence case while the
-     structurally identical .backlog-lane-label set them in caps. Those are
-     converged onto --type-micro + --type-micro-track rather than onto a new
-     token. The .eyebrow and .page-header-kicker utilities deliberately stay
-     SENTENCE CASE on the same size: they are generic containers for arbitrary
-     translated copy, where forced uppercase is a localization hazard. That
-     carve-out is pinned by typographyTokens.test.ts — do not "converge" it. */
-  --type-name:          600 var(--fs-4)/1.5 var(--font-sans);
-  --type-title-content: 600 var(--fs-title)/1.4 var(--font-sans);
+     documents itself as "+ uppercase", so it was the register all along. The
+     .eyebrow and .page-header-kicker utilities deliberately stay SENTENCE CASE
+     on the same size: they are generic containers for arbitrary translated
+     copy, where forced uppercase is a localization hazard. That carve-out is
+     pinned by typographyTokens.test.ts — do not "converge" it. */
+  --type-name:          700 var(--fs-4)/1.5 var(--font-sans);
+  --type-title-content: 400 var(--fs-title)/1.25 var(--font-sans);
 
-  --type-display-track:      var(--track-0);       /* 36px display sets solid */
-  --type-title-track:        var(--track-display); /* the one tightened tier */
+  --type-display-track:      var(--track-display); /* the display tier sets solid */
+  --type-title-track:        var(--track-display);
   --type-heading-track:      var(--track-0);
   --type-number-track:       var(--track-display);
   --type-body-track:         var(--track-body);
@@ -198,13 +196,13 @@
   --type-label-strong-track: var(--track-body-sm);
   --type-micro-track:        var(--track-caps);
   --type-code-track:         var(--track-0); /* never tighten a monospace column */
-  --type-name-track:          var(--track-body-sm);
-  --type-title-content-track: var(--track-body);
+  --type-name-track:          var(--track-body);
+  --type-title-content-track: var(--track-display);
 }
 
 /* CJK — reading roles want looser leading. */
 html:lang(zh-CN),
 html:lang(zh-TW) {
   --type-body:    400 var(--fs-4)/1.7 var(--font-sans);
-  --type-body-sm: 400 var(--fs-3)/1.7 var(--font-sans);
+  --type-body-sm: 400 var(--fs-2)/1.7 var(--font-sans);
 }

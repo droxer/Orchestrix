@@ -223,7 +223,7 @@
     min-width: 0;
     min-height: var(--touch-target);
     padding: 0 var(--sp-3);
-    border-radius: var(--r-2);
+    border-radius: var(--r-full);
     color: var(--ink-2);
     font: var(--type-label-strong);
   }

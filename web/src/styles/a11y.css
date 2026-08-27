@@ -83,9 +83,12 @@
   }
 }
 
-/* Touch targets — on coarse pointers (touch), raise interactive controls
-   that sit at 40px to the 44px WCAG 2.5.5 / Apple HIG minimum. Scoped to
-   pointer:coarse so desktop mouse density is unaffected. Loads from a11y.css
+/* Touch targets — on coarse pointers (touch), raise interactive controls to
+   the 44px WCAG 2.5.5 / Apple HIG minimum. The standard --control-h tier now
+   sits at 44px on its own (the source system renders inputs and primary pills at the
+   same height), so this sweep is what carries the DENSE tiers — in-row chips,
+   toggles, icon buttons, and the sm/xs button sizes — up to the floor. Scoped
+   to pointer:coarse so desktop mouse density is unaffected. Loads from a11y.css
    (last in source order) so it wins the equal-specificity tie. */
 @media (pointer: coarse) {
   [data-slot="button"],

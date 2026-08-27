@@ -1,14 +1,22 @@
-/* Fieldnotes palette — raw values, both registers side by side.
-   Relay is pencil on cream paper; the highlighter comes out for exactly two
-   jobs. A warm cream canvas, an olive ink ramp, status as a brightness
-   hierarchy on dot/border/text only — and a single hue, highlighter yellow
-   (#f7a501), shared by the primary action (a filled pill) and by work an
-   agent is doing right now (a pulsing dot, ring, or elapsed timer). The only
-   file allowed to originate a color.
-   Source system: DESIGN.md (cream canvas, olive ink, IBM Plex Sans, one
-   yellow CTA), adapted dual-register for Relay. Supersedes the Phosphor
-   identity (true-neutral monochrome + green --live). Rationale:
-   docs/superpowers/specs/2026-08-18-fieldnotes-identity-design.md
+/* Meta commerce palette — raw values, both registers side by side.
+   Relay is a stark, photography-first product surface: a near-white cloud
+   canvas, stark white cards, cobalt for the primary action, and pill
+   geometry on every button, tab, and badge. The only file allowed to
+   originate a color.
+   Source system: docs/design-system.md, "Appendix — the source system"
+   (Meta hardware commerce — white canvas, cobalt
+   #0064e0 CTA, Optimistic VF, 100px pills, 16–32px card rounding), adapted
+   dual-register for Relay. Supersedes the Fieldnotes identity (cream canvas,
+   olive ink, one highlighter yellow).
+
+   The source system documents no dark-mode token set (see the "Known gaps"
+   section of docs/design-system.md), so the
+   dark register below is DERIVED: the ink-deep #0a1317 becomes the canvas,
+   the cloud greys invert into an elevation ladder, and the two sanctioned
+   hues (cobalt, Oculus purple) are lifted only where AA demands it. Every
+   value that the source system does publish is used verbatim in the light register
+   unless WCAG forced a deepening, and each of those deepenings is noted at
+   the token.
 
    Breakpoints (reference — custom properties can't drive @media, so this
    list is the only registry there is; keep it honest when you add a query).
@@ -34,21 +42,21 @@
    don't split a component's responsive behaviour across two files. */
 
 :root {
-  /* Dark register (default) — the inside of the cover.
+  /* Dark register (default) — the night side of the commerce surface.
 
-     The cream register is the page; this register is the deep olive-charcoal
-     the same ink (#23251d) becomes when it carries a whole surface. The
-     ladder is an ELEVATION ladder here: 0 < 1 < 3 in perceived lift, with 2
-     as the fill tier (search, hover, inset wells) between card and drawer.
-     The light register cannot reproduce that — see the note there before
-     assuming 0..3 means "lighter" everywhere.
+     The source system's ink-deep (#0a1317) carries the canvas, and the ladder above
+     it is an ELEVATION ladder: 0 < 1 < 3 in perceived lift, with 2 as the
+     fill tier (search wells, hover) between card and drawer. The light
+     register cannot reproduce that — see the note there before assuming
+     0..3 means "lighter" everywhere.
 
-     Elevation is flat (no drop shadows), so the canvas → card step is the
-     only thing separating a card from the page besides its hairline. */
-  --surface-0: #1f211a; /* canvas — deep olive-charcoal */
-  --surface-1: #262820; /* cards, panels */
-  --surface-2: #2d2f27; /* fills, search, hover */
-  --surface-3: #34362b; /* drawers, modals */
+     Elevation is near-flat: the canvas → card step plus a hairline separates
+     a card from the page, and only floating commerce chrome (drawers,
+     dialogs, sticky summaries) earns the one published shadow. */
+  --surface-0: #0a1317; /* canvas — the source system's ink-deep */
+  --surface-1: #131c21; /* cards, panels */
+  --surface-2: #1b262c; /* fills, search, hover */
+  --surface-3: #22303a; /* drawers, modals */
 
   /* Zone surfaces — the three-pane shell (rail → list → canvas) reads as a
      monotonic elevation ladder in BOTH registers. The generic --surface-N
@@ -56,97 +64,96 @@
      surface-1 in dark, but the light register's raised-is-lighter ladder then
      puts the list ABOVE the rail (see the light block). These roles pin the
      zone order explicitly. Dark: rail is the lightest step, canvas darkest. */
-  --surface-rail: #2d2f27;
-  --surface-list: #262820;
+  --surface-rail: #1b262c;
+  --surface-list: #131c21;
 
   /* Ink — every tier that can carry TEXT clears WCAG 1.4.3 (4.5:1) against
      the worst plane it can land on, which is --surface-3, not the canvas.
-     Warm off-whites, tinted to the olive canvas so the register reads as one
-     material rather than grey text on a green-brown page.
-     Worst-plane ratios: ink-1 10.8 · ink-2 8.0 · ink-3 5.2 · ink-4 4.6. */
-  --ink-1: #f1f1e8; /* headings, emphasis */
-  --ink-2: #d0d1c2; /* body */
-  --ink-3: #a8a999; /* secondary labels */
-  --ink-4: #9e9f8f; /* timestamps, meta, disabled */
+     Cool off-whites tinted to the ink-deep canvas so the register reads as
+     one material.
+     Worst-plane ratios: ink-1 13.5 · ink-2 10.5 · ink-3 7.2 · ink-4 6.0. */
+  --ink-1: #ffffff; /* headings, emphasis */
+  --ink-2: #dfe3e8; /* body */
+  --ink-3: #b6bec6; /* secondary labels */
+  --ink-4: #a4adb6; /* timestamps, meta, disabled */
 
-  --line-1: #3b3d32; /* structural hairline */
-  --line-2: #2b2d24; /* soft hairline */
+  --line-1: #2c3a43; /* structural hairline */
+  --line-2: #1f2b32; /* soft hairline */
 
-  /* Action — highlighter yellow, register-invariant. The one saturated hue
-     in the system, and it is the SAME value on both canvases: on cream it is
-     the loudest thing on the page, on olive-charcoal it keeps 8:1 against
-     the canvas. Text on the fill is always the deep olive ink. No disabled
-     hex: disabled is opacity. */
-  --action: #f7a501;
-  --action-hover: #ffb61a; /* brightened for the dark canvas */
-  --action-soft: color-mix(in srgb, #f7a501 24%, transparent); /* selection wash, active nav */
-  --on-action: #23251d;
+  /* Action — cobalt, register-invariant. The source system reserves #0064e0 for the
+     in-product commerce CTA and gives marketing surfaces a black pill
+     instead; Relay is entirely in-product, so cobalt is THE primary action
+     here and the black pill survives as --ink-button below for the pre-auth
+     and landing surfaces that read as marketing.
 
-  /* Status — an olive brightness hierarchy: loud = bright, calm = dim.
-      Dot/border/text only, never fills, never actions.
-      Each tone owns a distinct step: err #f1f1e8 > warn #c6c7b8 >
-      info (--ink-3) #a8a999 > ok #a0a192. Every tone is AA-safe as small
-      text against the worst plane it can land on (--surface-3): err 10.8,
-      warn 7.2, info 5.2, ok 4.7 — the tones render as text often enough
-      (counts, inline state labels) that a decorative-only tier was a
-      liability. Because err shares its brightness with --ink-1, the bad tone
-      is also encoded by shape (hollow ring) — see StatusPill. */
-  --ok: #a0a192;
-  --warn: #c6c7b8;
-  --err: #f1f1e8;
-  /* Text on an --err FILL (destructive hover inversion). --err is the
-     register's loudest ink step, so the on-fill text is the opposite
-     register's ink — here, dark olive on the bright fill. */
-  --on-err: #23251d;
+     The fill and its pressed state are the same values on both canvases:
+     white on #0064e0 measures 5.4:1 and on the pressed #0457cb 6.5:1, so
+     neither register needs its own. No disabled hex: disabled is opacity. */
+  --action: #0064e0;
+  --action-hover: #0457cb; /* the source system's button-buy-cta-pressed */
+  --action-soft: color-mix(in srgb, #0091ff 15%, transparent); /* soft-cobalt callout tint, selection wash, active nav */
+  --on-action: #ffffff;
 
-  /* Live — work an agent is doing RIGHT NOW, in the highlighter family.
-     Fieldnotes merges Phosphor's two chromatic roles into one hue: the
-     yellow that fills the primary CTA also marks live work, and the channel
-     separates the jobs — a filled pill is an action, a pulsing dot/ring or
-     an elapsed timer is liveness. Legal only where --t-pulse is used;
-     --t-pulse-calm surfaces stay olive (see the spec §4). A screen's yellow
-     density is therefore still a utilisation readout, the same trick
-     Phosphor played with green.
+  /* Ink button — the source system's marketing-surface primary: a black pill with
+     white text, paired with an outlined secondary. Register-varying by
+     necessity: a black pill on the ink-deep canvas is invisible, so the dark
+     register inverts it to white-on-ink. */
+  --ink-button: #ffffff;
+  --on-ink-button: #0a1317;
 
-     Brighter than --action so a live dot reads hotter than a static CTA
-     beside it. 10.1:1 on --surface-0, 7.6:1 on --surface-3 — an elapsed
-     timer set in --live is legible, not decorative.
+  /* Status — the source system's semantic hues. The published values are BADGE FILL
+     colors (white text on a saturated pill), and Relay renders status as ink
+     far more often than as a fill — counts, inline state labels, dots — so
+     each tone is tuned until it clears 4.5:1 as small text against the worst
+     plane it can land on (--surface-3 here). The hue family is the source system's;
+     the lightness is ours.
+     Worst-plane ratios: ok 5.9 · warn 7.7 · err 4.9. */
+  --ok: #4ac16a;   /* success — the source system's #31a24c, lifted for the dark canvas */
+  --warn: #f7b928; /* warning — published value, already AA here */
+  --err: #ff6b7f;  /* critical — the source system's #e41e3f, lifted for the dark canvas */
+  /* Text on an --err FILL (destructive hover inversion). The lifted red is
+     bright enough here that the on-fill text is the canvas ink. */
+  --on-err: #0a1317;
+
+  /* Live — work an agent is doing RIGHT NOW. The source system sanctions exactly two
+     accents beyond the neutrals: cobalt and Oculus purple. Cobalt is spoken
+     for by the primary action, so liveness takes the purple — a channel that
+     can never be confused with "this is the button to press".
+     Legal only where --t-pulse is used; --t-pulse-calm surfaces stay
+     neutral. 5.1:1 on --surface-3, so an elapsed timer set in --live is
+     legible, not decorative.
      Deliberately no --live-wash companion: a wash is a fill, and this colour
      is never a fill. Tint a ring (see pulse-ring) or an ink, nothing else. */
-  --live: #ffc233;
+  --live: #cf7ef0; /* the source system's oculus-purple #a121ce, lifted for the dark canvas */
 
-  /* Link blue — the second sanctioned hue, for wayfinding only: anchors in
-     prose and the focus ring. Never a fill, never a status, never an action.
-     Light register takes DESIGN.md's link-blue #1d4ed8; the dark register
-     lifts it to keep AA on olive-charcoal. */
-  --link-blue: #8ab0f5;
-  --link-blue-strong: #b9ccf7;
+  /* Link blue — wayfinding only: anchors in prose and the focus ring. Never
+     a fill, never a status, never an action. The light register takes
+     the source system's meta-link #385898; the dark register lifts it to keep AA on
+     the ink-deep canvas. */
+  --link-blue: #8ab4f8;
+  --link-blue-strong: #b9d3fb;
 
   /* Code tokens — the ONE place hue is allowed to carry structure rather
      than meaning. Syntax highlighting is a reading aid, not a status: these
      values never appear outside a `code.hljs` block (styles/syntax.css), so
      they cannot compete with --action / --live / --err for a reader's
-     attention anywhere in the app chrome. Restrained and warmed toward the
-     olive register so a fence still reads as ink on paper rather than a
-     terminal dropped into the page.
+     attention anywhere in the app chrome.
      Five roles, no more — keyword, string, number, declaration, attribute —
      with comments left on --ink-3 so they recede. Every value clears AA
      (4.5:1) as small text on the worst plane a fence lands on: --surface-2
-     (the fence fill) and --surface-3 (drawers, the artifact viewer).
-     Dark ratios on surface-2/3: keyword 5.4/4.9 · string 7.0/6.4 ·
-     number 7.8/7.0 · declaration 6.5/5.9 · attribute 7.1/6.4. */
+     (the fence fill) and --surface-3 (drawers, the artifact viewer). */
   --code-keyword: #e0906a;      /* keywords, built-ins, types */
   --code-string: #a9c47c;       /* strings, regexps, quotes */
   --code-number: #e3bf7a;       /* numbers, literals, symbols */
   --code-declaration: #8fb8de;  /* function/class titles, sections */
   --code-attribute: #c9b3d9;    /* attributes, properties, tags, variables */
 
-  /* "One hue" is a claim about MEANING, not pigment, and the distinction
+  /* "Two hues" is a claim about MEANING, not pigment, and the distinction
      matters because the codebase has one other source of hue and a reader
      who takes the rule literally will file it as a bug:
 
-       App icons — favicon.svg and both relay-mark.svg carry the yellow,
-       because an olive chevron on an olive square is invisible at 16px.
+       App icons — favicon.svg and both relay-mark.svg carry a brand fill,
+       because a neutral chevron on a neutral square is invisible at 16px.
 
      That is not a status, so it does not compete with --live for meaning. Any
      THIRD source of colour is a bug — identity marks used to be one, deriving
@@ -159,41 +166,49 @@
      the same ones the two registers use above — declared once here so no
      component ever hand-copies a hex. Consumers: login.css (--lg-*),
      preferences.css (swatches), workspace.css, artifact.css, a11y.css. */
-  --dark-canvas: #1f211a;
-  --dark-surface: #262820;
-  --dark-elevated: #34362b;
-  --dark-ink: #f1f1e8;
+  --dark-canvas: #0a1317;
+  --dark-surface: #131c21;
+  --dark-elevated: #22303a;
+  --dark-ink: #ffffff;
   --dark-ink-strong: #ffffff;
-  --dark-body: #d0d1c2;
-  --dark-ink-soft: #a8a999;
-  --dark-line: color-mix(in srgb, #f1f1e8 14%, transparent);
-  --dark-line-soft: color-mix(in srgb, #f1f1e8 8%, transparent);
+  --dark-body: #dfe3e8;
+  --dark-ink-soft: #b6bec6;
+  --dark-line: color-mix(in srgb, #ffffff 14%, transparent);
+  --dark-line-soft: color-mix(in srgb, #ffffff 8%, transparent);
 
-  --light-canvas: #eeefe9;
-  --light-ink: #23251d;
+  --light-canvas: #eef1f5;
+  --light-ink: #0a1317;
 
   /* Document paper — artifact/file previews assume a white page in every
-     register, matching how the document would print. */
+     register, matching how the document would print. It is also the brand's
+     canvas value (the source system's canvas white, #ffffff). */
   --paper: #ffffff;
 
-  --scrim: rgba(0, 0, 0, 0.66);
+  --scrim: rgba(10, 19, 23, 0.66);
 
   /* ----- Register-invariant scales ----- */
 
-  /* Radii — DESIGN.md's 4/6 vocabulary: chips 4, controls 6, and every
-     larger container (cards, drawers, modals, sheets) on the same 6–8 band.
-     The old 10/14 top rungs are gone: nothing in the source system rounds
-     past 8px except pills. */
-  --r-1: 4px;  /* chips, tags */
-  --r-2: 6px;  /* buttons, inputs, all controls */
-  --r-3: 6px;  /* cards, drawers, modals */
-  --r-4: 8px;  /* hero plates, sheets */
-  --r-full: 9999px; /* dots, avatars, pills */
+  /* Radii — the source system's geometric signature. Pills are the brand: every
+     button, tab chip, and badge takes --r-full and is NEVER squared off.
+     Containers step 4 → 8 → 16 → 24 → 32 with the larger rungs reserved for
+     photographic and promotional surfaces.
+
+     `--r-full` is 9999px rather than the source system's literal 100px so
+     the pill holds its shape on any control height; at Relay's 28–44px
+     controls the two are visually identical. */
+  --r-1: 4px;   /* tags, micro-controls (rounded.sm) */
+  --r-2: 8px;   /* inputs, radio options, selection tiles (rounded.lg) */
+  --r-3: 16px;  /* cards, drawers, modals, FAQ items (rounded.xl) */
+  --r-4: 24px;  /* warranty/accessory tiles, ghost action cards (rounded.xxl) */
+  --r-5: 32px;  /* photographic feature cards, promo strips (rounded.xxxl) */
+  --r-full: 9999px; /* pills, tab chips, badges, dots, avatars */
 
   /* Spacing — 4px base, plus a micro tier below it. --sp-0-5/--sp-1-5 are
      the *only* sanctioned sub-4px gaps: they bind glyph-tight pairs (dot ↔
      label, icon ↔ text, stacked meta lines) where a full 4px step reads as
      a separation rather than a pairing. Anything larger uses the 4px scale.
+     The top two rungs are the source system's section rhythm: 64px between product
+     sections, 80px between marketing sections.
 
      --sp-hairline (1px) is NOT a gap — it is the width of a 1px visual
      construct expressed as spacing: padding that lets a 1px border/hairline
@@ -201,8 +216,8 @@
      drawn divider. Never use it to separate content. */
   --sp-hairline: 1px;
   --sp-0-5: 2px;
-  --sp-1: 4px;
   --sp-1-5: 6px;
+  --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
   --sp-4: 16px;
@@ -210,17 +225,21 @@
   --sp-6: 24px;
   --sp-7: 32px;
   --sp-8: 48px;
+  --sp-9: 64px;  /* product-section rhythm */
+  --sp-10: 80px; /* marketing-section rhythm */
   --sp-row: var(--sp-3); /* dense row rhythm */
 
-  --control-h: 40px;
-  --control-h-sm: 36px;
-  --control-h-xs: 28px;
+  /* Control heights — the source system renders form inputs and primary pills at
+     44px so they share a silhouette and clear the WCAG AAA touch floor. The
+     two tiers below it are Relay's dense in-row chrome, which the source
+     system has no equivalent for. */
+  --control-h: 44px;
+  --control-h-sm: 40px;
+  --control-h-xs: 32px;
 
   /* Measure — the reading-column cap for prose, descriptions, and empty-state
      copy. In ch, not px, so the column tracks the font rather than the layout:
      a line stays ~the same number of words at any root size.
-     Three tiers, because nine call sites had grown seven different values
-     (28/38/46/46/48/50/52/72ch) with nothing to anchor them:
 
        --measure-tight  captions, empty-state lines, one-line hints
        --measure        the default — descriptions, summaries, side copy
@@ -246,12 +265,21 @@
      transcript and composer always cap at the same width. */
   --thread-measure: 1200px;
   --space-w: 384px;
-  --header-h: 64px;
+  --header-h: 64px; /* the source system's top navigation height */
   /* Shared inline gutter for page chrome — route PageHeaders, the thread
      rail, and the chat header/transcript all inset by this one token so the
      content edges of adjacent panes line up instead of each picking its own
      step on the spacing scale. */
-  --page-gutter: var(--sp-5);
+  --page-gutter: var(--sp-6);
+
+  /* Elevation — the source system runs three levels and only two of them are real
+     shadows. Level 0 (cards, tiles) is flat: rounding plus a hairline. Level
+     1 is the pill-tab activation indicator. Level 2 is commerce chrome that
+     floats — the sticky purchase summary, and here the drawers, dialogs, and
+     menus that play the same role. Raw values live here; roles.css names
+     them --shadow-1/--shadow-2. */
+  --shadow-tab: rgba(0, 0, 0, 0.2) 1px 1px 0 0;
+  --shadow-panel: rgba(20, 22, 26, 0.3) 0 1px 4px 0;
 
   /* Z layers — surface < drawer < float < dialog.
      Only three tiers are real, and every one of them has consumers.
@@ -265,7 +293,7 @@
      one (popover 20 < drawer 30) and it was unusable by construction: a select
      opened inside a drawer would render behind the drawer. Anchored chrome
      always floats above the surface it was opened from, so it belongs at
-     --z-float. A removed `sheet` tier (50) likewise never had an occupant.
+     --z-float.
 
      Values 1/2/3 appear throughout the surface CSS for LOCAL stacking inside
      an already-positioned component. Those are correct as literals — they
@@ -276,41 +304,38 @@
 
   /* Type sizes — rem so browser font-size preference scales the UI
      (root pinned to 87.5% in base.css; 1rem = 14px at the default). */
-  /* The ladder is 12 / 13 / 15 / 16 / 18 / 20 / 24 / 36 — DESIGN.md's scale
-     (caption-xs → display-xl) with its 1px-apart pairs collapsed: heading-md
-     (20) absorbs heading-lg (21), and the code role owns 14px outside the
-     ladder because the mono face sizes to its own metrics, not the sans
-     ramp's. Nothing sits closer than 2px above --fs-4: steps a single pixel
-     apart cost a token and buy no visible hierarchy. Roles that need to
-     differ inside one size differ by weight instead — DESIGN.md's hierarchy
-     is built from weight contrast (400/500/600/700/800) far more than from
-     size.
+  /* The ladder is the source system's: 12 / 14 / 16 / 18 / 24 / 36 / 48, with the
+     hero display on its own clamp above. Two names share the 16px rung on
+     purpose — the source system has exactly ONE reading size between its
+     14px body-sm and its 18px subtitle, so --fs-4 aliases --fs-3 rather than
+     inventing a 15px step the brand does not have. The names survive because
+     call sites mean different things by them (dense prose vs body copy), and
+     the compact density scope below moves --fs-4 down a rung on its own.
 
      Most sizing flows through the --type-* roles in roles.css rather than
      these tokens directly, so a low direct-var count does not by itself mean
      a dead rung. Recount before deleting anything. */
-  --fs-1: 0.8571rem; /* 12px — micro, badges, compact metadata */
-  --fs-2: 0.9286rem; /* 13px — labels, chrome */
-  --fs-3: 1.0714rem; /* 15px — dense prose, captions */
-  --fs-4: 1.1429rem; /* 16px — body */
-  --fs-heading: 1.2857rem; /* 18px — section headings, in-message h1 */
-  --fs-title: 1.4286rem;   /* 20px — conversation / pane titles, content titles */
-  --fs-5: 1.7143rem; /* 24px — display-lg: KPI numerals, hero support tiers */
-  --fs-6: 2.5714rem; /* 36px — display-xl: hero headline */
-  /* Hero display numeral — the dashboard's single oversized KPI. A clamp,
-     not a rung: it tracks the viewport between 36px and 44px and never
-     joins the ladder, because nothing else is allowed at this size. */
-  --fs-hero: clamp(2.5714rem, 4vw, 3.1429rem);
+  --fs-1: 0.8571rem; /* 12px — caption: badges, legal microcopy, compact metadata */
+  --fs-2: 1rem;      /* 14px — body-sm: labels, chrome, button and pill-tab text */
+  --fs-3: 1.1429rem; /* 16px — body-md: the primary reading size */
+  --fs-4: var(--fs-3); /* 16px — body copy; see the note above */
+  --fs-heading: 1.2857rem; /* 18px — subtitle-lg: section headings, in-message h1 */
+  --fs-title: 1.7143rem;   /* 24px — heading-sm: card titles, pane and page titles */
+  --fs-5: 2.5714rem; /* 36px — heading-lg: KPI numerals, subsection headlines */
+  --fs-6: 3.4286rem; /* 48px — display-lg: section-opener display */
+  /* Hero display — the source system's 64px homepage hero, which drops to the 36px
+     heading tier below 768px. A clamp, not a rung: it tracks the viewport
+     between those two published sizes and never joins the ladder. */
+  --fs-hero: clamp(2.5714rem, 5vw, 4.5714rem);
 
-  /* Leading
+  /* Leading — the source system's published line heights: 1.16 hero, 1.17 display,
+     1.28 heading-lg, 1.25 heading-sm, 1.44 subtitle, 1.50 body, 1.43 body-sm.
      --leading-none: single-line numerals and marks that must not reserve
-     line box height (KPI values, monograms, dots-with-labels).
-     --leading-display: large display text wrapped to two lines.
-     --leading-snug: dense labels/meta that occasionally wrap. */
+     line box height (KPI values, monograms, dots-with-labels). */
   --leading-none: 1;
-  --leading-display: 1.1;
-  --leading-tight: 1.15;
-  --leading-snug: 1.35;
+  --leading-display: 1.17;
+  --leading-tight: 1.25;
+  --leading-snug: 1.43;
   --leading-normal: 1.5;
   --leading-loose: 1.65;
   /* Long-form prose (transcript answers, document previews). Loose is the
@@ -319,44 +344,52 @@
      glyphs sit on each other's shoulders. */
   --leading-prose: 1.75;
 
-  /* Tracking — DESIGN.md sets every reading role at 0 and reserves negative
-     tracking for the display tier (-0.6px at 24px ≈ -0.025em). IBM Plex Sans
-     is drawn wide and open, so body text needs no tightening; the body track
-     tokens are 0 on purpose and exist so the paired-track contract
-     (roles.css) stays greppable. Caps get no letterspacing either — the
-     source system's uppercase captions are set solid. */
-  --track-display: -0.025em;
-  --track-body: 0;
-  --track-body-sm: 0;
+  /* Tracking — the source system sets its display tier solid and gives the BODY
+     roles a fractional negative track instead: -0.16px at 16px and -0.14px
+     at 14px (≈ -0.01em), the snug-but-not-condensed setting Optimistic VF
+     was drawn for. Caps get no letterspacing — the source system's uppercase
+     captions are set solid — and the display tier is 0 because at 36–64px
+     the face already sets tight. The paired-track contract in roles.css is
+     what keeps these attached to their roles. */
+  --track-display: 0;
+  --track-body: -0.01em;
+  --track-body-sm: -0.01em;
   --track-0: 0;
   --track-caps: 0;
 
-  /* Families — IBM Plex Sans carries EVERY role: reading, control, and
-     display text, separated by weight (400/500/600/700) rather than by
-     face. The display tier is the same family at 700 with negative
-     tracking — DESIGN.md calls for 800 there, but Plex Variable tops out
-     at 700 and base.css disables font synthesis, so an 800 declaration
-     would silently render as 700; the roles say 700 and let size +
-     tracking carry the tier. There is no second sans. The mono is
-     technical text only — JetBrains Mono, kept from Phosphor: DESIGN.md's
-     own note names it a near-perfect substitute for Source Code Pro at
-     body sizes, and the vendored variable file was already shipped. */
+  /* Families — Optimistic VF is Meta's proprietary variable display face and
+     is not redistributable, so it leads the stack for anyone who has it
+     licensed and installed, and the published fallback chain (Montserrat,
+     Helvetica, Arial, Noto Sans) carries everyone else. IBM Plex Sans is the
+     vendored variable file this app actually ships — a humanist grotesque
+     that holds the source system's 400/500/700 weight ladder — and it sits ahead of
+     the metric fallbacks so the app renders from a font it controls rather
+     than from whatever Helvetica the OS supplies.
+
+     ONE family carries every role: reading, control, and display text,
+     separated by weight (400/500/700), never by face. The mono is technical
+     text only — JetBrains Mono, sized to its own metrics. */
   /* Transcript content is multilingual even when the UI language is English.
      Keep explicit Han fallbacks in the default stacks so agent-authored CJK
      never depends on a browser's last-resort missing-glyph substitution. */
-  --font-sans: var(--font-app-sans), "IBM Plex Sans", "PingFang SC", "PingFang TC", "Microsoft YaHei UI", "Microsoft JhengHei UI", "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans SC", "Noto Sans TC", "Avenir Next", "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Optimistic VF", var(--font-app-sans), "IBM Plex Sans", Montserrat, "PingFang SC", "PingFang TC", "Microsoft YaHei UI", "Microsoft JhengHei UI", "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans SC", "Noto Sans TC", Helvetica, Arial, "Noto Sans", ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-sans);
   --font-mono: var(--font-app-mono), "JetBrains Mono", "PingFang SC", "PingFang TC", "Microsoft YaHei", "Microsoft JhengHei", "Noto Sans Mono CJK SC", "Noto Sans Mono CJK TC", "Noto Sans SC", "Noto Sans TC", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 
-  /* Motion — one ease, two speeds, no overshoot.
+  /* OpenType — the source system switches ss01 and ss02 on together across every
+     heading role and treats them as a paired alternates package, never one
+     without the other. Faces without the sets ignore the declaration, so
+     base.css applies the pair app-wide rather than fencing it to headings. */
+  --font-features: "ss01" 1, "ss02" 1;
+
+  /* Motion — one ease, two speeds, no overshoot. The source system publishes no
+     timings and recommends 150–250ms ease-out for surface transitions and
+     300ms for accordion expand/collapse.
      --t-fast: state change under the pointer (hover, press, menu open).
-     --t-slow: entrances that cross real distance (sheets, first paint).
-     280ms, not 320: past ~300ms an entrance stops reading as responsive and
-     starts reading as a wait, and this is an operator tool where the same
-     panes open dozens of times an hour. */
-  --ease: cubic-bezier(0.2, 0, 0, 1);
-  --t-fast: 120ms;
-  --t-slow: 280ms;
+     --t-slow: entrances that cross real distance (sheets, first paint). */
+  --ease: cubic-bezier(0, 0, 0.2, 1); /* ease-out */
+  --t-fast: 150ms;
+  --t-slow: 250ms;
 
   /* Ambient loops — "something is running". Two cadences only, so the same
      liveness reads at the same tempo on every surface.
@@ -373,22 +406,18 @@
 
   /* --t-tick: the mechanical loop — a spinner rotating, a caret blinking. Not
      a pulse (those breathe to say "an agent is working"); this is a metronome
-     that says "this element is still alive". Was spelled 0.9s and 1s at the
-     two call sites that needed it. */
+     that says "this element is still alive". */
   --t-tick: 1s;
 
   /* Draw — content that renders itself over real time rather than changing
      state: a chart stroke arriving, a skeleton shimmer sweeping. Too long to
-     be --t-slow (a 320ms chart draw reads as a flicker), too purposeful to be
-     an ambient pulse. Was spelled 0.8s / 1.1s / 1.2s at four call sites;
-     the two survivors are workspace.css's loading-bar slide and skeleton
-     shimmer. */
+     be --t-slow (a 250ms chart draw reads as a flicker), too purposeful to be
+     an ambient pulse. */
   --t-draw: 1.1s;
 
   /* Stagger — the base step for a reveal ladder (list rows, activity
      sections, empty-state lines). Ladders multiply it (`calc(var(--t-stagger)
-     * 3)`); dense ladders use 1×, sparse ones 2×. One base keeps every
-     cascade on the same rhythm instead of the 40/80/90ms mix it replaced. */
+     * 3)`); dense ladders use 1×, sparse ones 2×. */
   --t-stagger: 40ms;
 
   /* Rise distance — the single travel for fade-and-rise entrances.
@@ -397,81 +426,105 @@
   --rise: 8px;
 }
 
-/* Light register — the cream page. Designed alongside dark, not derived
-   from it.
+/* Light register — the stark white commerce page. Designed alongside dark,
+   not derived from it.
 
    THE LADDER RUNS BOTH WAYS HERE. On a light canvas "raised" means lighter and
    "inset" means darker, and white is a ceiling you cannot build above — so 0..3
    is a ladder of DISTINCTNESS, not of lightness:
 
-     surface-0  canvas          #eeefe9   the warm cream page — never pure white
-     surface-1  cards, panels   #fcfcfa   raised — warm white, shy of pure
-     surface-2  fills, wells    #e5e7e0   RECESSED — deliberately darker
-     surface-3  drawers, modals #ffffff   the top plane, pure white
+     surface-0  canvas          #eef1f5   the soft-cloud page
+     surface-1  cards, panels   #fbfcfd   raised — near white
+     surface-2  fills, wells    #e2e7ee   RECESSED — deliberately darker
+     surface-3  drawers, modals #ffffff   the top plane, the source system's canvas
 
    surface-2 inverting direction between registers is correct: a search field
-   or hover well recedes from white and emerges from black. Cards sit one step
-   below pure white so the top plane has somewhere to go. The cream canvas is
-   the brand's most distinctive surface choice — never substitute pure white
-   for it. */
+   or hover well recedes from white and emerges from black. The source system paints
+   its marketing canvas pure white and its wells in surface-soft #f1f4f7;
+   Relay is a three-pane application rather than a scrolling page, so the two
+   trade places — the cloud grey carries the page and stark white carries the
+   cards and floating chrome that sit on it. Both values stay inside the
+   published cloud/white pair. */
 html[data-theme="light"] {
-  --surface-0: #eeefe9;
-  --surface-1: #fcfcfa;
-  --surface-2: #e5e7e0; /* recessed fill — see the note above */
-  --surface-3: #ffffff; /* top plane: the one pure white */
+  --surface-0: #eef1f5;
+  --surface-1: #fbfcfd;
+  /* The recessed fill has to work HARDER in this register than in dark. A
+     well (search field, hover row, inset chip) is separated from its plane by
+     the step between them, and the light planes are packed between the cloud
+     canvas and white — at #e2e7ee a search field measured 1.03 against the
+     list panel it sits in and read as plain text with a hairline, not as a
+     field. Deepened until the step is perceptible: 1.08 against the list,
+     1.11 against the canvas.
 
-  /* Zone surfaces — mirror the dark register's monotonic rail → list → canvas
-     ladder. In light "raised = lighter", so the rail is the lightest step (shy
-     of --surface-3's pure white so drawers keep the top plane), the list sits
-     between it and the canvas. */
-  --surface-rail: #f8f9f3;
-  --surface-list: #f3f4ee;
+     It cannot go deeper than this. The plane moves TOWARD the mid-tone status
+     inks as it darkens, and at #dee4ec the calmest of them (--live, --ok)
+     measured 4.53:1 here — passing, with no margin left for the next nudge.
+     This value keeps every tier at 4.6+ while the well still reads as a
+     well. */
+  --surface-2: #e0e6ed; /* recessed fill — see the note above */
+  --surface-3: #ffffff; /* top plane: the source system's canvas white */
 
-  /* Ink — DESIGN.md's olive ramp, deepened at the calm end so every tier
-     clears AA against the worst plane here (--surface-2, the recessed fill —
-     the one plane that moves toward the ink rather than away from it).
-     DESIGN.md's own mute (#6c6e63) measures 4.16:1 there and its ash
-     (#9b9c92) 2.23:1; both are marketing-page values, so the app's ink-3/ink-4
-     step down until they pass. Ratios against --surface-2: ink-1 12.4 ·
-     ink-2 6.7 · ink-3 5.1 · ink-4 4.8. The steps between tiers are tighter
-     than the dark register's and that is structural: white bounds the light
-     ramp at one end and the AA floor bounds it at the other. */
-  --ink-1: #23251d;
-  --ink-2: #4d4f46;
-  --ink-3: #5f6056;
-  --ink-4: #63645a;
+  /* Zone surfaces — the ladder RUNS THE OTHER WAY from the dark register, and
+     that is the point rather than an oversight. Dark builds the shell UP from
+     the canvas because lift means lighter there. Light cannot copy that: a
+     near-white rail beside a cloud canvas makes the app's CHROME the brightest
+     thing on screen, with the content sheet reading as the recessed part —
+     the exact inverse of a system whose whole premise is that the product
+     (the content) is the surface and everything else gets out of its way.
 
-  --line-1: #bfc1b7;
-  --line-2: #dcdfd2;
+     So in light the shell RECEDES: rail is the deepest cloud step, the list
+     sits between it and the canvas, and the content canvas is the lightest of
+     the three — with cards (--surface-1) and drawers (--surface-3) still
+     rising above it. Reading order by lightness is therefore
+     rail < list < canvas < card < drawer, which is the same order a reader's
+     eye should travel. */
+  --surface-rail: #e6ebf1;
+  --surface-list: #eaeef4;
 
-  /* --action is register-invariant (#f7a501 on :root) — only its hover and
-     wash change here: pressed darkens toward the ink on the light canvas. */
-  --action-hover: #dd9001;
-  --action-soft: color-mix(in srgb, #f7a501 16%, transparent);
+  /* Ink — the source system's text ramp: ink-deep, ink, charcoal, and a deepened
+     steel. The published steel (#5d6c7b) measures 4.34:1 on --surface-2, the
+     one plane that moves toward the ink, so ink-4 steps down until it passes.
+     Ratios against --surface-2: ink-1 14.9 · ink-2 13.3 · ink-3 7.2 ·
+     ink-4 5.0. Stone (#8595a4) stays out of the ramp entirely — it is a
+     disabled-label value, and disabled here is opacity. */
+  --ink-1: #0a1317; /* ink-deep */
+  --ink-2: #1c1e21; /* ink */
+  --ink-3: #444950; /* charcoal */
+  --ink-4: #556170; /* steel, deepened for AA */
 
-  /* Light status — loud = dark. Steps mirror the dark register:
-     err #23251d > warn #55564d > info (--ink-3) #5f6056 > ok #616257.
-     AA against the worst plane here (--surface-2): 12.4 / 6.0 / 5.1 / 5.0. */
-  --ok: #616257;
-  --warn: #55564d;
-  --err: #23251d;
-  /* Text on an --err fill — in this register --err IS the deep olive ink, so
-     the on-fill text is the dark register's bright ink. Without this split a
-     destructive hover printed --on-action (#23251d) on --err (#23251d). */
-  --on-err: #f1f1e8;
+  --line-1: #ced0d4; /* hairline */
+  --line-2: #dee3e9; /* hairline-soft */
 
-  /* Live — the highlighter family, deepened to a dark gold so an elapsed
-     timer clears AA as small text on cream: 4.9:1 on --surface-0, 4.5:1 on
-     --surface-2. The register-bright #f7a501 itself measures 1.7:1 on cream
-     and is fill-only here — never set text or a dot in it on the light
-     canvas. */
-  --live: #8a5f06;
+  /* --action / --action-hover / --on-action are register-invariant (declared
+     once on :root) — cobalt reads on both canvases without retuning. Only
+     the soft callout tint changes weight here. */
+  --action-soft: color-mix(in srgb, #0064e0 15%, transparent);
 
-  --link-blue: #1d4ed8;
-  --link-blue-strong: #1740ae;
+  /* Ink button — the source system's marketing black pill, verbatim on this canvas. */
+  --ink-button: #000000;
+  --on-ink-button: #ffffff;
 
-  /* Light code tokens — the same five roles inked for cream. Deepened, not
-     derived: the dark register's tints measure ~1.5:1 here. Ratios on
+  /* Light status — the same three hues, deepened until each clears 4.5:1 as
+     small text on the worst plane here (--surface-2). The source system's own values
+     measure 3.1 (success), 1.8 (warning), and 4.0 (critical) on white; they
+     are badge-fill colours, not text colours.
+     Ratios against --surface-2: ok 4.6 · warn 4.7 · err 4.7. */
+  --ok: #12752f;   /* success #31a24c, deepened */
+  --warn: #8a5a00; /* warning #f7b928, deepened */
+  --err: #c81232;  /* critical #e41e3f, deepened */
+  /* Text on an --err fill — white, as the source system's badge-critical prints it
+     (5.9:1 on this red). */
+  --on-err: #ffffff;
+
+  /* Live — Oculus purple at its published value: 4.6:1 on --surface-2 and
+     5.1:1 on the canvas, so an elapsed timer set in it is legible. */
+  --live: #a121ce;
+
+  --link-blue: #385898;      /* meta-link */
+  --link-blue-strong: #0457cb; /* deep cobalt — the active link colour */
+
+  /* Light code tokens — the same five roles inked for a light page. Deepened,
+     not derived: the dark register's tints measure ~1.5:1 here. Ratios on
      --surface-2/--surface-0: keyword 5.2/5.7 · string 5.8/6.2 ·
      number 4.5/4.9 · declaration 6.7/7.3 · attribute 7.3/7.9. */
   --code-keyword: #9c4221;
@@ -480,13 +533,13 @@ html[data-theme="light"] {
   --code-declaration: #1f4f82;
   --code-attribute: #5b3a75;
 
-  --scrim: rgba(35, 37, 29, 0.55);
+  --scrim: rgba(10, 19, 23, 0.55);
 }
 
 /* CJK — choose one system CJK face for both Latin and Han glyphs so mixed
-   labels remain internally coherent. IBM Plex Sans has no Han coverage, so
-   every Latin role joins the sans stack; technical text keeps the mono with
-   CJK glyph fallback. */
+   labels remain internally coherent. Neither Optimistic VF nor IBM Plex Sans
+   has Han coverage, so every Latin role joins the sans stack; technical text
+   keeps the mono with CJK glyph fallback. */
 html:lang(zh-CN) {
   --font-sans: "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", var(--font-app-sans), "IBM Plex Sans", sans-serif;
   --font-display: var(--font-sans);
@@ -501,10 +554,12 @@ html:lang(zh-TW) {
 
 html:lang(zh-CN),
 html:lang(zh-TW) {
-  /* Display falls back to sans above, so the display tracking must be
-     neutralised or Han titles would be crushed together. The body tracks are
-     already 0 in this system, so only the display tier needs the pin. */
+  /* The Latin tracks are negative in this system (Optimistic VF is drawn for
+     a snug body setting); Han glyphs are square and must never be tightened,
+     so every track is pinned solid here. */
   --track-display: 0;
+  --track-body: 0;
+  --track-body-sm: 0;
   --leading-normal: 1.7;
   --leading-loose: 1.8;
   --leading-prose: 1.9;
@@ -515,8 +570,8 @@ html:lang(zh-TW) {
   --leading-loose: 1.5;
   --sp-row: var(--sp-2);
   /* The dense reading tier runs one rung down: the compact scope's --fs-4
-     becomes the standard scope's --fs-3 (16 → 15px). Heading tiers are
-     untouched — density compresses rows, not hierarchy.
+     becomes the ladder's 14px body-sm rung. Heading tiers are untouched —
+     density compresses rows, not hierarchy.
 
      REDECLARING THE ROLES IS LOAD-BEARING, NOT REDUNDANT. A custom property is
      substituted at the element where it is DECLARED, not where it is used: a
@@ -526,14 +581,14 @@ html:lang(zh-TW) {
      --fs-4-derived role here re-resolves it in this scope, which is what makes
      the substitution real. Add a line whenever a new role is built on --fs-4.
 
-     --type-body-sm shifts by the same one-rung substitution (--fs-3 → --fs-2):
+     --type-body-sm shifts by the same one-rung substitution (--fs-2 → --fs-1):
      it is the app's supporting-text tier (hints, meta lines, empty-state copy),
-     so a dense admin table would otherwise print its meta larger than the
-     names beside it. */
-  --fs-4: 1.0714rem;
-  --type-body: 400 var(--fs-4)/1.5 var(--font-sans);
-  --type-name: 600 var(--fs-4)/1.5 var(--font-sans);
-  --type-body-sm: 400 var(--fs-2)/1.5 var(--font-sans);
+     so a dense admin table would otherwise print its meta at the same size as
+     the names beside it. */
+  --fs-4: var(--fs-2);
+  --type-body: 400 var(--fs-4)/1.43 var(--font-sans);
+  --type-name: 700 var(--fs-4)/1.43 var(--font-sans);
+  --type-body-sm: 400 var(--fs-1)/1.43 var(--font-sans);
 }
 
 /* CJK reading roles are looser; the compact scope must restate them too or a
@@ -543,5 +598,5 @@ html:lang(zh-TW) [data-density="compact"],
 html:lang(zh-CN)[data-density="compact"],
 html:lang(zh-TW)[data-density="compact"] {
   --type-body: 400 var(--fs-4)/1.7 var(--font-sans);
-  --type-body-sm: 400 var(--fs-2)/1.7 var(--font-sans);
+  --type-body-sm: 400 var(--fs-1)/1.7 var(--font-sans);
 }

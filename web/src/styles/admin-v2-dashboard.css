@@ -1,8 +1,8 @@
 /* =====================================================================
    Admin Dashboard  (adm-dash-* namespace)
 
-   The control room, read as one instrument. Fieldnotes rules apply in
-   full: the page is olive ink until something is working, and the live
+   The control room, read as one instrument. The system's rules apply in
+   full: the page is neutral ink until something is working, and the live
    yellow (--live) marks nodes that are running an agent RIGHT NOW —
    nowhere else. Ready is calm, completed is calm; only "in flight" glows.
 
@@ -239,7 +239,7 @@
   color: var(--ink-3);
   padding: var(--sp-0-5) var(--sp-2);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-1);
+  border-radius: var(--r-full);
   background: var(--surface-1);
 }
 
@@ -254,7 +254,7 @@
 }
 
 /* ── Fleet health ─────────────────────────────────────────────────────
-   Five states have to be told apart in a 10px bar, and the olive
+   Five states have to be told apart in a 10px bar, and the neutral
    brightness ramp alone cannot do it — ready (--ok) against unknown
    (--ink-4) is one step apart, and failed and stale resolve to the same
    --err. So each state is double-encoded, exactly as StatusPill encodes

@@ -62,8 +62,8 @@
   --radius-lg: var(--r-3);
   --radius-xl: var(--r-3);
   --radius-2xl: var(--r-4);
-  --radius-3xl: var(--r-4);
-  --radius-4xl: var(--r-4);
+  --radius-3xl: var(--r-5);
+  --radius-4xl: var(--r-5);
   --radius-full: var(--r-full);
 
   /* Numeric step → p-4, gap-2, size-4, h-11, …
@@ -137,6 +137,7 @@
   --destructive-foreground: var(--on-err);
   --border: var(--line-1);
   --input: var(--control-border);
-  --ring: var(--link); /* focus rings are link-blue: the yellow action fill
-                          measures 1.7:1 on cream, under the 3:1 indicator floor */
+  --ring: var(--link); /* focus rings are link-blue, never the cobalt action:
+                          a focused primary button must not ring in more of
+                          its own fill */
 }

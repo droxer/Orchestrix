@@ -1,5 +1,5 @@
 /* highlight.js token theme — five hues from tokens/palette.css (--code-*),
-   plus the olive ink ramp for everything that should recede. Structure, not
+   plus the neutral ink ramp for everything that should recede. Structure, not
    status: these colors exist only inside `code.hljs`, so they never compete
    with --action / --live / --err in the surrounding chrome. Applies anywhere
    a `code.hljs` block is rendered (workspace file preview, artifact source

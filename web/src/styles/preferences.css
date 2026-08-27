@@ -326,7 +326,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--r-1);
+  border-radius: var(--r-full);
   border: 1px solid var(--line-1);
   background: var(--control-fill);
   font-family: var(--font-mono);

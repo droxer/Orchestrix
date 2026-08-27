@@ -266,7 +266,7 @@
   overflow: hidden;
   padding: var(--sp-0-5) var(--sp-2);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-1);
+  border-radius: var(--r-full);
   background: var(--surface-1);
   color: var(--ink-3);
   font-family: var(--font-mono);

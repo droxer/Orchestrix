@@ -99,26 +99,24 @@ describe("UI primitive contracts", () => {
     assert.doesNotMatch(source, /ItemText className="[^"]*whitespace-nowrap/);
   });
 
-  it("encodes destructive by shape because --err and --ink-1 share a value", async () => {
+  it("encodes destructive by ring and inversion rather than a translucent tint", async () => {
     const palette = await readFile(resolve("web/src/styles/tokens/palette.css"), "utf8");
     const dark = palette.match(/:root\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
     const light = palette.match(/html\[data-theme="light"\]\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
 
-    // This is the whole reason a destructive button cannot be a tint: in the
-    // Fieldnotes palette the danger tone is the LOUD END of the ink ramp (the
-    // status tones are a brightness hierarchy of olive greys), so a
-    // translucent --err wash would be indistinguishable from neutral chrome.
-    // If a future palette gives --err its own hue, revisit the shape encoding
-    // below.
-    assert.equal(cssHex(dark, "err"), cssHex(dark, "ink-1"));
-    assert.equal(cssHex(light, "err"), cssHex(light, "ink-1"));
+    // --err carries the source system's critical hue, distinct from the ink ramp, so
+    // the variant reads in colour as well as in shape. It still refuses a
+    // translucent fill: the source system's badge-critical is a SOLID pill, and a
+    // washed-out red at rest would be indistinguishable from `ghost` on a
+    // busy row.
+    assert.notEqual(cssHex(dark, "err"), cssHex(dark, "ink-1"));
+    assert.notEqual(cssHex(light, "err"), cssHex(light, "ink-1"));
 
     // The hover inversion pairs the --err fill with a DEDICATED on-tone,
-    // --on-err, declared per register (dark ink on the bright register's
-    // --err, bright ink on the dark register's). It cannot reuse
-    // --on-action: that token is register-invariant #23251d while --err
-    // flips polarity between registers, so the pairing measured 1:1 in the
-    // light register until --on-err existed.
+    // --on-err, declared per register: the dark register's red is lifted for
+    // its canvas and takes dark text, the light register's is deepened and
+    // takes white, exactly as the source system's badge-critical prints it. It cannot
+    // reuse --on-action, which is white in both registers.
     for (const [name, block] of [["dark", dark], ["light", light]] as const) {
       const ratio = contrast(cssHex(block, "on-err"), cssHex(block, "err"));
       assert.ok(ratio >= 4.5, `${name} --on-err on --err is ${ratio.toFixed(2)}:1 — below the 4.5:1 floor`);
