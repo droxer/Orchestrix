@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import date
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 from relay.api import task_routes
@@ -310,6 +311,49 @@ def test_routine_create_defaults_next_run_when_omitted(monkeypatch) -> None:
 
         assert explicit_unscheduled.status_code == 201
         assert "routineNextRunDate" not in explicit_unscheduled.json()
+
+
+def test_routine_api_uses_the_scheduler_calendar(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        app.state.today = lambda: date(2026, 7, 7)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+
+        created = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Timezone-aware routine",
+                "ownerEmployeeId": "alice",
+                "assigneeEmployeeId": "alice",
+                "isRoutine": True,
+                "routineCadence": "daily",
+            },
+        )
+
+        assert created.status_code == 201
+        assert created.json()["routineNextRunDate"] == "2026-07-08"
+
+
+def test_manual_routine_start_uses_the_scheduler_calendar(monkeypatch) -> None:
+    observed: dict[str, date] = {}
+
+    async def dispatch(*args, run_date: date, **kwargs):
+        observed["run_date"] = run_date
+        return None
+
+    monkeypatch.setattr(task_routes, "dispatch_routine_occurrence", dispatch)
+    ctx = SimpleNamespace(today=lambda: date(2026, 7, 7))
+
+    asyncio.run(
+        task_routes.start_routine_occurrence_on_ready_node(
+            ctx, {}, {}, agent=None
+        )
+    )
+
+    assert observed["run_date"] == date(2026, 7, 7)
 
 
 def test_routine_cadence_change_and_reenable_recalculate_next_run(monkeypatch) -> None:

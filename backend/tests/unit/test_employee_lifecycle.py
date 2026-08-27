@@ -5,10 +5,11 @@ from types import SimpleNamespace
 
 import pytest
 from relay.persistence.agent_placement_store import DatabaseAgentPlacementStore
-from relay.persistence.agent_store import DatabaseAgentStore
-from relay.persistence.daemon_store import DatabaseDaemonStore
-from relay.persistence.team_store import DatabaseTeamStore
-from relay.security.auth import DatabaseUserAuthStore
+from relay.persistence.agent_placement_store import LocalAgentPlacementStore
+from relay.persistence.agent_store import DatabaseAgentStore, LocalAgentStore
+from relay.persistence.daemon_store import DatabaseDaemonStore, LocalDaemonStore
+from relay.persistence.team_store import DatabaseTeamStore, LocalTeamStore
+from relay.security.auth import DatabaseUserAuthStore, UserAuthStore
 from relay.services.employee_lifecycle import cascade_engine, soft_delete_employee
 
 
@@ -52,7 +53,9 @@ def build_context(tmp_path: Path, managed_node_store: object) -> SimpleNamespace
 
 
 def seed_employee(ctx: SimpleNamespace) -> tuple[str, str]:
-    user = ctx.auth_store.create_user("alice", "userpass", display_name="Alice")
+    user = ctx.auth_store.create_user(
+        "alice", "userpass", employee_id="alice", display_name="Alice"
+    )
     employee_id = user["employeeId"]
     agent = ctx.agent_store.create_agent(
         employee_id, {"displayName": "Planner", "executorKind": "claude", "defaultRole": "implementer"}
@@ -121,3 +124,33 @@ def test_file_backed_stores_have_no_shared_engine(tmp_path: Path) -> None:
     )
 
     assert cascade_engine(ctx) is None
+
+
+def test_file_backed_failure_restores_employee_and_agent(tmp_path: Path) -> None:
+    auth_store = UserAuthStore(tmp_path)
+    agent_store = LocalAgentStore(tmp_path)
+    placement_store = LocalAgentPlacementStore(tmp_path)
+    team_store = LocalTeamStore(tmp_path)
+    daemon_store = LocalDaemonStore(tmp_path)
+    ctx = SimpleNamespace(
+        auth_store=auth_store,
+        agent_store=agent_store,
+        agent_placement_store=placement_store,
+        team_store=team_store,
+        registry=SimpleNamespace(
+            daemon_store=daemon_store,
+            sandboxes={},
+            unassign_employee_everywhere=lambda employee_id: [],
+            get=lambda node_id: None,
+            fence_managed_node=lambda node_id: None,
+        ),
+        managed_node_store=RaisingManagedNodeStore(RuntimeError("provider down")),
+    )
+    employee_id, agent_id = seed_employee(ctx)
+
+    with pytest.raises(RuntimeError, match="provider down"):
+        soft_delete_employee(ctx, employee_id)
+
+    assert auth_store.authenticate("alice", "userpass") is not None
+    assert auth_store.deleted_employee_ids() == set()
+    assert [agent["id"] for agent in agent_store.list_agents()] == [agent_id]

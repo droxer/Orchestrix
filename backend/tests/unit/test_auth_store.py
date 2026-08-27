@@ -4,9 +4,20 @@ import json
 import os
 import stat
 import time
+from concurrent.futures import ThreadPoolExecutor
 from tempfile import TemporaryDirectory
+from uuid import UUID
 
-from relay.security.auth import DatabaseUserAuthStore, UserAuthStore, hash_session_token
+import pytest
+from fastapi import HTTPException
+from relay.security import auth as auth_module
+from relay.security.auth import (
+    DatabaseUserAuthStore,
+    UserAuthStore,
+    configure_admin_token,
+    get_admin_token,
+    hash_session_token,
+)
 from sqlalchemy import create_engine, text
 
 
@@ -88,6 +99,41 @@ def test_database_auth_store_persists_users_and_hashes_session_tokens() -> None:
         }
         assert store.delete_session(session["token"]) is True
         assert store.get_session_by_token(session["token"]) is None
+
+
+def test_database_auth_store_normalizes_human_readable_ids_before_uuid_queries() -> None:
+    normalize = getattr(auth_module, "normalize_database_id")
+
+    assert normalize("alice") is None
+    generated = normalize("550E8400-E29B-41D4-A716-446655440000")
+    assert generated == "550e8400-e29b-41d4-a716-446655440000"
+
+
+@pytest.mark.parametrize("store_kind", ["local", "database"])
+def test_bootstrap_allows_exactly_one_concurrent_first_admin(store_kind: str) -> None:
+    with TemporaryDirectory() as root:
+        configure_admin_token(root)
+        if store_kind == "database":
+            store = DatabaseUserAuthStore(
+                f"sqlite:///{root}/auth.db", create_schema=True
+            )
+        else:
+            store = UserAuthStore(root)
+        token = get_admin_token()
+        assert token is not None
+
+        def bootstrap(index: int) -> str:
+            try:
+                store.bootstrap_with_token(token, f"admin-{index}", "secret123")
+            except HTTPException as error:
+                return f"http-{error.status_code}"
+            return "created"
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            outcomes = list(pool.map(bootstrap, range(2)))
+
+        assert sorted(outcomes) == ["created", "http-409"]
+        assert len(store.list_users()) == 1
 
 
 def test_database_auth_store_enforces_unique_normalized_usernames() -> None:

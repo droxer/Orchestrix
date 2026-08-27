@@ -16,6 +16,7 @@ def clear_deploy_env(monkeypatch) -> None:
         "RELAY_SESSION_COOKIE_SAMESITE",
         "RELAY_FORCE_SECURE_COOKIES",
         "RELAY_TRUST_PROXY_HEADERS",
+        "RELAY_FORWARDED_ALLOW_IPS",
         "BACKEND_HOST",
         "BACKEND_PORT",
         "HOST",
@@ -118,7 +119,7 @@ class TestBindConfig:
     def test_defaults_stay_on_loopback(self) -> None:
         assert deploy_config.bind_host() == "127.0.0.1"
         assert deploy_config.bind_port() == 8790
-        assert deploy_config.trust_proxy_headers() is True
+        assert deploy_config.trust_proxy_headers() is False
 
     def test_platform_port_is_used_when_relay_specific_name_is_absent(
         self, monkeypatch
@@ -144,3 +145,19 @@ class TestBindConfig:
     def test_proxy_header_trust_can_be_disabled(self, monkeypatch) -> None:
         monkeypatch.setenv("RELAY_TRUST_PROXY_HEADERS", "0")
         assert deploy_config.trust_proxy_headers() is False
+
+    def test_proxy_header_trust_requires_explicit_non_wildcard_proxies(
+        self, monkeypatch
+    ) -> None:
+        monkeypatch.setenv("RELAY_TRUST_PROXY_HEADERS", "1")
+        with pytest.raises(RuntimeError, match="RELAY_FORWARDED_ALLOW_IPS"):
+            deploy_config.forwarded_allow_ips()
+
+        monkeypatch.setenv(
+            "RELAY_FORWARDED_ALLOW_IPS", "10.0.0.0/8, 192.168.1.10"
+        )
+        assert deploy_config.forwarded_allow_ips() == "10.0.0.0/8,192.168.1.10"
+
+        monkeypatch.setenv("RELAY_FORWARDED_ALLOW_IPS", "*")
+        with pytest.raises(RuntimeError, match="cannot contain"):
+            deploy_config.forwarded_allow_ips()
