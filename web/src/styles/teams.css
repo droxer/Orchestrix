@@ -13,11 +13,15 @@
   min-height: 0;
   flex-direction: column;
   border-right: 1px solid var(--line-1);
+  /* Shell zone role (see --surface-list in palette.css): every list rail —
+     threads, agents, teams — sits on the same elevation step between the nav
+     rail and the detail canvas. */
+  background: var(--surface-list);
 }
 
-.teams-roster .page-header {
-  padding-inline: var(--sp-4);
-}
+/* The header inset is --page-gutter, shared with the agent roster and every
+   other page header; the local --sp-4 override made this the one rail whose
+   title started at a different x than its neighbours. */
 
 .teams-detail {
   display: flex;
@@ -47,24 +51,66 @@
   padding: 0;
 }
 
-/* The table language itself — sticky header, shared grid template, ruled rows,
-   hover wash, selection accent — now lives in the <Table> primitive
-   (components/ui/table.tsx), which the four other lists in the app can share
-   instead of each re-declaring it. This surface keeps only what is specific to
-   a team row. */
-
+/* Same rhythm as .agents-roster-list and .conversation-list: rounded rows
+   separated by a 2px gutter, inset from the panel edge. The roster used to be
+   a <Table> with a sticky "Name / Status" column header — the only one of the
+   app's four list rails that had one. Two columns do not need naming when the
+   name is the row and the status is a pill at its right edge, and the ruled
+   full-bleed stripes it brought read as a different kind of object than the
+   thread and agent rows beside it. */
 .teams-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-0-5);
   margin: 0;
-  padding: 0;
+  padding: var(--sp-1) var(--sp-2) var(--sp-4);
   list-style: none;
+}
+
+/* A team row is the same object as a thread row and an agent row — a
+   selectable list item — so it wears the same shell: no border, --r-2, a
+   hover wash, and selection as wash + 2px leading accent. */
+.teams-list-row {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: var(--r-2);
+  overflow: hidden;
+  padding: var(--sp-row) var(--sp-3);
+  transition: background var(--t-fast) var(--ease);
+}
+
+.teams-list-row:hover {
+  background: var(--row-hover);
+}
+
+.teams-list-row[data-selected="true"] {
+  background: var(--action-soft);
+}
+
+/* Identical contract to .conversation-row and .agents-roster-row, keyed on the
+   same data-selected attribute, so selection looks the same on all three. */
+.teams-list-row[data-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  /* Inset holds the bar at ~55% of the row height, matching the other rails. */
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  border-radius: calc(var(--r-1) / 2);
+  background: var(--action);
 }
 
 .teams-list-row-select {
   display: grid;
-  grid-column: 1 / -1;
   grid-template-columns: 28px minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--sp-3);
+  /* --sp-2, the mark-to-name gap the agent roster uses; --sp-3 here left the
+     team name starting further right than the agent name one route over. */
+  gap: var(--sp-2);
   width: 100%;
   min-width: 0;
   /* Geometry beats the Button base utilities (h-(--control-h)). */
@@ -96,8 +142,6 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--action) 28%, var(--line-1));
 }
 
-/* The selected accent/wash comes from <TableRow>. */
-
 .teams-list-row:focus-within {
   outline: var(--focus-outline);
   outline-offset: var(--focus-offset);
@@ -107,7 +151,9 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: var(--sp-0-5);
+  /* The 4px name ↔ meta rhythm the agent roster and thread rail share; 2px
+     sat below the supporting-text rhythm used everywhere else. */
+  gap: var(--sp-1);
 }
 
 /* Row's primary action — mirrors .backlog-row-title. Geometry/background here
@@ -130,23 +176,23 @@
   text-overflow: ellipsis;
 }
 
-/* The row-select button carries its own hover wash (unlayered, so it beats
-   ghost's hover:bg-muted); the selected accent/wash comes from <TableRow>. */
+/* The wash and the selection accent live on .teams-list-row above, the same
+   place the thread and agent rails put them; the button only has to not paint
+   its own ghost hover over them. No underline on hover either — neither
+   sibling rail underlines a row title, and a row is not a link. */
 .teams-list-row-select:hover {
-  background: var(--row-hover);
+  background: transparent;
 }
 
-.teams-list-row-select:hover .teams-list-title {
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
+/* The row's meta line, in the same voice as .conversation-subline and
+   .agents-roster-row-meta — label role at the compact metadata rung. It read
+   as body copy here while the two rails beside it read as labels. */
 .teams-list-sub {
   overflow: hidden;
   color: var(--ink-3);
-  font: var(--type-body-sm);
-  font-size: var(--fs-1); /* compact metadata rung under the 13px title */
-  letter-spacing: var(--type-body-sm-track);
+  font: var(--type-label);
+  font-size: var(--fs-1); /* compact metadata rung — 12px under a 13px title */
+  letter-spacing: var(--type-label-track);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -374,17 +420,8 @@
 }
 
 @media (max-width: 820px) {
-  .teams-page-body {
-    padding: var(--sp-3);
-  }
-
-  /* Stacked-card mode: the column header is meaningless once rows restack, so
-     it is hidden. The restacked card layout is the reason the primitive is
-     div+ARIA rather than a real <table>. */
-  .teams-table [data-slot="table-header"] {
-    display: none;
-  }
-
+  /* Touch rows: the same taller padding the roster rails take on small
+     screens. The list keeps its own inset, so the body adds none. */
   .teams-list-row {
     padding: var(--sp-4) var(--sp-3);
   }

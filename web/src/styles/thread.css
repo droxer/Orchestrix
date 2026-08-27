@@ -97,9 +97,11 @@
    whole block. A folder marks itself on its own row, like any other row. */
 /* Hover is on the header itself, not the section: :hover on the section
    fires for pointers over its nested thread rows too, so the folder lit up
-   whenever you pointed at one of its children. */
+   whenever you pointed at one of its children. --row-hover is the shared list
+   wash; the local color-mix here was a fourth hand-mixed hover in a rail whose
+   thread, agent, and team rows all use the token. */
 .project-folder-header:hover {
-  background: color-mix(in srgb, var(--surface-2) 58%, transparent);
+  background: var(--row-hover);
 }
 
 .project-folder.selected > .project-folder-header,
@@ -108,6 +110,21 @@
      drives the content pane, so it should read as "you are here", not as an
      accent element. */
   background: var(--action-soft);
+}
+
+/* ...and the 2px leading accent every other selectable row in the app carries
+   (.conversation-row, .agents-roster-row, .teams-list-row). A project folder
+   drives the same detail pane those rows do; without the bar it was the one
+   selection in the product that spoke with only half the vocabulary. */
+.project-folder.selected > .project-folder-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: calc(var(--r-1) / 2);
+  background: var(--action);
 }
 
 /* There is deliberately no rule for .project-folder.ancestor — a folder
@@ -120,6 +137,9 @@
 }
 
 .project-folder-header {
+  /* Positioned so the selection accent above can hang off its leading edge,
+     the same way .conversation-row anchors its own. */
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--sp-1);
@@ -142,7 +162,10 @@
   gap: var(--sp-2);
   min-width: 0;
   flex: 1;
-  padding: var(--sp-2);
+  /* --sp-row/--sp-2: the row padding the thread rows below it use, minus the
+     leading inset the chevron already supplies. A uniform --sp-2 box made the
+     folder row taller on the sides than the rows it heads. */
+  padding: var(--sp-row) var(--sp-2);
   border-radius: var(--r-2);
   text-align: left;
 }
@@ -342,8 +365,12 @@
   align-items: stretch;
   width: 100%;
   /* .list-virtual supplies content-visibility; only the reserved height is
-     row-specific — a full row is 2×--sp-row padding + a 15px title line +
-     a 13px meta line (~57px). Nested rows reserve their own size below. */
+     row-specific. Rows are no longer one height: a row with status to speak
+     keeps its meta line (~57px), a settled one collapses to the single-line
+     floor (~36px). `auto` means this length is only the guess before first
+     render — the browser remembers each row's real size after that — so it is
+     set to the taller case, which reserves rather than under-reserves.
+     Nested rows reserve their own size below. */
   contain-intrinsic-size: auto 57px;
   border: 0;
   border-radius: var(--r-2);
@@ -360,9 +387,11 @@
   align-items: center;
   flex: 1;
   min-width: 0;
-  /* Full rows size to their two lines; the floor keeps a meta-less row
-     (no agents, no status, not offline) at a deliberate one-line height
-     rather than collapsing against the two-line rows around it. */
+  /* Full rows size to their content. The floor is what a single-line row
+     settles at — a settled thread drops its meta line entirely (see
+     threadRowMeta in lib/threads.ts), so this is now the common case rather
+     than the edge one, and it keeps those rows from collapsing tighter than
+     the tap target the rail needs. */
   min-height: calc(var(--sp-row) * 2 + var(--sp-5));
   /* Geometry beats the Button base utilities: h-(--control-h) would pin the
      row at 40px and clip the meta line (the same override
@@ -455,7 +484,9 @@
 
 /* Who has worked the thread, as a cluster of agent marks. Decorative — the
    running agent is named in the status text and the full set reads from the
-   cluster's tooltip — so the marks stay ink-3 and out of the hue budget. */
+   cluster's tooltip — so the marks stay ink-3 and out of the hue budget.
+   Lives in the meta line on a row that has status, and on the title line on a
+   settled one, which is why it carries no positional geometry of its own. */
 .conversation-agents {
   display: inline-flex;
   flex: none;
@@ -482,6 +513,13 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
+}
+
+/* The cluster inlined onto the title line holds its size; the name is what
+   ellipsizes when the rail is narrow. Without this the marks compressed to
+   slivers before a long title gave up a single character. */
+.conversation-name > .conversation-agents {
+  flex: none;
 }
 
 .conversation-name strong {

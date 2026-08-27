@@ -9,6 +9,7 @@ import {
   pickActiveThreadSession,
   sessionAgents,
   threadLabel,
+  threadRowMeta,
   upsertThreadSession,
 } from "../src/lib/threads.js";
 import {
@@ -398,5 +399,48 @@ describe("adaptive composer contract", () => {
 
     assert.doesNotMatch(composer, /ModeToggle|composerMode|setComposerMode/);
     assert.doesNotMatch(handoff, /handoffMode|setHandoffMode|modeOptions/);
+  });
+});
+
+/* A full thread row's second line exists to carry status. A settled thread
+   deliberately says nothing about status (the group header above it already
+   reads "idle"), which left the line holding only the decorative agent
+   cluster — 16px of row height for one ornamental glyph, on the majority of
+   rows in a long list. */
+describe("threadRowMeta", () => {
+  it("keeps the second line for a row that has status to speak", () => {
+    assert.deepEqual(
+      threadRowMeta({ layout: "full", hasStatus: true, agentCount: 2 }),
+      { subline: true, inlineAgents: false },
+    );
+  });
+
+  it("drops the second line and inlines the marks for a settled row", () => {
+    assert.deepEqual(
+      threadRowMeta({ layout: "full", hasStatus: false, agentCount: 2 }),
+      { subline: false, inlineAgents: true },
+    );
+  });
+
+  // Nothing to inline, nothing to line-break for: the row is its title.
+  it("collapses a settled row that no agent has touched", () => {
+    assert.deepEqual(
+      threadRowMeta({ layout: "full", hasStatus: false, agentCount: 0 }),
+      { subline: false, inlineAgents: false },
+    );
+  });
+
+  /* Nested rows are single-line by construction — they carry their own state
+     pip because the flat in-project list has no group headers, and adding
+     marks would undo the density that layout exists for. */
+  it("leaves nested rows single-line whatever their state", () => {
+    assert.deepEqual(
+      threadRowMeta({ layout: "nested", hasStatus: true, agentCount: 3 }),
+      { subline: false, inlineAgents: false },
+    );
+    assert.deepEqual(
+      threadRowMeta({ layout: "nested", hasStatus: false, agentCount: 3 }),
+      { subline: false, inlineAgents: false },
+    );
   });
 });

@@ -9,6 +9,7 @@
  */
 
 import type { ProjectRecord } from "../types.js";
+import type { ProjectCollectionStatus } from "./projectPage.js";
 
 export const projectExpansionKey = "relay-web.projectExpansion";
 
@@ -108,4 +109,32 @@ export function projectEmptyKey(
 ): "project.no_matching_threads" | null {
   if (threadCount > 0) return null;
   return hasQuery ? "project.no_matching_threads" : null;
+}
+
+export type ProjectDirectoryState = "loading" | "error" | "empty" | "filtered-empty" | "ready";
+
+/** What the projects rail should show in place of its folders.
+ *
+ *  The rail lists the same collection the project detail pane resolves through
+ *  resolveProjectOverviewState, and that pane already separates loading from
+ *  error from not-found. The rail used to fold all three into "No projects yet
+ *  · Create project", so a slow or failed fetch read as an empty account and
+ *  invited the user to create a project they might already own.
+ *
+ *  Existing folders win over every non-ready status on purpose: the projects
+ *  query refetches on a poll interval, so a populated rail re-enters "loading"
+ *  regularly and blanking it to a spinner each time would be its own defect. */
+export function projectDirectoryState(
+  { projectCount, collectionStatus, hasQuery }: {
+    projectCount: number;
+    collectionStatus: ProjectCollectionStatus;
+    hasQuery: boolean;
+  },
+): ProjectDirectoryState {
+  if (projectCount > 0) return "ready";
+  if (collectionStatus === "loading") return "loading";
+  // A failure outranks the search explanation — the query did not empty the
+  // list, the request did, and saying "no matches" would blame the wrong thing.
+  if (collectionStatus === "error") return "error";
+  return hasQuery ? "filtered-empty" : "empty";
 }

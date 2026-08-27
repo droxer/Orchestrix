@@ -1,7 +1,7 @@
 import { ActionEdit, ActionRemove, NodeOffline } from "./icons";
 import { useTranslation } from "react-i18next";
 import type { RelaySession } from "../types";
-import { canDeleteThread, sessionAgents, threadLabel, type ThreadItem } from "../lib/threads";
+import { canDeleteThread, sessionAgents, threadLabel, threadRowMeta, type ThreadItem } from "../lib/threads";
 import { agentLabel } from "../lib/plan";
 import { AgentMark } from "./AgentMark";
 import { Button } from "@/components/ui/button";
@@ -88,7 +88,19 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose, tone, l
   // in the status text, and the full set reads from the title tooltip.
   const agents = sessionAgents(session);
   const agentsTitle = agents.map(agentLabel).join(", ");
-  const hasMeta = Boolean(status) || agents.length > 0;
+  // Where the cluster goes, and whether the row earns a second line at all.
+  const { subline, inlineAgents } = threadRowMeta({
+    layout,
+    hasStatus: Boolean(status),
+    agentCount: agents.length,
+  });
+  const agentCluster = agents.length > 0 ? (
+    <span className="conversation-agents" title={agentsTitle} aria-hidden="true">
+      {agents.map((agent) => (
+        <AgentMark key={agent} agent={agent} size={12} />
+      ))}
+    </span>
+  ) : null;
 
   function handleClose() {
     onClose?.(session.id);
@@ -131,6 +143,10 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose, tone, l
                   property of the thread itself, and the name line survives
                   the hover swap that hides the timestamp. */}
               {offlineMark}
+              {/* A settled row has no status line to hang the marks under, so
+                  they ride here rather than keeping a second line alive for
+                  one decorative glyph. */}
+              {inlineAgents ? agentCluster : null}
             </span>
             {stamp ? (
               <span className="conversation-stamp tnum">
@@ -138,21 +154,13 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose, tone, l
               </span>
             ) : null}
           </span>
-          {layout === "full" && hasMeta ? (
+          {subline && status ? (
             <span className="conversation-subline">
-              {status ? (
-                <span className="conversation-status" data-tone={status.tone}>
-                  <span className="conversation-state-dot" data-tone={status.tone} aria-hidden="true" />
-                  <span>{status.text}</span>
-                </span>
-              ) : null}
-              {agents.length > 0 ? (
-                <span className="conversation-agents" title={agentsTitle} aria-hidden="true">
-                  {agents.map((agent) => (
-                    <AgentMark key={agent} agent={agent} size={12} />
-                  ))}
-                </span>
-              ) : null}
+              <span className="conversation-status" data-tone={status.tone}>
+                <span className="conversation-state-dot" data-tone={status.tone} aria-hidden="true" />
+                <span>{status.text}</span>
+              </span>
+              {agentCluster}
             </span>
           ) : null}
         </span>

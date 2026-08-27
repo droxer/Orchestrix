@@ -17,14 +17,7 @@ import { TeamDrawer } from "./admin/TeamDrawer";
 import { TeamWorkspacePage } from "./TeamWorkspacePage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { SearchInput } from "@/components/ui/search-input";
 
 export function TeamsPage({
   currentUser,
@@ -45,10 +38,22 @@ export function TeamsPage({
     (value) => value === "create",
     (value) => value ? "create" : null,
   );
+  const [query, setQuery] = useUrlSearchState("q", "", (value) => value ?? "", (value) => value || null);
   const sortedTeams = useMemo(
     () => [...teams].sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" })),
     [teams],
   );
+  // Same search contract as the agent roster and the thread rail: a name
+  // match, plus the roster line the row already prints, so what you can read
+  // on a row is what you can search for.
+  const visibleTeams = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return sortedTeams;
+    return sortedTeams.filter((team) => [
+      team.name,
+      ...team.members.map((member) => member.displayName),
+    ].join(" ").toLowerCase().includes(normalized));
+  }, [query, sortedTeams]);
   const loading = isFetching && teams.length === 0;
   const selectedTeam = selectedTeamForWorkspace(sortedTeams, teamId);
   const selectedRowRef = useRef<HTMLLIElement>(null);
@@ -85,47 +90,62 @@ export function TeamsPage({
           )}
         />
 
+        {/* The shared filter band every list rail carries (inputs.css), so a
+            roster is searched the same way wherever you are. */}
+        <div className="list-filter-bar">
+          <SearchInput
+            className="list-filter-search"
+            iconSize={14}
+            label={t("teams.search_label")}
+            name="teams-query"
+            value={query}
+            placeholder={t("teams.search_placeholder")}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
+
         <div className="teams-page-body">
           {loading ? (
             <div className="route-loading" role="status" aria-live="polite">{t("admin.loading")}</div>
-          ) : sortedTeams.length === 0 ? (
-            <RelayEmptyState title={t("teams.empty_title")} body={t("teams.empty_body")} />
+          ) : visibleTeams.length === 0 ? (
+            <RelayEmptyState
+              title={teams.length === 0 ? t("teams.empty_title") : t("teams.empty_filtered_title")}
+              body={teams.length === 0 ? t("teams.empty_body") : t("teams.empty_filtered_body")}
+            />
           ) : (
-            <Table
-              className="teams-table"
-              columns="minmax(0, 1fr) auto"
-              aria-label={t("teams.title")}
-              // A roster table is a dense list surface: names drop to 15px and
-              // the member sub-line to 13px, matching the agent roster rail.
-              data-density="compact"
-            >
-              <TableHeader>
-                <TableHead>{t("teams.name")}</TableHead>
-                <TableHead className="text-right">{t("teams.col_status")}</TableHead>
-              </TableHeader>
-              <TableBody render={<ul className="teams-list" />}>
-                {sortedTeams.map((team) => {
-                  // Lead first, then the rest of the crew. Listing every member
-                  // after the lead printed the lead's name twice on every row.
-                  const supportNames = team.members
-                    .filter((member) => member.id !== team.leadAgentId)
-                    .map((member) => member.displayName)
-                    .join(", ");
-                  const roster = team.lead?.displayName
-                    ? [team.lead.displayName, supportNames].filter(Boolean).join(" · ")
-                    : supportNames || t("teams.no_members");
-                  return (
-                    <TableRow
-                      key={team.id}
-                      render={<li ref={team.id === selectedTeam?.id ? selectedRowRef : undefined} />}
-                      className="teams-list-row"
-                      data-selected={team.id === selectedTeam?.id ? "true" : "false"}
-                    >
+            /* A roster rail, not a table: no column header, and rows are
+               inset rounded objects separated by a 2px gutter — the same
+               list language as .agents-roster-list and .conversation-rows.
+               The two facts a row carried under column headers (name, status)
+               read positionally here, as they do on every other rail. */
+            /* Compact density: a roster rail is a list layout, so names sit
+               one rung down (16 → 15px) against their 13px meta — scoped to
+               the list, as on the agent roster, so the detail pane beside it
+               keeps its record density. */
+            <ul className="teams-list" data-density="compact" aria-label={t("teams.title")}>
+              {visibleTeams.map((team) => {
+                // Lead first, then the rest of the crew. Listing every member
+                // after the lead printed the lead's name twice on every row.
+                const supportNames = team.members
+                  .filter((member) => member.id !== team.leadAgentId)
+                  .map((member) => member.displayName)
+                  .join(", ");
+                const roster = team.lead?.displayName
+                  ? [team.lead.displayName, supportNames].filter(Boolean).join(" · ")
+                  : supportNames || t("teams.no_members");
+                const selected = team.id === selectedTeam?.id;
+                return (
+                  <li
+                    key={team.id}
+                    className="list-virtual"
+                    ref={selected ? selectedRowRef : undefined}
+                  >
+                    <article className="teams-list-row" data-selected={selected ? "true" : "false"}>
                       <Button
                         variant="ghost"
                         type="button"
                         className="teams-list-row-select"
-                        aria-current={team.id === selectedTeam?.id ? "page" : undefined}
+                        aria-current={selected ? "page" : undefined}
                         onClick={() => onSelectTeam(team.id)}
                       >
                         <span className="teams-list-mark" aria-hidden="true">
@@ -135,11 +155,11 @@ export function TeamsPage({
                             fallback={<IdentityMark kind="team" />}
                           />
                         </span>
-                        <TableCell render={<span />} className="teams-list-identity">
+                        <span className="teams-list-identity">
                           <span className="teams-list-title">{team.name}</span>
                           <small className="teams-list-sub">{roster}</small>
-                        </TableCell>
-                        <TableCell render={<span />} className="teams-list-status">
+                        </span>
+                        <span className="teams-list-status">
                           {/* "ready" is the default healthy state and stays
                               implicit; other roster states get named. */}
                           {!team.enabled ? (
@@ -147,13 +167,13 @@ export function TeamsPage({
                           ) : teamAvailability(team) !== "ready" ? (
                             <StatusPill value={teamAvailability(team)} />
                           ) : null}
-                        </TableCell>
+                        </span>
                       </Button>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                    </article>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
       </div>
