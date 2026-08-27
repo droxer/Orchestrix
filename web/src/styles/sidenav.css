@@ -163,7 +163,7 @@
   min-width: 188px;
   padding: var(--sp-2);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
+  border-radius: var(--r-3);
   background: var(--surface-0);
   box-shadow: var(--shadow-2);
   transform: translateY(-100%);
@@ -180,7 +180,7 @@
   min-height: 38px;
   padding: 0 var(--sp-3);
   border: 1px solid transparent;
-  border-radius: var(--r-1);
+  border-radius: var(--r-full);
   background: transparent;
   color: var(--ink-1);
   font: var(--type-label);
@@ -215,7 +215,7 @@
   min-width: 188px;
   padding: var(--sp-2);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
+  border-radius: var(--r-3);
   background: var(--surface-0);
   box-shadow: var(--shadow-2);
   transform: translateY(-100%);

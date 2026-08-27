@@ -113,7 +113,7 @@
   padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
   border: 1px solid var(--line-1);
   border-left: 3px solid var(--info);
-  border-radius: var(--r-2);
+  border-radius: var(--r-3);
   background: var(--surface-3);
   color: var(--ink-1);
   box-shadow: var(--shadow-2);

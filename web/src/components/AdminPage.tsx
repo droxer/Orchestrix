@@ -460,7 +460,7 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
                 variant="ghost"
                 // The shared list-header create affordance — a plain ghost
                 // plus; the header's view toggle already names what is being
-                // added, so a labelled plate restated it at amber volume.
+                // added, so a labelled plate restated it at cobalt volume.
                 className="page-header-icon-action"
                 onClick={() => setAddEmployeeOpen(true)}
                 aria-label={t("admin.v2.add_employee_cta")}

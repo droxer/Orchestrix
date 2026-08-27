@@ -96,9 +96,9 @@ export function EmployeeCard({
             <span className={`tnum ${isOverLocalComputerLimit(member) ? "" : "tone-muted"}`}>
               {localComputerUsageLabel(member)}
             </span>
-            {/* Hue can't say "over" — yellow means action/live and the status
-                tones are an olive brightness hierarchy — so the pill carries a
-                word, like every other state on this card. */}
+            {/* Hue alone can't say "over" — a red count and a red pill read
+                the same at a glance — so the pill carries a word, like every
+                other state on this card. */}
             {isOverLocalComputerLimit(member) ? (
               <TonePill
                 tone="bad"

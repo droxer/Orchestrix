@@ -1,5 +1,5 @@
 // Field-notes marginalia — the Relay double-chevron » sketched in the
-// notebook margin: pencil-olive linework, dashed construction lines, small
+// notebook margin: neutral-ink linework, dashed construction lines, small
 // annotation arrows and ticks. This is the identity's entire decorative
 // layer, so the rules are strict:
 //

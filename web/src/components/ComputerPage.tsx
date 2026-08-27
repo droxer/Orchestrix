@@ -88,7 +88,7 @@ export function ComputerPage({
 
   const connectCta = (size: "default" | "sm", variant: "default" | "outline" = "default") => (
     <div className="computer-connect-cta">
-      {/* The header CTA takes the quiet outline tier — the amber fill is
+      {/* The header CTA takes the quiet outline tier — the cobalt fill is
           reserved for the empty state, where connecting is the page's one
           move. The usage readout (2/3) and limit reason stay attached to the
           action either way. */}

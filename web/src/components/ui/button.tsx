@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import { NavRefresh } from "@/components/icons"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow,transform] duration-(--t-fast) ease-(--ease) outline-none select-none focus-visible:border-ring focus-visible:[outline:var(--focus-outline)] focus-visible:[outline-offset:var(--focus-offset)] active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:[outline:var(--focus-outline-danger)] aria-invalid:[outline-offset:var(--focus-offset)] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-full border border-transparent bg-clip-padding text-xs font-bold whitespace-nowrap transition-[color,background-color,border-color,box-shadow,transform] duration-(--t-fast) ease-(--ease) outline-none select-none focus-visible:border-ring focus-visible:[outline:var(--focus-outline)] focus-visible:[outline-offset:var(--focus-offset)] active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:[outline:var(--focus-outline-danger)] aria-invalid:[outline-offset:var(--focus-offset)] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -27,59 +27,57 @@ const buttonVariants = cva(
           "bg-(--control-fill) text-secondary-foreground hover:bg-(--control-fill-hover) aria-expanded:bg-(--control-fill-hover) aria-expanded:text-secondary-foreground",
         ghost:
           "hover:bg-(--control-fill-hover) hover:text-foreground aria-expanded:bg-(--control-fill-hover) aria-expanded:text-foreground",
-        /* Destructive is encoded by SHAPE, not hue. Fieldnotes keeps status
-           tones in the olive brightness hierarchy — --err is the loudest ink
-           step, not a colour of its own — so a tinted wash would read as
-           emphasis, not danger.
-           Danger therefore reads through three non-chromatic signals: a visible
-           hairline ring where ghost has none, --err ink (the loudest step
-           above inherited body ink), and a full contrast inversion on hover/focus.
-           Same substitution StatusPill makes for its `bad` tone. */
+        /* Destructive reads in the source system's critical red: a hairline ring
+           where ghost has none, --err ink, and a full inversion to the red
+           fill with --on-err text on hover/focus. The shape signal (the ring)
+           is kept alongside the hue so the variant survives forced-colors
+           mode, where the red is dropped. */
         destructive:
           "border-destructive/45 text-destructive hover:border-destructive hover:bg-destructive hover:text-destructive-foreground focus-visible:border-destructive focus-visible:[outline:var(--focus-outline-danger)] focus-visible:[outline-offset:var(--focus-offset)]",
-        /* Circular icon-only action — the retired thread.css icon recipe:
+        /* Circular icon-only action — the source system's 40px button-icon-circular:
            ink-3 idle; a control wash + line-2 + ink-1 on hover. Always paired
-           with the round `icon-r` (40px) / `icon-r-sm` (28px) sizes. `tinted`
-           swaps the hover to an --action wash; a `danger` className re-tints
-           it to --err. */
+           with the round `icon-r` (--control-h) / `icon-r-sm` (28px) sizes.
+           `tinted` swaps the hover to an --action wash; a `danger` className
+           re-tints it to --err. */
         icon: "text-(--ink-3) hover:border-(--line-2) hover:bg-(--control-fill-hover) hover:text-(--ink-1)",
       },
       size: {
+        /* The source system's pill padding is `14px 30px` around a 14px label; at
+           Relay's 44px --control-h the vertical half is the height, and the
+           inline half rounds to the 24px step on the grid. */
         default:
-          "h-(--control-h) gap-1.5 px-3 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        /* The text tier climbs with the size tier: xs 11px → sm 13px →
-           default 14px (the base `text-sm`). `sm` previously carried an
-           arbitrary text-[0.8rem] (11.2px), which put it BELOW xs's 13px and
-           inverted the ladder. */
-        xs: "h-6 gap-1 rounded-md px-2 text-micro in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1 rounded-md px-3 text-xs in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5",
-        /* One step ABOVE `default`: 44px against a 40px --control-h, which
-           also clears --touch-target on fine pointers. */
-        lg: "h-11 gap-1.5 px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
+          "h-(--control-h) gap-1.5 px-6 has-data-[icon=inline-end]:pr-4 has-data-[icon=inline-start]:pl-4",
+        /* The text tier climbs with the size tier: xs 12px (caption) → sm and
+           default 14px (the source system's button-md, the base `text-xs`). Every
+           tier keeps the pill — "buttons are NEVER squared in Meta's system",
+           and that holds for the dense in-row tiers too. */
+        xs: "h-6 gap-1 rounded-full px-3 text-micro in-data-[slot=button-group]:rounded-full has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg:not([class*='size-'])]:size-3",
+        sm: "h-7 gap-1 rounded-full px-4 text-xs in-data-[slot=button-group]:rounded-full has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
+        /* One step ABOVE `default`: 48px against the 44px --control-h, for
+           hero and dual-CTA pairs where the pill carries a marketing weight. */
+        lg: "h-12 gap-2 px-7 has-data-[icon=inline-end]:pr-5 has-data-[icon=inline-start]:pl-5",
         /* Drawer/footer call-to-action: full control height with stronger
            label typography. Replaces the old `.adm-form-actions` descendant
            override so footer buttons are styled explicitly.
 
-           Shares `default`'s 14px text tier, and differs from it by WEIGHT
-           (600 vs 500) and padding, not by size. It used to carry text-2xs
-           (13px), which put the drawer's commit action one step BELOW an
-           ordinary button at the same 40px height — the ladder inversion the
-           note above `xs` warns about, in the one slot where the label matters
-           most. Weight is the right channel for emphasis here; shrinking the
-           type is not. */
-        cta: "h-(--control-h) gap-1.5 px-4 font-semibold",
+           Shares `default`'s 14px/700 label and differs from it by padding
+           alone — in this system the button label is ALREADY the bold tier
+           (the source system's button-md is 14px/700), so a commit action cannot
+           emphasise itself by getting heavier. It leads through the cobalt
+           fill of the `default` variant and a wider pill. */
+        cta: "h-(--control-h) gap-2 px-7",
         /* Square counterpart of `default`: the toolbar refresh buttons sit
            directly beside default-size buttons, so the icon tier tracks
            --control-h instead of a fixed 32px that rendered 8px short.
            `icon-sm`/`icon-xs` remain the dense tiers for in-row chrome. */
         icon: "size-(--control-h)",
         "icon-xs":
-          "size-6 rounded-md in-data-[slot=button-group]:rounded-md [&_svg:not([class*='size-'])]:size-3",
+          "size-6 rounded-full in-data-[slot=button-group]:rounded-full [&_svg:not([class*='size-'])]:size-3",
         "icon-sm":
-          "size-7 rounded-md in-data-[slot=button-group]:rounded-md",
-        "icon-lg": "size-11",
-        /* Round footprints for the `icon` variant: 40px tracks --control-h;
-           28px is the dense card-footer/toolbar tier. */
+          "size-7 rounded-full in-data-[slot=button-group]:rounded-full",
+        "icon-lg": "size-12",
+        /* Round footprints for the `icon` variant: --control-h tracks the
+           44px pill; 28px is the dense card-footer/toolbar tier. */
         "icon-r": "size-(--control-h) rounded-full",
         "icon-r-sm": "size-7 rounded-full",
       },

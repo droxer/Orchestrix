@@ -149,13 +149,16 @@ This is the better steady state once you have a domain. Requires DNS.
    | `RELAY_CORS_ALLOW_ORIGIN_REGEX` | `https://relay-web-[a-z0-9-]+\.vercel\.app` | **Option B only**, if you want Vercel preview deployments to reach the API. |
    | `RELAY_SESSION_COOKIE_DOMAIN` | `.example.com` | **Option B only.** Shares the cookie across `app.` and `api.`. |
    | `RELAY_SESSION_COOKIE_SAMESITE` | `lax` | Default. Only set to `none` for the unrelated-domains case. |
+   | `RELAY_TRUST_PROXY_HEADERS` | `1` | Trust forwarded scheme/client headers from the deployment edge. |
+   | `RELAY_FORWARDED_ALLOW_IPS` | comma-separated proxy IPs/CIDRs | Required with proxy trust. Use the socket-peer addresses or networks assigned to your edge; `*` is rejected. |
    | `RELAY_STREAM_MAX_SECONDS` | `240` | **Option A only.** See [SSE through a proxy](#sse-through-a-proxy). |
    | `RELAY_LOG_LEVEL` | `INFO` | |
 
-   TLS terminates at Railway's edge, so the app sees plain HTTP. Relay trusts
-   `X-Forwarded-Proto` by default (`RELAY_TRUST_PROXY_HEADERS=1`) and marks
-   session cookies `Secure` from it. If you front the backend with something
-   that does not send that header, set `RELAY_FORCE_SECURE_COOKIES=1`.
+   TLS terminates at Railway's edge, so the app sees plain HTTP. Enable proxy
+   headers and restrict them to the edge's socket-peer IPs/CIDRs; Relay then
+   marks session cookies `Secure` from `X-Forwarded-Proto`. If you cannot obtain
+   a stable trusted-proxy range, leave proxy headers disabled and set
+   `RELAY_FORCE_SECURE_COOKIES=1` instead.
 
 5. **Attach a volume at `/data`.** Profile images and managed-node records are
    the operational state that does not live in Postgres, and a container
@@ -295,7 +298,9 @@ the backend serves at `/`. See [local-development.md](local-development.md).
 | `RELAY_SESSION_COOKIE_DOMAIN` | unset (host-only) | Cookie `Domain`, e.g. `.example.com`. |
 | `RELAY_SESSION_COOKIE_SAMESITE` | `lax` | `lax`, `strict`, or `none`. `none` forces `Secure`. |
 | `RELAY_FORCE_SECURE_COOKIES` | `0` | Mark cookies `Secure` regardless of request scheme. |
-| `RELAY_TRUST_PROXY_HEADERS` | `1` | Honor `X-Forwarded-Proto`/`X-Forwarded-For`. |
+| `RELAY_TRUST_PROXY_HEADERS` | `0` | Honor trusted `X-Forwarded-Proto`/`X-Forwarded-For` values. |
+| `RELAY_FORWARDED_ALLOW_IPS` | unset | Required comma-separated IP/CIDR allowlist when proxy headers are enabled; `*` is rejected. |
+| `RELAY_MAX_JSON_BODY_BYTES` | `4194304` | Maximum JSON request body size before a `413` response. |
 | `RELAY_STREAM_MAX_SECONDS` | `1800` | Cap on one SSE connection. |
 | `RELAY_ADMIN_TOKEN` | unset | One-time admin bootstrap token. |
 | `RELAY_DATA_DIR` | `.relay` | Non-Postgres operational state; `/data` in the image. |

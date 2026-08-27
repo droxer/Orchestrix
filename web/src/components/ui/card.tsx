@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 /* Card — shadcn's slot vocabulary (card / card-header / card-title /
-   card-description / card-action / card-content / card-footer) on Fieldnotes'
+   card-description / card-action / card-content / card-footer) on the system's
    flat elevation model.
 
    Two deliberate departures from upstream shadcn:
@@ -88,13 +88,13 @@ function CardTitle({
     defaultTagName: "h3",
     props: mergeProps<"h3">(
       {
-        // Card title — DESIGN.md's heading-sm-mixed tier (18px / 600 / solid),
+        // Card title — the source system's subtitle-lg tier (18px / 700 / solid),
         // not the display tier: only the 24px rung tracks tight, and
         // font-display aliases the sans the card already inherits. leading-tight
         // (1.15) is single-line card chrome; palette.css has no 1.56 token and
         // a wrapped card title does not need document leading.
         className: cn(
-          "m-0 text-lg leading-tight font-semibold tracking-(--track-0) text-ink",
+          "m-0 text-lg leading-tight font-bold tracking-(--track-0) text-ink",
           className
         ),
       },

@@ -97,9 +97,7 @@ class ServerTimingMiddleware:
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
-    async def __call__(
-        self, scope: Scope, receive: Receive, send: Send
-    ) -> None:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -126,9 +124,7 @@ class CookieRequestGuardMiddleware:
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
-    async def __call__(
-        self, scope: Scope, receive: Receive, send: Send
-    ) -> None:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http" or scope.get("method") not in self._unsafe_methods:
             await self.app(scope, receive, send)
             return
@@ -158,9 +154,7 @@ class CookieRequestGuardMiddleware:
         await self.app(scope, receive, send)
 
 
-def _request_origin_allowed(
-    scope: Scope, headers: dict[str, str], origin: str
-) -> bool:
+def _request_origin_allowed(scope: Scope, headers: dict[str, str], origin: str) -> bool:
     host = headers.get("host", "")
     if host and origin == f"{scope.get('scheme', 'http')}://{host}":
         return True
@@ -176,9 +170,7 @@ class SecurityHeadersMiddleware:
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
-    async def __call__(
-        self, scope: Scope, receive: Receive, send: Send
-    ) -> None:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -276,6 +268,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     except Exception as error:  # noqa: BLE001 - migration failure must not block startup
         logger.warning("Agent computer-id migration deferred", error=str(error))
 
+    today = scheduler_today_from_env()
     scheduler = task_scheduler_from_env(
         task_store=task_store,
         registry=registry,
@@ -284,6 +277,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
         project_store=project_store,
         managed_node_store=managed_node_store,
         org_settings_store=org_settings_store,
+        today=today,
     )
 
     @asynccontextmanager
@@ -338,6 +332,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.state.control_plane_notifier = control_plane_notifier
     app.state.notification_bridge = notification_bridge
     app.state.task_scheduler = scheduler
+    app.state.today = today
     app.state.control_panel_version = CONTROL_PANEL_VERSION
 
     # Platform health checks run before the app has a database session and must
@@ -513,6 +508,7 @@ def task_scheduler_from_env(
     project_store: Any,
     managed_node_store: Any | None = None,
     org_settings_store: Any | None = None,
+    today: Callable[[], date] | None = None,
 ) -> TaskScheduler | None:
     enabled = os.environ.get("RELAY_TASK_SCHEDULER_ENABLED", "1").strip().lower()
     if enabled in ("0", "false", "no", "off"):
@@ -531,7 +527,7 @@ def task_scheduler_from_env(
         max_dispatches_per_tick=max(
             1, int(os.environ.get("RELAY_TASK_SCHEDULER_MAX_DISPATCHES", "5"))
         ),
-        today=scheduler_today_from_env(),
+        today=today or scheduler_today_from_env(),
     )
 
 

@@ -14,7 +14,6 @@ from .core.logging_config import setup_logging
 from .core.storage_config import database_url_from_env
 from .persistence.session_import import migrate_local_sessions
 from .persistence.session_store import DatabaseSessionStore
-from .security.auth import get_admin_token
 
 load_backend_env()
 
@@ -49,8 +48,8 @@ def main(argv: list[str] | None = None) -> None:
     auth_store = app.state.auth_store
     if not auth_store.has_users():
         logger.info(
-            "No users yet. Bootstrap the first admin via /api/v1/auth/bootstrap with admin token: {}",
-            get_admin_token(),
+            "No users yet. Bootstrap the first admin via /api/v1/auth/bootstrap "
+            "using the persisted admin token.",
         )
     logger.info("Relay backend listening on http://{}:{}", args.host, args.port)
     logger.info("Relay backend control panel: http://{}:{}/admin", args.host, args.port)
@@ -65,5 +64,7 @@ def main(argv: list[str] | None = None) -> None:
         # client: without this every request reads as plain http from the
         # proxy's address, and session cookies would never be marked Secure.
         proxy_headers=trust_proxy,
-        forwarded_allow_ips="*" if trust_proxy else None,
+        forwarded_allow_ips=(
+            deploy_config.forwarded_allow_ips() if trust_proxy else None
+        ),
     )

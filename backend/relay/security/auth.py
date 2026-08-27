@@ -5,7 +5,9 @@ import os
 import secrets
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import RLock
 from typing import Any, Literal
+from uuid import UUID, uuid5
 
 from fastapi import HTTPException, Request
 from loguru import logger
@@ -21,6 +23,7 @@ from sqlalchemy import (
     delete,
     insert,
     select,
+    text,
     update,
 )
 from sqlalchemy.exc import IntegrityError
@@ -52,6 +55,33 @@ USER_THEMES: tuple[UserTheme, ...] = ("light", "dark", "system")
 USER_LANGUAGES: tuple[UserLanguage, ...] = ("en", "zh-CN", "zh-TW")
 DEFAULT_USER_THEME: UserTheme = "system"
 DEFAULT_USER_LANGUAGE: UserLanguage = "en"
+_AUTH_LOCKS: dict[str, RLock] = {}
+_AUTH_LOCKS_GUARD = RLock()
+_BOOTSTRAP_ADVISORY_LOCK_ID = 7_362_959_917_925_924_673
+_RELAY_ENTITY_ID_NAMESPACE = UUID("c8fa2fd5-5eca-4cc6-b763-a5ae1a57ff63")
+
+
+def _shared_auth_lock(key: str) -> RLock:
+    with _AUTH_LOCKS_GUARD:
+        return _AUTH_LOCKS.setdefault(key, RLock())
+
+
+def normalize_database_id(value: str | None) -> str | None:
+    """Return a canonical UUID or None for legacy human-readable identifiers."""
+    if not value or not value.strip():
+        return None
+    try:
+        return str(UUID(value.strip()))
+    except ValueError:
+        return None
+
+
+def database_id_for_reference(value: str, entity_kind: str) -> str:
+    """Map a UUID or legacy human handle to one stable UUID-backed identity."""
+    normalized = normalize_database_id(value)
+    if normalized:
+        return normalized
+    return str(uuid5(_RELAY_ENTITY_ID_NAMESPACE, f"{entity_kind}:{value.strip()}"))
 
 
 def hash_password(password: str) -> str:
@@ -152,6 +182,7 @@ class UserAuthStore:
         self.sessions_path = self.auth_dir / "sessions.json"
         self.deleted_employees_path = self.auth_dir / "deleted_employees.json"
         self.session_ttl_seconds = session_ttl_seconds
+        self._lock = _shared_auth_lock(f"local:{self.auth_dir.resolve()}")
 
     def deleted_employee_ids(self) -> set[str]:
         if not self.deleted_employees_path.exists():
@@ -271,11 +302,12 @@ class UserAuthStore:
             or not secrets.compare_digest(token, expected)
         ):
             raise HTTPException(401, "Invalid admin token.")
-        if self.has_users():
-            raise HTTPException(
-                409, "Bootstrap is only allowed before the first user is created."
-            )
-        return self.create_user(username, password, role="admin")
+        with self._lock:
+            if self.has_users():
+                raise HTTPException(
+                    409, "Bootstrap is only allowed before the first user is created."
+                )
+            return self.create_user(username, password, role="admin")
 
     def create_session(self, user_id: str) -> dict[str, Any]:
         token = new_session_token()
@@ -475,6 +507,7 @@ class DatabaseUserAuthStore:
     ):
         self.engine = shared_engine(database_url)
         self.session_ttl_seconds = session_ttl_seconds
+        self._bootstrap_lock = _shared_auth_lock(f"database:{self.engine.url}")
         if create_schema:
             create_all_tables(self.engine)
 
@@ -501,7 +534,11 @@ class DatabaseUserAuthStore:
             raise ValueError("password is required.")
         if role not in ("admin", "user"):
             raise ValueError("role must be admin or user.")
-        employee_id = employee_id.strip() if employee_id else new_database_id()
+        employee_id = (
+            database_id_for_reference(employee_id, "employee")
+            if employee_id
+            else new_database_id()
+        )
         display_name = display_name.strip() if display_name else username
         department_id = department_id.strip() if department_id else None
         department_name = department_name.strip() if department_name else None
@@ -605,14 +642,14 @@ class DatabaseUserAuthStore:
         department_name: str | None = None,
         max_local_computers: int | None = None,
     ) -> dict[str, Any]:
-        employee_id = employee_id.strip()
-        if not employee_id:
+        requested_employee_id = employee_id.strip()
+        if not requested_employee_id:
             raise ValueError("employeeId is required.")
         with store_transaction(self.engine) as conn:
             return self._ensure_employee(
                 conn,
-                employee_id,
-                display_name=display_name,
+                database_id_for_reference(requested_employee_id, "employee"),
+                display_name=display_name or requested_employee_id,
                 email=email,
                 department_id=department_id,
                 department_name=department_name,
@@ -638,9 +675,7 @@ class DatabaseUserAuthStore:
         if not employee_id:
             raise ValueError("employeeId is required.")
         if clear_max_local_computers and max_local_computers is not None:
-            raise ValueError(
-                "maxLocalComputers cannot be both cleared and set."
-            )
+            raise ValueError("maxLocalComputers cannot be both cleared and set.")
         now = datetime.now(timezone.utc)
         patch: dict[str, Any] = {}
         if display_name is not None:
@@ -763,11 +798,17 @@ class DatabaseUserAuthStore:
             or not secrets.compare_digest(token, expected)
         ):
             raise HTTPException(401, "Invalid admin token.")
-        if self.has_users():
-            raise HTTPException(
-                409, "Bootstrap is only allowed before the first user is created."
-            )
-        return self.create_user(username, password, role="admin")
+        with self._bootstrap_lock, store_transaction(self.engine) as conn:
+            if self.engine.dialect.name == "postgresql":
+                conn.execute(
+                    text("SELECT pg_advisory_xact_lock(:lock_id)"),
+                    {"lock_id": _BOOTSTRAP_ADVISORY_LOCK_ID},
+                )
+            if conn.execute(select(self.users.c.id).limit(1)).first() is not None:
+                raise HTTPException(
+                    409, "Bootstrap is only allowed before the first user is created."
+                )
+            return self.create_user(username, password, role="admin")
 
     def create_session(self, user_id: str) -> dict[str, Any]:
         token = new_session_token()
@@ -878,8 +919,9 @@ class DatabaseUserAuthStore:
         name: str | None = None,
         parent_department_id: str | None = None,
     ) -> dict[str, Any]:
-        department_id = department_id.strip()
-        name = name.strip() if name else department_id
+        requested_department_id = department_id.strip()
+        department_id = database_id_for_reference(requested_department_id, "department")
+        name = name.strip() if name else requested_department_id
         parent_department_id = (
             parent_department_id.strip() if parent_department_id else None
         )
@@ -924,7 +966,7 @@ class DatabaseUserAuthStore:
             return row_to_department(row)
 
         department = {
-            "id": new_database_id(),
+            "id": department_id,
             "name": name,
             "parentDepartmentId": parent_department_pk,
             "createdAt": _format_iso(now),
@@ -942,7 +984,7 @@ class DatabaseUserAuthStore:
     def _ensure_employee(
         self,
         conn: Any,
-        employee_id: str,
+        employee_id: str | None,
         *,
         display_name: str | None = None,
         email: str | None = None,
@@ -958,13 +1000,16 @@ class DatabaseUserAuthStore:
             else None
         )
         department_pk = department["id"] if department else None
-        row = (
-            conn.execute(
-                select(self.employees).where(self.employees.c.id == employee_id)
+        employee_id = normalize_database_id(employee_id)
+        row = None
+        if employee_id:
+            row = (
+                conn.execute(
+                    select(self.employees).where(self.employees.c.id == employee_id)
+                )
+                .mappings()
+                .first()
             )
-            .mappings()
-            .first()
-        )
         if row:
             employee_pk = row["id"]
             patch: dict[str, Any] = {"updated_at": now}
@@ -999,7 +1044,7 @@ class DatabaseUserAuthStore:
             return row_to_employee(row)
 
         employee = {
-            "id": new_database_id(),
+            "id": employee_id or new_database_id(),
             "displayName": display_name or employee_id,
             "email": email,
             "departmentId": department_pk,

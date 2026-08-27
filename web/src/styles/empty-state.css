@@ -251,7 +251,7 @@ html[data-theme="dark"] .relay-bleed-mark {
 
 /* ── Marginalia ───────────────────────────────────────────────────────
    Field-notes vignettes (marginalia.tsx) sketched into the corner of an
-   empty state: pencil-olive strokes at low opacity, absolutely positioned
+   empty state: neutral ink strokes at low opacity, absolutely positioned
    so they never perturb layout, and hidden below the mobile tier where the
    measure is too narrow to host a margin. Strokes only — never --action /
    --live yellow, which is reserved for actionable and live work. */

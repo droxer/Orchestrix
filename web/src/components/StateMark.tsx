@@ -3,10 +3,10 @@ import { cn } from "@/lib/utils";
 /**
  * The shape half of Relay's state vocabulary.
  *
- * The palette is an olive brightness ramp with one hue (the action/live
- * yellow), so five or six states cannot be separated by colour alone —
- * `--err` resolves to the same loudest ink step as `--ink-1`. Brightness
- * therefore carries the *step* (loud → calm) and shape carries the *class*:
+ * Five or six states cannot be separated by colour alone even now that the
+ * status tones carry hue: at a 10px mark, a green and an amber dot are two
+ * dots. Colour therefore carries the *tone* (good → bad) and shape carries
+ * the *class*:
  *
  * - `solid`  — on track, nothing to say
  * - `live`   — an agent is working right now (the only `--live` surface here)

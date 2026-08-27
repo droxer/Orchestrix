@@ -168,7 +168,7 @@
 
 /* The list pages' one create affordance — a ghost icon button, never a text
    CTA: the header already says what the list is, so a labelled "New X" plate
-   restates it at amber volume. Born as the project rail's add button; now
+   restates it at cobalt volume. Born as the project rail's add button; now
    shared by threads, backlog, routines, agents, and teams so "new" looks
    identical on every list. Icon is always ActionAdd at 16px. */
 .page-header-icon-action {

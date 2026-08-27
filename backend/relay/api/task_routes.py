@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -154,7 +154,10 @@ def bool_field(body: dict[str, Any], key: str) -> bool | None:
 
 
 def routine_fields(
-    body: dict[str, Any], *, current: dict[str, Any] | None = None
+    body: dict[str, Any],
+    *,
+    current: dict[str, Any] | None = None,
+    calendar_date: date | None = None,
 ) -> dict[str, Any]:
     has_routine_input = any(
         key in body
@@ -212,7 +215,7 @@ def routine_fields(
             (current is None and not has_next_run_input) or cadence_changed or reenabled
         )
     ):
-        today = date.today()
+        today = calendar_date or datetime.now(timezone.utc).date()
         calculated_next_run = next_routine_date(today, resolved_cadence, today)
         next_run = calculated_next_run.isoformat() if calculated_next_run else None
     effective_next_run = (
@@ -252,7 +255,7 @@ async def start_routine_occurrence_on_ready_node(
         actor,
         agent=agent,
         assignments=assignments,
-        run_date=date.today(),
+        run_date=ctx.today(),
     )
 
 
@@ -265,7 +268,7 @@ def complete_linked_task_sessions(
             session = ctx.session_store.get_session(session_id)
         except (KeyError, FileNotFoundError):
             continue
-        except Exception:
+        except Exception:  # noqa: BLE001 - one unreadable linked session must not block the rest
             logger.warning(
                 "Unexpected error reading linked session",
                 session_id=session_id,
@@ -361,7 +364,7 @@ async def create_task(request: Request, ctx: AppContextDep) -> dict[str, Any]:
         raise HTTPException(400, "status is not a recognized task status.")
     if status == "assigned" and not (project or assigned_agent_id or assigned_team_id):
         raise HTTPException(400, "assigned status requires an agent or team.")
-    routine = routine_fields(body)
+    routine = routine_fields(body, calendar_date=ctx.today())
     if (
         routine.get("isRoutine")
         and not (project or assigned_agent_id or assigned_team_id)
@@ -481,7 +484,7 @@ async def update_task(
     if "status" in body and not status:
         raise HTTPException(400, "status is not a recognized task status.")
     due_date = date_field(body, "dueDate")
-    routine = routine_fields(body, current=current)
+    routine = routine_fields(body, current=current, calendar_date=ctx.today())
     assignee = (
         assignee_employee_id_for_task(actor, body, current.get("assigneeEmployeeId"))
         if "assigneeEmployeeId" in body or "assignee_employee_id" in body
@@ -599,8 +602,10 @@ async def update_task(
         ctx.session_store, current
     ):
         raise HTTPException(409, "task_execution_active")
-    if next_is_routine and next_routine_enabled and not (
-        current.get("projectId") or next_agent_id or next_team_id
+    if (
+        next_is_routine
+        and next_routine_enabled
+        and not (current.get("projectId") or next_agent_id or next_team_id)
     ):
         raise HTTPException(400, "An enabled routine requires an agent or team.")
     assignment_clear_requested = assignment_changed and not (
@@ -993,7 +998,7 @@ async def task_artifacts(
             session = ctx.session_store.get_session(session_id)
         except (KeyError, FileNotFoundError):
             continue  # A linked session may have been deleted; skip it.
-        except Exception:
+        except Exception:  # noqa: BLE001 - one unreadable linked session must not block the rest
             logger.warning(
                 "Unexpected error reading linked session for artifact aggregation",
                 session_id=session_id,

@@ -1,4 +1,4 @@
-# Relay Design — Fieldnotes
+# Relay Design — Meta Commerce
 
 <p align="center">
   <img src="../web/public/brand/relay-logo.svg" alt="Relay logo" width="360">
@@ -6,70 +6,76 @@
 
 ## Overview
 
-Relay's visual language is **Fieldnotes**: an operator's field notebook,
-rendered in software. It rests on one rule:
+Relay's visual language follows the Meta hardware-commerce system recorded in
+[Appendix — the source system](#appendix--the-source-system) at the end of this
+document. That appendix is the complete extracted spec (it replaces the
+`DESIGN.md` the analysis originally shipped as); everything above it is what
+Relay actually implements, and the two are meant to be read together. It rests
+on one rule:
 
-> **Relay is pencil on cream paper; the highlighter comes out for action and
-> for work in flight — and for nothing else.**
+> **A stark canvas carries the content; cobalt carries the action; every
+> button, tab, and badge is a pill.**
 
-A warm cream canvas, an olive ink ramp, status as a brightness hierarchy on
-dot/border/text only, two registers designed side by side — and exactly one
-saturated hue, highlighter yellow (`#f7a501`), shared by the primary action
-and by work an agent is doing *right now*. The system adapts the source
-analysis in `DESIGN.md` (cream canvas, olive ink, IBM Plex Sans, one yellow
-CTA) into a dual-register application identity. It supersedes the Phosphor
-identity (true-neutral monochrome + green `--live`); the migration rationale
-lives in `docs/superpowers/specs/2026-08-18-fieldnotes-identity-design.md`.
+A near-white cloud canvas with stark white cards, a cool ink ramp, the source
+system's semantic status hues, and one saturated action colour — cobalt `#0064e0` —
+worn only by things you can press. The system adapts the source analysis into
+a dual-register application identity. It supersedes the Fieldnotes identity
+(cream canvas, olive ink, one highlighter yellow), which in turn superseded
+Phosphor.
 
-- **One action color.** `--action` is highlighter yellow (`#f7a501`) and it
-  is **register-invariant** — the same hex on the cream page and on the dark
-  olive cover. Text on the fill is always the deep olive ink (`--on-action`
-  `#23251d`, 7.6:1 on the yellow). The yellow pill carries every primary
-  action: brand-adjacent CTAs, primary buttons, selection. There is no
-  disabled hex — disabled is opacity. Links are **not** `--action`: they take
-  `--link`, the system's second sanctioned hue (link blue), reserved for
-  wayfinding — anchors in prose and the focus ring.
-- **Status is dot / border / text — never fills.** `--ok` `--warn` `--err`
-  are an olive brightness hierarchy — loud = bright (`--err` = `--ink-1`),
-  calm = dim (`--ok` dimmest) — holding exactly one value per register each.
-  **Every tone clears AA as small text** against the worst plane it can land
-  on. `--info` is not a separate value: it aliases `--ink-3`. Green is gone
-  from the system: "passed/ready" is calm olive, not a hue.
+- **One action colour.** `--action` is cobalt (`#0064e0`) and it is
+  **register-invariant**, down to its pressed state (`--action-hover`
+  `#0457cb`, the source system's `primary-deep`). Text on the fill is always white
+  (`--on-action`, 5.4:1 on the fill and 6.5:1 on the pressed state). The source
+  system runs two primaries — cobalt inside the commerce flow, a black pill on
+  marketing surfaces — and Relay is entirely in-product, so cobalt is the
+  action here and the black pill survives as `--ink-button` for pre-auth and
+  landing chrome. There is no disabled hex — disabled is opacity. Links are
+  **not** `--action`: they take `--link` (the source system's meta-link blue),
+  reserved for wayfinding — anchors in prose and the focus ring.
+- **Status is chromatic, and still dot / border / text — never fills.**
+  `--ok` `--warn` `--err` carry the source system's success / warning / critical
+  hues. The published values are *badge fill* colours (white text on a
+  saturated pill); Relay renders status as ink far more often than as a fill,
+  so each tone is deepened or lifted until it **clears AA as small text**
+  against the worst plane it can land on. The hue family is the source
+  system's; the lightness is ours. `--info` is not a separate value: it aliases `--ink-3`.
 - **Every ink tier that can carry text clears 4.5:1.** The bar is the worst
   plane a tier can land on — `--surface-3` in dark, `--surface-2` in light —
-  because meta text sits on drawers and inset wells too. This is why the
-  light ramp's calm end (`--ink-3` `#5f6056`, `--ink-4` `#63645a`) is deeper
-  than the source system's marketing-page values (`#6c6e63`, `#9b9c92`
-  measure 4.16 and 2.23 against the recessed fill): app chrome carries real
-  content at those tiers, not decoration. See the ratio table under Colors.
-- **Dual-first registers.** The light register is the cream page
-  (`#eeefe9` — never pure white); the dark register is the notebook's cover,
-  a deep olive-charcoal (`#1f211a`) that the same ink becomes when it carries
-  a whole surface. Neither is derived from the other; both live side by side
-  in `palette.css`. Dark is the default register (`:root`);
-  `html[data-theme="light"]` overrides it.
-- **One hue, two jobs — the channel separates them.** Yellow fills a pill:
-  that is an action. Yellow pulses on a dot, a ring, or an elapsed timer:
-  that is `--live`, work happening right now. `--live` is the yellow *family*
-  rather than the CTA hex itself — brighter on dark (`#ffc233`), deepened to
-  gold on light (`#8a5f06`, the lightest yellow-family value that still
-  clears AA as small text on cream). Because idle surfaces hold no yellow at
-  all, a screen's yellow density still reads as a utilization gauge from
-  across the room — the same trick Phosphor played with green, now folded
-  into the single hue the source system allows.
-- **One sans, every job.** IBM Plex Sans Variable carries reading, control,
-  and display text; hierarchy is built from **weight** (400/500/600/700) and
-  tracking, not face. The display tier is 700 with −0.025em tracking; body
-  text is set solid at 400. JetBrains Mono survives for technical text only —
-  IDs, logs, code — set 400 untracked. (DESIGN.md names JetBrains Mono a
-  near-perfect substitute for Source Code Pro at body sizes, and the
-  vendored variable file was already shipped.)
-- **Tight geometry, hairline depth.** 4px chips, 6px controls and cards, 8px
-  sheets — the source system's 4/6/8 vocabulary; the old 10/14px top rungs
-  are gone. Structure comes from 1px hairlines; the two shadow tokens are
-  reserved for floating chrome.
-- **One ease, two speeds.** `--ease` `cubic-bezier(0.2, 0, 0, 1)`,
-  `--t-fast` 120ms, `--t-slow` 280ms. Nothing overshoots.
+  because meta text sits on drawers and inset wells too. This is why the light
+  ramp's calm end (`--ink-4` `#556170`) is deeper than the source system's steel
+  (`#5d6c7b`, 4.34:1 against the recessed fill), and why `stone` (`#8595a4`)
+  never enters the ramp at all: it is a disabled-label value, and disabled
+  here is opacity.
+- **Dual-first registers.** The light register is the commerce page: a
+  soft-cloud canvas (`#eef1f5`) under near-white cards and stark white
+  floating chrome. The source system publishes **no dark-mode token set** (see
+  [Known gaps](#known-gaps-and-what-relay-did-about-them)), so the dark
+  register is **derived**: `ink-deep` (`#0a1317`)
+  becomes the canvas and the cloud greys invert into an elevation ladder.
+  Dark is the default register (`:root`); `html[data-theme="light"]`
+  overrides it.
+- **Two accents, two jobs.** The source system sanctions cobalt and Oculus purple and
+  nothing else. Cobalt is the action; the purple is `--live`, work an agent is
+  doing *right now*. Splitting them across hues rather than across channels is
+  deliberate: a pulsing blue dot beside a blue button would put "working" and
+  "press me" in the same colour.
+- **One sans, every job.** The source face is **Optimistic VF**, which Meta
+  does not license for redistribution: it leads `--font-sans` for anyone who
+  has it installed, and the vendored **IBM Plex Sans Variable** behind it is
+  the face this app actually ships. Hierarchy is built from **size and
+  weight** (400/500/700), never from a second face. The weight ramp is
+  inverted against the usual expectation: the display tiers are 500 and the
+  heaviest weight belongs to the *small* roles — button labels, badges, body
+  emphasis. JetBrains Mono survives for technical text only — IDs, logs,
+  code — set 400 untracked.
+- **Pill geometry, generous cards.** Every button, tab chip, and badge takes
+  `--r-full`; containers step 4 → 8 → 16 → 24 → 32. "Buttons are NEVER
+  squared in Meta's system" is a rule, not a preference.
+- **One ease, two speeds.** `--ease` `cubic-bezier(0, 0, 0.2, 1)` (ease-out),
+  `--t-fast` 150ms, `--t-slow` 250ms — the source system's recommended band.
+  Nothing
+  overshoots.
 
 The executable source is `web/src/styles/tokens/`. Review the application in
 both registers when changing tokens; do not maintain a second hard-coded token
@@ -84,10 +90,10 @@ Tailwind `@theme` machinery:
 
 1. **`palette.css`** — raw values: both color registers side by side, plus
    the register-invariant scales (radii, spacing, measure, type sizes,
-   tracking, leading, z-index, motion, families, shell dimensions). This is
-   the *only* file allowed to originate a color — enforced by
-   `web/.stylelintrc.json`.
-2. **`roles.css`** — the composites: twelve `--type-*` roles and their paired
+   tracking, leading, elevation, z-index, motion, families, shell
+   dimensions). This is the *only* file allowed to originate a color —
+   enforced by `web/.stylelintrc.json`.
+2. **`roles.css`** — the composites: the `--type-*` roles and their paired
    `--type-*-track` tokens, `--shadow-1` / `--shadow-2`, the focus contract
    (`--focus-outline` / `--focus-outline-danger` / `--focus-w` /
    `--focus-offset`), `--link` / `--link-hover`, and the `--info` alias.
@@ -98,8 +104,8 @@ Tailwind `@theme` machinery:
    token renames. Note shadcn's own `--accent` / `--ring` names are its
    aliases (hover surface / outline color), which is why the action family
    is named `--action`, not `--accent`. `--ring` points at `--link`, not
-   `--action`: the yellow action fill measures 1.7:1 on cream, under the 3:1
-   floor for focus indicators, so focus rings are link blue.
+   `--action`: a focused primary button must not ring in more of its own
+   fill.
 
    The file has two halves with different rules. The **additive** colour
    aliases exist only if a component asks for them — Tailwind ships no default
@@ -107,11 +113,12 @@ Tailwind `@theme` machinery:
    guards** (`--radius-*`, `--text-*`, `--spacing`) override stock Tailwind
    scales, so they are kept complete whether or not each step is used:
    deleting `--radius-xl` does not remove `rounded-xl`, it hands it back to
-   Tailwind's 12px default, off the 4/6/8 ramp. There is deliberately no
+   Tailwind's 12px default, off the radius ramp. There is deliberately no
    named spacing scale — `p-sm` and `p-3` were the same 12px reached two ways,
    and the numeric scale is the one that maps 1:1 onto `--sp-N`.
-4. **`base.css`** — html/body reset, the `:focus-visible` contract, and the
-   shared utilities (`.tnum`, `.code`, `.eyebrow`, `.tone-*`).
+4. **`base.css`** — html/body reset, the `:focus-visible` contract, the
+   `ss01`/`ss02` feature pair, and the shared utilities (`.tnum`, `.code`,
+   `.eyebrow`, `.tone-*`).
 
    `.tnum` and `.code` are deliberately two names, not one. `.tnum` gives
    tabular figures in the reading face — counts, timestamps, ratios, sizes.
@@ -122,17 +129,17 @@ Tailwind `@theme` machinery:
    `.<class>.code` override.
 
 **Naming rule:** component CSS only ever references a palette token
-(`--surface-*`, `--ink-*`, `--line-*`, `--action*`, `--ok/--warn/--err/--info`,
-`--live`, `--link-blue*`, `--r-*`, `--sp-*`, `--measure*`, `--fs-*`,
-`--track-*`, `--font-*`, `--z-*`, `--t-*`, `--ease`) or a role (`--type-*`,
-`--shadow-*`, `--focus-*`, `--link*`) — never a literal hex/`rgb()`/`hsl()`.
+(`--surface-*`, `--ink-*`, `--line-*`, `--action*`, `--ink-button`,
+`--ok/--warn/--err/--info`, `--live`, `--link-blue*`, `--r-*`, `--sp-*`,
+`--measure*`, `--fs-*`, `--track-*`, `--font-*`, `--z-*`, `--t-*`, `--ease`)
+or a role (`--type-*`, `--shadow-*`, `--focus-*`, `--link*`) — never a literal
+hex/`rgb()`/`hsl()`.
 
 **No exceptions.** `web/.stylelintrc.json` grants exactly one file-level
 override — `palette.css`, which originates colour by definition. Every other
 stylesheet consumes tokens outright. `login.css`, `preferences.css`, and
-`artifact.css` are **not**
-exceptions — they consume the pinned `--dark-*` / `--light-*` / `--paper`
-tokens, which is exactly why those tokens exist.
+`artifact.css` are **not** exceptions — they consume the pinned `--dark-*` /
+`--light-*` / `--paper` tokens, which is exactly why those tokens exist.
 
 ## Colors
 
@@ -140,40 +147,55 @@ Dark register / light register:
 
 | Token | Dark | Light | Role |
 |---|---|---|---|
-| `--surface-0` | `#1f211a` | `#eeefe9` | canvas (olive-charcoal / cream) |
-| `--surface-1` | `#262820` | `#fcfcfa` | cards, panels |
-| `--surface-2` | `#2d2f27` | `#e5e7e0` | fills, search, hover |
-| `--surface-3` | `#34362b` | `#ffffff` | drawers, modals |
-| `--ink-1` | `#f1f1e8` | `#23251d` | headings, emphasis |
-| `--ink-2` | `#d0d1c2` | `#4d4f46` | body |
-| `--ink-3` | `#a8a999` | `#5f6056` | secondary labels |
-| `--ink-4` | `#9e9f8f` | `#63645a` | timestamps, meta, disabled |
-| `--line-1` | `#3b3d32` | `#bfc1b7` | structural hairline |
-| `--line-2` | `#2b2d24` | `#dcdfd2` | soft hairline |
-| `--action` | `#f7a501` | `#f7a501` | actions, selection, brand — register-invariant |
-| `--action-hover` | `#ffb61a` | `#dd9001` | hover / active |
-| `--action-soft` | 24% yellow wash | 16% yellow wash | selection wash, active nav |
-| `--on-action` | `#23251d` | `#23251d` | text on the action fill |
-| `--link` / `--link-hover` | `#8ab0f5` / `#b9ccf7` | `#1d4ed8` / `#1740ae` | anchors in prose, focus ring |
-| `--ok` | `#a0a192` | `#616257` | ready, passed, done — calm (dim) |
-| `--warn` | `#c6c7b8` | `#55564d` | attention, degraded |
-| `--err` | `#f1f1e8` | `#23251d` | failed, destructive — loud (= ink-1) |
+| `--surface-0` | `#0a1317` | `#eef1f5` | canvas (ink-deep / soft cloud) |
+| `--surface-1` | `#131c21` | `#fbfcfd` | cards, panels |
+| `--surface-2` | `#1b262c` | `#e0e6ed` | fills, search, hover |
+| `--surface-3` | `#22303a` | `#ffffff` | drawers, modals |
+| `--ink-1` | `#ffffff` | `#0a1317` | headings, emphasis |
+| `--ink-2` | `#dfe3e8` | `#1c1e21` | body |
+| `--ink-3` | `#b6bec6` | `#444950` | secondary labels |
+| `--ink-4` | `#a4adb6` | `#556170` | timestamps, meta, disabled |
+| `--line-1` | `#2c3a43` | `#ced0d4` | structural hairline |
+| `--line-2` | `#1f2b32` | `#dee3e9` | soft hairline |
+| `--action` | `#0064e0` | `#0064e0` | actions, selection, brand — register-invariant |
+| `--action-hover` | `#0457cb` | `#0457cb` | pressed / active — register-invariant |
+| `--action-soft` | 15% soft-cobalt wash | 12% cobalt wash | selection wash, active nav |
+| `--on-action` | `#ffffff` | `#ffffff` | text on the action fill |
+| `--ink-button` / `--on-ink-button` | `#ffffff` / `#0a1317` | `#000000` / `#ffffff` | the source system's marketing pill |
+| `--link` / `--link-hover` | `#8ab4f8` / `#b9d3fb` | `#385898` / `#0457cb` | anchors in prose, focus ring |
+| `--ok` | `#4ac16a` | `#12752f` | ready, passed, done |
+| `--warn` | `#f7b928` | `#8a5a00` | attention, degraded |
+| `--err` | `#ff6b7f` | `#c81232` | failed, destructive |
+| `--on-err` | `#0a1317` | `#ffffff` | text on the critical fill |
 | `--info` | = `--ink-3` | = `--ink-3` | neutral notice |
-| `--live` | `#ffc233` | `#8a5f06` | an agent is working *right now* |
-| `--scrim` | `rgba(0,0,0,.66)` | `rgba(35,37,29,.55)` | overlay scrim (one layer) |
+| `--live` | `#cf7ef0` | `#a121ce` | an agent is working *right now* |
+| `--scrim` | `rgba(10,19,23,.66)` | `rgba(10,19,23,.55)` | overlay scrim (one layer) |
 
 ### The surface ladder runs both ways
 
 In **dark** the ladder is elevation: 0 < 1 < 3 in perceived lift, with 2 as
 the fill tier between card and drawer. **Light cannot reproduce that**,
 because white is a ceiling you cannot build above — so 0..3 there is a ladder
-of *distinctness*: cream canvas `#eeefe9` → warm-white cards `#fcfcfa`
+of *distinctness*: cloud canvas `#eef1f5` → near-white cards `#fbfcfd`
 (raised) → drawers/modals `#ffffff` (top plane), with `--surface-2`
-deliberately **recessed** below the canvas. A search field or hover well
+deliberately **recessed** below the canvas.
+
+The **zone** surfaces run the other way from dark. Dark builds the shell up
+from the canvas (lift means lighter there); light cannot copy that, because a
+near-white rail beside a cloud canvas makes the app's *chrome* the brightest
+thing on screen and leaves the content sheet reading as the recessed part. So
+in light the shell recedes — `--surface-rail` `#e6ebf1` < `--surface-list`
+`#eaeef4` < canvas — and lightness order becomes rail < list < canvas < card <
+drawer, the same order the eye should travel. A search field or hover well
 recedes from white and emerges from black; that inversion is correct, and only
-`--surface-2` does it. The cream canvas is the identity's most distinctive
-surface choice — never substitute pure white for it, and never paint a
-section band over it; the page is one continuous sheet.
+`--surface-2` does it.
+
+The source system paints its marketing canvas pure white and its wells in
+`surface-soft` `#f1f4f7`. Relay is a three-pane application rather than a
+scrolling page, so the two trade places: the cloud grey carries the page and
+stark white carries the cards and floating chrome that sit on it. Both values
+stay inside the published cloud/white pair — do not substitute a grey from
+outside it, and do not paint shaded section bands over the canvas.
 
 ### Contrast floors
 
@@ -182,21 +204,18 @@ can land on**, not against the canvas. Ratios against that plane:
 
 | | ink-1 | ink-2 | ink-3 | ink-4 | ok | warn | err |
 |---|---|---|---|---|---|---|---|
-| dark (vs `--surface-3`) | 10.82 | 7.95 | 5.15 | 4.57 | 4.69 | 7.18 | 10.82 |
-| light (vs `--surface-2`) | 12.44 | 6.68 | 5.11 | 4.81 | 4.96 | 5.96 | 12.44 |
+| dark (vs `--surface-3`) | 13.53 | 10.50 | 7.20 | 5.95 | 5.88 | 7.68 | 4.94 |
+| light (vs `--surface-2`) | 14.94 | 13.29 | 7.22 | 5.02 | 4.63 | 4.72 | 4.66 |
 
 `paletteTokens.test.ts` computes these from the declared hexes rather than
 pinning the hexes themselves, so a future palette move is checked for
-*legibility* rather than for matching a list. The light steps are tighter than
-dark and that is structural: white bounds the light ramp at one end and the
-AA floor at the other.
+*legibility* rather than for matching a list. The same test asserts each
+status tone still reads as **its hue** (green leads in `--ok`, red in `--err`,
+amber's channels descend r > g > b) — the deepening AA forced on the light
+register must not turn a green into a grey.
 
-`--action-soft` is not a hex: it is `color-mix(in srgb, #f7a501 24%, transparent)`
-on dark and 16% on light, so the selection wash always tracks the action
-color. Note the deliberate collision in both registers: `--err == --ink-1`,
-so error text is pixel-identical to heading text and error states lean on
-icon and shape (the hollow `dot-ring`) — inherent to the loud = bright/dark
-hierarchy, do not "fix" it by tinting.
+`--action-soft` is not a hex: it is a `color-mix` of the cobalt into
+transparency, so the selection wash always tracks the action colour.
 
 A **pinned group** (`--dark-canvas`, `--dark-surface`, `--dark-elevated`,
 `--dark-ink`, `--dark-ink-strong`, `--dark-body`, `--dark-ink-soft`,
@@ -207,113 +226,120 @@ once, the diff viewer, ink-fill buttons. A test asserts each pinned token
 equals its live counterpart — the pins silently drifted once already, which
 is the failure they exist to prevent.
 
-Artifact chips are **monochrome olive** — kind is carried by the icon and the
-mono kind label, not by hue.
+Artifact chips are **monochrome** — kind is carried by the icon and the mono
+kind label, not by hue.
 
-### The yellow scope rule
+### The accent scope rule
 
-Yellow carries two jobs, and the channel — not the hue — tells them apart:
+Two accents, two jobs, and they never trade places:
 
-| filled pill (`--action`) | pulsing dot / ring / timer (`--live`) |
+| cobalt (`--action`) | Oculus purple (`--live`) |
 |---|---|
 | primary CTA, subscribe, save | composer running indicator |
 | selection wash, active nav | task + backlog running rows |
 | brand mark accent in app icons | agent stream activity, busy header |
-| | thread pulse, streaming rail node |
+| the selected-row accent bar | thread pulse, streaming rail node |
 | | status pill on a running agent/node (TonePill `live`) |
 
 **`--live` is legal exactly where `--t-pulse` is used, and nowhere
 `--t-pulse-calm` is used.** Passive presence (online dot, idle node, login
-readiness) stays olive. A static yellow surface never means "running", and a
-pulsing olive surface never exists.
+readiness) stays neutral. A static purple surface never means "running", and a
+pulsing neutral surface never exists.
 
-"One hue" is a claim about **meaning**, not pigment. The carve-outs, all
+"Two accents" is a claim about **meaning**, not pigment. The carve-outs, all
 deliberate — a reader who takes the rule literally will file them as bugs:
 
-- **Link blue is the second sanctioned hue**, and it is wayfinding, not
-  decoration: anchors in prose (`--link`) and the focus ring
-  (`--focus-outline`). It is never a fill, a status, or an action.
-- **App icons carry the yellow.** `favicon.svg` and `relay-mark.svg` use
-  `#f7a501` on their lead chevron. A tab-strip icon is not reporting a run,
-  but at 16px an olive chevron on an olive square is invisible. The bare
-  wordmark stays olive.
+- **Link blue is wayfinding, not decoration**: anchors in prose (`--link`)
+  and the focus ring (`--focus-outline`). It is never a fill, a status, or an
+  action.
+- **App icons carry the cobalt.** `favicon.svg` and `relay-mark.svg` use
+  `#0064e0` on their lead chevron. A tab-strip icon is not reporting a run,
+  but at 16px a neutral chevron on a neutral square is invisible. The bare
+  wordmark stays ink.
 - **Identity marks are neutral.** Agents and teams render as neutral class
   glyphs (`IdentityMark.tsx`) — no procedural per-name hues. Identity is
   carried by glyph shape, never *what is happening*.
-- **Login is the cover, not a page.** Pre-auth runs on the pinned dark-olive
-  ramp because no theme has loaded; its primary CTA already takes the
-  register-invariant yellow like every other primary action. The cover sets
-  its field labels, footer meta, and status line in the mono face — a
-  deliberate skin; everywhere else mono is technical text only. The disabled
-  submit is a `color-mix` wash of the yellow over the canvas, not the
-  system's disabled-by-opacity convention, because on the pinned dark cover
-  the label must stay legible against the darkened fill. Its faint olive
-  spotlight radial-gradient is the one gradient besides the functional
-  hatches and fades.
+- **Syntax highlighting is a reading aid.** The five `--code-*` roles are the
+  one place hue carries structure rather than meaning; they never appear
+  outside a `code.hljs` block.
+- **Login is a marketing surface.** Pre-auth runs on the pinned dark ramp
+  because no theme has loaded; its primary CTA takes the register-invariant
+  cobalt like every other primary action. The cover sets its field labels,
+  footer meta, and status line in the mono face — a deliberate skin;
+  everywhere else mono is technical text only.
 - **The atelier landing keeps one ambient glow.** The empty transcript state
   drifts an ink-only wash on `--t-ambient`. That is decoration, not
-  liveness — no pulse cadence, no yellow — so an idle landing's yellow
-  density stays zero. It is the ambient loop's only occupant; a second one
-  is a bug.
+  liveness — no pulse cadence, no accent — so an idle landing's accent
+  density stays zero. It is the ambient loop's only occupant; a second one is
+  a bug.
 
 Any **further** source of colour is a bug.
 
 Because every `--live` surface also pulses and is accompanied by an elapsed
-timer and status copy, color is never the sole channel (WCAG 1.4.1). Motion is
-part of that encoding, so `prefers-reduced-motion` needs checking whenever a
+timer and status copy, colour is never the sole channel (WCAG 1.4.1). Motion
+is part of that encoding, so `prefers-reduced-motion` needs checking whenever a
 liveness surface changes.
 
 ## Typography
 
-**IBM Plex Sans Variable** carries every role — `--font-sans` and
-`--font-display` are the same family, and the display tier is a weight and
-tracking decision, not a face decision. **JetBrains Mono** (`--font-mono`)
-carries technical text only. Twelve roles.
+**One sans** carries every role — `--font-sans` and `--font-display` are the
+same family, and the display tier is a size and weight decision, not a face
+decision. **JetBrains Mono** (`--font-mono`) carries technical text only.
 
 The display face is chosen by **content origin, not by size**: a fixed UI noun
-(Threads, Backlog, the wordmark, a drawer title) takes the display tier
-(700, tight-tracked), while a string written by a person or an agent takes
-its calmer content sibling. A 60-character thread name set at the display
-weight reads as a headline shouting someone's words.
+(Threads, Backlog, the wordmark, a drawer title) takes the display tier, while
+a string written by a person or an agent takes its calmer content sibling —
+the source system's editorial-subhead move, where a lighter weight at a display size
+introduces visual rest.
 
 | Role | Spec | Paired track | Use |
 |---|---|---|---|
-| `--type-display` | 700 36/1.5 | `--track-0` | hero headline, admin metric values |
-| `--type-title` | 700 20/1.33 | `--track-display` | page titles and other fixed UI nouns |
-| `--type-heading` | 700 18/1.5 | `--track-0` | section heads, list labels, in-message h1 |
-| `--type-title-content` | 600 20/1.4 | `--track-body` | titles whose text comes from a user or agent |
+| `--type-display` | 500 48/1.17 | `--track-display` (0) | hero headline, admin metric values |
+| `--type-title` | 500 24/1.25 | `--track-display` (0) | page titles and other fixed UI nouns |
+| `--type-heading` | 700 18/1.44 | `--track-0` | section heads, list labels, in-message h1 |
+| `--type-title-content` | 400 24/1.25 | `--track-display` (0) | titles whose text comes from a user or agent |
 | `--type-body` | 400 16/1.5 | `--track-body` | prose, message bodies, inputs |
-| `--type-name` | 600 16/1.5 | `--track-body-sm` | the identity of the thing a row or card is about |
-| `--type-body-sm` | 400 15/1.5 | `--track-body-sm` | dense prose, captions |
-| `--type-label` | 500 13/1.5 | `--track-body-sm` | chrome labels, nav, metadata |
-| `--type-label-strong` | 600 13/1.5 | `--track-body-sm` | bold chrome, button labels |
-| `--type-micro` | 600 12/1.33 | `--track-caps` | structural group labels (+ uppercase), badges, compact metadata |
-| `--type-number` | 700 24/1.33 | `--track-display` | metrics |
+| `--type-name` | 700 16/1.5 | `--track-body` | the identity of the thing a row or card is about |
+| `--type-body-sm` | 400 14/1.43 | `--track-body-sm` | dense prose, captions |
+| `--type-label` | 500 14/1.43 | `--track-body-sm` | chrome labels, nav, metadata |
+| `--type-label-strong` | 700 14/1.43 | `--track-body-sm` | bold chrome, button and pill-tab labels |
+| `--type-micro` | 700 12/1.33 | `--track-caps` (0) | structural group labels (+ uppercase), badges |
+| `--type-number` | 500 36/1.28 | `--track-display` (0) | metrics |
 | `--type-code` | 400 14/1.43 | `--track-0` | commands, logs, IDs |
 
 **Every role ships a paired `--type-<role>-track`.** The `font:` shorthand
 cannot carry `letter-spacing`, so a role applied as `font: var(--type-title)`
 silently loses its tracking unless the call site remembers a second
 declaration — pairing the tokens by name makes the omission greppable, and
-`typographyTokens.test.ts` sweeps every stylesheet for it. Several paired
-tracks resolve to 0 **by design**: the source system sets only its 24px
-display tier tight (−0.6px ≈ −0.025em) and everything else solid. The tokens
-stay explicit so a role's tracking is decided in `roles.css`, once.
+`typographyTokens.test.ts` sweeps every stylesheet for it.
 
-**There is no 800.** DESIGN.md's display tier calls for weight 800, but IBM
-Plex Sans Variable tops out at 700 and `base.css` disables font synthesis —
-an 800 declaration would silently render as 700, so the roles say 700 and let
-size and tracking carry the tier.
+**The tracking runs the other way round here.** The source system tightens its
+*reading* roles fractionally (−0.16px at 16px, −0.14px at 14px ≈ −0.01em) —
+the snug-but-not-condensed setting Optimistic VF was drawn for — and sets the
+display tier and the uppercase captions **solid**. Several paired tracks
+therefore resolve to 0 by design; the tokens stay explicit so a role's
+tracking is decided in `roles.css`, once.
 
-The size ladder is **12 / 13 / 15 / 16 / 18 / 20 / 24 / 36** (`--fs-1`,
-`--fs-2`, `--fs-3`, `--fs-4`, `--fs-heading`, `--fs-title`, `--fs-5`,
-`--fs-6`, all rem; root pinned to 87.5% so 1rem = 14px at the default). It is
-the source system's scale with its 1px-apart pairs collapsed — heading-md
-(20) absorbs heading-lg (21) — because steps a single pixel apart cost a
-token and buy no visible hierarchy. The code role sits at 14px *outside* the
-ladder: the mono face sizes to its own metrics, and 14 is the source
-system's code-sm. The root font-size is pinned to 87.5% so the browser's
-font-size preference scales the whole UI (WCAG 1.4.4).
+**`ss01` and `ss02` ship together.** The source system treats them as a paired
+alternates package for every heading role, never one without the other.
+`base.css` declares the pair (`--font-features`) at the root: faces without
+the sets ignore it, so fencing it to headings would buy nothing but a second
+place to forget one of them.
+
+**There is no 800.** IBM Plex Sans Variable tops out at 700 and `base.css`
+disables font synthesis, so an 800 declaration would silently render as 700.
+Nothing in the roles asks for it — in this system the heaviest weight (700)
+already belongs to the small emphasis tiers, and the display tiers sit at 500.
+
+The size ladder is **12 / 14 / 16 / 18 / 24 / 36 / 48** (`--fs-1`, `--fs-2`,
+`--fs-3`, `--fs-heading`, `--fs-title`, `--fs-5`, `--fs-6`, all rem; root
+pinned to 87.5% so 1rem = 14px at the default), with `--fs-hero` clamping
+between 36 and 64px for the one hero tier. `--fs-4` **aliases `--fs-3`**: the
+source system has exactly one reading size between its 14px body-sm and its
+18px subtitle, so the two names survive for call-site meaning (dense prose vs
+body copy) rather than inventing a 15px step the brand does not have. The root
+font-size is pinned to 87.5% so the browser's font-size preference scales the
+whole UI (WCAG 1.4.4).
 
 **`--track-display` must be applied to every display-tier rule** — via the
 role's paired track token or directly. Display-tier means *two* shapes, and
@@ -329,9 +355,10 @@ glyph with no inter-character spacing to track.
 
 **CJK:** `html:lang(zh-CN)` / `html:lang(zh-TW)` put a system CJK family first
 for both Latin and Han glyphs, keeping mixed-script labels internally
-coherent. IBM Plex Sans has no Han coverage, so every role joins that same
-sans stack — and `--track-display` is pinned to 0 there, or Han titles would
-be crushed together. Reading leading loosens (1.7/1.8/1.9).
+coherent. Neither Optimistic VF nor IBM Plex Sans has Han coverage, so every
+role joins that same sans stack — and **every** track is pinned to 0 there,
+because Han glyphs are square and must never be tightened. Reading leading
+loosens (1.7/1.8/1.9).
 
 The vendored WOFF2 files are fontsource's **latin** subsets
 (`@fontsource-variable/ibm-plex-sans` 5.3.0, OFL-1.1, wght 100–700;
@@ -341,37 +368,44 @@ through to the system sans by design rather than shipping a second file.
 
 ## Geometry, elevation, motion
 
-- **Radii:** `--r-1` 4px (chips, tags) · `--r-2` 6px (buttons, inputs, all
-  controls) · `--r-3` 6px (cards, drawers, modals) · `--r-4` 8px (hero
-  plates, sheets) · `--r-full` (dots, avatars, pills). The source system's
-  vocabulary clusters at 4–6px and never rounds past 8px outside pills; the
-  old 10/14px rungs are retired.
+- **Radii:** `--r-1` 4px (tags, micro-controls) · `--r-2` 8px (inputs, radio
+  options, selection tiles) · `--r-3` 16px (cards, drawers, modals) · `--r-4`
+  24px (accessory tiles, ghost action cards) · `--r-5` 32px (photographic
+  feature cards, promo strips) · `--r-full` (pills, tab chips, badges, dots,
+  avatars). `--r-full` is 9999px rather than the source system's literal 100px so the
+  pill holds its shape at any control height; at Relay's 28–44px controls the
+  two are visually identical.
 - **Spacing:** 4px base — `--sp-1` 4 · `--sp-2` 8 · `--sp-3` 12 · `--sp-4`
-  16 · `--sp-5` 20 · `--sp-6` 24 · `--sp-7` 32 · `--sp-8` 48 · `--sp-9` 64.
-  Below the base sit exactly two micro steps, `--sp-0-5` 2 and `--sp-1-5` 6,
-  for glyph-tight pairs (dot ↔ label, icon ↔ text, stacked meta lines). They
-  are the only sanctioned sub-4px gaps. `--sp-row` (12px, compact 8px via
-  `[data-density="compact"]`) sets row rhythm; `--control-h` (40px) is the
-  standard control height.
+  16 · `--sp-5` 20 · `--sp-6` 24 · `--sp-7` 32 · `--sp-8` 48 · `--sp-9` 64
+  (product-section rhythm) · `--sp-10` 80 (marketing-section rhythm). Below
+  the base sit exactly two micro steps, `--sp-0-5` 2 and `--sp-1-5` 6, for
+  glyph-tight pairs (dot ↔ label, icon ↔ text, stacked meta lines). They are
+  the only sanctioned sub-4px gaps. `--sp-row` (12px, compact 8px via
+  `[data-density="compact"]`) sets row rhythm; `--control-h` is **44px** —
+  the source system renders inputs and primary pills at the same height so they share
+  a silhouette and clear the WCAG AAA touch floor.
 - **Density:** `[data-density="compact"]` drops the reading tier one rung
-  (`--fs-4` 16 → 15px) for genuinely dense surfaces (tables and list
+  (`--fs-4` 16 → 14px) for genuinely dense surfaces (tables and list
   layouts). Put the attribute on the dense container, not the page. It
   overrides `--fs-4` **and restates every role built on it** (`--type-body`,
-  `--type-name`), because a custom property resolves `var()` where it is
-  *declared*, not where it inherits. Add a restatement whenever a new role
-  uses `--fs-4`.
-- **Elevation:** the system is flat — planes separate by hairline, not lift.
-  `--shadow-1` is `none`; `--shadow-2` resolves to a single 1px ring so
-  borderless floating chrome (drawers, dialogs, composer, tooltips) keeps a
-  crisp edge without faux depth.
+  `--type-name`, `--type-body-sm`), because a custom property resolves
+  `var()` where it is *declared*, not where it inherits. Add a restatement
+  whenever a new role uses `--fs-4`.
+- **Elevation:** the source system runs three levels and only two of them are real
+  shadows. Level 0 — cards and tiles — is flat: rounding plus a hairline, and
+  the source system explicitly calls heavy shadows on a marketing card a
+  mistake ("elevation is a commerce-flow signal, not a marketing flourish").
+  `--shadow-1` is therefore `none`. `--shadow-2` is the one published blur
+  (`rgba(20,22,26,.3) 0 1px 4px`) plus a 1px hairline ring, carried by chrome
+  that genuinely floats: drawers, dialogs, menus, sticky summaries.
 - **Focus:** `--focus-outline` — a 2px solid **link-blue** ring at a 2px
   offset (WCAG 1.4.11), drawn with `outline`, **not** `box-shadow`, so no
   ancestor's `overflow: hidden` can clip it and forced-colors mode preserves
-  it. The ring cannot be the action yellow: `#f7a501` measures 1.7:1 on
-  cream, far under the 3:1 indicator floor. Destructive controls take
-  `--focus-outline-danger`, which differs by **shape** (dashed) rather than
-  colour — `--err` and `--ink-1` resolve to the same value in both
-  registers, so a colour-only danger ring would communicate nothing.
+  it. The ring is not the cobalt action, so a focused primary button never
+  rings in more of its own fill. Destructive controls take
+  `--focus-outline-danger`, which differs by **both** colour (`--err`) and
+  shape (dashed) — the stroke style is the half that survives forced-colors
+  mode, where the hue is dropped.
 - **Measure:** the reading-column cap, in `ch` — `--measure-tight` 34
   (captions, empty-state lines), `--measure` 48 (the default),
   `--measure-wide` 72 (long-form agent prose). Anything narrower is a layout
@@ -380,8 +414,9 @@ through to the system sans by design rather than shipping a second file.
   `--z-float` 120 · `--z-dialog` 300. There is deliberately no `popover` tier
   below `drawer`. Bare `z-index: 1/2/3` in component CSS orders siblings
   inside an already-positioned component and must not be promoted to tokens.
-- **Motion:** `--ease` `cubic-bezier(0.2, 0, 0, 1)`; `--t-fast` 120ms,
-  `--t-slow` 280ms. No spring, no overshoot.
+- **Motion:** `--ease` `cubic-bezier(0, 0, 0.2, 1)` (ease-out); `--t-fast`
+  150ms, `--t-slow` 250ms — the source system publishes no timings and
+  recommends 150–250ms for surface transitions. No spring, no overshoot.
 - **Ambient loops:** `--t-pulse` 1.6s for active work (streaming agent,
   running task, busy header) and `--t-pulse-calm` 2.6s for passive presence
   (online dot, idle node) — the same liveness reads at the same tempo
@@ -398,14 +433,12 @@ through to the system sans by design rather than shipping a second file.
 
 ## Marginalia
 
-The source system's entire decorative layer is hand-drawn mascot marginalia
-scattered across the page. Relay's equivalent is the **field-notes doodle**:
-the double-chevron mark sketched in the margin — pencil-weight olive linework
-(`--ink-3`/`--ink-4` strokes), dashed construction lines, annotation ticks —
-shipped as inline SVG components in `web/src/components/marginalia.tsx` and
-anchored in empty states. The rules:
+Relay keeps one small decorative layer: the **double-chevron doodle** sketched
+in the margin of empty states — hairline-weight ink linework (`--ink-3` /
+`--ink-4` strokes), dashed construction lines, annotation ticks — shipped as
+inline SVG components in `web/src/components/marginalia.tsx`. The rules:
 
-- **Olive ink only.** Marginalia never takes the yellow (action/live), never
+- **Ink only.** Marginalia never takes an accent (action or live), never
   takes a status tone, never fills — strokes alone.
 - **Never animate them.** They are set dressing in an operator tool;
   `prefers-reduced-motion` is trivially satisfied because there is no motion.
@@ -418,46 +451,46 @@ anchored in empty states. The rules:
 
 ### Do
 - Use `--action` for actions, and use it scarcely: primary CTA, selection,
-  the brand mark. One yellow pill per fold is plenty.
-- Pair the action fill with `--on-action` — deep olive ink on the yellow, in
-  both registers.
+  the brand mark. One cobalt pill per fold is plenty — the source system's own
+  note is that the colour's weight is meaningful precisely because it is rare.
+- Pair the action fill with `--on-action` — white on the cobalt, in both
+  registers.
 - Use `--action-soft` for selected rows and active navigation.
-- Carry status as dots/borders/text on the olive brightness hierarchy
-  (loud = bright on dark, loud = dark on light); use `--info` for status
-  without alarm.
+- Give every button, tab chip, and badge `--r-full`. A squared button reads
+  as a third-party widget dropped into the page.
+- Carry status as dots/borders/text on the semantic tones; use `--info` for
+  status without alarm.
 - Use `--live` only for work happening right now, and only where `--t-pulse`
   is used — see the scope rule under Colors.
-- Pair `--live` with motion and text, never color alone.
+- Pair `--live` with motion and text, never colour alone.
 - Use `--link` for anchors and the focus ring; `--measure*` for reading
   columns.
-- Apply the paired `--type-*-track` (or `--track-display`) at every
-  display-role site, even where the paired track is 0 — the declaration is
-  the contract.
+- Apply the paired `--type-*-track` at every display-role site, even where
+  the paired track is 0 — the declaration is the contract.
 - Disable with opacity, not a dedicated hex.
-- Carry depth with hairlines first; shadows only on floating chrome.
+- Carry depth with hairlines first; the one blur is for floating chrome.
 - Add new raw values to `palette.css` and new roles to `roles.css` — never
-  inline a color in a component file (`npm run lint:css -w web` enforces).
+  inline a colour in a component file (`npm run lint:css -w web` enforces).
 
 ### Don't
-- Don't use a status color as an action, or the action color as a status.
-- Don't introduce a third chromatic color. Yellow is action/live, blue is
-  wayfinding; everywhere else brightness is the only signal.
-- Don't reintroduce green for "passed" or "healthy" — a finished task is
-  calm olive. `--live` means *running*, not *done*.
-- Don't set text or dots in the raw `#f7a501` on the light canvas — it
-  measures 1.7:1 on cream. On light, yellow-family text/dots use `--live`'s
-  deep gold; the raw yellow is fill-only there.
-- Don't paint the canvas pure white or add shaded section bands — the cream
-  sheet runs uninterrupted.
-- Don't fill backgrounds with status colors.
-- Don't tint agent avatars with vendor brand colors — glyph shape carries
+- Don't use a status colour as an action, or the action colour as a status.
+- Don't introduce a third accent. Cobalt is the action, purple is liveness,
+  blue is wayfinding; everywhere else the ink ramp is the only signal.
+- Don't square off a pill, and don't run a card without rounding.
+- Don't set text or dots in a status tone taken straight from the source
+  system's badge palette — those are *fill* values (success `#31a24c` measures 3.1:1
+  on white, warning `#f7b928` 1.8:1). The tokens here are already the
+  text-safe tuning; use them.
+- Don't paint shaded section bands over the canvas — the page is one sheet.
+- Don't fill backgrounds with status colours.
+- Don't tint agent avatars with vendor brand colours — glyph shape carries
   identity.
 - Don't add overshoot or extra easing curves — there is exactly one ease.
-- Don't color artifact chips by kind — olive, icon + label only.
+- Don't colour artifact chips by kind — icon + label only.
 - Don't paint a focus ring as a `box-shadow` — it is an `outline`, so it
   survives clipping ancestors and forced-colors mode.
 - Don't hand-write a `ch` width for prose; reach for the `--measure*` tier.
-- Don't add a size step within 2px of an existing one — separate by weight
+- Don't add a size step off the source system's ladder — separate by weight
   instead.
 - Don't declare `font-weight: 800` — Plex tops out at 700 and synthesis is
   disabled; the declaration would be a lie.
@@ -469,22 +502,388 @@ anchored in empty states. The rules:
 | `--sidenav-w` | 72px | Collapsed left rail |
 | `--sidenav-w-open` | 228px | Expanded left rail |
 | `--thread-w` | 318px | Conversation list pane |
-| `--header-h` | 64px | Chat panel top bar |
+| `--header-h` | 64px | Chat panel top bar (the source system's nav height) |
+
+## Responsive behaviour
+
+Relay's breakpoint registry lives in a comment at the top of `palette.css` —
+custom properties cannot drive `@media`, so that list is the only registry
+there is, and it must be updated when a query is added. The app-wide tiers are
+**820px** (mobile) and **1040px** (tablet); everything else is a component tier
+(480 backlog card grid · 560 artifact chips · 600 dialog stack · 640 compact
+panes · 720 transcript time column · 768 admin drawer · 900 dashboard medium ·
+1100 multi-pane → single pane · 1200 dashboard widest). Two rules of thumb: a
+new query reuses a tier above rather than inventing a neighbour, and one
+component gets one breakpoint.
+
+The source system's own tiers are marketing-page tiers (< 480 · 480–767 ·
+768–1023 · 1024–1359 · ≥ 1360) and its collapsing rules are about heroes,
+feature grids, and a PDP purchase rail Relay does not have. What carries over
+is the *behaviour*: multi-column layouts collapse toward one column, side rails
+become sticky bottom chrome, and display type steps down the ladder rather than
+scaling continuously.
+
+**Touch targets.** The source system renders pill buttons at 40–44px, circular
+icon buttons at 40px (bumped to 44 on mobile), and form inputs at 44px. Relay
+pins `--control-h` to 44px so buttons and inputs share that silhouette
+outright, and `a11y.css` raises the *dense* tiers — in-row chips, toggles,
+icon buttons, the `sm`/`xs` button sizes — to `--touch-target` under
+`@media (pointer: coarse)`, leaving desktop mouse density alone.
+
 
 ## Data visualization
 
-Charts are olive-grey — a brightness ramp, not a hue ramp. The admin
+Charts run on the ink ramp — a brightness ramp, not a hue ramp. The admin
 token-usage chart stacks a three-step ink ramp, dimmest at the base: output =
 `--ink-2` (brightest — it is the product of the work), input = `--ink-3`,
 cache = `--ink-4` (the bulk, but the least interesting). **No series may take
-`--action`**: a yellow chart fill reads as "click me". Because the ramp
+`--action`**: a cobalt chart fill reads as "click me". Because the ramp
 deliberately uses neighbouring ink steps, each segment carries a
 `--surface-1` hairline stroke — adjacent steps of a monochrome ramp merge
 into one flat band without it.
 
-Fleet-health bars double-encode: the grey ramp alone cannot separate five
-values in an 8px bar (ready and unknown sit one step apart, failed and stale
-both resolve to `--err`), so stale takes a `--warn` hatch. `--live` marks the
-running node count and its bar segment — the card's yellow density is a
+Fleet-health bars double-encode: the ink ramp alone cannot separate five
+values in an 8px bar, so stale takes a `--warn` hatch. `--live` marks the
+running node count and its bar segment — the card's accent density is a
 utilisation readout: live-carrying elements when work is in flight, none when
 idle.
+
+---
+
+# Appendix — the source system
+
+Everything below is the extracted Meta commerce design system that Relay's
+identity is adapted from. It was captured from four surfaces — meta.com
+(homepage), the Ray-Ban Meta Skyler Gen 2 product page, the Quest 3S buy-now
+configurator, and the AI-glasses prescription page — and token coverage was
+identical across all four, so the system is genuinely unified rather than
+per-page. It is reproduced here so this document stands alone; the sections
+above are the authority on what Relay ships, and this appendix is the
+authority on where those decisions came from.
+
+Note the register difference throughout: the source is a **marketing and
+commerce site** with full-bleed product photography, and Relay is a dense
+multi-pane operator tool. Where the two disagree, the sections above record
+which way Relay went and why.
+
+## Source voice
+
+Meta's commerce surfaces read as a confident hardware merchandiser. The voice
+is photography-first: large, full-bleed product imagery dominates above-the-fold
+real estate, with white space and a tight typographic hierarchy carrying the
+rest. The signature is a dual-CTA pattern — a black pill primary on marketing
+surfaces shifting to saturated cobalt inside buy-now flows, paired with an
+outlined ghost button for the secondary action.
+
+Key characteristics:
+
+- Stark white canvas carrying full-bleed product photography, with 32px corner
+  softening on showcase tiles.
+- A two-tier primary button system: black pills on marketing, cobalt pills
+  inside buy-now panels.
+- Optimistic VF as the universal display *and* body face, with `ss01, ss02`
+  switched on together.
+- Pill buttons and 32/40px cards as the dominant geometric signature.
+- Saturated promotional banners (yellow, or dark ink) used sparingly above the
+  nav for time-bound offers.
+- Photographic feature cards with no card chrome at all — the product imagery
+  *is* the surface treatment.
+
+## Source colors
+
+| Source name | Value | Role in the source system |
+|---|---|---|
+| `primary` | `#0064e0` | Cobalt buy-now CTA — "Add to cart", "Configure", "Pre-order" |
+| `primary-deep` | `#0457cb` | Pressed state; also the active link colour |
+| `primary-soft` | `#0091ff` | Translucent informational callout tint (at 15% alpha) |
+| `on-primary` | `#ffffff` | Text on the cobalt fill |
+| `ink-button` | `#000000` | Marketing-surface primary pill |
+| `on-ink-button` | `#ffffff` | Text on the black pill |
+| `fb-blue` | `#1876f2` | Selected radio/checkbox, inline form-control activation |
+| `meta-link` | `#385898` | Legacy navigation and footer link affordances |
+| `oculus-purple` | `#a121ce` | VR product accent, category emphasis on Quest surfaces |
+| `success` | `#31a24c` | "In stock", "Free returns" |
+| `success-bg` | `#24e400` | Saturated success fill |
+| `attention` | `#f2a918` | Mid-priority alerts, timed callouts |
+| `warning` | `#f7b928` | Promo banners, limited-time tags |
+| `warning-bg` | `#ffe200` | Saturated promo fill |
+| `critical` | `#e41e3f` | Validation errors, destructive feedback |
+| `critical-strong` | `#f0284a` | Form-input error border, inline error labels |
+| `canvas` | `#ffffff` | Page background and primary card surface |
+| `surface-soft` | `#f1f4f7` | Product thumbnails, warranty cards, search-pill rest |
+| `ink-deep` | `#0a1317` | Primary headline and body text on light surfaces |
+| `ink` | `#1c1e21` | Standard body and secondary headline text |
+| `charcoal` | `#444950` | Tertiary body text, form-button labels |
+| `slate` | `#4b4c4f` | Section-header copy, supporting microcopy |
+| `steel` | `#5d6c7b` | Quieter caption text, footer link hierarchy |
+| `stone` | `#8595a4` | Disabled or de-emphasised labels |
+| `hairline` | `#ced0d4` | 1px input border, form-control divider |
+| `hairline-soft` | `#dee3e9` | Quieter divider on cards, footers, section breaks |
+| `disabled-text` | `#bcc0c4` | Disabled button fill |
+
+### How Relay maps them
+
+| Source token | Relay token | What changed and why |
+|---|---|---|
+| `primary` / `primary-deep` / `on-primary` | `--action` / `--action-hover` / `--on-action` | Unchanged values. Relay is entirely in-product, so cobalt is *the* action rather than a commerce-only variant. |
+| `ink-button` / `on-ink-button` | `--ink-button` / `--on-ink-button` | Verbatim in light; inverted in dark, where a black pill would vanish into the canvas. |
+| `primary-soft` | `--action-soft` | Carried as a `color-mix` wash rather than a flat hex, so the selection tint tracks the action colour. |
+| `meta-link` | `--link-blue` (light) | Verbatim. Dark lifts it to `#8ab4f8` for AA on the ink-deep canvas. |
+| `oculus-purple` | `--live` | Verbatim in light, lifted in dark. Relay spends the second sanctioned accent on liveness because cobalt is already the action. |
+| `success` / `warning` / `critical` | `--ok` / `--warn` / `--err` | Hue family kept; lightness retuned per register so each clears 4.5:1 as *small text* — the published values are badge-fill colours. |
+| `canvas` / `surface-soft` | `--surface-3` / `--surface-2`, `--surface-0` | Traded places: in a three-pane app the cloud grey carries the page and white carries cards and floating chrome. |
+| `ink-deep` / `ink` / `charcoal` | `--ink-1` / `--ink-2` / `--ink-3` | Verbatim. |
+| `steel` | `--ink-4` | Deepened to `#556170`; the published value measures 4.34:1 against the recessed fill. |
+| `stone` / `disabled-text` | — | Not adopted. Disabled is opacity in Relay, so a dedicated disabled ink has no consumer. |
+| `hairline` / `hairline-soft` | `--line-1` / `--line-2` | Verbatim. |
+| `fb-blue` | — | Not adopted; the focus ring and form activation both run on `--link`, which clears AA as text as well as being an indicator. |
+| `success-bg` / `warning-bg` / `attention` / `critical-strong` | — | Not adopted. Relay renders status as ink, not as saturated fills, so the fill-only tiers have no job. |
+
+## Source typography
+
+**Optimistic VF** is Meta's proprietary variable display face; the published
+fallback chain is Montserrat, Helvetica, Arial, Noto Sans. Its axes run from
+300 (editorial subheads) through 500 (hero, display, heading-sm) to 700
+(subtitles, body emphasis, button labels). `ss01` and `ss02` are switched on
+across every heading role and are treated as a paired package — never one
+without the other. A secondary Helvetica chain carries 12px technical microcopy
+in spec sheets and footer fine print.
+
+| Source role | Size | Weight | Line height | Tracking | OpenType | Use |
+|---|---|---|---|---|---|---|
+| `hero-display` | 64px | 500 | 1.16 | 0 | ss01, ss02 | Homepage hero, category opener |
+| `display-lg` | 48px | 500 | 1.17 | 0 | ss01, ss02 | Section-opener display |
+| `heading-lg` | 36px | 500 | 1.28 | 0 | ss01, ss02 | Subsection headlines |
+| `heading-md` | 28px | 300 | 1.21 | 0 | ss01, ss02 | Editorial subheads in the light weight |
+| `heading-sm` | 24px | 500 | 1.25 | 0 | ss01, ss02 | Card titles, feature-tile headers |
+| `subtitle-lg` | 18px | 700 | 1.44 | 0 | — | Bold callouts, FAQ question titles |
+| `subtitle-md` | 18px | 400 | 1.44 | 0 | — | Body lead, longer-line subtitles |
+| `body-md` | 16px | 400 | 1.50 | −0.16px | — | Primary body text |
+| `body-md-bold` | 16px | 700 | 1.50 | −0.16px | — | Body emphasis; also `link-md` |
+| `body-sm` | 14px | 400 | 1.43 | −0.14px | — | Secondary body, helper text |
+| `body-sm-bold` | 14px | 700 | 1.43 | −0.14px | — | Pill-tab labels, footer headings |
+| `caption-bold` | 12px | 700 | 1.33 | 0 | — | Badge labels, timestamps |
+| `caption` | 12px | 400 | 1.33 | 0 | — | Footer fine print, legal microcopy |
+| `button-md` | 14px | 700 | 1.43 | −0.14px | — | Pill button labels |
+| `link-md` | 16px | 700 | 1.50 | −0.16px | — | Inline navigation links |
+
+Source principles:
+
+- Negative letter-spacing on the *reading* roles (−0.14 to −0.16px) tightens
+  the type fractionally; the face was drawn for that snug-but-not-condensed
+  setting.
+- Editorial subheads use the 300 weight to introduce visual rest between the
+  500-weight displays and the 400-weight body — a three-tier rhythm.
+- All headings carry `ss01, ss02` together.
+- Buttons, pill tabs, and footer headings share `body-sm-bold`, which is what
+  visually relates the interactive elements to each other.
+
+**What Relay does with it:** the ladder above collapses to 12 / 14 / 16 / 18 /
+24 / 36 / 48 plus a hero clamp. The 28px/300 editorial tier is not adopted as a
+size — Relay expresses the same "visual rest" idea as `--type-title-content`
+(24px/400), because a dense operator tool has no editorial intro headlines. The
+proprietary face is not redistributable, so `--font-sans` names it first and
+ships vendored IBM Plex Sans behind it; Plex tops out at 700, which is why no
+role declares 800 and why the 300 weight is unused.
+
+## Source layout scales
+
+**Spacing** — 4px base with 8px as the dominant step: 4 · 8 · 10 · 12 · 16 ·
+20 · 24 · 32 · 40 · 48 · 64 · 80 · 120. Marketing sections separate at 80px,
+product-detail sections at 64px, FAQ stacks at 32px. Card padding is 32px
+standard, 24px for icon-feature tiles, 64px for promo strips. Relay adopts the
+whole scale except the 10px and 120px rungs (10 is off the 4px grid; 120 is a
+marketing hero gutter with no in-app consumer) and adds nothing below 4px
+except its two documented micro steps.
+
+**Grid** — marketing pages cap near 1280px with 32–48px gutters; the PDP is a
+58/42 split with a `max-width: 380px` sticky purchase rail; three-up feature
+grids use a 24px column gap and six-up thumbnail rows a 12px gap. Relay's
+equivalent caps are `--thread-measure` (1200px) and the `--measure*` reading
+tiers.
+
+**Radii** — 2 · 4 · 6 · 8 · 16 · 24 · 32 · 40 · 100 (pill) · 50% (circle).
+Product hero photography sits in 32px frames; square thumbnails take 16px;
+selection-grid tiles take 8px, deliberately tighter than showcase frames;
+swatches are 32px circles with a 2px white ring when selected. Relay keeps
+4 / 8 / 16 / 24 / 32 / pill and drops the 2px, 6px, and 40px rungs — 2 and 6
+are finer than anything in the app's chrome, and 40 belongs to accessory hero
+panels.
+
+**Elevation** — three levels, only two of which are shadows:
+
+| Level | Treatment | Use |
+|---|---|---|
+| 0 (flat) | No shadow; 32px rounding + hairline-soft border | Product cards, why-buy tiles |
+| 1 (subtle) | `rgba(0,0,0,0.2) 1px 1px 0 0` | Pill-tab activation indicator |
+| 2 (sticky panel) | `rgba(20,22,26,0.3) 0 1px 4px 0` | PDP purchase summary, sticky mobile checkout bar |
+
+Relay wires level 0 to `--shadow-1` (`none`) and level 2 to `--shadow-2` (the
+published blur plus a hairline ring). Level 1 has no Relay consumer — its job
+is a pill-tab active state, which Relay signals with the dark fill instead.
+
+Decorative depth in the source is photographic: full-bleed imagery on rounded
+cards creates atmosphere without shadows, and translucent overlays
+(`rgba(255,255,255,0.1)` to `rgba(10,19,23,0.12)`) lift text off dark hero
+photography. Pastel tints behind accessory cutouts are photographic content,
+not system tokens.
+
+## Source components
+
+Hover states are deliberately undocumented in the source — default and
+pressed/active only.
+
+### Buttons
+
+- **`button-primary`** — black pill, white label, `button-md` type, `14px 30px`
+  padding, full radius. Pressed flips the fill to `charcoal`; disabled uses
+  `disabled-text`.
+- **`button-buy-cta`** — cobalt pill, white label, same type and metrics.
+  Pressed deepens to `primary-deep`. Appears *only* inside the buy-now
+  configurator and PDP purchase rail.
+- **`button-secondary`** — transparent, ink-deep label, `2px solid ink-deep`
+  border, `12px 28px`, full radius. The usual partner in a dual-CTA hero.
+- **`button-ghost`** — transparent with a `2px solid rgba(10,19,23,0.12)`
+  border, `10px 22px`, full radius. Tertiary actions.
+- **`button-pill-tab`** / **`-active`** — white with a hairline border and
+  `8px 16px` padding; active swaps to an ink-deep fill with white text and no
+  border.
+- **`button-icon-circular`** — 40×40px, white, ink icon, circular.
+
+### Cards and containers
+
+- **`card-product-feature`** — white, 32px radius, 32px padding, hairline-soft
+  border.
+- **`card-feature-photo`** — 32px radius, no padding, no border; the image
+  fills the card and copy overlays bottom-left in white.
+- **`card-promo-strip`** — ink-deep fill, white text, 32px radius, 64px
+  padding.
+- **`card-icon-feature`** — white, 16px radius, 24px padding.
+- **`card-checkout-summary`** — white, 16px radius, 24px padding, hairline-soft
+  border, level-2 shadow.
+- **`product-thumbnail`** — surface-soft, 16px radius, 16px padding, 1:1.
+- **`warranty-card`** — surface-soft, 24px radius, 32px padding.
+- **`why-buy-tile`** — white, 16px radius, `32px 24px` padding, hairline-soft
+  border; heading `subtitle-lg`, body `body-sm`.
+
+### Inputs and forms
+
+- **`text-input`** — white, ink text, 1px hairline border, 8px radius, 12px
+  padding, 44px tall. Focused swaps to a `2px solid fb-blue` border; error to a
+  `1px solid critical-strong` border with the error label below in the same
+  colour at `body-sm`.
+- **`search-pill`** — surface-soft fill, steel text, `body-sm`, full radius,
+  40px tall.
+- **`radio-option`** / **`-selected`** — white, 8px radius, 20px padding, 1px
+  `rgba(10,19,23,0.12)` border; selected swaps to `2px solid #0143b5`.
+- **`color-swatch-circle`** — 32px circle with a 2px white ring on selection.
+
+### Badges and banners
+
+All four badges share the same chrome — `caption-bold` type, full radius,
+`4px 10px` padding — and differ only by fill: promo yellow (`warning`, ink-deep
+text), attention (`attention`, white text), success (`success`, white text),
+critical (`critical`, white text). **`promo-banner`** is a full-width strip
+*above* the nav in ink-deep or yellow, `body-sm-bold`, `12px 24px` padding,
+carrying one line of offer copy and an inline link.
+
+### Navigation
+
+Desktop: a sticky white bar ~64px tall with a bottom hairline-soft border —
+wordmark left, pill-tab category nav centre, search-pill plus circular icon
+buttons right. Mobile: logo, hamburger, cart; the pill nav slides into a
+full-screen drawer below 768px. Breadcrumbs on the PDP set `body-sm` with a
+stone separator dot, an ink active leaf, and steel parent links.
+
+### Signature compositions
+
+- **`hero-band-marketing`** — full-bleed photography, `hero-display` copy in
+  white, a `subtitle-md` line, then the `button-primary` + `button-secondary`
+  pair.
+- **`product-gallery-pdp`** — 80×80px thumbnail strip (8px radius,
+  surface-soft, hairline-soft border; active border goes ink-deep), a
+  ~720×720px main image at 32px radius, and the sticky
+  `card-checkout-summary` rail.
+- **`color-sku-picker-row`** — six-up 1:1 tiles, surface-soft, 8px radius,
+  16px image padding; active tile takes a `2px solid ink-deep` border, with the
+  variant name in `body-sm-bold` and price in `body-sm` below.
+- **`feature-icon-row`** — four `card-icon-feature` cells, each a 32px line
+  icon, a `subtitle-lg` headline, and `body-sm` copy.
+- **`faq-accordion`** — 16px-radius items, question in `subtitle-lg`, a 20px
+  steel chevron right, answer in `body-md` with 16px top padding.
+- **`tech-specs-table`** — two columns: label `body-sm-bold` ink, value
+  `body-sm` charcoal, rows separated by a hairline-soft rule, group headers in
+  `heading-sm`.
+- **`testimonial-customer-card`** — white, 16px radius, 32px padding,
+  hairline-soft border, 40px avatar circle, `body-sm-bold` byline, `body-md`
+  quote.
+- **`footer-region`** — white with a hairline-soft top border and
+  `64px 32px` padding; six column groups with `body-sm-bold` headings and
+  `body-sm` steel links, and a bottom row of `caption` legal links in stone.
+
+**What Relay implements:** the button, input, badge, and card chrome above map
+directly onto the shadcn primitives (`ui/button.tsx`, `ui/input.tsx`,
+`ui/badge.tsx`, `ui/card.tsx`) and the surface stylesheets. The commerce-only
+compositions — PDP gallery, SKU picker, promo banner, FAQ accordion,
+testimonial card, marketing footer — have no counterpart in an operator tool
+and are recorded here for reference only. Their *chrome rules* still apply
+whenever a similar object appears: a summary rail takes the checkout-summary
+treatment, a spec table takes the tech-specs treatment.
+
+## Source do's and don'ts
+
+**Do**
+
+- Reserve cobalt for buy-now CTAs; its weight is meaningful precisely because
+  it does not appear on marketing pages. *(Relay reads this as: keep the action
+  colour scarce — one cobalt pill per fold.)*
+- Use the black pill for marketing-surface primaries, paired with the outlined
+  secondary.
+- Apply the full radius to every button, category pill, badge, and chip.
+- Apply 32px to photographic product cards and 16px to icon-feature tiles, so
+  the card hierarchy stays visible.
+- Switch on `ss01, ss02` together for any heading — never one without the other.
+- Use the 300-weight editorial tier for subheads; it creates the signature
+  rhythm against the 500-weight displays.
+
+**Don't**
+
+- Don't use cobalt for marketing-surface primaries.
+- Don't introduce accent colours beyond cobalt and Oculus purple — the hardware
+  brand is deliberately monochromatic outside its product photography.
+- Don't soften a pill below the full radius; the pill is a brand signature.
+- Don't run feature cards without rounding — 32px is the floor for a
+  photographic surface.
+- Don't reduce `body-md` line-height below 1.50; the negative tracking already
+  tightens the metric.
+- Don't apply heavy shadows to marketing cards — elevation is a commerce-flow
+  signal, not a marketing flourish.
+
+## Known gaps, and what Relay did about them
+
+The source analysis flagged four gaps. Each is closed here, and this is where
+to look before "fixing" something that looks unspecified:
+
+1. **Selected/checked states for non-button form controls** were not visible on
+   the captured surfaces. Relay follows the `radio-option-selected` pattern —
+   cobalt on white — for `Checkbox` and `Switch` (`data-checked` takes the
+   `--action` fill).
+2. **No animation or transition timings** were extracted; the analysis
+   recommended 150–250ms ease-out for surface transitions and 300ms for
+   accordion expand/collapse. Relay pins `--ease` to `cubic-bezier(0, 0, 0.2, 1)`
+   with `--t-fast` 150ms and `--t-slow` 250ms, and adds its own liveness
+   cadences (`--t-pulse`, `--t-pulse-calm`, `--t-tick`, `--t-draw`,
+   `--t-stagger`) which the source has no equivalent for.
+3. **No dark-mode tokens** are published. Relay's dark register is derived —
+   `ink-deep` becomes the canvas, the cloud greys invert into an elevation
+   ladder, and cobalt stays put because white clears AA on it either way. Every
+   derived value is documented at its token in `palette.css`.
+4. **Pastel decorative tints** behind accessory cutouts are photographic
+   content, not system colours. Relay has no equivalent surface and does not
+   introduce one.
+
+One further gap is Relay's own: the source system has no vocabulary for *work
+in progress* — no "an agent is running right now" state — because a commerce
+page has nothing that runs. `--live`, the pulse cadences, and the `StateMark`
+shape vocabulary are Relay additions built on the one accent the source leaves
+unspent.

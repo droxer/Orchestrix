@@ -54,7 +54,7 @@ describe("local typography assets", () => {
 });
 
 describe("application typography roles", () => {
-  it("wires Plex for every reading and display role, mono for technical text only", () => {
+  it("wires one sans for every reading and display role, mono for technical text only", () => {
     const layout = readWebSource("app/layout.tsx");
     const palette = readWebSource("styles/tokens/palette.css");
 
@@ -64,9 +64,16 @@ describe("application typography roles", () => {
     assert.match(layout, /variable:\s*["']--font-app-mono["']/);
     assert.doesNotMatch(layout, /MonaSans|--font-app-display|Geist/);
 
-    // The display tier is the SANS family at 700 with negative tracking —
-    // hierarchy comes from weight, not face. The mono is technical text only.
-    assert.match(palette, /--font-sans:\s*var\(--font-app-sans\),\s*["']IBM Plex Sans["']/);
+    // The display tier is the SANS family at a heavier weight — hierarchy
+    // comes from weight and size, never from a second face. The mono is
+    // technical text only.
+    //
+    // The source system's face is Optimistic VF, which Meta does not license for
+    // redistribution: it leads the stack for anyone who has it installed, and
+    // the vendored IBM Plex Sans behind it is the face this app actually
+    // ships. Both must be present — a stack that names only the proprietary
+    // face renders from whatever the OS guesses.
+    assert.match(palette, /--font-sans:\s*["']Optimistic VF["'],\s*var\(--font-app-sans\),\s*["']IBM Plex Sans["']/);
     assert.match(palette, /--font-display:\s*var\(--font-sans\);/);
     assert.match(palette, /--font-mono:\s*var\(--font-app-mono\),\s*["']JetBrains Mono["']/);
     assert.doesNotMatch(
@@ -76,32 +83,39 @@ describe("application typography roles", () => {
     );
   });
 
-  it("caps the display tier at 700 and keeps code at 400", () => {
+  it("sets the display tiers at 500, emphasis at 700, and keeps code at 400", () => {
     const roles = readWebSource("styles/tokens/roles.css");
 
-    // IBM Plex Sans Variable tops out at 700 and base.css disables font
-    // synthesis — an 800 declaration would silently render as 700, so the
-    // roles say 700 and let size + tracking carry the tier.
-    assert.match(roles, /--type-display:\s+700[^;]+var\(--font-display\);/);
-    assert.match(roles, /--type-title:\s+700[^;]+var\(--font-display\);/);
+    // The source system's weight ramp is inverted against the usual expectation: the
+    // display and heading-sm tiers are 500 and the heaviest weight in the
+    // system (700) belongs to the SMALL roles — button labels, badges, body
+    // emphasis. Size carries hierarchy; weight carries emphasis. An 800 would
+    // render as 700 anyway (IBM Plex Sans Variable tops out there and base.css
+    // disables font synthesis), so it stays out of the roles entirely.
+    assert.match(roles, /--type-display:\s+500[^;]+var\(--font-display\);/);
+    assert.match(roles, /--type-title:\s+500[^;]+var\(--font-display\);/);
     assert.match(roles, /--type-heading:\s+700[^;]+var\(--font-display\);/);
-    assert.match(roles, /--type-number:\s+700[^;]+var\(--font-display\);/);
+    assert.match(roles, /--type-number:\s+500[^;]+var\(--font-display\);/);
+    assert.match(roles, /--type-label-strong:\s+700[^;]+var\(--font-sans\);/);
+    assert.match(roles, /--type-name:\s+700[^;]+var\(--font-sans\);/);
     assert.doesNotMatch(roles, /--type-[a-z-]+:\s+800/, "no weight 800 exists in this system — Plex tops out at 700");
     assert.match(roles, /--type-code:\s+400[^;]+var\(--font-mono\);/);
     assert.match(roles, /--type-body:\s+400[^;]+var\(--font-sans\);/);
     assert.match(roles, /--type-label:\s+500[^;]+var\(--font-sans\);/);
   });
 
-  it("tracks the display tier and sets the reading tiers solid", () => {
+  it("tracks the reading tiers and sets the display tier solid", () => {
     const palette = readWebSource("styles/tokens/palette.css");
 
-    // DESIGN.md reserves negative tracking for the display tier (-0.6px at
-    // 24px ≈ -0.025em); IBM Plex Sans is drawn wide and open, so body text
-    // and caps set solid. The zero-valued tokens are the design, not missing
-    // values — they keep the paired-track contract greppable.
-    assert.match(palette, /--track-display:\s*-0\.025em;/);
-    assert.match(palette, /--track-body:\s*0;/);
-    assert.match(palette, /--track-body-sm:\s*0;/);
+    // The source system tightens its READING roles fractionally (-0.16px at 16px,
+    // -0.14px at 14px ≈ -0.01em) — the snug-but-not-condensed setting
+    // Optimistic VF was drawn for — and sets the display tier and the
+    // uppercase captions solid, the opposite of the usual arrangement. The
+    // zero-valued tokens are the design, not missing values; they keep the
+    // paired-track contract greppable.
+    assert.match(palette, /--track-display:\s*0;/);
+    assert.match(palette, /--track-body:\s*-0\.01em;/);
+    assert.match(palette, /--track-body-sm:\s*-0\.01em;/);
     assert.match(palette, /--track-caps:\s*0;/);
 
     // --track-tight was declared 0, so its name promised a tightening it never

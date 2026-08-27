@@ -2,7 +2,7 @@
    Login screen
 
    Minimal centered sign-in card on a flat dark canvas — the pre-auth
-   "cover" stays in the pinned dark-olive register (no theme preference
+   "cover" stays in the pinned dark register (no theme preference
    loaded yet). The local --lg-* names alias the always-dark register in
    tokens/palette.css so the screen stays dark whatever theme the
    operator has saved; the one thing shared with the post-auth product
@@ -94,10 +94,10 @@
   text-align: center;
 }
 
-/* The display rung is 700 in --type-display and the 36px tier sets SOLID
-   (--type-display-track = --track-0, matching DESIGN.md's display-xl); only
-   the 24px rung tracks tight. The pinned --lg-* register is a colour fork,
-   not a type fork, so the role carries the font. */
+/* --type-display is 500 at the 48px rung and sets SOLID — the source system
+   tracks its reading roles, not its display tier, so --type-display-track is 0
+   by design. The pinned --lg-* register is a colour fork, not a type fork, so
+   the role carries the font. */
 .login-headline {
   margin: 0;
   font: var(--type-display);

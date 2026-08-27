@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import date
 from typing import Annotated
 
 from fastapi import Depends, Request
@@ -42,6 +44,7 @@ class AppContext:
     org_settings_store: OrgSettingsStore
     workspace_query_broker: WorkspaceQueryBroker
     control_plane_notifier: KeyedEventNotifier
+    today: Callable[[], date]
 
 
 def app_context(request: Request) -> AppContext:
@@ -62,6 +65,7 @@ def app_context(request: Request) -> AppContext:
         org_settings_store=request.app.state.org_settings_store,
         workspace_query_broker=request.app.state.workspace_query_broker,
         control_plane_notifier=request.app.state.control_plane_notifier,
+        today=request.app.state.today,
     )
 
 

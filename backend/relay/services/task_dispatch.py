@@ -617,12 +617,12 @@ async def start_routine_occurrence_on_ready_node(
     actor: dict[str, Any],
     *,
     agent: str | None,
+    run_date: date,
     assignments: list[dict[str, Any]] | None = None,
-    run_date: date | None = None,
 ) -> DispatchResult | None:
     if not routine.get("isRoutine") or not routine.get("routineEnabled"):
         return None
-    today = run_date or date.today()
+    today = run_date
     today_iso = today.isoformat()
     scheduled_run_date = routine_next_run_date(routine)
     occurrence = active_routine_occurrence(ctx.task_store, routine)

@@ -9,11 +9,12 @@ const secondaryBadgeClasses =
   "border-transparent bg-secondary text-secondary-foreground [a]:hover:bg-secondary/90"
 
 const badgeVariants = cva(
-  /* px-2/py-0.5/font-medium per shadcn latest. The former px-3/py-1/semibold
-     made a chip read as heavy as a small button, which fought the status pills
-     it sits beside in table rows and on cards. Radius stays --r-1 (the chip
-     tier in palette.css), not shadcn's rounded-md. */
-  "group/badge inline-flex w-fit shrink-0 items-center justify-center gap-1 truncate overflow-hidden rounded-sm border px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow,border-color,background-color] duration-(--t-fast) ease-(--ease) focus-visible:[outline:var(--focus-outline)] focus-visible:[outline-offset:var(--focus-offset)] focus-visible:ring-0 [&>svg]:pointer-events-none [&>svg]:size-3",
+  /* The source system's badge chrome: caption-bold (12px/700) on a `4px 10px` pad
+     inside a --r-full pill. Every badge, chip, and tag in the source system
+     is a pill — the shape is a brand signature, so this tier does not get to
+     opt out of it the way a squared shadcn chip would. The dot-carrying
+     status tones below keep the pill and add a leading dot. */
+  "group/badge inline-flex w-fit shrink-0 items-center justify-center gap-1 truncate overflow-hidden rounded-full border px-3 py-0.5 text-micro font-bold whitespace-nowrap transition-[color,box-shadow,border-color,background-color] duration-(--t-fast) ease-(--ease) focus-visible:[outline:var(--focus-outline)] focus-visible:[outline-offset:var(--focus-offset)] focus-visible:ring-0 [&>svg]:pointer-events-none [&>svg]:size-3",
   {
     variants: {
       variant: {

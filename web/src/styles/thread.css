@@ -238,7 +238,7 @@
   width: 26px;
   height: 26px;
   border: 0;
-  border-radius: var(--r-1);
+  border-radius: var(--r-full);
   color: var(--ink-4);
   background: transparent;
   cursor: pointer;
@@ -353,7 +353,7 @@
   margin: 0;
   padding: var(--sp-3) var(--sp-4);
   border: 1px dashed var(--line-2);
-  border-radius: var(--r-2);
+  border-radius: var(--r-3);
   color: var(--ink-3);
   font: var(--type-body-sm);
   line-height: var(--leading-normal);
@@ -610,7 +610,7 @@
   height: 24px;
   padding: 0;
   border: 0;
-  border-radius: var(--r-2);
+  border-radius: var(--r-full);
   background: transparent;
   color: var(--ink-3);
   cursor: pointer;

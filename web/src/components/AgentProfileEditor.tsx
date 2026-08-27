@@ -84,7 +84,7 @@ export function AgentProfileEditor({
         {editable && !editing ? (
           <Button
             type="button"
-            // Always the quiet outline tier — the amber default made a
+            // Always the quiet outline tier — the cobalt default made a
             // secondary record action the loudest thing on the profile page.
             variant="outline"
             size="sm"

@@ -237,7 +237,7 @@
   height: var(--control-h-xs);
   padding: 0 var(--sp-3);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
+  border-radius: var(--r-full);
   background: var(--surface-0);
   color: var(--ink-1);
   font: var(--type-label);
@@ -420,7 +420,7 @@
   gap: var(--sp-2);
   padding: var(--sp-1) var(--sp-2);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
+  border-radius: var(--r-full);
   background: transparent;
   color: var(--ink-2);
   font: var(--type-label-strong);
@@ -811,7 +811,7 @@
   height: 20px;
   padding: 0 var(--sp-2);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-1);
+  border-radius: var(--r-full);
   background: var(--surface-2);
   width: fit-content;
 }
@@ -911,7 +911,7 @@
   height: 20px;
   padding: 0 var(--sp-2);
   border: 1px solid transparent;
-  border-radius: var(--r-1);
+  border-radius: var(--r-full);
   font: var(--type-micro);
   letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
@@ -996,7 +996,7 @@
   flex: none;
   width: 36px;
   height: var(--control-h-sm);
-  border-radius: var(--r-2);
+  border-radius: var(--r-full);
   color: var(--ink-3);
   background: var(--surface-2);
   border: 1px solid var(--line-1);
@@ -1298,7 +1298,7 @@
   font: var(--type-body-sm);
   letter-spacing: var(--type-body-sm-track);
   border: 1px dashed var(--line-2);
-  border-radius: var(--r-2);
+  border-radius: var(--r-3);
   background: var(--surface-1);
 }
 
@@ -1313,7 +1313,7 @@
   letter-spacing: var(--type-label-strong-track);
   text-transform: none;
   border: 1px solid var(--line-2);
-  border-radius: var(--r-1);
+  border-radius: var(--r-full);
   background: var(--surface-1);
   color: var(--ink-3);
   flex: none;
@@ -1364,7 +1364,7 @@
   place-items: center;
   width: 18px;
   height: 18px;
-  border-radius: var(--r-1);
+  border-radius: var(--r-full);
   opacity: 0.85;
 }
 
@@ -1400,7 +1400,7 @@
   padding: var(--sp-4);
   /* Same list-row edge as .adm-assign-node / .adm-placement-item. */
   border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
+  border-radius: var(--r-full);
   background: var(--surface-0);
   transition:
     border-color var(--t-fast) var(--ease),
@@ -1462,7 +1462,7 @@
   letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
   padding: var(--sp-0-5) var(--sp-1-5);
-  border-radius: var(--r-1);
+  border-radius: var(--r-full);
   border: 1px solid var(--line-1);
   color: var(--ink-1);
   background: var(--surface-0);
@@ -1969,8 +1969,8 @@
 
 .adm-chat-callback code {
   overflow-wrap: anywhere;
-  /* Raw yellow text measured 1.7:1 on cream (fails AA); the mono face already
-     separates the string, so it takes plain ink. */
+  /* The action cobalt is a FILL colour, not an ink for a code string; the
+     mono face already separates the string, so it takes plain ink. */
   color: var(--ink-1);
   font-size: var(--fs-2);
 }
@@ -2058,7 +2058,7 @@
   width: 28px;
   height: var(--control-h-xs);
   border: none;
-  border-radius: var(--r-1);
+  border-radius: var(--r-full);
   background: transparent;
   color: var(--ink-3);
   cursor: pointer;

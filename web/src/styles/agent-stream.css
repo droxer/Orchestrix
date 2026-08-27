@@ -191,7 +191,7 @@
 .agent-thinking-toggle:focus-visible {
   outline: var(--focus-outline);
   outline-offset: var(--focus-offset);
-  border-radius: var(--r-1);
+  border-radius: var(--r-full);
 }
 
 /* Tool / command lines — inline `⏺` mono lines, not bordered chips. A run of

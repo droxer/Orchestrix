@@ -4,7 +4,7 @@ import { useRender } from "@base-ui/react/use-render"
 import { cn } from "@/lib/utils"
 
 /* Field label — the `--type-label` role expressed as utilities: text-xs
-   resolves to --fs-2 (13px) and font-medium to 500, matching the token that the
+   resolves to --fs-2 (14px) and font-medium to 500, matching the token that the
    hand-rolled `.adm-field > span` descendant selector used to apply. Having a
    real component means a label can carry `htmlFor`, react to a disabled peer,
    and be used outside `.adm-field` — none of which the descendant rule allowed.

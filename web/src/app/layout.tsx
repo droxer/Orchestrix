@@ -7,11 +7,13 @@ import "../styles.css";
 import { InlineScript } from "../components/InlineScript";
 import { Providers } from "./providers";
 
-// Fieldnotes typography: IBM Plex Sans carries every role — reading, control,
-// and display — with hierarchy built from weight (400/500/600/700) rather
-// than face. JetBrains Mono remains for technical text only: session IDs,
-// logs, and code, set 400 untracked (DESIGN.md names it a near-perfect
-// substitute for Source Code Pro at body sizes). Both are local variable
+// One sans carries every role — reading, control, and display — with
+// hierarchy built from size and weight (400/500/700) rather than from a
+// second face. The source system's own face is Optimistic VF, which Meta does not
+// license for redistribution: palette.css names it first for anyone who has
+// it installed, and IBM Plex Sans (loaded here) is the variable file this app
+// actually ships behind it. JetBrains Mono remains for technical text only:
+// session IDs, logs, and code, set 400 untracked. Both are local variable
 // fonts to avoid layout drift.
 //
 // The vendored WOFF2 is fontsource's latin subset of IBM Plex Sans

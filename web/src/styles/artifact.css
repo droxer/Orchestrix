@@ -9,7 +9,7 @@
 .artifact-chip {
   min-width: 0;
   border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
+  border-radius: var(--r-full);
   background: var(--surface-1);
   overflow: hidden;
   transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
@@ -178,7 +178,7 @@
   max-height: min(70vh, 720px);
   aspect-ratio: auto 16 / 9;
   object-fit: contain;
-  border-radius: var(--r-2);
+  border-radius: var(--r-3);
   background: var(--surface-2);
 }
 
@@ -187,7 +187,7 @@
   width: 100%;
   min-height: 480px;
   border: 0;
-  border-radius: var(--r-2);
+  border-radius: var(--r-3);
   background: var(--paper); /* document paper — previews assume a white page in every theme */
 }
 
@@ -236,7 +236,7 @@
   width: var(--control-h);
   height: var(--control-h);
   border: 0;
-  border-radius: var(--r-2);
+  border-radius: var(--r-full);
   background: transparent;
   color: var(--artifact-accent, var(--info));
   cursor: pointer;
@@ -333,7 +333,7 @@
 .artifact-index-filter-btn {
   padding: var(--sp-0-5) var(--sp-3);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
+  border-radius: var(--r-full);
   background: transparent;
   color: var(--ink-3);
   font: var(--type-label-strong);
@@ -473,7 +473,7 @@
   height: var(--control-h-xs);
   padding: 0 var(--sp-3);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
+  border-radius: var(--r-full);
   background: transparent;
   color: var(--ink-2);
   font: var(--type-label-strong);
