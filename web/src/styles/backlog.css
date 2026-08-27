@@ -43,7 +43,7 @@
 
 .backlog-stat-eyebrow {
   font: var(--type-micro);
-  letter-spacing: var(--track-0);
+  letter-spacing: var(--type-micro-track);
   color: var(--ink-3);
 }
 
@@ -167,17 +167,18 @@
   background: transparent;
   color: var(--ink-3);
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
 }
 
-/* link-inline — accent text action beside the filter button. */
+/* link-inline — a wayfinding anchor beside the filter button, so it takes the
+   link hue; the underline stays, it is link grammar. */
 .backlog-filter-clear {
   min-height: 36px;
   border: 0;
   background: transparent;
   padding: var(--sp-2) var(--sp-1);
-  color: var(--action);
+  color: var(--link);
   font: var(--type-label);
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -186,7 +187,7 @@
 }
 
 .backlog-filter-clear:hover {
-  color: var(--action-hover);
+  color: var(--link-hover);
 }
 
 .backlog-filter-clear:focus-visible {
@@ -417,6 +418,8 @@
 .agent-state::after {
   content: "";
   position: absolute;
+  /* -3px: the pip straddles the glyph's corner edge — half on, half off — so
+     it reads as attached to the avatar rather than floating beside it. */
   right: -3px;
   bottom: -3px;
   width: 9px;
@@ -474,7 +477,7 @@
   background: var(--surface-0);
   color: var(--ink-2);
   font: var(--type-label);
-  letter-spacing: var(--track-0);
+  letter-spacing: var(--type-label-track);
 }
 
 .priority-badge[data-priority="normal"] {
@@ -567,6 +570,8 @@
 .state-mark[data-shape="live"]::after {
   content: "";
   position: absolute;
+  /* -5px: the halo rides proud of the dot so the pulsing ring clears the
+     static mark instead of hugging it. */
   inset: -5px;
   border-radius: var(--r-full);
   border: 2px solid color-mix(in srgb, var(--mark-accent) 30%, transparent);
@@ -774,21 +779,19 @@
 }
 
 /* Secondary actions carry meaning on hover — completing (success) and
-   blocking (caution) read differently from neutral navigation. Reopen reuses
-   the neutral hover since reopening is constructive. */
+   blocking (caution) read differently from neutral navigation. The tone rides
+   the icon/text only; status hues never fill, so the wash stays the neutral
+   row hover. Reopen reuses the neutral hover since reopening is
+   constructive. */
 .backlog-task-actions .backlog-action-done:hover:not(:disabled),
 .backlog-row-actions .backlog-action-done:hover:not(:disabled) {
-  --tone: var(--ok);
-  border-color: var(--tone-line);
-  background: color-mix(in srgb, var(--ok) 10%, var(--surface-0));
+  background: var(--row-hover);
   color: var(--ok);
 }
 
 .backlog-task-actions .backlog-action-block:hover:not(:disabled),
 .backlog-row-actions .backlog-action-block:hover:not(:disabled) {
-  --tone: var(--err);
-  border-color: var(--tone-line);
-  background: color-mix(in srgb, var(--err) 9%, var(--surface-0));
+  background: var(--row-hover);
   color: var(--err);
 }
 
@@ -946,6 +949,8 @@
    hue, matching the .agent-state indicator used on the boards. */
 .task-assignment-summary-mark::after {
   position: absolute;
+  /* -3px: same corner-straddle overlap as .agent-state::after — attached, not
+     floating. */
   right: -3px;
   bottom: -3px;
   width: 12px;
@@ -1018,6 +1023,8 @@
   display: flex;
   align-items: center;
   margin-top: var(--sp-1);
+  /* 3px: offsets the first avatar's -3px overlap so the stack's leading edge
+     still aligns with the text above it. */
   padding-left: 3px;
 }
 
@@ -1028,6 +1035,8 @@
   justify-content: center;
   width: 22px;
   height: 22px;
+  /* -3px: overlaps the avatar stack so the faces cluster into one group
+     instead of reading as separate chips. */
   margin-left: -3px;
   border: 2px solid var(--surface-1);
   border-radius: var(--r-full);
@@ -1487,7 +1496,7 @@
 .backlog-row-status {
   color: var(--row-accent);
   font: var(--type-label);
-  letter-spacing: var(--track-0);
+  letter-spacing: var(--type-label-track);
 }
 
 /* Calm tiers would otherwise render the label dimmer than plain meta text. */

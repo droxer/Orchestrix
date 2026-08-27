@@ -68,7 +68,10 @@
   font: var(--type-heading);
   letter-spacing: var(--type-heading-track);
   opacity: 0;
-  transition: opacity var(--t-fast) var(--ease) calc(var(--t-fast) * 0.75);
+  transition: opacity var(--t-fast) var(--ease) calc(var(--t-stagger) * 3);
+  /* The fade stays --t-fast; only the delay is stepped, against the
+     --t-stagger reveal base like the label ladder below, so the wordmark
+     lands between groups 2 and 3 as the rail's width transition runs. */
 }
 
 .sidenav-panel[data-expanded="true"] .sidenav-brand-word {
@@ -339,12 +342,14 @@
    carries a label span. The old per-button ladder therefore replayed
    1,2 / 2,3 / 2,3 / 2,3,4 down the rail instead of counting to eight.
    Group-level steps are monotonic by construction and stay correct when
-   an item is added to or removed from a group. */
-.sidenav-panel[data-expanded="true"] .sidenav-group:nth-child(1) .sidenav-label { transition-delay: calc(var(--t-fast) * 0.25); }
-.sidenav-panel[data-expanded="true"] .sidenav-group:nth-child(2) .sidenav-label { transition-delay: calc(var(--t-fast) * 0.5); }
-.sidenav-panel[data-expanded="true"] .sidenav-group:nth-child(3) .sidenav-label { transition-delay: calc(var(--t-fast) * 0.75); }
-.sidenav-panel[data-expanded="true"] .sidenav-group:nth-child(4) .sidenav-label { transition-delay: var(--t-fast); }
-.sidenav-panel[data-expanded="true"] .sidenav-bottom .sidenav-label { transition-delay: var(--t-fast); }
+   an item is added to or removed from a group. Delays step against
+   --t-stagger (the reveal-ladder base), preserving the 1–4 ordering that
+   lets the rail's width transition lead each label's fade. */
+.sidenav-panel[data-expanded="true"] .sidenav-group:nth-child(1) .sidenav-label { transition-delay: calc(var(--t-stagger) * 1); }
+.sidenav-panel[data-expanded="true"] .sidenav-group:nth-child(2) .sidenav-label { transition-delay: calc(var(--t-stagger) * 2); }
+.sidenav-panel[data-expanded="true"] .sidenav-group:nth-child(3) .sidenav-label { transition-delay: calc(var(--t-stagger) * 3); }
+.sidenav-panel[data-expanded="true"] .sidenav-group:nth-child(4) .sidenav-label { transition-delay: calc(var(--t-stagger) * 4); }
+.sidenav-panel[data-expanded="true"] .sidenav-bottom .sidenav-label { transition-delay: calc(var(--t-stagger) * 4); }
 
 /* Expanded button layout: icon + label side by side. Compact rows at the
    40px control height (not the 48px collapsed square), tight label rhythm. */
@@ -444,6 +449,9 @@
 
 .sidenav-badge-dot {
   position: absolute;
+  /* 7px lands the 6px dot on the icon's top-right corner inside the 40px
+     collapsed button — close enough to read as "on this destination", far
+     enough not to cover the glyph. */
   top: 7px;
   right: 7px;
   width: 6px;

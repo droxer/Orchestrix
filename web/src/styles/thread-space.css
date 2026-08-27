@@ -129,7 +129,9 @@
   width: 28px;
   height: var(--control-h-xs);
   border-radius: var(--r-2);
-  background: color-mix(in srgb, var(--info) 12%, transparent);
+  /* Neutral row wash for the tile: status tones are dot/border/text, never
+     fills — the --info tone stays on the glyph itself. */
+  background: var(--row-hover);
   color: var(--info);
 }
 

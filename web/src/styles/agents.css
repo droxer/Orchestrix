@@ -277,12 +277,12 @@
   flex: none;
 }
 
-/* Same ownership mapping as .adm-node-profile-kind: the cloud mark carries the
-   action tint and the chip itself stays a neutral hairline, so ownership never
-   competes with the status dot (the loud/calm brightness tiers stay reserved
-   for health). */
+/* Same ownership mapping as .adm-node-profile-kind: the cloud mark steps up
+   one ink tier and the chip itself stays a neutral hairline, so ownership
+   never competes with the status dot (the loud/calm brightness tiers stay
+   reserved for health). */
 .agent-placement-badge[data-ownership="managed"] > svg {
-  color: var(--action);
+  color: var(--ink-2);
 }
 
 /* Status hue lives only on the dot (tone-* sets --tone in base.css), matching

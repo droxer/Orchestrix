@@ -130,7 +130,7 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
             key={tick.value}
             x={PADDING.left - 8}
             y={tick.y + 3}
-            fontSize={10}
+            style={{ fontSize: 'var(--fs-1)' }}
             textAnchor="end"
             fill="var(--ink-4)"
             fontFamily="var(--font-sans)"
@@ -143,7 +143,7 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
             key={i}
             x={tick.x}
             y={HEIGHT - 8}
-            fontSize={10}
+            style={{ fontSize: 'var(--fs-1)' }}
             textAnchor="middle"
             fill="var(--ink-4)"
             fontFamily="var(--font-sans)"

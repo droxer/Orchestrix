@@ -9,7 +9,6 @@
 @theme inline {
     /* The core shadcn bridge (@theme + :root aliases) lives in
        tokens/shadcn-bridge.css — do not re-declare it here. */
-    --font-heading: var(--font-display);
 }
 
 @layer base {

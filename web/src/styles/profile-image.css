@@ -89,6 +89,9 @@
 
 .profile-image-picker-action {
   position: absolute;
+  /* Corner badge: -5px lets the 25px disc straddle the tile's bottom-right
+     edge instead of floating inside it — the overhang is what reads as
+     "attached to this image". */
   right: -5px;
   bottom: -5px;
   display: grid;
@@ -109,6 +112,8 @@
 
 .profile-image-picker-remove {
   position: absolute;
+  /* Same corner-badge grammar as the action disc, nudged 2px further out
+     (-7px) so the smaller 24px button clears the tile's corner radius. */
   top: -7px;
   right: -7px;
   display: grid;
@@ -183,6 +188,8 @@
    ::before so the picker layout and offsets stay untouched. */
 @media (pointer: coarse) {
   .profile-image-picker-remove {
+    /* -17px keeps the grown 44px hit area centered where the 24px visual
+       sits: the base -7px minus the 10px of radius added per side. */
     top: -17px;
     right: -17px;
     width: var(--touch-target);

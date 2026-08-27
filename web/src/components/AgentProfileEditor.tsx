@@ -138,7 +138,7 @@ export function AgentProfileEditor({
           </div>
           <Textarea
             ref={textareaRef}
-            className="agent-personality-textarea code"
+            className="agent-personality-textarea"
             name="agent-personality"
             aria-label={t("agents_page.personality_title")}
             aria-describedby={helpId}

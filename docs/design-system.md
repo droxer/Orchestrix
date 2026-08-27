@@ -242,7 +242,19 @@ deliberate — a reader who takes the rule literally will file them as bugs:
   carried by glyph shape, never *what is happening*.
 - **Login is the cover, not a page.** Pre-auth runs on the pinned dark-olive
   ramp because no theme has loaded; its primary CTA already takes the
-  register-invariant yellow like every other primary action.
+  register-invariant yellow like every other primary action. The cover sets
+  its field labels, footer meta, and status line in the mono face — a
+  deliberate skin; everywhere else mono is technical text only. The disabled
+  submit is a `color-mix` wash of the yellow over the canvas, not the
+  system's disabled-by-opacity convention, because on the pinned dark cover
+  the label must stay legible against the darkened fill. Its faint olive
+  spotlight radial-gradient is the one gradient besides the functional
+  hatches and fades.
+- **The atelier landing keeps one ambient glow.** The empty transcript state
+  drifts an ink-only wash on `--t-ambient`. That is decoration, not
+  liveness — no pulse cadence, no yellow — so an idle landing's yellow
+  density stays zero. It is the ambient loop's only occupant; a second one
+  is a bug.
 
 Any **further** source of colour is a bug.
 

@@ -263,12 +263,12 @@
 }
 
 /* Nested threads are subordinate to the folder, so they give up the 600
-   weight to it. Same 13px rung, regular weight — the step down marks
-   "subordinate", not "unimportant". */
+   weight to it — the label role's 500 at the same 13px rung. The step down
+   marks "subordinate", not "unimportant". */
 .project-folder-threads .conversation-name strong {
   color: var(--ink-2);
-  font: 500 var(--fs-2)/1.5 var(--font-sans);
-  letter-spacing: var(--track-0);
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
 }
 
 /* Selection and unread-style attention pull the title back to full ink —
@@ -284,8 +284,8 @@
 }
 
 .project-folder-threads .conversation-row[data-selected="true"]::after {
-  top: 8px;
-  bottom: 8px;
+  top: var(--sp-2);
+  bottom: var(--sp-2);
 }
 
 .project-folder-empty {

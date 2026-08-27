@@ -162,7 +162,11 @@
 .pref-group-label {
   margin: 0 0 var(--sp-3);
   font: var(--type-micro);
-  letter-spacing: var(--track-0);
+  /* The role's named pair: the sentence-case carve-out that keeps generic
+     eyebrows on --track-0 is documented in base.css for .eyebrow and
+     .page-header-kicker only; this group label takes the paired track
+     (both resolve to 0 today — the declaration is the contract). */
+  letter-spacing: var(--type-micro-track);
   color: var(--ink-3);
 }
 

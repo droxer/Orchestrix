@@ -19,7 +19,9 @@
     height: 100dvh;
     border-left: 0;
     border-top: 1px solid var(--line-1);
-    --rise-from: 16px;
+    /* Travel stays at the default pane tier (--rise); the system has
+       exactly two rise distances and full-viewport drawers take the pane
+       one. */
     animation: rise var(--t-slow) var(--ease);
   }
 
@@ -101,7 +103,6 @@
     max-height: min(92dvh, 100%);
     border-radius: var(--r-3) var(--r-3) 0 0;
     /* Shared rise: accepts the full 0→1 fade (sheet-in's .72 opacity floor dropped). */
-    --rise-from: 12px;
     animation: rise var(--t-fast) var(--ease) both;
   }
 
@@ -138,7 +139,6 @@
     padding-bottom: max(env(safe-area-inset-bottom), var(--sp-4));
     border-radius: var(--r-3) var(--r-3) 0 0;
     /* Shared rise: accepts the full 0→1 fade (sheet-in's .72 opacity floor dropped). */
-    --rise-from: 12px;
     animation: rise var(--t-fast) var(--ease) both;
   }
 

@@ -257,7 +257,7 @@
    trailing column read as a button and orphaned the row. */
 .team-profile-member-lead {
   flex: none;
-  color: var(--action);
+  color: var(--ink-3);
   font: var(--type-micro);
   letter-spacing: var(--type-micro-track);
   text-transform: uppercase;

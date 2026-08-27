@@ -332,12 +332,15 @@
   --track-caps: 0;
 
   /* Families — IBM Plex Sans carries EVERY role: reading, control, and
-     display text, separated by weight (400/500/600/700/800) rather than by
-     face. The display tier is the same family at 700/800 with negative
-     tracking; there is no second sans. The mono is technical text only —
-     JetBrains Mono, kept from Phosphor: DESIGN.md's own note names it a
-     near-perfect substitute for Source Code Pro at body sizes, and the
-     vendored variable file was already shipped. */
+     display text, separated by weight (400/500/600/700) rather than by
+     face. The display tier is the same family at 700 with negative
+     tracking — DESIGN.md calls for 800 there, but Plex Variable tops out
+     at 700 and base.css disables font synthesis, so an 800 declaration
+     would silently render as 700; the roles say 700 and let size +
+     tracking carry the tier. There is no second sans. The mono is
+     technical text only — JetBrains Mono, kept from Phosphor: DESIGN.md's
+     own note names it a near-perfect substitute for Source Code Pro at
+     body sizes, and the vendored variable file was already shipped. */
   /* Transcript content is multilingual even when the UI language is English.
      Keep explicit Han fallbacks in the default stacks so agent-authored CJK
      never depends on a browser's last-resort missing-glyph substitution. */
@@ -377,7 +380,9 @@
   /* Draw — content that renders itself over real time rather than changing
      state: a chart stroke arriving, a skeleton shimmer sweeping. Too long to
      be --t-slow (a 320ms chart draw reads as a flicker), too purposeful to be
-     an ambient pulse. Was spelled 0.8s / 1.1s / 1.2s at four call sites. */
+     an ambient pulse. Was spelled 0.8s / 1.1s / 1.2s at four call sites;
+     the two survivors are workspace.css's loading-bar slide and skeleton
+     shimmer. */
   --t-draw: 1.1s;
 
   /* Stagger — the base step for a reveal ladder (list rows, activity

@@ -764,9 +764,9 @@ export function ChannelsView({
                   <ProviderAvatar provider={integration.provider} />
                   <span className="adm-chat-integration-main">
                     <strong>{integration.displayName}</strong>
-                    <span className="code">
+                    <span>
                       {providerLabel(integration.provider)}
-                      {integration.tenantId ? ` · ${integration.tenantId}` : ""}
+                      {integration.tenantId ? <> · <span className="code">{integration.tenantId}</span></> : null}
                     </span>
                   </span>
                   <TonePill

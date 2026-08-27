@@ -8,6 +8,7 @@ import { useComposer } from "../../hooks/useComposer";
 import { useMentionAutocomplete } from "../../hooks/useMentionAutocomplete";
 import { parseMentions, replaceAddressRun, type MentionCandidate } from "../../lib/mentions";
 import { MentionHighlight } from "./MentionHighlight";
+import { Button } from "@/components/ui/button";
 import { MENTION_LIST_ID, MentionPopup, mentionOptionId } from "./MentionPopup";
 import { ThreadRuntimeReadout, ThreadRuntimeSelect } from "./ThreadRuntimeSelect";
 
@@ -249,7 +250,7 @@ const ComposerView = forwardRef<ComposerHandle, {
             <div className="composer-footer-right">
               {/* One mounted element for send↔stop so keyboard focus survives
                   the run starting; the glyph cross-fades instead. */}
-              <button
+              <Button variant="default"
                 type={running ? "button" : "submit"}
                 className={running ? "send-button send-button-cancel" : "send-button"}
                 disabled={!running && (
@@ -271,7 +272,7 @@ const ComposerView = forwardRef<ComposerHandle, {
                 <span className="send-button-icon" key={running ? "stop" : "send"}>
                   {running ? <ComposerStop size={13} /> : <ActionSend size={16} />}
                 </span>
-              </button>
+              </Button>
             </div>
           </div>
         </div>

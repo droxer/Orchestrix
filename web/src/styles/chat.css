@@ -106,7 +106,9 @@
 .chat-agent-select[data-availability="unavailable"] {
   --tone: var(--err);
   border-color: var(--tone-line);
-  background: color-mix(in srgb, var(--err) 6%, var(--surface-3));
+  /* Fill stays a neutral surface step: status is dot/border/text, never a
+     fill — the unavailable tone lives on the border and the label. */
+  background: var(--surface-2);
   color: var(--err);
   opacity: 1;
 }
@@ -151,11 +153,11 @@
   color: var(--ink-3);
 }
 
-/* Disabled rows stay fully legible: status is communicated by label and
-   shape, while the disabled interaction is still enforced by Base UI. */
+/* Disabled is opacity, the system convention (base.css) — there is no
+   disabled hex, and a dedicated ink tier would be one in disguise. The
+   interaction itself is still enforced by Base UI. */
 .chat-agent-option[data-disabled] {
-  opacity: 1;
-  color: var(--ink-3);
+  opacity: 0.55;
 }
 
 .chat-agent-option-availability[data-availability="pending"] {
@@ -193,6 +195,8 @@
 
 .chat-artifacts-count {
   position: absolute;
+  /* Off-scale optical nudge: the -3px pull overlaps the button corner so the
+     count badge reads as pinned to it, not floating beside it. */
   right: -3px;
   bottom: -3px;
   min-width: 18px;
@@ -281,7 +285,7 @@
      column 2 explicitly so it still lines up with the turn bodies. */
   grid-column: 2;
   font: var(--type-micro);
-  letter-spacing: var(--track-0);
+  letter-spacing: var(--type-micro-track);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -318,8 +322,9 @@
   color: var(--ink-1);
   background: var(--surface-0);
   border: 1px solid var(--line-1);
-  /* Agents are squares; the human is a rounded badge/avatar filled with the
-     action color. Agent identity is the profile image inside. */
+  /* Agents are squares; the human is a circle. Yellow is reserved for action
+     and live work, so the human-vs-machine tell is the silhouette, not a
+     fill. Agent identity is the profile image inside. */
   border-radius: var(--r-1);
 }
 
@@ -334,10 +339,10 @@
 }
 
 .rail-node-user {
-  background: var(--action);
-  border-color: var(--action);
+  background: var(--surface-3);
+  border-color: var(--line-1);
   border-radius: var(--r-2);
-  color: var(--on-action);
+  color: var(--ink-1);
 }
 
 /* ---- Speaker avatars: a matched but distinct pair ------------------------
@@ -345,8 +350,9 @@
    Scoped one level deeper than the bare .rail-node so they win over the
    atelier.css circle override regardless of import order.
 
-   You    → a round solid action-yellow avatar. Round reads as "a person"; the
-            circle silhouette is the fast human-vs-machine tell.
+   You    → a round ink-on-neutral avatar. Round reads as "a person" — the
+            circle silhouette is the fast human-vs-machine tell, and yellow is
+            reserved for action/live, so it can't carry speaker identity.
    Agent  → a square tile carrying that agent's profile image — its upload, or
             the name monogram on its identity hue. The circle-vs-square
             contrast, not colour, separates the two speakers; the monogram's
@@ -354,9 +360,6 @@
             generic Relay product mark lives on the agent-phase divider.) */
 .msg-user .rail-node.rail-node-user {
   border-radius: var(--r-full);
-  border-color: transparent;
-  background: var(--action);
-  color: var(--on-action);
 }
 
 .msg-agent .rail-node.rail-node-agent {
@@ -511,7 +514,7 @@
   margin-bottom: 0;
   color: var(--ink-1);
   font: var(--type-label-strong);
-  letter-spacing: var(--track-0);
+  letter-spacing: var(--type-label-strong-track);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -596,8 +599,8 @@
 }
 
 .msg-turn-action:focus-visible {
-  outline: 2px solid var(--action);
-  outline-offset: 2px;
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .msg-turn-action-label {

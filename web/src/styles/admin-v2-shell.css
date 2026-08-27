@@ -1,6 +1,6 @@
 /* =====================================================================
    Admin Page v2  (adm-* namespace)
-   Operational control plane: white canvas, hairline grids, sans-tabular
+   Operational control plane: cream canvas, hairline grids, sans-tabular
    numerals, ink action color. Shares PageHeader + view-toggle chrome
    with Backlog and Routine; pulse strip and attention rail are admin-only.
    ===================================================================== */
@@ -46,9 +46,8 @@
 
 .adm-loading {
   color: var(--ink-3);
-  font-family: var(--font-sans);
-  font-size: var(--fs-3);
-  letter-spacing: var(--track-caps);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
 }
 
 /* ── View toggle — same segmented-control language as .backlog-view-toggle

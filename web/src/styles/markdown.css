@@ -440,7 +440,7 @@ html:lang(zh-TW) .md-body blockquote {
    ordered list. Unstyled it reads as an unexplained second document; the rule
    and the muted scale mark it as apparatus rather than more body copy. */
 .md-body sup a[data-footnote-ref] {
-  padding: 0 2px;
+  padding: 0 var(--sp-0-5);
   color: var(--link);
   text-decoration: none;
   font-size: var(--fs-1);

@@ -103,7 +103,7 @@ html[data-theme="dark"] .relay-bleed-mark {
 .relay-empty-hint {
   margin: var(--sp-1) 0 0;
   font: var(--type-label);
-  letter-spacing: var(--track-0);
+  letter-spacing: var(--type-label-track);
   color: var(--ink-3);
 }
 
@@ -140,7 +140,7 @@ html[data-theme="dark"] .relay-bleed-mark {
   gap: var(--sp-2);
   color: var(--ink-3);
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
 }
 

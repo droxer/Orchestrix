@@ -39,7 +39,7 @@
 .thread-runtime-context {
   color: var(--ink-3);
   font: var(--type-label);
-  letter-spacing: var(--track-0);
+  letter-spacing: var(--type-label-track);
   white-space: nowrap;
 }
 
@@ -70,10 +70,11 @@
 }
 
 /* Ownership reads on the mark, matching the fleet badges: a cloud computer
-   Relay runs takes the achromatic action ink, a person's own machine stays
-   neutral. */
+   Relay runs steps down a rung of ink while a person's own machine keeps
+   full ink. Yellow is reserved for action/live, so it can't carry
+   ownership. */
 .thread-runtime-select[data-ownership="managed"] > svg {
-  color: var(--action);
+  color: var(--ink-2);
 }
 
 /* The pick outlived its machine: it survives a heartbeat flap on purpose, but
@@ -133,7 +134,7 @@
 }
 
 .thread-runtime-option[data-ownership="managed"] > svg {
-  color: var(--action);
+  color: var(--ink-2);
 }
 
 .thread-runtime-option-body {
@@ -266,7 +267,9 @@
 }
 
 /* iOS zooms any focused field under 16px; coarse pointers get the bump. The
-   mirror takes the same bump or the pills stop lining up on phones. */
+   mirror takes the same bump or the pills stop lining up on phones. The 16px
+   must stay a hard literal floor — var(--fs-4) collapses to 15px under
+   [data-density=compact], which would reintroduce the zoom bug. */
 @media (pointer: coarse) {
   .composer-input textarea,
   .composer-highlight { font-size: 16px; }
@@ -321,16 +324,17 @@
 }
 
 /* Primary assign plate — a 36px amber plate, the one place "commit" still
-   earns the action fill now that list headers all carry the ghost plus. */
+   earns the action fill now that list headers all carry the ghost plus. The
+   plate itself (action background, on-action ink, hover, focus ring,
+   transparent border) comes from Button's default variant in Composer.tsx;
+   this file keeps only the geometry, the icon layout, and the cancel
+   restyle. */
 .send-button {
   display: grid;
   place-items: center;
   width: 36px;
   height: var(--control-h-sm);
-  border: 1px solid transparent;
   border-radius: var(--r-2);
-  background: var(--action);
-  color: var(--on-action);
   cursor: pointer;
   transition:
     background var(--t-fast) var(--ease),
@@ -339,31 +343,10 @@
     box-shadow var(--t-fast) var(--ease);
 }
 
-.send-button:hover:not(:disabled) {
-  background: var(--action-hover);
-}
-
-.send-button:active:not(:disabled) {
-  background: var(--action-hover);
-}
-
-.send-button:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
-
 /* Stop state keeps the same solid plate as send — the send↔stop transition
    is only a glyph swap, so the composer's primary control never changes
-   silhouette. The solid square alone carries the "stop" meaning. */
-.send-button.send-button-cancel {
-  background: var(--action);
-  color: var(--on-action);
-}
-
-.send-button.send-button-cancel:hover:not(:disabled) {
-  background: var(--action-hover);
-}
-
+   silhouette. Button's default variant supplies that identical plate, so the
+   only stop-specific chrome left is the danger focus ring. */
 .send-button.send-button-cancel:focus-visible {
   outline: var(--focus-outline-danger);
   outline-offset: var(--focus-offset);
@@ -463,8 +446,9 @@
 }
 
 /* Blocked mention: the send is disabled while this is in the draft, so it
-   must not look like the settled ones. A hatched wash carries that without
-   borrowing a status colour. */
+   must not look like the settled ones. The hatched --warn wash mirrors the
+   sanctioned fleet-health stale treatment — --warn is a rung in the olive
+   brightness hierarchy, not a chroma, so this borrows no status hue. */
 .composer-mention-token:not([data-eligible]) {
   background: repeating-linear-gradient(
     -45deg,

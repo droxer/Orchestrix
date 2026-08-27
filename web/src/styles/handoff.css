@@ -54,7 +54,7 @@
   background: var(--surface-0);
 }
 
-/* Panel header — the routing icon in an action-tinted chip plus a title, so
+/* Panel header — the routing icon in a quiet surface-2 chip plus a title, so
    the drawer reads as a deliberate "pass this turn to another agent" affordance
    rather than a bare stack of selects. */
 .handoff-panel-head {
@@ -71,8 +71,8 @@
   width: 24px;
   height: 24px;
   border-radius: var(--r-2);
-  background: var(--action-soft);
-  color: var(--action);
+  background: var(--surface-2);
+  color: var(--ink-3);
 }
 
 .handoff-panel-title {

@@ -292,7 +292,7 @@
   background: var(--action);
   color: var(--on-action);
   font: var(--type-label-strong);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--type-label-strong-track);
   flex-shrink: 0;
 }
 
@@ -526,7 +526,7 @@
 
 .adm-provision-section-meta {
   font: var(--type-label-strong);
-  letter-spacing: var(--track-0);
+  letter-spacing: var(--type-label-strong-track);
   color: var(--ink-4);
 }
 
@@ -590,13 +590,15 @@
 }
 
 .create-agent-runtime-option:focus-visible {
-  outline: 2px solid var(--action);
-  outline-offset: 2px;
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
 }
 
 .create-agent-runtime-option.is-selected {
   border-color: var(--action);
-  background: color-mix(in srgb, var(--action) 9%, var(--surface-1));
+  /* Selection is a sanctioned action job, but the wash ratio is the token's
+     (24%/16%), not a hand-mix. */
+  background: var(--action-soft);
 }
 
 .create-agent-runtime-option:disabled {
@@ -644,7 +646,7 @@
   width: 10px;
   height: 10px;
   border: 1px solid var(--ink-4);
-  border-radius: 50%;
+  border-radius: var(--r-full);
 }
 
 .create-agent-runtime-option.is-selected .create-agent-runtime-check {
@@ -711,7 +713,9 @@
 }
 
 .adm-provision-outcome.is-managed {
-  border-left-color: var(--action);
+  /* Ownership is an ink tier, not the action hue: managed sits one step above
+     local's --info (= ink-3) so the accent bar keeps the hierarchy. */
+  border-left-color: var(--ink-2);
 }
 
 .adm-provision-outcome.is-local {
@@ -812,9 +816,9 @@
   flex-shrink: 0;
 }
 
-/* Same ownership mapping as .adm-node-profile-kind: managed = action tint,
-   local = neutral ink. */
-.adm-profile-segment-dot[data-kind="managed"] { background: var(--action); }
+/* Ownership is carried by the segment label and active shape, not hue — both
+   kinds read as quiet ink-3 dots. */
+.adm-profile-segment-dot[data-kind="managed"] { background: var(--ink-3); }
 .adm-profile-segment-dot[data-kind="local"] { background: var(--ink-3); }
 
 .adm-profile-field > .adm-form-hint {
@@ -896,8 +900,8 @@
 }
 
 .adm-placement-remove:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--err) 8%, transparent);
-  border-color: var(--err);
+  /* Tone stays on the icon; status hues never fill. */
+  background: var(--row-hover);
   color: var(--err);
 }
 

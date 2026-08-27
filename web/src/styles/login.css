@@ -226,7 +226,10 @@
   background: color-mix(in srgb, var(--lg-accent) 40%, var(--lg-canvas));
   color: var(--lg-muted);
   /* The wash is the disabled signal — cancel the primitive's opacity-50 so
-     the label keeps the --lg-muted contrast it was picked for. */
+     the label keeps the --lg-muted contrast it was picked for. This is a
+     deliberate carve-out from the system's "disabled is opacity" rule: the
+     pinned pre-auth cover never lightens, so a sheer yellow fill would
+     keep nearly full strength and read as available rather than dimmed. */
   opacity: 1;
 }
 
@@ -271,7 +274,10 @@
   letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
   --blink-from: 0.55;
-  animation: blink var(--t-pulse) var(--ease) infinite;
+  /* Passive readiness, not work in flight — the calm cadence, not the
+     --t-pulse active-work tempo. The ▌ caret has no channel of its own; it
+     rides this breathe, so there is no --t-tick split to make. */
+  animation: blink var(--t-pulse-calm) var(--ease) infinite;
 }
 
 .login-checking-text::after {
