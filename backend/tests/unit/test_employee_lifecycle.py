@@ -20,14 +20,21 @@ class RaisingManagedNodeStore:
 
     def __init__(self, error: Exception | None = None):
         self.error = error
+        self.nodes: list[dict] = []
 
     def list_nodes(self) -> list[dict]:
+        return self.nodes
+
+    def update_node(self, node_id: str, patch: dict) -> dict:
         if self.error:
             raise self.error
-        return []
+        node = next(node for node in self.nodes if node["id"] == node_id)
+        node.update(patch)
+        return node
 
-    def update_node(self, node_id: str, patch: dict) -> dict:  # pragma: no cover
-        raise AssertionError("not reached")
+
+def add_managed_node(store: RaisingManagedNodeStore, employee_id: str) -> None:
+    store.nodes.append({"id": "managed_a", "employeeId": employee_id})
 
 
 def build_context(tmp_path: Path, managed_node_store: object) -> SimpleNamespace:
@@ -60,7 +67,12 @@ def seed_employee(ctx: SimpleNamespace) -> tuple[str, str]:
     )
     employee_id = user["employeeId"]
     agent = ctx.agent_store.create_agent(
-        employee_id, {"displayName": "Planner", "executorKind": "claude", "defaultRole": "implementer"}
+        employee_id,
+        {
+            "displayName": "Planner",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+        },
     )
     return employee_id, agent["id"]
 
@@ -88,8 +100,11 @@ def test_failure_midway_leaves_the_employee_and_agents_intact(tmp_path: Path) ->
     Without it, the employee was already marked deleted and their agents gone
     by the time the managed-node step failed, leaving no way to finish or undo.
     """
-    ctx = build_context(tmp_path, RaisingManagedNodeStore(RuntimeError("provider down")))
+    ctx = build_context(
+        tmp_path, RaisingManagedNodeStore(RuntimeError("provider down"))
+    )
     employee_id, agent_id = seed_employee(ctx)
+    add_managed_node(ctx.managed_node_store, employee_id)
 
     with pytest.raises(RuntimeError, match="provider down"):
         soft_delete_employee(ctx, employee_id)
@@ -100,8 +115,11 @@ def test_failure_midway_leaves_the_employee_and_agents_intact(tmp_path: Path) ->
 
 
 def test_failure_restores_in_memory_registry_nodes(tmp_path: Path) -> None:
-    ctx = build_context(tmp_path, RaisingManagedNodeStore(RuntimeError("provider down")))
+    ctx = build_context(
+        tmp_path, RaisingManagedNodeStore(RuntimeError("provider down"))
+    )
     employee_id, _ = seed_employee(ctx)
+    add_managed_node(ctx.managed_node_store, employee_id)
     ctx.registry.sandboxes["node_a"] = {"id": "node_a", "employeeId": employee_id}
 
     def drop_employee(_employee_id: str) -> list[str]:
@@ -114,6 +132,25 @@ def test_failure_restores_in_memory_registry_nodes(tmp_path: Path) -> None:
         soft_delete_employee(ctx, employee_id)
 
     assert ctx.registry.sandboxes["node_a"]["employeeId"] == employee_id
+
+
+def test_failure_does_not_erase_an_unrelated_registry_update(tmp_path: Path) -> None:
+    ctx = build_context(tmp_path, RaisingManagedNodeStore())
+    employee_id, _ = seed_employee(ctx)
+    ctx.registry.sandboxes["node_a"] = {"id": "node_a", "employeeId": employee_id}
+
+    add_managed_node(ctx.managed_node_store, employee_id)
+
+    def fail_after_unrelated_update(node_id: str, patch: dict) -> dict:
+        ctx.registry.sandboxes["node_b"] = {"id": "node_b", "status": "ready"}
+        raise RuntimeError("provider down")
+
+    ctx.managed_node_store.update_node = fail_after_unrelated_update
+
+    with pytest.raises(RuntimeError, match="provider down"):
+        soft_delete_employee(ctx, employee_id)
+
+    assert ctx.registry.sandboxes["node_b"]["status"] == "ready"
 
 
 def test_file_backed_stores_have_no_shared_engine(tmp_path: Path) -> None:
@@ -149,6 +186,7 @@ def test_file_backed_failure_restores_employee_and_agent(tmp_path: Path) -> None
         managed_node_store=RaisingManagedNodeStore(RuntimeError("provider down")),
     )
     employee_id, agent_id = seed_employee(ctx)
+    add_managed_node(ctx.managed_node_store, employee_id)
 
     with pytest.raises(RuntimeError, match="provider down"):
         soft_delete_employee(ctx, employee_id)

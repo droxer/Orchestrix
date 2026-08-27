@@ -100,12 +100,29 @@ def test_database_auth_store_persists_users_and_hashes_session_tokens() -> None:
         assert store.get_session_by_token(session["token"]) is None
 
 
-def test_database_auth_store_normalizes_human_readable_ids_before_uuid_queries() -> None:
+def test_database_ids_reject_human_handles_for_uuid_queries() -> None:
     normalize = auth_module.normalize_database_id
 
     assert normalize("alice") is None
     generated = normalize("550E8400-E29B-41D4-A716-446655440000")
     assert generated == "550e8400-e29b-41d4-a716-446655440000"
+
+
+def test_database_auth_store_maps_human_handles_independently_and_stably() -> None:
+    with TemporaryDirectory() as root:
+        store = DatabaseUserAuthStore(f"sqlite:///{root}/auth.db", create_schema=True)
+
+        alice = store.create_user(
+            "alice", "secret123", employee_id="alice", display_name="Same"
+        )
+        bob = store.create_user(
+            "bob", "secret123", employee_id="bob", display_name="Same"
+        )
+        alice_again = store.ensure_employee("alice", display_name="Renamed Alice")
+
+        assert alice["employeeId"] != bob["employeeId"]
+        assert alice_again["id"] == alice["employeeId"]
+        assert alice_again["displayName"] == "Renamed Alice"
 
 
 @pytest.mark.parametrize("store_kind", ["local", "database"])

@@ -4,6 +4,7 @@ import asyncio
 
 import pytest
 from fastapi import HTTPException
+from relay.api import helpers
 from relay.api.helpers import assignment_list, json_body
 from starlette.requests import Request
 
@@ -34,7 +35,7 @@ def test_json_body_rejects_payloads_over_the_configured_limit(monkeypatch) -> No
     messages = iter(
         [
             {"type": "http.request", "body": b'{"value"', "more_body": True},
-            {"type": "http.request", "body": b': 12345}', "more_body": False},
+            {"type": "http.request", "body": b": 12345}", "more_body": False},
         ]
     )
 
@@ -56,6 +57,17 @@ def test_json_body_rejects_payloads_over_the_configured_limit(monkeypatch) -> No
 
     assert raised.value.status_code == 413
     assert raised.value.detail == "JSON request body exceeds the 8 byte limit."
+
+
+def test_json_body_rejects_an_oversized_chunk_before_copying_it() -> None:
+    append_chunk = helpers.append_json_body_chunk
+    body = bytearray(b"ok")
+
+    with pytest.raises(HTTPException) as raised:
+        append_chunk(body, b"oversized", 4)
+
+    assert raised.value.status_code == 413
+    assert body == b"ok"
 
 
 def test_assignment_list_preserves_and_bounds_per_assignment_briefs() -> None:

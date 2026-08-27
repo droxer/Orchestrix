@@ -65,14 +65,22 @@ def soft_delete_employee(ctx: Any, employee_id: str) -> dict[str, Any]:
     engine = cascade_engine(ctx)
     scope = store_transaction(engine) if engine is not None else nullcontext()
     registry = getattr(ctx, "registry", None)
-    restore = _registry_snapshot(registry, employee_id)
+    managed_nodes = _employee_managed_nodes(ctx, employee_id)
+    registry_node_ids = _registry_node_ids(registry, employee_id, managed_nodes)
+    registry_scope = (
+        registry.dispatch_scope(registry_node_ids)
+        if registry is not None and hasattr(registry, "dispatch_scope")
+        else nullcontext()
+    )
 
-    try:
-        with local_store_rollback(ctx), scope:
-            return _cascade(ctx, employee_id)
-    except Exception:
-        _restore_registry(registry, restore)
-        raise
+    with registry_scope:
+        restore = _registry_snapshot(registry, registry_node_ids)
+        try:
+            with local_store_rollback(ctx), scope:
+                return _cascade(ctx, employee_id, managed_nodes)
+        except Exception:
+            _restore_registry(registry, restore)
+            raise
 
 
 @contextmanager
@@ -157,7 +165,9 @@ def _local_store_paths(stores: list[Any]) -> list[Path]:
     return sorted(paths, key=lambda path: str(path.resolve()))
 
 
-def _cascade(ctx: Any, employee_id: str) -> dict[str, Any]:
+def _cascade(
+    ctx: Any, employee_id: str, managed_nodes: list[dict[str, Any]]
+) -> dict[str, Any]:
     project_store = getattr(ctx, "project_store", None)
     if project_store and project_store.list_projects(
         employee_id, include_archived=True
@@ -184,9 +194,7 @@ def _cascade(ctx: Any, employee_id: str) -> dict[str, Any]:
         deleted_agents.append(deleted["id"])
 
     deleted_managed_nodes: list[str] = []
-    for node in ctx.managed_node_store.list_nodes():
-        if node.get("employeeId") != employee_id:
-            continue
+    for node in managed_nodes:
         deleted = ctx.managed_node_store.update_node(
             node["id"], {"desiredState": "deleted"}
         )
@@ -204,15 +212,47 @@ def _cascade(ctx: Any, employee_id: str) -> dict[str, Any]:
     }
 
 
+def _employee_managed_nodes(ctx: Any, employee_id: str) -> list[dict[str, Any]]:
+    managed_node_store = getattr(ctx, "managed_node_store", None)
+    if managed_node_store is None:
+        return []
+    return [
+        node
+        for node in managed_node_store.list_nodes()
+        if node.get("employeeId") == employee_id
+    ]
+
+
+def _registry_node_ids(
+    registry: Any,
+    employee_id: str,
+    managed_nodes: list[dict[str, Any]],
+) -> list[str]:
+    sandboxes = getattr(registry, "sandboxes", {})
+    node_ids = {
+        node_id
+        for node_id, node in sandboxes.items()
+        if node.get("employeeId") == employee_id
+    }
+    node_ids.update(
+        node["activeDaemonNodeId"]
+        for node in managed_nodes
+        if node.get("activeDaemonNodeId")
+    )
+    return sorted(node_ids)
+
+
 def _registry_snapshot(
-    registry: Any, employee_id: str
+    registry: Any, node_ids: list[str]
 ) -> dict[str, dict[str, Any]] | None:
     sandboxes = getattr(registry, "sandboxes", None)
     if sandboxes is None:
         return None
-    # Every node is captured, not just this employee's: fencing a managed node
-    # can touch one whose employeeId was already cleared.
-    return {node_id: dict(node) for node_id, node in sandboxes.items()}
+    return {
+        node_id: dict(sandboxes[node_id])
+        for node_id in node_ids
+        if node_id in sandboxes
+    }
 
 
 def _restore_registry(
@@ -223,6 +263,6 @@ def _restore_registry(
     sandboxes = getattr(registry, "sandboxes", None)
     if sandboxes is None:
         return
-    sandboxes.clear()
-    sandboxes.update(snapshot)
+    for node_id, node in snapshot.items():
+        sandboxes[node_id] = node
     logger.warning("Restored in-memory daemon nodes after a failed employee delete")

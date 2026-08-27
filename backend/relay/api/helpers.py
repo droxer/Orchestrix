@@ -43,6 +43,12 @@ def max_json_body_bytes() -> int:
     return value
 
 
+def append_json_body_chunk(body: bytearray, chunk: bytes, limit: int) -> None:
+    if len(chunk) > limit - len(body):
+        raise HTTPException(413, f"JSON request body exceeds the {limit} byte limit.")
+    body.extend(chunk)
+
+
 async def json_body(request: Request) -> dict[str, Any]:
     content_type = (
         request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
@@ -63,11 +69,7 @@ async def json_body(request: Request) -> dict[str, Any]:
     try:
         body = bytearray()
         async for chunk in request.stream():
-            body.extend(chunk)
-            if len(body) > limit:
-                raise HTTPException(
-                    413, f"JSON request body exceeds the {limit} byte limit."
-                )
+            append_json_body_chunk(body, chunk, limit)
     except ClientDisconnect as error:
         raise HTTPException(
             400, "Client disconnected while reading request body."

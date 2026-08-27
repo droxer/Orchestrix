@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from threading import RLock
 from typing import Any, Literal
-from uuid import UUID
+from uuid import UUID, uuid5
 
 from fastapi import HTTPException, Request
 from loguru import logger
@@ -58,6 +58,7 @@ DEFAULT_USER_LANGUAGE: UserLanguage = "en"
 _AUTH_LOCKS: dict[str, RLock] = {}
 _AUTH_LOCKS_GUARD = RLock()
 _BOOTSTRAP_ADVISORY_LOCK_ID = 7_362_959_917_925_924_673
+_RELAY_ENTITY_ID_NAMESPACE = UUID("c8fa2fd5-5eca-4cc6-b763-a5ae1a57ff63")
 
 
 def _shared_auth_lock(key: str) -> RLock:
@@ -73,6 +74,14 @@ def normalize_database_id(value: str | None) -> str | None:
         return str(UUID(value.strip()))
     except ValueError:
         return None
+
+
+def database_id_for_reference(value: str, entity_kind: str) -> str:
+    """Map a UUID or legacy human handle to one stable UUID-backed identity."""
+    normalized = normalize_database_id(value)
+    if normalized:
+        return normalized
+    return str(uuid5(_RELAY_ENTITY_ID_NAMESPACE, f"{entity_kind}:{value.strip()}"))
 
 
 def hash_password(password: str) -> str:
@@ -525,7 +534,11 @@ class DatabaseUserAuthStore:
             raise ValueError("password is required.")
         if role not in ("admin", "user"):
             raise ValueError("role must be admin or user.")
-        employee_id = normalize_database_id(employee_id)
+        employee_id = (
+            database_id_for_reference(employee_id, "employee")
+            if employee_id
+            else new_database_id()
+        )
         display_name = display_name.strip() if display_name else username
         department_id = department_id.strip() if department_id else None
         department_name = department_name.strip() if department_name else None
@@ -635,7 +648,7 @@ class DatabaseUserAuthStore:
         with store_transaction(self.engine) as conn:
             return self._ensure_employee(
                 conn,
-                normalize_database_id(requested_employee_id),
+                database_id_for_reference(requested_employee_id, "employee"),
                 display_name=display_name or requested_employee_id,
                 email=email,
                 department_id=department_id,
@@ -907,7 +920,7 @@ class DatabaseUserAuthStore:
         parent_department_id: str | None = None,
     ) -> dict[str, Any]:
         requested_department_id = department_id.strip()
-        department_id = normalize_database_id(requested_department_id)
+        department_id = database_id_for_reference(requested_department_id, "department")
         name = name.strip() if name else requested_department_id
         parent_department_id = (
             parent_department_id.strip() if parent_department_id else None
@@ -919,12 +932,13 @@ class DatabaseUserAuthStore:
             else None
         )
         parent_department_pk = parent["id"] if parent else None
-        lookup = (
-            self.departments.c.id == department_id
-            if department_id
-            else self.departments.c.name == name
+        row = (
+            conn.execute(
+                select(self.departments).where(self.departments.c.id == department_id)
+            )
+            .mappings()
+            .first()
         )
-        row = conn.execute(select(self.departments).where(lookup)).mappings().first()
         if row:
             department_pk = row["id"]
             patch: dict[str, Any] = {"updated_at": now}
@@ -952,7 +966,7 @@ class DatabaseUserAuthStore:
             return row_to_department(row)
 
         department = {
-            "id": department_id or new_database_id(),
+            "id": department_id,
             "name": name,
             "parentDepartmentId": parent_department_pk,
             "createdAt": _format_iso(now),
@@ -992,16 +1006,6 @@ class DatabaseUserAuthStore:
             row = (
                 conn.execute(
                     select(self.employees).where(self.employees.c.id == employee_id)
-                )
-                .mappings()
-                .first()
-            )
-        elif display_name:
-            row = (
-                conn.execute(
-                    select(self.employees).where(
-                        self.employees.c.display_name == display_name
-                    )
                 )
                 .mappings()
                 .first()
