@@ -460,7 +460,6 @@
     "name_required": "请输入团队名称。",
     "lead_required": "请选择负责人智能体。",
     "lead_badge": "负责人",
-    "col_status": "状态",
     "no_members": "暂无成员",
     "member_count_one": "{{count}} 名成员",
     "member_count_other": "{{count}} 名成员",
@@ -475,6 +474,10 @@
     "select_body": "选择团队以查看其档案、工作区和活动。",
     "empty_title": "暂无团队",
     "empty_body": "将智能体组成有负责人的命名团队，以便重复派发任务。",
+    "empty_filtered_title": "没有匹配的团队",
+    "empty_filtered_body": "请调整搜索条件。",
+    "search_label": "搜索团队",
+    "search_placeholder": "搜索团队…",
     "edit_members": "编辑成员",
     "rename": "重命名团队"
   },

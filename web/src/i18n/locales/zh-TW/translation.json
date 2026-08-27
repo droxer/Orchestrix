@@ -459,7 +459,6 @@
     "name_required": "請輸入團隊名稱。",
     "lead_required": "請選擇負責人智能體。",
     "lead_badge": "負責人",
-    "col_status": "狀態",
     "no_members": "暫無成員",
     "member_count_one": "{{count}} 名成員",
     "member_count_other": "{{count}} 名成員",
@@ -474,6 +473,10 @@
     "select_body": "選擇團隊以查看其檔案、工作區和活動。",
     "empty_title": "尚無團隊",
     "empty_body": "將智能體組成有負責人的命名團隊，以便重複派發任務。",
+    "empty_filtered_title": "沒有符合的團隊",
+    "empty_filtered_body": "請調整搜尋條件。",
+    "search_label": "搜尋團隊",
+    "search_placeholder": "搜尋團隊…",
     "edit_members": "編輯成員",
     "rename": "重新命名團隊"
   },

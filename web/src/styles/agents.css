@@ -22,7 +22,12 @@
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--line-1);
-  background: var(--surface-0);
+  /* Shell zone role (see --surface-list in palette.css): every list rail —
+     threads, agents, teams — sits on the same elevation step between the nav
+     rail and the detail canvas. This one sat flat on --surface-0, so the
+     agent roster read as canvas while the thread rail beside it read as a
+     rail. */
+  background: var(--surface-list);
 }
 
 /* The roster's filter band is .list-filter-bar / .list-filter-search

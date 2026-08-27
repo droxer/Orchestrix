@@ -97,9 +97,11 @@
    whole block. A folder marks itself on its own row, like any other row. */
 /* Hover is on the header itself, not the section: :hover on the section
    fires for pointers over its nested thread rows too, so the folder lit up
-   whenever you pointed at one of its children. */
+   whenever you pointed at one of its children. --row-hover is the shared list
+   wash; the local color-mix here was a fourth hand-mixed hover in a rail whose
+   thread, agent, and team rows all use the token. */
 .project-folder-header:hover {
-  background: color-mix(in srgb, var(--surface-2) 58%, transparent);
+  background: var(--row-hover);
 }
 
 .project-folder.selected > .project-folder-header,
@@ -108,6 +110,21 @@
      drives the content pane, so it should read as "you are here", not as an
      accent element. */
   background: var(--action-soft);
+}
+
+/* ...and the 2px leading accent every other selectable row in the app carries
+   (.conversation-row, .agents-roster-row, .teams-list-row). A project folder
+   drives the same detail pane those rows do; without the bar it was the one
+   selection in the product that spoke with only half the vocabulary. */
+.project-folder.selected > .project-folder-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: calc(var(--r-1) / 2);
+  background: var(--action);
 }
 
 /* There is deliberately no rule for .project-folder.ancestor — a folder
@@ -120,6 +137,9 @@
 }
 
 .project-folder-header {
+  /* Positioned so the selection accent above can hang off its leading edge,
+     the same way .conversation-row anchors its own. */
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--sp-1);
@@ -142,7 +162,10 @@
   gap: var(--sp-2);
   min-width: 0;
   flex: 1;
-  padding: var(--sp-2);
+  /* --sp-row/--sp-2: the row padding the thread rows below it use, minus the
+     leading inset the chevron already supplies. A uniform --sp-2 box made the
+     folder row taller on the sides than the rows it heads. */
+  padding: var(--sp-row) var(--sp-2);
   border-radius: var(--r-2);
   text-align: left;
 }

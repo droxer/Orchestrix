@@ -460,7 +460,6 @@
     "name_required": "Enter a team name.",
     "lead_required": "Choose a lead agent.",
     "lead_badge": "lead",
-    "col_status": "Status",
     "no_members": "No members",
     "member_count_one": "{{count}} member",
     "member_count_other": "{{count}} members",
@@ -475,6 +474,10 @@
     "select_body": "Choose a team to inspect its profile, workspace, and activity.",
     "empty_title": "No teams yet",
     "empty_body": "Group agents under a named lead for repeatable task dispatch.",
+    "empty_filtered_title": "No teams match",
+    "empty_filtered_body": "Adjust your search.",
+    "search_label": "Search teams",
+    "search_placeholder": "Search teams…",
     "edit_members": "Edit members",
     "rename": "Rename team"
   },
