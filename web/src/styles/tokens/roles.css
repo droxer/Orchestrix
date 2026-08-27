@@ -24,10 +24,16 @@
   --shadow-1: none;
   --shadow-2: 0 0 0 1px var(--line-1), var(--shadow-panel);
 
-  /* Row wash under the pointer. A partial --surface-1 rather than the flat
-     surface so the ruled hairlines stay visible through the hover. Was
-     hand-mixed identically in backlog.css, teams.css, and admin-v2-views.css. */
-  --row-hover: color-mix(in srgb, var(--surface-1) 60%, transparent);
+  /* Row wash under the pointer. Translucent INK, not a surface step — the
+     same fix --control-fill below documents. Mixed from --surface-1 (60%),
+     the wash was plane-dependent: 1.06–1.13 on the dark planes but 1.00 on
+     a light --surface-1 card and 1.02 on a --surface-3 drawer — hover was
+     literally invisible there. Mixed toward --ink-1 it always moves AWAY
+     from the plane it lands on (darkening in light, lifting in dark), and
+     the translucency keeps the ruled hairlines visible through the hover.
+     4% measures 1.08–1.13 against every plane in both registers.
+     Was hand-mixed identically in backlog.css, teams.css, and admin-v2-views.css. */
+  --row-hover: color-mix(in srgb, var(--ink-1) 4%, transparent);
 
   /* Hairline under the pointer. Cards and rows that are themselves targets
      strengthen their edge on hover rather than washing their fill, so a hovered
@@ -146,7 +152,7 @@
      36px heading-lg above it is reserved for KPI numerals and subsection
      headlines, where an oversized figure is the point. */
   --type-title:        500 var(--fs-title)/1.25 var(--font-display);
-  --type-heading:      700 var(--fs-heading)/1.44 var(--font-display);
+  --type-heading:      700 var(--fs-heading)/var(--leading-heading) var(--font-display);
   --type-body:         400 var(--fs-4)/1.5  var(--font-sans);
   --type-body-sm:      400 var(--fs-2)/1.43 var(--font-sans);
   --type-label:        500 var(--fs-2)/1.43 var(--font-sans);

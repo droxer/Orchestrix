@@ -60,7 +60,7 @@ export function NodeRow({ node, employeeName, storedTokens, colocated, onReveal,
             </span>
             <NodePresence node={node} t={t} withLabel />
             {showStatusPill ? (
-              <TonePill tone={tone} label={statusLabel} live={tone === "info"} />
+              <TonePill tone={tone} label={statusLabel} live={status === "running" || status === "busy"} />
             ) : null}
           </span>
           <span className="adm-node-card-handle code" translate="no">{node.id}</span>

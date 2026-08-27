@@ -82,7 +82,7 @@ function TableHead({
       {
         role: "columnheader",
         className: cn(
-          "min-w-0 truncate text-micro font-medium tracking-(--track-caps) text-muted-foreground uppercase",
+          "min-w-0 truncate text-micro font-bold tracking-(--track-caps) text-muted-foreground uppercase",
           className
         ),
       },

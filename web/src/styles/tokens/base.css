@@ -14,6 +14,14 @@
      buy nothing but a second place to forget one of them. */
   font-feature-settings: var(--font-features);
   text-rendering: optimizeLegibility;
+}
+
+/* Subpixel thinning is a DARK-mode technique: on light glyphs over a dark
+   field it restores the apparent weight macOS otherwise adds, but on dark
+   text over a light page it thins strokes and drops apparent weight — costly
+   in a system whose hierarchy rides the 400/500/700 ladder. Fenced to the
+   dark register; the light register renders at the platform default. */
+html[data-theme="dark"] {
   -webkit-font-smoothing: antialiased;
 }
 
@@ -70,7 +78,7 @@ body {
   background: var(--action);
   color: var(--on-action);
   font-size: var(--fs-3);
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
   transition: transform var(--t-fast) var(--ease);
 }
@@ -106,11 +114,11 @@ body {
 /* FAMILY ONLY — never the `font` shorthand. This sheet is in @layer relay,
    after Tailwind's utilities, so `font: inherit` here reset size, weight, and
    line-height on every shadcn Button and silently beat the utilities that
-   buttonVariants sets: `font-medium`, `font-semibold`, and the entire
+   buttonVariants sets: `font-bold` and the entire
    text-micro → text-xs → text-sm size ladder were dead on arrival. The ladder
-   coincidentally matched on size (--fs-3 is 14px, same as text-sm), so only
+   coincidentally matched on size (--fs-2 is 14px, same as text-sm), so only
    the weight gave it away — a real login button computed 400 while its class
-   list said font-medium. The exclusion above at :not([data-slot]) exists for
+   list said font-bold. The exclusion above at :not([data-slot]) exists for
    exactly this reason; this rule re-introduced the problem it was written to
    avoid. Buttons still need the family, because the UA sets its own. */
 button[data-slot="button"] {
@@ -138,10 +146,10 @@ button:not([data-slot="button"]) {
   background: none;
 }
 
-/* Disabled is opacity — there is no disabled hex in the palette. */
+/* Disabled is opacity — one token, no disabled hex in the palette. */
 button:not([data-slot="button"]):disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: var(--opacity-disabled);
 }
 
 button:not([data-slot="button"]):not(:disabled):active {

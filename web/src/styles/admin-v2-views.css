@@ -173,7 +173,8 @@
 
 .adm-emp-row.is-pulse::after {
   /* A one-shot 'recently updated' marker, not live work — ink, drawn once on
-     the --t-draw cadence (yellow + pulse cadence are reserved for --live). */
+     the --t-draw cadence (--live purple + the pulse cadences are reserved for
+     live work). */
   content: "";
   position: absolute;
   left: calc(-1 * var(--sp-4));
@@ -687,7 +688,7 @@
 
 .adm-node-card.is-pulse::after {
   /* Same one-shot 'recently updated' marker as .adm-emp-row.is-pulse — ink on
-     the --t-draw cadence, never the action/live yellow. */
+     the --t-draw cadence, never the --action cobalt or --live purple. */
   content: "";
   position: absolute;
   inset: 0;
@@ -1251,7 +1252,7 @@
 }
 
 .adm-runtime-mark.is-disabled {
-  opacity: 0.4;
+  opacity: var(--opacity-disabled);
 }
 
 /* ---- Agent presence on a computer ---------------------------------------
@@ -1374,7 +1375,7 @@
   background: var(--surface-2);
 }
 .adm-agent-chip.is-disabled {
-  opacity: 0.45;
+  opacity: var(--opacity-disabled);
   text-decoration: line-through;
   text-decoration-thickness: 1px;
 }
@@ -1793,7 +1794,7 @@
 }
 
 /* Hero size of the same ink-on-neutral provider glyph — ownership is not an
-   action, so no yellow wash here either. */
+   action, so no cobalt wash here either. */
 .adm-chat-avatar--hero {
   width: 64px;
   height: 64px;

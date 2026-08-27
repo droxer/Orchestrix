@@ -127,7 +127,7 @@
 .pref-nav-item.active {
   background: var(--surface-1);
   color: var(--ink-1);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .pref-nav-item.active::before {
@@ -252,7 +252,7 @@
 }
 
 .pref-option-row.selected .pref-option-label {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .pref-option-check {
@@ -288,13 +288,13 @@
    register-varying --surface-0. They read the pinned --dark-* / --light-*
    register tokens in palette.css instead, which resolve to the same values
    both registers use and stay in sync with them by definition. The action
-   dot can use --action directly: the yellow is register-invariant. */
+   dot can use --action directly: the cobalt is register-invariant. */
 .pref-theme-swatch[data-tone="light"] {
   background: var(--light-canvas);
 }
 
 .pref-theme-swatch[data-tone="light"]::after {
-  background: var(--action); /* the register-invariant action yellow */
+  background: var(--action); /* the register-invariant action cobalt */
 }
 
 .pref-theme-swatch[data-tone="dark"] {
@@ -312,7 +312,7 @@
 }
 
 .pref-theme-swatch[data-tone="system"]::after {
-  /* One dot, one yellow: --action is register-invariant, so the system
+  /* One dot, one cobalt: --action is register-invariant, so the system
      swatch needs no split gradient. */
   background: var(--action);
 }
@@ -331,7 +331,7 @@
   background: var(--control-fill);
   font-family: var(--font-mono);
   font-size: var(--fs-1);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: var(--track-caps);
   color: var(--ink-1);
 }

@@ -267,7 +267,7 @@ button.computer-run-open:hover {
   white-space: nowrap;
 }
 
-/* The one place the live yellow belongs on this surface: a counter that is
+/* The one place the live purple belongs on this surface: a counter that is
    moving because an agent is working right now. */
 .computer-run-elapsed {
   color: var(--live);
@@ -333,7 +333,7 @@ button.computer-run-open:hover {
 }
 
 .computer-runtime-row.is-disabled {
-  opacity: 0.5;
+  opacity: var(--opacity-disabled);
 }
 
 /* Presence, same shape rule as the fleet marks: filled = this runtime can

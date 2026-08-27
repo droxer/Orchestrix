@@ -72,12 +72,12 @@ function Field({
       >
         {label}
         {required ? (
-          <span className="font-semibold text-primary" aria-hidden="true">
+          <span className="font-semibold text-destructive" aria-hidden="true">
             *
           </span>
         ) : null}
         {optional ? (
-          <span className="text-micro font-semibold tracking-(--track-caps) text-muted-foreground uppercase">
+          <span className="text-micro font-bold tracking-(--track-caps) text-muted-foreground uppercase">
             {optional}
           </span>
         ) : null}

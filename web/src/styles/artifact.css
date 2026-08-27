@@ -238,18 +238,18 @@
   border: 0;
   border-radius: var(--r-full);
   background: transparent;
-  color: var(--artifact-accent, var(--info));
+  color: var(--info);
   cursor: pointer;
   transition: background var(--t-fast) var(--ease);
   flex: 0 0 auto;
 }
 
 .artifact-index-btn:hover {
-  background: color-mix(in srgb, var(--artifact-accent, var(--info)) 12%, transparent);
+  background: color-mix(in srgb, var(--info) 12%, transparent);
 }
 
 .artifact-index-btn.is-active {
-  background: color-mix(in srgb, var(--artifact-accent, var(--info)) 85%, transparent);
+  background: color-mix(in srgb, var(--info) 85%, transparent);
   color: var(--surface-0);
 }
 
@@ -399,8 +399,8 @@
   width: 28px;
   height: var(--control-h-xs);
   border-radius: var(--r-2);
-  color: var(--artifact-accent, var(--info));
-  background: color-mix(in srgb, var(--artifact-accent, var(--info)) 14%, transparent);
+  color: var(--info);
+  background: color-mix(in srgb, var(--info) 14%, transparent);
 }
 
 .artifact-index-row-copy {

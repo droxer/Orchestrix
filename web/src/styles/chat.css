@@ -157,7 +157,7 @@
    disabled hex, and a dedicated ink tier would be one in disguise. The
    interaction itself is still enforced by Base UI. */
 .chat-agent-option[data-disabled] {
-  opacity: 0.55;
+  opacity: var(--opacity-disabled);
 }
 
 .chat-agent-option-availability[data-availability="pending"] {
@@ -209,7 +209,7 @@
   background: var(--ink-1);
   color: var(--surface-0);
   font-size: var(--fs-1);
-  font-weight: 600;
+  font-weight: 700;
   line-height: var(--leading-none);
 }
 
@@ -351,13 +351,15 @@
    atelier.css circle override regardless of import order.
 
    You    → a round ink-on-neutral avatar. Round reads as "a person" — the
-            circle silhouette is the fast human-vs-machine tell, and yellow is
-            reserved for action/live, so it can't carry speaker identity.
+            circle silhouette is the fast human-vs-machine tell; hue never
+            carries speaker identity (cobalt --action is pressable-only and
+            purple --live means an agent is working right now).
    Agent  → a square tile carrying that agent's profile image — its upload, or
-            the name monogram on its identity hue. The circle-vs-square
-            contrast, not colour, separates the two speakers; the monogram's
-            hue separates one agent from another across a handoff. (The
-            generic Relay product mark lives on the agent-phase divider.) */
+            its neutral monogram. The circle-vs-square contrast, not colour,
+            separates the two speakers; the retired per-agent identity hues no
+            longer separate one agent from another across a handoff — the
+            image and the name do. (The generic Relay product mark lives on
+            the agent-phase divider.) */
 .msg-user .rail-node.rail-node-user {
   border-radius: var(--r-full);
 }
@@ -383,7 +385,12 @@
 }
 
 .rail-node-system.tone-good { background: var(--ok); }
-.rail-node-system.tone-bad  { background: var(--err); }
+/* Bad takes the shared hollow-ring shape (.dot-ring, base.css) the agent
+   state pip above uses: shape carries the alarm, not a solid --err fill. */
+.rail-node-system.tone-bad {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--err);
+}
 .rail-node-system.tone-info { background: var(--info); }
 
 /* A continuation from the same agent drops its header and empties the rail
@@ -588,7 +595,7 @@
 }
 
 .msg-turn-action:disabled {
-  opacity: 0.45;
+  opacity: var(--opacity-disabled);
   cursor: not-allowed;
 }
 

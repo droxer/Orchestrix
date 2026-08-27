@@ -51,7 +51,7 @@
 
 .relay-search:focus-within input:focus-visible,
 .adm-search:focus-within .adm-search-input:focus-visible {
-  box-shadow: none;
+  outline: none;
 }
 
 .relay-search input::placeholder,
@@ -118,7 +118,9 @@
   background: var(--surface-2);
   color: var(--ink-1);
   font-family: var(--font-sans);
-  font-weight: 600;
+  /* The weight ramp is 400/500/700 — identity initials take the name
+     register's 700. */
+  font-weight: 700;
   position: relative;
 }
 

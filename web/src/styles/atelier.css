@@ -1,7 +1,8 @@
 /* ======================== Relay Atelier =========================
-   AI-native workspace: a night studio wrapping a warm paper canvas. The
-   chromatic split makes the navigation feel like a command deck, while active
-   thinking remains deliberately calm and legible in the center.
+   AI-native workspace shell: one neutral canvas where the chrome stays quiet,
+   cobalt --action marks only what is pressable, and purple --live marks work
+   in flight, while active thinking remains deliberately calm and legible in
+   the center.
 
    OWNERSHIP RULE: this sheet may only define selectors that no other
    stylesheet defines. Component chrome belongs in the component's own sheet
@@ -66,12 +67,18 @@ body {
 
 /* A themed rail, not a permanently-dark island: the active route is a
    solid action plate — no ambient glow. Background reads the shell zone role
-   (see --surface-rail in palette.css), not the generic surface-2 fill. */
+   (see --surface-rail in palette.css), not the generic surface-2 fill.
+
+   The rail owns the rail|list seam. In light the zone steps measure ≈1.05
+   (palette.css) — a luminance step that quiet cannot carry the app's primary
+   structural boundary alone (the palette rejects 1.03 for a well on the
+   list panel), so the seam draws the same --line-1 hairline the list|canvas
+   edge (thread.css) has. */
 .sidenav-panel {
   align-items: center;
   padding: var(--sp-4) var(--sp-2) var(--sp-3);
   background: var(--surface-rail);
-  border-right: 0;
+  border-right: 1px solid var(--line-1);
   color: var(--ink-2);
 }
 
@@ -117,8 +124,8 @@ body {
   border-radius: 0;
   /* The landing gets the app's one ambient wash: two soft ink pools — one
      behind the hero, a second bloom off-axis so the field reads lit rather
-     than flat. Both are neutral: idle surfaces hold no yellow, and an
-     --action pool here would read as work in flight. Sizes past 100% let
+     than flat. Both are neutral: idle surfaces hold no accent, and an
+     --action pool here would read as something to press. Sizes past 100% let
      the drift keyframe travel the pools without ever exposing an edge. */
   background:
     radial-gradient(52% 42% at 50% 40%, color-mix(in srgb, var(--ink-1) 4%, transparent), transparent 72%),
@@ -226,8 +233,8 @@ html[data-theme="dark"] .transcript-inner:has(.transcript-empty) {
   }
 
   .mobile-topbar-title {
-    /* Chrome title, not a display tier: semibold sans, set solid. */
-    font-weight: 600;
+    /* Chrome title, not a display tier: bold sans, set solid. */
+    font-weight: 700;
     letter-spacing: var(--track-0);
   }
 

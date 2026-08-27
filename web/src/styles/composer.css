@@ -187,11 +187,6 @@
   .thread-runtime-select { max-width: 100%; }
 }
 
-@keyframes composer-icon-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
 .composer-input-wrap {
   position: relative;
   width: min(100%, var(--thread-measure));
@@ -209,9 +204,11 @@
   outline-offset: var(--focus-offset);
 }
 
-/* Running state — quiet action hairline; send→stop carries the state change. */
+/* Running state — quiet action hairline at the one accent-edge strength
+   (--tone-line); send→stop carries the state change. */
 .composer-input-wrap[data-running] {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--action) 36%, transparent), var(--shadow-2);
+  --tone: var(--action);
+  box-shadow: 0 0 0 1px var(--tone-line), var(--shadow-2);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -276,10 +273,6 @@
 @media (pointer: coarse) {
   .composer-input textarea,
   .composer-highlight { font-size: 16px; }
-}
-
-.composer-input textarea:focus-visible {
-  box-shadow: none;
 }
 
 .composer-input textarea::placeholder {
@@ -355,10 +348,12 @@
   outline-offset: var(--focus-offset);
 }
 
-/* Send↔stop glyph swap keeps the composer's primary state change calm. */
+/* Send↔stop glyph swap keeps the composer's primary state change calm. The
+   shared `rise` keyframe with a zero travel is a pure fade-in. */
 .send-button-icon {
   display: inline-flex;
-  animation: composer-icon-in var(--t-fast) var(--ease);
+  --rise-from: 0;
+  animation: rise var(--t-fast) var(--ease);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -54,8 +54,15 @@
   color: var(--ink-4);
 }
 
-/* The dialog-level ring already says "this surface owns the keyboard"; a
-   second ring on the field inside it is noise. */
+/* The container draws the one ring for this surface: focus lives on the
+   input, but the menu is what the eye reads as focused, so :focus-within
+   carries the ring and the field's own is suppressed to keep the two from
+   doubling up (the .composer-input-wrap focus pattern in composer.css). */
+.command-menu:focus-within {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
+}
+
 .command-input:focus-visible {
   outline: none;
 }

@@ -80,15 +80,21 @@
   --line-1: #2c3a43; /* structural hairline */
   --line-2: #1f2b32; /* soft hairline */
 
-  /* Action — cobalt, register-invariant. The source system reserves #0064e0 for the
-     in-product commerce CTA and gives marketing surfaces a black pill
-     instead; Relay is entirely in-product, so cobalt is THE primary action
-     here and the black pill survives as --ink-button below for the pre-auth
-     and landing surfaces that read as marketing.
+  /* Action — cobalt, register-invariant AS A FILL. The source system reserves
+     #0064e0 for the in-product commerce CTA and gives marketing surfaces a
+     black pill instead; Relay is entirely in-product, so cobalt is THE primary
+     action here and the black pill survives as --ink-button below for the
+     pre-auth and landing surfaces that read as marketing.
 
-     The fill and its pressed state are the same values on both canvases:
-     white on #0064e0 measures 5.4:1 and on the pressed #0457cb 6.5:1, so
-     neither register needs its own. No disabled hex: disabled is opacity. */
+     The invariance proof is FILL-ONLY: white on #0064e0 measures 5.4:1 and on
+     the pressed #0457cb 6.5:1, so neither register needs its own fill. As an
+     INK the same cobalt is not register-invariant at all — on the light planes
+     it measures 4.29 (surface-2) / 4.33 (rail) / 4.75 (canvas), under the 4.5:1
+     AA floor for text. `color: var(--action)` is therefore legal only for
+     large, non-text glyphs (WCAG 1.4.11's 3:1 — its one ink consumer today is
+     the 36px runtime mark in admin-v2-drawers.css); anything that reads as
+     text and needs a blue takes --link. No disabled hex: disabled is
+     --opacity-disabled. */
   --action: #0064e0;
   --action-hover: #0457cb; /* the source system's button-buy-cta-pressed */
   --action-soft: color-mix(in srgb, #0091ff 15%, transparent); /* soft-cobalt callout tint, selection wash, active nav */
@@ -202,6 +208,14 @@
   --r-4: 24px;  /* warranty/accessory tiles, ghost action cards (rounded.xxl) */
   --r-5: 32px;  /* photographic feature cards, promo strips (rounded.xxxl) */
   --r-full: 9999px; /* pills, tab chips, badges, dots, avatars */
+
+  /* Disabled is opacity — one strength for every disabled control, so the
+     state reads identically everywhere and no call site picks its own. WCAG
+     exempts disabled controls from 1.4.3, but the 0.45–0.55 range this
+     replaces landed disabled light-register text at 1.9–2.7:1 on the canvas;
+     0.6 keeps it at ~2.5–4.7:1 depending on the ink tier — visibly inactive,
+     not ghosted. */
+  --opacity-disabled: 0.6;
 
   /* Spacing — 4px base, plus a micro tier below it. --sp-0-5/--sp-1-5 are
      the *only* sanctioned sub-4px gaps: they bind glyph-tight pairs (dot ↔
@@ -335,6 +349,9 @@
   --leading-none: 1;
   --leading-display: 1.17;
   --leading-tight: 1.25;
+  /* The subtitle/heading leading, named so Tailwind call sites can reference
+     it (`leading-(--leading-heading)`) instead of spelling a literal. */
+  --leading-heading: 1.44;
   --leading-snug: 1.43;
   --leading-normal: 1.5;
   --leading-loose: 1.65;
@@ -477,9 +494,18 @@ html[data-theme="light"] {
      the three — with cards (--surface-1) and drawers (--surface-3) still
      rising above it. Reading order by lightness is therefore
      rail < list < canvas < card < drawer, which is the same order a reader's
-     eye should travel. */
-  --surface-rail: #e6ebf1;
-  --surface-list: #eaeef4;
+     eye should travel.
+
+     The steps are deepened past what the cloud scale would suggest: at the
+     original #e6ebf1/#eaeef4 the ladder measured 1.029 (rail → list) and
+     1.028 (list → canvas) — a quarter of the dark register's 1.119/1.087,
+     and exactly the ~1.03 step this file rejects for a well on the list
+     panel (see --surface-2 above). These values measure ≈1.05 on both
+     steps, and the rail → list seam additionally carries a --line-1 border
+     (atelier.css) because a structural boundary must not rest on luminance
+     alone. */
+  --surface-rail: #e2e7ed;
+  --surface-list: #e8ecf2;
 
   /* Ink — the source system's text ramp: ink-deep, ink, charcoal, and a deepened
      steel. The published steel (#5d6c7b) measures 4.34:1 on --surface-2, the
@@ -493,7 +519,13 @@ html[data-theme="light"] {
   --ink-4: #556170; /* steel, deepened for AA */
 
   --line-1: #ced0d4; /* hairline */
-  --line-2: #dee3e9; /* hairline-soft */
+  /* The SOFT hairline must still read on the recessed planes: at #dee3e9 it
+     measured 1.027 on --surface-2 — under the 1.03 step this file rejects
+     for a well on the list panel — and existed only on cards and drawers
+     (1.26/1.29). #d6dce3 measures 1.10 on a well and stays clearly softer
+     than --line-1 everywhere (1.22 vs 1.23 on the well, 1.38 vs 1.54 on a
+     drawer). */
+  --line-2: #d6dce3; /* hairline-soft */
 
   /* --action / --action-hover / --on-action are register-invariant (declared
      once on :root) — cobalt reads on both canvases without retuning. Only
@@ -526,10 +558,10 @@ html[data-theme="light"] {
   /* Light code tokens — the same five roles inked for a light page. Deepened,
      not derived: the dark register's tints measure ~1.5:1 here. Ratios on
      --surface-2/--surface-0: keyword 5.2/5.7 · string 5.8/6.2 ·
-     number 4.5/4.9 · declaration 6.7/7.3 · attribute 7.3/7.9. */
+     number 4.5/5.0 · declaration 6.7/7.3 · attribute 7.3/7.9. */
   --code-keyword: #9c4221;
   --code-string: #41601f;
-  --code-number: #8a5f06;
+  --code-number: #895e05;
   --code-declaration: #1f4f82;
   --code-attribute: #5b3a75;
 
@@ -575,7 +607,7 @@ html:lang(zh-TW) {
 
      REDECLARING THE ROLES IS LOAD-BEARING, NOT REDUNDANT. A custom property is
      substituted at the element where it is DECLARED, not where it is used: a
-     role declared on :root as `600 var(--fs-4)/1.5 …` has already resolved
+     role declared on :root as `400 var(--fs-4)/1.5 …` has already resolved
      --fs-4 against :root by the time it inherits down here, so overriding
      --fs-4 alone does nothing to `font: var(--type-body)`. Restating each
      --fs-4-derived role here re-resolves it in this scope, which is what makes

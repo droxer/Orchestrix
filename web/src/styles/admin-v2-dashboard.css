@@ -3,7 +3,7 @@
 
    The control room, read as one instrument. The system's rules apply in
    full: the page is neutral ink until something is working, and the live
-   yellow (--live) marks nodes that are running an agent RIGHT NOW —
+   purple (--live) marks nodes that are running an agent RIGHT NOW —
    nowhere else. Ready is calm, completed is calm; only "in flight" glows.
 
    Composition is a 2:1 editorial split rather than a uniform card grid:
@@ -260,15 +260,17 @@
    --err. So each state is double-encoded, exactly as StatusPill encodes
    "bad" by shape as well as brightness:
 
-     running  --live      the live yellow, the only hue allowed here
+     running  --live      the live purple, the only hue allowed here
      failed   --err       loudest ink, solid
      stale    --warn      distinguished from failed by hatch texture
      ready    --ok        calm mid tier
      unknown  --ink-4     dimmest
 
-   Data-viz exception to "status tone is text/dot only, never fills": a bar
-   segment IS the datum. Canvas chrome elsewhere keeps status to text and
-   dots. */
+   Data-viz exception to "status tone is text/dot only, never fills" — a
+   deliberate Relay addition (docs/design-system.md, "Known gaps"): the
+   source system has no data-viz vocabulary for status proportions, and a
+   bar segment IS the datum. Canvas chrome elsewhere keeps status to text
+   and dots. */
 .adm-dash-bar {
   display: flex;
   width: 100%;
@@ -363,9 +365,9 @@
   .adm-dash-stat.tone-live .adm-dash-stat-dot { animation: none; }
 }
 
-/* Bad drops out of the brightness race: --err is byte-identical to --action,
-   so a solid dot reads as "primary/selected" rather than "problem". Hollow
-   ring instead — the same shape StatusPill and the node presence dots use. */
+/* Bad is told by shape, not brightness: at 6px a solid --err dot reads as
+   just another loud dot, not as "problem". Hollow ring instead — the same
+   shape StatusPill and the node presence dots use. */
 .adm-dash-stat.tone-bad .adm-dash-stat-dot {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px currentColor;
@@ -451,7 +453,7 @@
 }
 
 .adm-dash-top-count {
-  /* A 15px numeral is not the display tier — weight and tabular figures
+  /* A 16px numeral is not the display tier — weight and tabular figures
      carry it; tightening is reserved for the 24px rung. */
   font-size: var(--fs-3);
   font-weight: 700;
