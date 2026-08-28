@@ -1,6 +1,9 @@
 import { useTranslation } from "react-i18next";
 import type { EmployeeAgent, RelaySession } from "../types";
-import { NavThreads } from "./icons";
+import {
+  ICON,
+  NavThreads,
+} from "./icons";
 import { ArtifactNavButton } from "./ArtifactNavButton";
 import { IdentityMark } from "./IdentityMark";
 import { ProfileImage } from "./ProfileImagePicker";
@@ -23,7 +26,7 @@ export function ThreadHeader({ activeSession, participants, artifactCount, space
     <header className="chat-header">
       <div className="chat-title">
         <Button variant="ghost" className="mobile-back-button" type="button" aria-label={t("nav.threads")} onClick={onBackToThreads}>
-          <NavThreads size={16} /><span>{t("nav.threads")}</span>
+          <NavThreads size={ICON.md} /><span>{t("nav.threads")}</span>
         </Button>
         <div className="chat-title-text">
           <h2 title={activeSession ? (activeSession.title?.trim() || activeSession.taskGoal) : undefined}>{activeSession ? (activeSession.title?.trim() || activeSession.taskGoal) : t("thread.new_thread")}</h2>
@@ -56,7 +59,7 @@ export function ThreadHeader({ activeSession, participants, artifactCount, space
             aria-expanded={!threadListHidden}
             onClick={onToggleThreadList}
           >
-            <NavThreads size={16} />
+            <NavThreads size={ICON.md} />
           </Button>
         ) : null}
         <ArtifactNavButton

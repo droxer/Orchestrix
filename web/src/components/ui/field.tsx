@@ -72,7 +72,7 @@ function Field({
       >
         {label}
         {required ? (
-          <span className="font-semibold text-destructive" aria-hidden="true">
+          <span className="font-bold text-destructive" aria-hidden="true">
             *
           </span>
         ) : null}

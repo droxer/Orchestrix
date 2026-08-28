@@ -2,7 +2,12 @@
 
 import type { TFunction } from "i18next";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
-import { NodeLocal, NodeManaged, NodePending } from "../icons";
+import {
+  ICON,
+  NodeLocal,
+  NodeManaged,
+  NodePending,
+} from "../icons";
 import {
   nodeOwnershipProfile,
   nodeLocalityKinds,
@@ -77,14 +82,14 @@ export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = 
         title={ownershipHint}
         translate="no"
       >
-        <OwnershipIcon size={13} className="adm-node-profile-icon" aria-hidden="true" />
+        <OwnershipIcon size={ICON.sm} className="adm-node-profile-icon" aria-hidden="true" />
         {ownershipLabel}
       </span>
       {showSandbox ? (
         <>
           <span className="adm-node-profile-sep" aria-hidden="true">·</span>
           <span
-            className="adm-node-profile-sandbox"
+            className="adm-node-profile-sandbox code"
             data-sandbox={sandbox}
             title={sandboxHint}
           >
@@ -95,7 +100,7 @@ export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = 
       {!card && localityText ? (
         <>
           <span className="adm-node-profile-sep" aria-hidden="true">·</span>
-          <span className="adm-node-profile-locality" title={localityHint} translate="no">
+          <span className="adm-node-profile-locality code" title={localityHint} translate="no">
             {localityText}
           </span>
         </>

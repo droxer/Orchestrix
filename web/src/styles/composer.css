@@ -165,11 +165,6 @@
 
 .thread-runtime-option-id {
   overflow: hidden;
-  font-family: var(--font-mono);
-  font-feature-settings: "tnum" 1;
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  letter-spacing: var(--type-code-track);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -411,8 +406,8 @@
 }
 
 .mention-option-mark {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-md);
+  height: var(--icon-md);
   flex: none;
   border-radius: var(--r-full);
 }

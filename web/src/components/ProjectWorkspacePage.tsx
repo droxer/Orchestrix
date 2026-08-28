@@ -22,7 +22,13 @@ import {
 import { truncateId, formatRelativeTime } from "../lib/adminHelpers";
 import type { DaemonNodeMonitorRecord, EmployeeAgent, ProjectMember, ProjectRecord } from "../types";
 import { AgentStateBadge } from "./AgentStateBadge";
-import { ActionAdd, ActionEdit, NavBack, WorkspaceFolder } from "./icons";
+import {
+  ActionAdd,
+  ActionEdit,
+  ICON,
+  NavBack,
+  WorkspaceFolder,
+} from "./icons";
 import { PageHeader } from "./PageHeader";
 import { ProjectMemberEditor } from "./ProjectMemberEditor";
 import { ProjectWorkspaceFiles } from "./ProjectWorkspaceFiles";
@@ -121,7 +127,7 @@ function ProjectMemberLane({
           title={t("project.member_edit_name", { name })}
           onClick={onEdit}
         >
-          <ActionEdit size={13} aria-hidden="true" />
+          <ActionEdit size={ICON.sm} aria-hidden="true" />
         </Button>
       ) : null}
     </article>
@@ -164,7 +170,7 @@ function ProjectProfile({
           ))}
           {onAddMember && members.length < MAX_PROJECT_MEMBERS ? (
             <button type="button" className="project-member-tile-add" onClick={onAddMember}>
-              <ActionAdd size={16} aria-hidden="true" />
+              <ActionAdd size={ICON.md} aria-hidden="true" />
               <span>{t("project.member_add")}</span>
             </button>
           ) : null}
@@ -179,7 +185,7 @@ function ProjectProfile({
           {onAddMember ? (
             <div className="project-profile-empty-action">
               <Button type="button" variant="outline" size="sm" onClick={onAddMember}>
-                <ActionAdd size={14} aria-hidden="true" />
+                <ActionAdd size={ICON.sm} aria-hidden="true" />
                 {t("project.member_add")}
               </Button>
             </div>
@@ -287,7 +293,7 @@ export function ProjectWorkspacePage({
         kicker={t("project.page_kicker")}
         title={(
           <span className="workspace-header-title">
-            <span className="workspace-header-mark"><ProjectMark size={14} /></span>
+            <span className="workspace-header-mark"><ProjectMark size={ICON.sm} /></span>
             {project.name}
           </span>
         )}
@@ -297,12 +303,12 @@ export function ProjectWorkspacePage({
         actions={(
           <>
             <Button type="button" variant="ghost" size="sm" className="project-mobile-back" onClick={onBack}>
-              <NavBack size={14} aria-hidden="true" />
+              <NavBack size={ICON.sm} aria-hidden="true" />
               {t("project.back")}
             </Button>
             {actions.settings ? (
               <Button type="button" variant="outline" size="sm" onClick={onOpenSettings}>
-                <ActionEdit size={14} aria-hidden="true" />
+                <ActionEdit size={ICON.sm} aria-hidden="true" />
                 {t("project.edit")}
               </Button>
             ) : null}
@@ -317,7 +323,7 @@ export function ProjectWorkspacePage({
                 aria-label={t("project.new_thread", { project: project.name })}
                 title={t("project.new_thread_short")}
               >
-                <ActionAdd size={16} aria-hidden="true" />
+                <ActionAdd size={ICON.md} aria-hidden="true" />
               </Button>
             ) : null}
           </>

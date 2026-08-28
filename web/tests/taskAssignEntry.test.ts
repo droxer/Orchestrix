@@ -31,16 +31,24 @@ describe("Task assignment discoverability", () => {
   it("exposes a quick-assign action on backlog and routine cards and rows", async () => {
     const backlogSource = await readFile(resolve("web/src/components/BacklogPage.tsx"), "utf8");
     const routinesSource = await readFile(resolve("web/src/components/RoutinesPage.tsx"), "utf8");
+    // The card and row renderers moved to task-board/BacklogRecords.tsx when
+    // BacklogPage.tsx was split; the page still owns the handler they call.
+    const backlogRecords = await readFile(
+      resolve("web/src/components/task-board/BacklogRecords.tsx"),
+      "utf8",
+    );
 
     for (const source of [backlogSource, routinesSource]) {
-      assert.match(source, /onAssign: \(\) => void/);
       assert.match(source, /onAssign: \(\) => assignTask\(task\)/);
       assert.match(source, /setAssignmentFocus\(true\)/);
       assert.match(source, /initialFocus=\{assignmentFocus \? "assignment" : "title"\}/);
-      assert.match(source, /backlog\.assign_task/);
     }
+    assert.match(routinesSource, /onAssign: \(\) => void/);
+    assert.match(routinesSource, /backlog\.assign_task/);
+    assert.match(backlogRecords, /onAssign: \(\) => void/);
+    assert.match(backlogRecords, /backlog\.assign_task/);
     // Both backlog views (board card + list row) carry the button.
-    assert.equal(backlogSource.match(/<NavAgents size=\{14\} \/>/g)?.length, 2);
+    assert.equal(backlogRecords.match(/<NavAgents size=\{ICON\.sm\} \/>/g)?.length, 2);
     assert.match(routinesSource, /RoutineAssignButton/);
   });
 

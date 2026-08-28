@@ -11,7 +11,14 @@ import { useDialogs } from "@/components/ui/DialogProvider";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
 import { type CurrentUser, type DaemonNodeMonitorRecord, type EmployeeAgent, type RelaySession, type RelayTaskListItem } from "../types";
-import { ActionCalendar, ActionStart, NavAgents, ViewGrid, ViewList } from "./icons";
+import {
+  ActionCalendar,
+  ActionStart,
+  ICON,
+  NavAgents,
+  ViewGrid,
+  ViewList,
+} from "./icons";
 import { agentReadyForTask } from "../lib/backlog";
 import { TaskAssignee, TaskExecutionBadge } from "./TaskAssignee";
 import { isTaskAssigneeCurrentUser, taskAssigneeDisplayName, teamReady } from "../lib/taskAssignment";
@@ -199,7 +206,7 @@ function RoutineStartButton({
       aria-label={t("backlog.start")}
       title={t("backlog.start")}
     >
-      <ActionStart size={14} />
+      <ActionStart size={ICON.sm} />
     </Button>
   );
 }
@@ -216,7 +223,7 @@ function RoutineAssignButton({ onAssign }: { onAssign: () => void }) {
       aria-label={t("backlog.assign_task")}
       title={t("backlog.assign_task")}
     >
-      <NavAgents size={14} />
+      <NavAgents size={ICON.sm} />
     </Button>
   );
 }
@@ -270,7 +277,7 @@ function RoutineCard({
           </>
         )}
         <span className={cn("backlog-due", tone !== "neutral" && tone)}>
-          <ActionCalendar size={13} />
+          <ActionCalendar size={ICON.sm} />
           {task.routineNextRunDate ? formatNextRunDate(task.routineNextRunDate) : t("routine.no_next_run")}
         </span>
         {session ? (
@@ -303,7 +310,7 @@ function RoutineViewToggle({ view, onChange }: { view: RoutineView; onChange: (v
         title={t("routine.view_card")}
         onClick={() => onChange("card")}
       >
-        <ViewGrid size={15} />
+        <ViewGrid size={ICON.sm} />
       </Button>
       <Button variant="ghost"
         type="button"
@@ -314,7 +321,7 @@ function RoutineViewToggle({ view, onChange }: { view: RoutineView; onChange: (v
         title={t("routine.view_list")}
         onClick={() => onChange("list")}
       >
-        <ViewList size={15} />
+        <ViewList size={ICON.sm} />
       </Button>
     </div>
   );
@@ -363,7 +370,7 @@ function RoutineRow({
         <TaskAssignee task={task} ready={ready} assigneeDisplayName={assigneeDisplayName} assigneeIsSelf={assigneeIsSelf} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} />
       </span>
       <span className={cn("backlog-row-due", tone !== "neutral" && tone)} role="cell">
-        <ActionCalendar size={13} />
+        <ActionCalendar size={ICON.sm} />
         {task.routineNextRunDate ? formatNextRunDate(task.routineNextRunDate) : t("routine.no_next_run")}
       </span>
       <div className="backlog-row-actions" role="cell" aria-label={t("backlog.actions")}>

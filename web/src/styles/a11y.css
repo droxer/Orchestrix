@@ -28,40 +28,6 @@
   border: 0;
 }
 
-/* Focus replacement for containers that delegate focus to descendants */
-.adm-search:focus-within {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
-
-.pref-modal:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
-
-/* Large operational collections stay cheap without changing DOM semantics or
-   keyboard order. The browser skips paint/layout for off-screen records and
-   reserves a representative row/card height to prevent scroll jumps. */
-.workspace-pick-list > li,
-.workspace-file-pick,
-.backlog-task,
-.routine-card,
-.adm-emp-row,
-.adm-node-card,
-.agents-roster-row {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 96px;
-}
-
-/* .backlog-row is intentionally excluded above: its mobile layout is a taller,
-   variable-height stacked card, and content-visibility's size estimate clamps
-   and clips it. The task list is bounded, so the render-skip saving is minimal. */
-
-.backlog-task,
-.routine-card,
-.adm-node-card {
-  contain-intrinsic-size: auto 220px;
-}
 
 /* Reduced motion — system-wide safety net. Individual surfaces
    (empty-state, login) already neutralize their entrances, but several
@@ -83,14 +49,39 @@
   }
 }
 
-/* Touch targets — on coarse pointers (touch), raise interactive controls to
-   the 44px WCAG 2.5.5 / Apple HIG minimum. The standard --control-h tier now
-   sits at 44px on its own (the source system renders inputs and primary pills at the
-   same height), so this sweep is what carries the DENSE tiers — in-row chips,
-   toggles, icon buttons, and the sm/xs button sizes — up to the floor. Scoped
-   to pointer:coarse so desktop mouse density is unaffected. Loads from a11y.css
-   (last in source order) so it wins the equal-specificity tie. */
+/* Touch targets — on coarse pointers (touch), interactive controls reach the
+   44px WCAG 2.5.5 / Apple HIG minimum.
+
+   THIS USED TO BE AN ALLOWLIST. Roughly thirty hand-written selectors were
+   enumerated here, and every control added to the app after a selector was
+   written simply missed the sweep. Two native buttons had been sitting below
+   the floor for exactly that reason — `.project-folder-toggle` at 26px and
+   `.workspace-page-tab` at 34px — and nothing could have caught them, because
+   an allowlist has no way to report what is not on it. The failure was also
+   invisible to anyone developing on a mouse.
+
+   It is now a DENYLIST. The rule below matches interactive elements by what
+   they ARE — tag and ARIA role — so a new control clears the floor on the day
+   it is written, and shrinking one back below 44px takes an explicit entry in
+   the exceptions block, with a reason. That is the direction the maintenance
+   burden should point: safe by default, deliberate to opt out.
+
+   Scoped to pointer:coarse so desktop mouse density is unaffected. Loads from
+   a11y.css (last in source order) so it wins the equal-specificity tie. */
 @media (pointer: coarse) {
+  button,
+  summary,
+  a[href],
+  select,
+  textarea,
+  input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="menuitemcheckbox"],
+  [role="menuitemradio"],
+  [role="option"],
+  [role="switch"],
   [data-slot="button"],
   [data-slot="link-button"],
   [data-slot="input"],
@@ -98,33 +89,7 @@
   [data-slot="select-trigger"],
   [data-slot="select-item"],
   [data-slot="select-scroll-up-button"],
-  [data-slot="select-scroll-down-button"],
-  input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-  select,
-  textarea,
-  .decision-bar button,
-  .handoff-actions button,
-  .dialog-actions [data-slot="button"],
-  #thread-panel .page-header-actions button,
-  .chat-header [data-variant="icon"],
-  .send-button,
-  .backlog-filter-chip,
-  .backlog-filter-clear,
-  .backlog-task-actions select,
-  .backlog-task-actions button,
-  .backlog-row-actions select,
-  .backlog-row-actions button,
-  .code-view-toggle,
-  .adm-view-toggle-btn,
-  .adm-copy-pill,
-  .adm-form-actions [data-slot="button"],
-  .overlay-close,
-  .adm-chat-rows button,
-  .relay-search,
-  .adm-search,
-  .adm-fleet-chip,
-  .adm-node-card-icon-btn,
-  .msg-turn-action {
+  [data-slot="select-scroll-down-button"] {
     min-height: var(--touch-target);
   }
 
@@ -145,81 +110,29 @@
     font-size: 16px;
   }
 
+  /* Square icon buttons want the floor on BOTH axes — the rule above only
+     sets height, and a 44px-tall, 28px-wide button is still a miss. */
   .dialog-toast-close,
-  .profile-image-picker-remove {
-    width: var(--touch-target);
-    height: var(--touch-target);
-  }
-
-  .sidenav-btn {
-    min-height: var(--touch-target);
-    min-width: var(--touch-target);
-  }
-
-  /* Settings flyout rows sit at 38px on fine pointers; raise to the touch
-     target minimum on coarse pointers. */
-  .sidenav-settings-menu button {
-    min-height: var(--touch-target);
-  }
-
-  /* Conversation row actions are hover-revealed (opacity:0) on fine pointers.
-     Touch has no hover, so they'd stay invisible yet still occupy layout and
-     absorb taps. Pin them visible and give them a real 32px target (≥ WCAG
-     2.5.8) so rename/close are discoverable and hittable on touch. */
-  .conversation-rename-btn,
-  .conversation-remove-btn {
-    opacity: 1;
-    width: 32px;
-    height: 32px;
-  }
-
-  /* Two more small controls take the same documented 32px WCAG 2.5.8 tier as
-     the conversation row actions above rather than the 44px floor: the
-     reasoning expander is a ~20px inline toggle whose full bump would bend
-     the thinking block's baseline rhythm, and the fence copy button is
-     hover-revealed on fine pointers and pinned visible on touch — the same
-     posture as the row actions. */
-  .agent-thinking-toggle,
-  .md-fence-copy {
-    min-width: 32px;
-    min-height: 32px;
-  }
-
-  .artifact-index-btn {
-    width: var(--touch-target);
-    height: var(--touch-target);
-  }
-
-  /* Drawer controls that sit below the touch target on fine pointers:
-     the run-mode segment (34px) and the destructive placement remove (28px). */
-  .adm-profile-segment-btn {
-    min-height: var(--touch-target);
-  }
-
-  .adm-placement-remove {
-    width: var(--touch-target);
-    height: var(--touch-target);
-  }
-
-  .backlog-view-btn {
-    width: var(--touch-target);
-    height: var(--touch-target);
-  }
-
+  .profile-image-picker-remove,
+  .sidenav-btn,
+  .artifact-index-btn,
+  .adm-placement-remove,
+  .backlog-view-btn,
   #thread-panel .page-header-actions button,
   .chat-header [data-variant="icon"],
   .send-button,
   .backlog-task-actions .backlog-action-icon,
   .backlog-row-actions .backlog-action-icon,
   .overlay-close,
-  .adm-chat-rows button {
+  .adm-chat-rows button,
+  .adm-node-card-icon-btn {
     width: var(--touch-target);
     height: var(--touch-target);
   }
 
+  /* Controls whose hit area has to grow sideways rather than square up. */
   .msg-turn-action {
     min-width: var(--touch-target);
-    height: var(--touch-target);
     padding-inline: var(--sp-3);
   }
 
@@ -232,12 +145,39 @@
     padding-inline: var(--sp-3);
   }
 
-  .adm-node-card-icon-btn {
-    width: var(--touch-target);
-    height: var(--touch-target);
+  /* Hover-revealed row actions have no hover on touch: they would stay
+     invisible while still occupying layout and absorbing taps. Pin them
+     visible. */
+  .conversation-rename-btn,
+  .conversation-remove-btn,
+  .md-fence-copy {
+    opacity: 1;
   }
 
-  /* The card action grid pins 28px slots on fine pointers; the boosted 44px
+  /* ── Deliberate exceptions ──────────────────────────────────────────────
+     Everything below stays UNDER the 44px floor on purpose. Each one still
+     clears WCAG 2.5.8 (24px), which is the actual conformance minimum; 44px
+     is the stricter target this app holds itself to elsewhere. Adding to this
+     list means writing down why the floor does not apply — "it looked too big"
+     is not a reason, and neither is "the layout broke": a layout that cannot
+     hold a 44px control on touch is the thing to fix.
+
+     These are inline glyph buttons that share a line with running text. A
+     44px box around a control that sits inside a sentence does not enlarge a
+     target so much as bend the text it lives in — the reasoning expander
+     would push the thinking block off its baseline rhythm, and the row
+     actions would set the conversation row's height from a decoration. */
+  .conversation-rename-btn,
+  .conversation-remove-btn,
+  .agent-thinking-toggle,
+  .md-fence-copy {
+    min-width: var(--control-h-xs);
+    min-height: var(--control-h-xs);
+    width: var(--control-h-xs);
+    height: var(--control-h-xs);
+  }
+
+  /* The card action grid pins its slots on fine pointers; the boosted 44px
      buttons would overflow their columns and overlap without matching tracks. */
   .adm-node-card-actions {
     grid-template-columns: repeat(5, var(--touch-target));

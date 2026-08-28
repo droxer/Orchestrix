@@ -86,23 +86,7 @@
   background: var(--row-hover);
 }
 
-.teams-list-row[data-selected="true"] {
-  background: var(--action-soft);
-}
-
-/* Identical contract to .conversation-row and .agents-roster-row, keyed on the
-   same data-selected attribute, so selection looks the same on all three. */
-.teams-list-row[data-selected="true"]::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  /* Inset holds the bar at ~55% of the row height, matching the other rails. */
-  top: 10px;
-  bottom: 10px;
-  width: 2px;
-  border-radius: calc(var(--r-1) / 2);
-  background: var(--action);
-}
+/* Selection comes from `.rail-row` (tokens/base.css). */
 
 .teams-list-row-select {
   display: grid;
@@ -326,12 +310,7 @@
   align-items: center;
   gap: var(--sp-1);
   color: var(--ink-3);
-  font-family: var(--font-mono);
-  font-feature-settings: "tnum" 1;
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
   font-size: var(--fs-2);
-  letter-spacing: var(--type-code-track);
   white-space: nowrap;
 }
 

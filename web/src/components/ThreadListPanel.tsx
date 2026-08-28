@@ -1,7 +1,12 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionAdd, ChevronDownIcon, WorkspaceFolder } from "./icons";
+import {
+  ActionAdd,
+  ChevronDownIcon,
+  ICON,
+  WorkspaceFolder,
+} from "./icons";
 import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
 import { ThreadRow, type ThreadItem } from "./ThreadRow";
@@ -259,7 +264,7 @@ export function ThreadListPanel({
               title={createLabel}
               onClick={directoryMode === "projects" ? onCreateProject : () => onNewThread(null)}
             >
-              <ActionAdd size={16} />
+              <ActionAdd size={ICON.md} />
             </Button>
           );
         })()}
@@ -267,7 +272,7 @@ export function ThreadListPanel({
       <div className="list-filter-bar">
         <SearchInput
           className="list-filter-search"
-          iconSize={14}
+          iconSize={ICON.sm}
           label={directoryMode === "projects" ? t("project.search_label") : t("thread.search_label")}
           name="thread-search"
           placeholder={directoryMode === "projects" ? t("project.search_placeholder") : t("thread.search_placeholder")}
@@ -314,7 +319,7 @@ export function ThreadListPanel({
                 aria-expanded={expanded}
                 onClick={() => applyExpansion(toggleProjectExpansion(expansion, project))}
               >
-                <ChevronDownIcon size={14} />
+                <ChevronDownIcon size={ICON.sm} />
               </button>
               <button
                 type="button"
@@ -329,7 +334,7 @@ export function ThreadListPanel({
                 }}
               >
                 <span className="project-folder-icon">
-                  <WorkspaceFolder size={15} aria-hidden="true" />
+                  <WorkspaceFolder size={ICON.sm} aria-hidden="true" />
                   {projectState ? (
                     <span className="project-folder-state-dot" data-tone={projectState} aria-hidden="true" />
                   ) : null}

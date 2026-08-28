@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { DaemonNodeMonitorRecord } from "../../types";
 import { nodeOwnershipProfile } from "../../lib/adminHelpers";
 import { nodeOwnershipIcon } from "../admin/NodeProfileBadges";
+import { ICON } from "../icons";
 import {
   Select,
   SelectContent,
@@ -111,7 +112,7 @@ export const ThreadRuntimeSelect = memo(function ThreadRuntimeSelect({
           aria-label={t("thread.choose_computer")}
           title={selectedTitle}
         >
-          {SelectedMark ? <SelectedMark size={16} aria-hidden="true" /> : null}
+          {SelectedMark ? <SelectedMark size={ICON.md} aria-hidden="true" /> : null}
           <span className="thread-runtime-select-name">
             {selected ? runtimeLabel(selected) : t("thread.no_computers")}
           </span>
@@ -137,12 +138,12 @@ export const ThreadRuntimeSelect = memo(function ThreadRuntimeSelect({
                 className="thread-runtime-option"
                 data-ownership={ownership}
               >
-                <OwnershipMark size={16} aria-hidden="true" />
+                <OwnershipMark size={ICON.md} aria-hidden="true" />
                 <span className="thread-runtime-option-body">
                   <span className="thread-runtime-option-name" translate="no">{name}</span>
                   {name === node.id ? null : (
                     <span className="thread-runtime-option-meta">
-                      <span className="thread-runtime-option-id" translate="no">{node.id}</span>
+                      <span className="thread-runtime-option-id code" translate="no">{node.id}</span>
                     </span>
                   )}
                 </span>

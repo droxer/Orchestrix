@@ -19,7 +19,11 @@ import { ManageExecutorsDrawer } from "./admin/ManageExecutorsDrawer";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
-import { ActionAdd, AdminNode } from "./icons";
+import {
+  ActionAdd,
+  AdminNode,
+  ICON,
+} from "./icons";
 
 export function ComputerPage({
   nodes,
@@ -100,7 +104,7 @@ export function ComputerPage({
         disabled={atLimit}
         title={limitHint ?? undefined}
       >
-        <ActionAdd size={14} aria-hidden="true" />
+        <ActionAdd size={ICON.sm} aria-hidden="true" />
         {t("computer.connect_button")}
         {computerLimit !== undefined ? (
           <span className="computer-connect-usage tnum">
@@ -184,7 +188,7 @@ export function ComputerPage({
           <RelayEmptyState
             title={t("computer.empty_title")}
             body={t("computer.empty_body")}
-            illustration={<AdminNode size={40} aria-hidden="true" />}
+            illustration={<AdminNode size={ICON.hero} aria-hidden="true" />}
             actions={connectCta("default")}
           />
         ) : (

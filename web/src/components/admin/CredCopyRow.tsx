@@ -1,7 +1,11 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
-import { ActionApprove, ActionCopy } from "../icons";
+import {
+  ActionApprove,
+  ActionCopy,
+  ICON,
+} from "../icons";
 import { Button } from "@/components/ui/button";
 
 interface CredCopyRowProps {
@@ -30,7 +34,7 @@ export function CredCopyRow({ label, value, copyLabel, copied, onCopy, hint }: C
           aria-label={copyLabel}
           title={copyLabel}
         >
-          {copied ? <ActionApprove size={14} aria-hidden="true" /> : <ActionCopy size={14} aria-hidden="true" />}
+          {copied ? <ActionApprove size={ICON.sm} aria-hidden="true" /> : <ActionCopy size={ICON.sm} aria-hidden="true" />}
           <span>{copied ? t("admin.copied") : t("admin.copy")}</span>
           <span className="sr-only" aria-live="polite">{copied ? t("admin.copied") : ""}</span>
         </Button>

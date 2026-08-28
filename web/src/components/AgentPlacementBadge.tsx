@@ -8,7 +8,12 @@ import {
   type AgentPlacementDescription,
   type PlacementOwnership,
 } from "../lib/agentPlacements";
-import { NodeLocal, NodeManaged, NodePending } from "./icons";
+import {
+  ICON,
+  NodeLocal,
+  NodeManaged,
+  NodePending,
+} from "./icons";
 
 export const OWNERSHIP_ICON: Record<PlacementOwnership, typeof NodeManaged> = {
   managed: NodeManaged,
@@ -39,19 +44,19 @@ export function AgentPlacementBadge({
 
   return (
     <span
-      className="agent-placement-badge"
+      className="agent-placement-badge code"
       data-ownership={description.ownership}
       title={detailTitle}
     >
       <i className={`agent-placement-badge-dot tone-${placementStatusTone(status)}`} aria-hidden="true" />
-      <OwnershipIcon size={13} aria-hidden="true" />
-      <span className="agent-placement-badge-name" translate="no">
+      <OwnershipIcon size={ICON.sm} aria-hidden="true" />
+      <span className="agent-placement-badge-name code" translate="no">
         {description.nodeName}
       </span>
       <span className="sr-only">{statusLabel}</span>
-      <span className="agent-placement-badge-kind">{ownershipLabel}</span>
+      <span className="agent-placement-badge-kind code">{ownershipLabel}</span>
       {showsSandbox ? (
-        <span className="agent-placement-badge-sandbox">{sandboxLabel}</span>
+        <span className="agent-placement-badge-sandbox code">{sandboxLabel}</span>
       ) : null}
     </span>
   );

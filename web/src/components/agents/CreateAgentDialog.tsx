@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { ICON } from "../icons";
 
 interface CreateAgentDialogProps {
   open: boolean;
@@ -55,7 +56,7 @@ function ComputerOptionLabel({
   const ComputerIcon = OWNERSHIP_ICON[ownership];
   return (
     <span className="create-agent-computer-option">
-      <ComputerIcon size={14} aria-hidden="true" />
+      <ComputerIcon size={ICON.sm} aria-hidden="true" />
       <span className="create-agent-computer-name" translate="no">{label}</span>
       <span className="create-agent-computer-kind">{kindLabel}</span>
     </span>
@@ -320,7 +321,7 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
                     onClick={() => setExecutorKind(kind)}
                   >
                     <span className="create-agent-runtime-mark" aria-hidden="true">
-                      <AgentMark agent={kind} size={22} />
+                      <AgentMark agent={kind} size={ICON.xl} />
                     </span>
                     <span className="create-agent-runtime-option-copy">
                       <span className="create-agent-runtime-option-name" translate="no">{agentLabel(kind)}</span>

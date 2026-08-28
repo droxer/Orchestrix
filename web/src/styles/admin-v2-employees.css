@@ -1,0 +1,683 @@
+/* Admin console — content frame, member fieldset, and the EMPLOYEES view
+   (list rows, cards, metrics) plus the fleet filter chips and the shared
+   control row both views sit under.
+
+   Split out of a 2145-line admin-v2-views.css, which carried five unrelated
+   views. The split is at the section rules that were already drawn in that
+   file's comments; no rule moved between sections. */
+
+/* ── Content ──────────────────────────────────────────────────────── */
+.adm-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.adm-content-main {
+  overflow-y: auto;
+  padding: var(--sp-6) var(--page-gutter);
+  min-width: 0;
+}
+
+.adm-content-main:has(> .adm-view-stage > .adm-dash) {
+  padding: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .adm-emp-row.is-pulse::after,
+  .adm-node-card.is-pulse::after {
+    animation: none;
+  }
+}
+
+.adm-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-7);
+}
+
+/* Was `.adm-field team-member-fieldset`, borrowing the field stack from a class
+   that is now the <Field> component. A <legend> is not a <Label>, so it carries
+   the label type role here rather than inheriting it from a descendant rule. */
+.team-member-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1-5);
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.team-member-fieldset legend {
+  margin-bottom: var(--sp-2);
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
+  color: var(--ink-2);
+}
+
+.team-member-options {
+  display: grid;
+  gap: var(--sp-hairline);
+  overflow: hidden;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--line-1);
+}
+
+.team-member-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-0);
+  cursor: pointer;
+}
+
+.team-member-option:hover {
+  background: var(--row-hover);
+}
+
+.team-member-option-main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-0-5);
+}
+
+.team-member-option-name {
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Meta line = kind · home computer, one quiet mono row. The middot separator
+   is generated, never typed, so both surfaces stay in lockstep. */
+.team-member-option-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--ink-3);
+  font-size: var(--fs-2);
+  white-space: nowrap;
+}
+
+.team-member-option-meta > * + *::before {
+  content: "·";
+  margin-right: var(--sp-1);
+  color: var(--ink-4);
+}
+
+.team-member-option-computer {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--sp-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adm-employees-empty.relay-empty--fill {
+  min-height: min(420px, 50vh);
+}
+
+.adm-fleet-empty.relay-empty--fill {
+  min-height: min(280px, 40vh);
+}
+
+/* ── Employees view ───────────────────────────────────────────────── */
+.adm-emp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Column geometry is declared ONCE per table, shared by the header row and
+   the data rows — drift here is what silently misaligns headers from cells. */
+.adm-emp-cols,
+.adm-emp-row {
+  /* Render-skip, row tier. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 96px;
+  display: grid;
+  /* identity / computers / limit / activity / actions */
+  grid-template-columns: minmax(220px, 1.2fr) minmax(0, 2fr) auto auto auto;
+  gap: var(--sp-6);
+}
+
+.adm-emp-cols {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-0);
+  padding: 0 0 var(--sp-3);
+  border-bottom: 1px solid var(--line-1);
+}
+
+.adm-col-label {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.adm-col-label--metrics {
+  text-align: right;
+}
+
+.adm-emp-row {
+  align-items: center;
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--line-2);
+  position: relative;
+  transition: background var(--t-fast) var(--ease);
+}
+
+.adm-emp-row.is-pulse::after {
+  /* A one-shot 'recently updated' marker, not live work — ink, drawn once on
+     the --t-draw cadence (--live purple + the pulse cadences are reserved for
+     live work). */
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--sp-4));
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--ink-3);
+  animation: adm-pulse-fade var(--t-draw) var(--ease) forwards;
+}
+
+@keyframes adm-pulse-fade {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.adm-emp-id { min-width: 0; }
+
+.adm-emp-id-line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.adm-emp-name {
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
+  margin: 0;
+  color: var(--ink-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-emp-meta {
+  margin: var(--sp-1) 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+  color: var(--ink-3);
+}
+
+.adm-emp-nodes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.adm-emp-no-nodes {
+  font-size: var(--fs-3);
+  color: var(--ink-3);
+  font-style: italic;
+}
+
+.adm-node-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--control-h-xs);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-full);
+  background: var(--surface-0);
+  color: var(--ink-1);
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
+  cursor: pointer;
+  transition: border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.adm-node-chip:hover {
+  border-color: var(--line-strong);
+}
+
+/* Official vendor glyph — identity, alongside the employee's agent name. */
+.adm-node-chip-mark {
+  flex: 0 0 auto;
+  opacity: var(--opacity-mark);
+}
+
+/* Computer chip on the employee card/row — a readout, not a control: the
+   machine's actions live on its own node card, so no pointer and no hover
+   affordance. Anatomy mirrors the node card: presence dot, ownership mark,
+   name. */
+.adm-computer-chip {
+  cursor: default;
+  gap: var(--sp-2);
+}
+
+.adm-computer-chip:hover {
+  border-color: var(--line-1);
+}
+
+.adm-computer-chip .adm-node-chip-mark {
+  opacity: 1;
+  color: var(--ink-3);
+}
+
+.adm-computer-chip[data-ownership="managed"] .adm-node-chip-mark {
+  color: var(--ink-2);
+}
+
+
+/* A dark machine recedes, matching the node card's offline treatment. */
+.adm-computer-chip[data-online="false"] {
+  color: var(--ink-3);
+}
+
+.adm-computer-chip[data-online="false"] .adm-node-chip-mark {
+  color: var(--ink-4);
+}
+
+.adm-emp-metrics {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+}
+
+.adm-emp-metric {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-1);
+  min-width: 3.5rem;
+}
+
+.adm-emp-metric-label {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.adm-emp-running {
+  font: var(--type-number);
+  letter-spacing: var(--type-number-track);
+}
+
+.adm-emp-ratio {
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+}
+
+/* Dedicated actions cell — mirrors the Nodes list ACTIONS column: a quiet
+   neutral icon button that tints red only on hover, not a red-at-rest glyph. */
+.adm-emp-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.adm-view-error {
+  margin: 0 0 var(--sp-4);
+  font-size: var(--fs-3);
+  color: var(--err);
+}
+
+@media (max-width: 719px) {
+  /* Employee rows: the 3-column grid (minmax(220px,…)) can't fit a phone, so
+     stack identity → agents → metrics. The column-label header is meaningless
+     stacked, so hide it. */
+  .adm-emp-cols {
+    display: none;
+  }
+
+  .adm-emp-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-3);
+    padding: var(--sp-4) 0;
+  }
+
+  .adm-emp-metrics {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .adm-emp-actions {
+    justify-self: start;
+    justify-content: flex-start;
+  }
+}
+
+/* There used to be a `:where(.admin-console) .tone-*` block here that painted
+   `color` for six tone names. It was the second contract on the `.tone-`
+   prefix — base.css defines those classes as setting the `--tone` VARIABLE and
+   nothing else — and it cost more than it bought. Being a bare class name it
+   leaked out of the console by source order, so two further "pin" rules had to
+   be written to shove `.adm-node-chip` and `.adm-agent-chip` back to their
+   identity ink; the pins then had to be specificity-matched and
+   source-ordered against the painter, and one of them needed `:has()` to carve
+   out the single chip that genuinely did want the tone.
+
+   All three rules are gone. The two elements that actually want a tone-colored
+   text fill now ask for it directly and locally, by reading the variable the
+   driver already sets: `.adm-assign-node-status` (admin-v2-drawers.css) and
+   the status-word chip below. Everything else keeps the neutral ink it
+   declares for itself, without a pin, because nothing is fighting it anymore.
+
+   Do not reintroduce a broad `.tone-* { color }` rule. A component that wants
+   the tone as ink writes `color: var(--tone, <its own neutral>)` on its own
+   selector. */
+
+/* ManageExecutorsDrawer reuses .adm-agent-chip for a plain status-word chip
+   (no vendor glyph, no dot) where the tone-colored text IS the content. The
+   marked identity chip keeps the chip's own --ink-3: an agent name
+   (CLAUDE/CODEX/…) is identity, never status. */
+.adm-agent-chip:not(:has(.adm-agent-chip-mark)) {
+  color: var(--tone, var(--ink-3));
+}
+
+/* ── Fleet view — filter chips ────────────────────────────────────── */
+.adm-fleet-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+.adm-fleet-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--ink-2);
+  font: var(--type-label-strong);
+  text-transform: none;
+  letter-spacing: var(--type-label-strong-track);
+  cursor: pointer;
+  transition: border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+
+.adm-fleet-chip:hover {
+  color: var(--ink-1);
+  border-color: var(--line-strong);
+}
+
+
+.adm-fleet-chip.active,
+.adm-fleet-chip[data-active="true"] {
+  /* Segmented-control recipe: recessed surface-0 fill + inset hairline, the
+     same idiom as the shell view-toggle. Not a selectable list row, so no
+     action-soft wash. */
+  color: var(--ink-1);
+  border-color: var(--line-1);
+  background: var(--surface-0);
+  box-shadow: inset 0 0 0 1px var(--line-1);
+}
+
+.adm-fleet-chip.active .adm-fleet-chip-count,
+.adm-fleet-chip[data-active="true"] .adm-fleet-chip-count {
+  color: var(--ink-1);
+}
+
+.adm-fleet-chip-count {
+  font: var(--type-micro);
+  color: var(--ink-3);
+  text-transform: none;
+  letter-spacing: var(--type-micro-track);
+}
+
+.adm-fleet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--sp-4);
+}
+
+.adm-node-history {
+  margin-top: var(--sp-8);
+  padding-top: var(--sp-6);
+  border-top: 1px solid var(--line-1);
+}
+
+.adm-node-history-head {
+  margin-bottom: var(--sp-4);
+}
+
+/* Count sits beside the heading it describes, not floated to the far edge. */
+.adm-node-history-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.adm-node-history-head h2 {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.adm-node-history-head p {
+  margin: var(--sp-1) 0 0;
+  color: var(--ink-3);
+  font: var(--type-label);
+}
+
+.adm-node-history-count {
+  min-width: 2rem;
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-full);
+  color: var(--ink-3);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-align: center;
+}
+
+.adm-node-history-list {
+  display: grid;
+  gap: var(--sp-hairline);
+  margin: 0;
+  padding: var(--sp-hairline);
+  border-radius: var(--r-2);
+  background: var(--line-1);
+  list-style: none;
+  overflow: hidden;
+}
+
+.adm-node-history-row {
+  display: grid;
+  grid-template-columns: auto minmax(150px, 1.2fr) minmax(150px, 1fr) auto auto;
+  align-items: center;
+  gap: var(--sp-4);
+  min-width: 0;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface-1);
+}
+
+.adm-node-history-icon {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-1);
+  color: var(--ink-3);
+  background: var(--surface-2);
+}
+
+.adm-node-history-identity {
+  display: grid;
+  min-width: 0;
+}
+
+.adm-node-history-identity strong,
+.adm-node-history-identity span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-node-history-identity strong {
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
+}
+
+.adm-node-history-identity span,
+.adm-node-history-meta,
+.adm-node-history-row time {
+  color: var(--ink-3);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+}
+
+/* The identity span carries the retired node's id — re-assert the code face
+   the `font` shorthand above resets. */
+.adm-node-history-identity span.code {
+  font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
+}
+
+/* Meta truncates so a long employee id can't wrap and break row rhythm.
+   The delete button's danger ink comes from the destructive Button variant. */
+.adm-node-history-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-node-history-error {
+  margin: var(--sp-3) 0 0;
+  color: var(--err);
+  font: var(--type-label);
+}
+
+@media (max-width: 820px) {
+  .adm-node-history-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .adm-node-history-meta,
+  .adm-node-history-row time {
+    display: none;
+  }
+}
+
+/* ── Shared control row (filters/search on the left, card/list toggle on
+   the right) — keeps the Employees and Nodes views chrome-aligned. ─────── */
+.adm-view-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+}
+
+.adm-view-controls > .adm-fleet-filters {
+  margin-bottom: 0;
+  flex: 1 1 auto;
+}
+
+.adm-view-controls > .adm-search {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.adm-layout-toggle {
+  flex: 0 0 auto;
+}
+
+/* ── Employee card (card view) — inherits the node-card frame so the two
+   views read as one system; only the interior slots differ. ───────────── */
+.adm-emp-card .adm-node-card-body {
+  gap: var(--sp-3);
+}
+
+.adm-emp-card-dept {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-3);
+  text-align: right;
+}
+
+.adm-emp-card-email {
+  margin: 0;
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-emp-card-metrics {
+  display: flex;
+  align-items: center;
+  /* Three metrics plus the action buttons no longer fit one line at the
+     card's narrowest, so let them wrap instead of overflowing the footer. */
+  flex-wrap: wrap;
+  min-width: 0;
+  column-gap: var(--sp-5);
+  row-gap: var(--sp-2);
+  font-feature-settings: var(--font-features), "tnum" 1;
+}
+
+.adm-emp-card-metric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  /* CJK labels can break at any character, and as flex items their
+     min-content is one glyph — without nowrap a tight footer splits
+     "运行中"/"就绪" mid-word. */
+  white-space: nowrap;
+}
+
+.adm-emp-card-metric .tnum {
+  font: var(--type-label-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Employee cards carry only edit + delete — collapse the fixed 5-slot node
+   grid (an unslotted button would auto-place into column 1 and leave empty
+   28px tracks) and pin the buttons to the footer edge. */
+.adm-emp-card .adm-node-card-actions {
+  display: flex;
+  margin-left: auto;
+}
+
+.adm-node-card.is-pulse::after {
+  /* Same one-shot 'recently updated' marker as .adm-emp-row.is-pulse — ink on
+     the --t-draw cadence, never the --action cobalt or --live purple. */
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--ink-3);
+  animation: adm-pulse-fade var(--t-draw) var(--ease) forwards;
+  pointer-events: none;
+}

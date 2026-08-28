@@ -4,6 +4,7 @@ import type { AgentName, LogicalAgentAvailability } from "../types";
 import { AgentMark } from "./AgentMark";
 import { IdentityMark } from "./IdentityMark";
 import { ProfileImage } from "./ProfileImagePicker";
+import { ICON } from "./icons";
 
 /**
  * Visual agent-state indicator for a task. The agent's profile image carries
@@ -73,7 +74,7 @@ export function AgentStateBadge({
           fallback={name ? <IdentityMark kind="agent" /> : null}
         />
       ) : (
-        <AgentMark agent={agent} size={14} />
+        <AgentMark agent={agent} size={ICON.sm} />
       )}
       <span className="sr-only">{label}</span>
     </span>

@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SearchInput } from "@/components/ui/search-input";
+import { ICON } from "./icons";
 
 interface FiltersBarProps {
   ariaLabel: string;
@@ -43,7 +44,7 @@ export function FiltersBar({
         <SearchInput
           className="backlog-filter-search-wrap"
           inputClassName="backlog-filter-search"
-          iconSize={15}
+          iconSize={ICON.sm}
           label={searchLabel}
           name={searchName}
           value={query}

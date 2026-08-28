@@ -14,7 +14,7 @@ describe("node card profile layout", () => {
       source("web/src/components/admin/NodeRow.tsx"),
       source("web/src/components/admin/NodeActions.tsx"),
       source("web/src/components/admin/NodeProfileBadges.tsx"),
-      source("web/src/styles/admin-v2-views.css"),
+      source("web/src/styles/admin-v2-nodes.css"),
     ]);
 
     assert.match(card, /<NodeProfileBadges[\s\S]*?\bcard\b[\s\S]*?\/>/);

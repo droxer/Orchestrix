@@ -2,7 +2,10 @@
 
 import { useMemo, useState, type Dispatch, RefObject, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionRoute } from "./icons";
+import {
+  ActionRoute,
+  ICON,
+} from "./icons";
 import { RelayMark } from "./RelayMark";
 import type { AgentName, AgentTeam, DaemonNodeMonitorRecord, EmployeeAgent, ProjectRecord, RelayArtifact, RelaySession } from "../types";
 import {
@@ -358,7 +361,7 @@ export function ThreadsView({
                             {!isHandoff ? (
                               <RelayMark width={12} height={12} className="transcript-phase-icon transcript-phase-mark" />
                             ) : PhaseIcon ? (
-                              <PhaseIcon size={12} className="transcript-phase-icon" aria-hidden="true" />
+                              <PhaseIcon size={ICON.xs} className="transcript-phase-icon" aria-hidden="true" />
                             ) : null}
                             {phaseLabel}
                           </span>

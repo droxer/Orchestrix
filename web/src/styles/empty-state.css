@@ -66,8 +66,8 @@ html[data-theme="dark"] .relay-bleed-mark {
   position: relative;
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 56px;
+  width: var(--avatar-xl);
+  height: var(--avatar-xl);
   border-radius: var(--r-2);
   background: var(--surface-2);
   box-shadow: inset 0 0 0 1px var(--line-2);
@@ -149,8 +149,8 @@ html[data-theme="dark"] .relay-bleed-mark {
 }
 
 .transcript-empty .relay-empty-avatar {
-  width: 80px;
-  height: 80px;
+  width: var(--avatar-3xl);
+  height: var(--avatar-3xl);
   border-radius: var(--r-3);
   /* Flat system, one decorative exception: a wide action-tinted halo stands
      in for a drop shadow so the hero tile reads as the room's focal point.
@@ -223,10 +223,6 @@ html[data-theme="dark"] .relay-bleed-mark {
   transform: translateY(1px);
 }
 
-.transcript-empty-suggestion:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
 
 .transcript-empty-hints {
   display: inline-flex;
@@ -256,12 +252,13 @@ html[data-theme="dark"] .relay-bleed-mark {
    measure is too narrow to host a margin. Strokes only — never the --action
    cobalt or --live purple, which are reserved for actionable and live work. */
 
+/* --ink-4, not --ink-3 dimmed to 0.6 — that composited to 3.60:1 in dark and
+   2.98:1 in light. Quiet is an ink tier, not an opacity. */
 .relay-empty-marginalia {
   position: absolute;
   top: var(--sp-5);
   right: var(--sp-6);
-  color: var(--ink-3);
-  opacity: 0.6;
+  color: var(--ink-4);
   pointer-events: none;
   user-select: none;
 }

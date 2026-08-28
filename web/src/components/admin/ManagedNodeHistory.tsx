@@ -7,7 +7,12 @@ import { useDialogs } from "@/components/ui/DialogProvider";
 import { formatRelativeTime } from "../../lib/adminHelpers";
 import { managedNodeHistory } from "../../lib/managedNodeHistory";
 import type { ManagedNodeRecord } from "../../types";
-import { AdminDelete, AdminNode, AdminRestore } from "../icons";
+import {
+  AdminDelete,
+  AdminNode,
+  AdminRestore,
+  ICON,
+} from "../icons";
 
 interface ManagedNodeHistoryProps {
   nodes: ManagedNodeRecord[];
@@ -82,7 +87,7 @@ export function ManagedNodeHistory({ nodes, onRecover, onDeletePermanently }: Ma
         {historical.map((node) => (
           <li key={node.id} className="adm-node-history-row">
             <span className="adm-node-history-icon" aria-hidden="true">
-              <AdminNode size={16} />
+              <AdminNode size={ICON.md} />
             </span>
             <span className="adm-node-history-identity">
               <strong>{node.displayName}</strong>
@@ -101,7 +106,7 @@ export function ManagedNodeHistory({ nodes, onRecover, onDeletePermanently }: Ma
               disabled={pending?.id === node.id}
               onClick={() => void handleRecover(node)}
             >
-              <AdminRestore size={14} aria-hidden="true" />
+              <AdminRestore size={ICON.sm} aria-hidden="true" />
               {pending?.id === node.id && pending.kind === "recover"
                 ? t("admin.v2.history_recovering")
                 : t("admin.v2.history_recover_action")}
@@ -113,7 +118,7 @@ export function ManagedNodeHistory({ nodes, onRecover, onDeletePermanently }: Ma
               disabled={pending?.id === node.id}
               onClick={() => void handleDelete(node)}
             >
-              <AdminDelete size={14} aria-hidden="true" />
+              <AdminDelete size={ICON.sm} aria-hidden="true" />
               {pending?.id === node.id && pending.kind === "delete"
                 ? t("admin.v2.history_deleting")
                 : t("admin.v2.history_delete_action")}

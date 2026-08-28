@@ -3,7 +3,13 @@
 import { useTranslation } from "react-i18next";
 import type { AdminPageView } from "../../lib/store";
 import { Button } from "@/components/ui/button";
-import { AdminDashboard, AdminEmployees, AdminNode, AdminSettings } from "../icons";
+import {
+  AdminDashboard,
+  AdminEmployees,
+  AdminNode,
+  AdminSettings,
+  ICON,
+} from "../icons";
 
 export type AdminView = AdminPageView;
 
@@ -39,7 +45,7 @@ export function AdminViewToggle({ view, onChange }: AdminViewToggleProps) {
             title={item.label}
             onClick={() => onChange(item.id)}
           >
-            <Icon size={15} aria-hidden="true" />
+            <Icon size={ICON.sm} aria-hidden="true" />
             <span className="adm-view-toggle-label">{item.label}</span>
           </Button>
         );

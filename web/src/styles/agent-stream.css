@@ -51,8 +51,8 @@
 .collaboration-node[open] > summary .collaboration-branch { transform: rotate(45deg); }
 
 .collaboration-status-dot {
-  width: 7px;
-  height: 7px;
+  width: var(--dot);
+  height: var(--dot);
   border-radius: var(--r-full);
   background: var(--tone);
 }
@@ -69,11 +69,6 @@
 .collaboration-status,
 .collaboration-meta {
   color: var(--ink-3);
-  font-family: var(--font-mono);
-  font-feature-settings: "tnum" 1;
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
 }
 
@@ -107,13 +102,19 @@
 
 /* Reasoning is not Markdown (it renders as plain lines), so it carries its own
    copy of the inline-code chip rather than inheriting the shared one. */
+/* Inlines the .code utility's body on purpose: react-markdown emits this
+   <code> element itself, so there is no markup to hang the class on. These
+   two element selectors are the ONLY sanctioned copies — every component that
+   controls its own markup wears `.code` instead (14 rules used to reproduce
+   this block, which is why a one-line change to the utility had to be made in
+   24 places). */
 .agent-thinking code {
   padding: var(--sp-1) var(--sp-2);
   border-radius: var(--r-1);
   background: var(--surface-2);
   color: var(--ink-1);
   font-family: var(--font-mono);
-  font-feature-settings: "tnum" 1;
+  font-feature-settings: var(--font-features), "tnum" 1;
   font-variant-numeric: tabular-nums;
   letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
@@ -132,11 +133,6 @@
 
 .agent-thinking-marker {
   flex: none;
-  font-family: var(--font-mono);
-  font-feature-settings: "tnum" 1;
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
   line-height: var(--leading-loose);
   color: var(--ink-4);
@@ -189,8 +185,6 @@
 }
 
 .agent-thinking-toggle:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
   border-radius: var(--r-full);
 }
 
@@ -203,11 +197,6 @@
   align-items: baseline;
   gap: var(--sp-2);
   min-width: 0;
-  font-family: var(--font-mono);
-  font-feature-settings: "tnum" 1;
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
   line-height: var(--leading-normal);
   color: var(--ink-2);
@@ -253,24 +242,24 @@
   color: var(--ink-2);
 }
 
+/* Reads the tone driver. This was a FOURTH spelling of the tone vocabulary,
+   hiding from the `.tone-*` guards behind its own prefix: `agent-status-good`
+   /-bad/-warn/-info re-derived --ok/--err/--warn by hand, exactly the
+   duplication base.css exists to prevent, and the element it labels was
+   already receiving a tone from the same segment data. Now it emits
+   `tone-<tone>` like everything else. */
 .agent-status {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
   align-self: flex-start;
-  color: var(--ink-3);
+  color: var(--tone, var(--ink-3));
   font: var(--type-label);
 }
 
 .agent-status > svg {
   flex-shrink: 0;
 }
-
-.agent-status-good    { color: var(--ok); }
-.agent-status-bad { color: var(--err); }
-.agent-status-warn  { color: var(--warn); }
-.agent-status-info  { color: var(--ink-2); }
-.agent-status-info  > svg { color: var(--info); }
 
 .agent-raw {
   margin: 0;
@@ -279,11 +268,6 @@
   border-radius: var(--r-2);
   background: var(--surface-1);
   color: var(--ink-2);
-  font-family: var(--font-mono);
-  font-feature-settings: "tnum" 1;
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
   line-height: var(--leading-loose);
   white-space: pre-wrap;
@@ -337,8 +321,8 @@
 
 .agent-stream-pulse {
   flex-shrink: 0;
-  width: 6px;
-  height: 6px;
+  width: var(--dot-sm);
+  height: var(--dot-sm);
   border-radius: var(--r-full);
   background: var(--live);
   /* Re-tint the shared pulse-ring so the halo matches the dot. */
@@ -374,7 +358,7 @@
 }
 
 .artifact-plan-note-loading {
-  opacity: 0.6;
+  opacity: var(--opacity-disabled);
 }
 
 .artifact-plan-skeleton {

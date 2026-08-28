@@ -82,14 +82,28 @@
   white-space: nowrap;
 }
 
-.artifact-stat.tone-up {
-  color: var(--ok);
-}
-.artifact-stat.tone-down {
-  color: var(--err);
+/* The chip's ink IS the tone. This used to be two rules keyed on `.tone-up`
+   and `.tone-down` — a direction vocabulary that meant good/bad here and
+   meant "pure ink tier, no hue" in admin-v2-dashboard.css, two readings of
+   one class name. The stat now emits real `good`/`bad` tones
+   (lib/artifactStats.ts) and this reads the driver's variable instead of
+   re-deriving the mapping. */
+.artifact-stat {
+  color: var(--tone, var(--ink-3));
 }
 
-/* Diff: per-line add/delete coloring with a sign gutter. */
+/* Diff: per-line add/delete coloring with a sign gutter.
+
+   NO OPACITY ON TEXT ANYWHERE IN THIS BLOCK. The line numbers, the sign
+   column, and the meta/context tiers used to dim an ink token with opacity
+   (0.45 / 0.5 / 0.55 / 0.85), which composites the ink toward the plane and
+   throws away the contrast the palette proved for it: the line-number column
+   measured 2.90:1 in dark and 2.24:1 in light — under the 3:1 floor for any
+   perceivable content, let alone the 4.5:1 AA floor for text you are being
+   asked to read. Emphasis is the INK RAMP's job (--ink-1 through --ink-4),
+   and the ramp bottoms out at --ink-4 precisely because that is the dimmest
+   tier that still passes; reaching past it with opacity is reaching past the
+   floor. */
 .artifact-diff {
   font-family: var(--font-mono);
   letter-spacing: var(--type-code-track);
@@ -108,16 +122,15 @@
 }
 .artifact-diff-ln {
   padding-right: var(--sp-2);
-  color: var(--ink-3);
+  color: var(--ink-4);
   font-variant-numeric: tabular-nums;
   text-align: right;
   user-select: none;
-  opacity: 0.45;
 }
 .artifact-diff-sign {
   text-align: center;
   user-select: none;
-  opacity: 0.5;
+  color: var(--ink-3);
 }
 .artifact-diff-text {
   padding-right: var(--sp-4);
@@ -133,16 +146,13 @@
   color: color-mix(in srgb, var(--err) 65%, var(--ink-1));
 }
 .artifact-diff-line.is-hunk {
-  color: var(--dark-ink-soft);
-  opacity: 0.9;
+  color: var(--ink-3);
 }
 .artifact-diff-line.is-meta {
-  color: var(--ink-3);
-  opacity: 0.55;
+  color: var(--ink-4);
 }
 .artifact-diff-line.is-context {
-  color: var(--ink-1);
-  opacity: 0.85;
+  color: var(--ink-2);
 }
 
 /* Terminal block for command logs and test output. */
@@ -253,10 +263,6 @@
   color: var(--surface-0);
 }
 
-.artifact-index-btn:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
 
 /* Expanded list panel — always rendered, parked off-canvas to the left and
    revealed with transform/opacity (never layout) on expand. */
@@ -312,10 +318,6 @@
   letter-spacing: var(--type-label-track);
 }
 
-.artifact-index-search input:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
 
 .artifact-index-search input::placeholder {
   color: var(--ink-3);
@@ -388,10 +390,6 @@
   box-shadow: var(--accent-bar);
 }
 
-.artifact-index-row:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
 
 .artifact-index-row-icon {
   display: grid;
@@ -440,7 +438,7 @@
   align-items: center;
   gap: var(--sp-3);
   padding: 0 var(--sp-4);
-  height: 44px;
+  height: var(--control-h);
   border-bottom: 1px solid var(--line-1);
   background: var(--surface-1);
   flex: 0 0 auto;
@@ -489,10 +487,6 @@
   border-color: var(--line-strong);
 }
 
-.artifact-preview-action-btn:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
 
 .artifact-preview-body {
   min-width: 0;

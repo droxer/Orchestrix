@@ -22,14 +22,16 @@
    list is the only registry there is; keep it honest when you add a query).
 
      480px   narrow phone — backlog card grid, login stack
-     560px   artifact chip row
      600px   dialog stack
      640px   compact — dashboard, admin shell, composer, workspace panes
      720px   transcript grid drops its fixed time column. Written as the
              complementary pair `min-width: 720px` / `max-width: 719px`;
              never use `max-width: 720px`, which overlaps the wide rule at
              exactly 720px.
-     768px   admin drawer + admin shell collapse
+     768px   CONTAINER tier, not a viewport one — the `computer` and `record`
+             containers widen here. Container queries are breakpoints too and
+             belong in this list; leaving them out is what made this row look
+             dead when it is not.
      820px   MOBILE — the app-wide tier (14 rules). Default to this one.
      900px   dashboard + backlog medium
     1040px   TABLET — the app-wide tier
@@ -39,7 +41,17 @@
    Two rules of thumb: a new query should reuse a tier above rather than
    invent a neighbour (700/800/1024 were each ~20px from a real tier and have
    been folded into 720/820/1040), and one component gets one breakpoint —
-   don't split a component's responsive behaviour across two files. */
+   don't split a component's responsive behaviour across two files.
+
+   The list is checked in BOTH directions (designGrid.test.ts), across @media
+   AND @container queries: a query with no registry row fails, and a registry
+   row with no query fails too. The second half is new. It caught 560px
+   ("artifact chip row"), which had outlived its query and sat here describing
+   behaviour the app no longer had — worse than not listing it, since a reader
+   reaching for "the nearest existing tier" would have picked one nothing
+   used. It also caught 768px, which turned out to be very much alive as a
+   CONTAINER tier: the first draft of the check only swept @media and would
+   have deleted a live row. Both halves sweep both at-rules now. */
 
 :root {
   /* Dark register (default) — the night side of the commerce surface.
@@ -209,13 +221,53 @@
   --r-5: 32px;  /* photographic feature cards, promo strips (rounded.xxxl) */
   --r-full: 9999px; /* pills, tab chips, badges, dots, avatars */
 
-  /* Disabled is opacity — one strength for every disabled control, so the
-     state reads identically everywhere and no call site picks its own. WCAG
-     exempts disabled controls from 1.4.3, but the 0.45–0.55 range this
-     replaces landed disabled light-register text at 1.9–2.7:1 on the canvas;
-     0.6 keeps it at ~2.5–4.7:1 depending on the ink tier — visibly inactive,
-     not ghosted. */
+  /* Opacity — the STATE scale. Three strengths, and the rule that governs all
+     of them is on the last one.
+
+     --opacity-disabled  a control that cannot be used right now. WCAG exempts
+                         disabled controls from 1.4.3, but the 0.45–0.55 range
+                         this replaced landed disabled light-register text at
+                         1.9–2.7:1 on the canvas; 0.6 keeps it at ~2.5–4.7:1
+                         depending on the ink tier — visibly inactive, not
+                         ghosted.
+     --opacity-dormant   content ABOUT something unreachable, which is not the
+                         same as a control you cannot press: a dark computer's
+                         agent rows are a record of what is installed, not an
+                         offer of capacity. Sits just under disabled so the
+                         two read as different facts.
+     --opacity-ghost     the placeholder left behind by something the user is
+                         currently holding — a dragged card's origin slot, an
+                         unfilled agent slot.
+
+     The old comment on --opacity-disabled claimed "no call site picks its
+     own", and that was already false when it was written: nine rules read the
+     token while three others spelled the same disabled state 0.6, 0.65 and
+     0.72, and the identical "this machine is dark" recede was 0.55 in
+     admin-v2-nodes.css and 0.6 in computer.css.
+
+     OPACITY MAY NOT DIM TEXT. Compositing an ink token toward its plane
+     discards the contrast the ink ramp proves for it, and the ramp's own
+     floor is the reason: --ink-4 exists because it is the dimmest tier that
+     still passes AA, so reaching past it with opacity is reaching past the
+     floor by construction. Seven rules did exactly that and every one failed
+     — the diff line-number column at 2.90:1 dark / 2.24:1 light, the code
+     gutter at 3.78 / 2.67, the empty-state marginalia at 3.60 / 2.98. They
+     now step the ink instead. A quieter piece of text is an --ink-* tier;
+     opacity is for the STATE of a whole element, and paletteTokens.test.ts
+     fails on any rule that sets both `color` and an opacity below 1. */
   --opacity-disabled: 0.6;
+  --opacity-dormant: 0.55;
+  --opacity-ghost: 0.45;
+  /* A vendor/brand glyph sits one notch under the label it accompanies: it is
+     identity, not emphasis. Opacity rather than an ink tier because these are
+     brand SVGs with their own fills, not currentColor glyphs — the one case
+     where dimming is the only mechanism available. Was 0.8 / 0.85 / 0.8 at
+     three call sites doing the identical job. */
+  --opacity-mark: 0.8;
+  /* A drawer that another drawer has opened on top of. Paired with a 0.98
+     scale — barely dimmed on purpose, because it is still the surface the
+     user will come back to. */
+  --opacity-underlay: 0.92;
 
   /* Spacing — 4px base, plus a micro tier below it. --sp-0-5/--sp-1-5 are
      the *only* sanctioned sub-4px gaps: they bind glyph-tight pairs (dot ↔
@@ -245,11 +297,117 @@
 
   /* Control heights — the source system renders form inputs and primary pills at
      44px so they share a silhouette and clear the WCAG AAA touch floor. The
-     two tiers below it are Relay's dense in-row chrome, which the source
-     system has no equivalent for. */
+     tiers below it are Relay's dense in-row chrome, which the source
+     system has no equivalent for.
+
+     These three tokens existed and the product ran on NINE heights — 24, 25,
+     26, 28, 32, 34, 36, 38, 48 — every one a raw px literal, so no deviation
+     was greppable. The cost was not abstract: `.backlog-view-btn` was 28px on
+     the backlog and 34px on the routine route (one class, two heights), the
+     backlog's own row-action cluster mixed 28 and 36, and the profile-image
+     picker put a 24px button next to a 25px one.
+
+     The fourth rung below is not a new idea, it is the tier those 24/25/26px
+     controls were already reaching for and spelling three ways.
+
+     Pick by what the control sits IN:
+
+       --control-h-2xs  an inline glyph button sharing a line of text — a
+                        remove ×, a copy button, a disclosure caret. Sized to
+                        the text line, not to the pointer; every one of these
+                        needs an entry in the coarse-pointer block in
+                        a11y.css, which raises it to --touch-target.
+       --control-h-xs   dense in-row chrome: the icon buttons in a row's
+                        action cluster, small toggles, segmented buttons.
+       --control-h-sm   a standalone compact control — filter chips, page
+                        tabs, menu rows. Not inside a row; it IS the row.
+       --control-h      form inputs and primary pills. Shares the source
+                        system's silhouette and clears the touch floor on its
+                        own, with no coarse-pointer entry needed.
+       --control-h-lg   one step ABOVE the pill tier, for a hero or dual-CTA
+                        pair where the button carries marketing weight. The
+                        only rung that exists to be loud rather than to fit.
+
+     A control that wants a height not on this ladder is telling you it has
+     been mis-classified; re-read the four jobs above before adding a fifth. */
+  --control-h-lg: 48px;
   --control-h: 44px;
   --control-h-sm: 40px;
   --control-h-xs: 32px;
+  --control-h-2xs: 24px;
+
+  /* Glyph sizes, for CSS-drawn marks. The mirror of the ICON scale in
+     components/icons.tsx — a lucide glyph takes its size as a React prop, a
+     vendor mark rendered by a stylesheet takes it from here, and the two must
+     name the same ladder or the same picture renders at two sizes depending
+     on which layer drew it. Rungs and their jobs are documented at ICON;
+     dimensionScales.test.ts pins the two scales together. */
+  --icon-xs: 12px;
+  --icon-sm: 14px;
+  --icon-md: 16px;
+  --icon-lg: 18px;
+  --icon-xl: 24px;
+  --icon-hero: 40px;
+
+  /* Avatar / identity-mark boxes — the square that holds a glyph, initials,
+     or a photograph, and carries a presence pip in its corner. A different
+     question from --dot-* below (the pip itself) and from the ICON scale in
+     components/icons.tsx (the glyph inside), and it went the same way both of
+     those did: thirteen sizes between 20 and 80px, with `.agent-state` alone
+     rendering at 22px on the board and 34px on a project member tile.
+
+       --avatar-xs  inline in a dense row (assignee stack, transcript rail)
+       --avatar-sm  inline with a line of text
+       --avatar-md  a list row's identity slot
+       --avatar-lg  a card header
+       --avatar-xl  an empty state or a page hero
+       --avatar-2xl a picker target or a hero provider plate
+
+     The glyph inside an avatar is sized by its box, not from this scale. */
+  --avatar-xs: 20px;
+  --avatar-sm: 24px;
+  --avatar-md: 32px;
+  --avatar-lg: 40px;
+  --avatar-xl: 56px;
+  --avatar-2xl: 64px;
+  /* A full-pane empty state, where the mark is the only thing on screen —
+     the transcript's, as against the 56px one inside a panel. */
+  --avatar-3xl: 80px;
+
+  /* Status dot — the most repeated atom in the product, and for a long time
+     the least governed one. It shipped at 6, 7, 8, 9 and 10px across 24
+     declarations, every one a raw literal, and the disagreements were
+     visible: thread.css drew a 6px folder dot directly above a 7px thread
+     dot in the SAME rail, backlog.css ran an 8px .state-mark beside a 9px
+     .agent-state pip, and the admin console used 6 and 8 on one screen.
+
+     Two sheets had already written down a tier without knowing the other
+     had: admin-v2-views.css declared "two deliberate tiers — presence is the
+     loud cue, every status/agent dot is the quiet tier", and backlog.css
+     sized .state-mark "to the 8px dot cell the list rows already reserve".
+     Those are the same taxonomy seen from two directions, so the scale below
+     is theirs, made explicit and given the third rung both implied.
+
+     Pick by CONTEXT, not by how loud you want it:
+
+       --dot-sm   inside a chip, pill, badge, or other bounded container.
+                  The container already draws the eye; the dot is a hint
+                  within it, not a signal across the page.
+       --dot      a row's status pip — the dot cell a list row, rail row, or
+                  tree row reserves. Has to carry state across the width of
+                  the row it labels, so it runs one step above the in-chip
+                  tier.
+       --dot-lg   a presence pip overlaid on an avatar or glyph. Reads
+                  smaller than its box because it is ringed by 2px of the
+                  surface colour to punch itself out of the artwork
+                  underneath; the ring costs 4px of the 10, leaving 6px of
+                  visible colour — the --dot-sm tier, which is the point.
+
+     A dot larger than --dot-lg is not a dot. Marks, avatars, and vendor
+     glyphs size themselves. */
+  --dot-sm: 6px;
+  --dot: 8px;
+  --dot-lg: 10px;
 
   /* Measure — the reading-column cap for prose, descriptions, and empty-state
      copy. In ch, not px, so the column tracks the font rather than the layout:

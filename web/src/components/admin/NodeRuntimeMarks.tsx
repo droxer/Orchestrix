@@ -3,6 +3,7 @@
 import type { TFunction } from "i18next";
 import type { AgentName, ControlPanelDaemonNodeRecord } from "../../types";
 import { AgentMark } from "../AgentMark";
+import { ICON } from "../icons";
 import {
   agentStatusTone,
   nodeAgentPresence,
@@ -72,7 +73,7 @@ export function NodeRuntimeMarks({
             translate="no"
           >
             <i className="adm-agent-dot" aria-hidden="true" />
-            <AgentMark agent={name} size={14} className="adm-agent-chip-mark" />
+            <AgentMark agent={name} size={ICON.sm} className="adm-agent-chip-mark" />
           </span>
         );
       })}

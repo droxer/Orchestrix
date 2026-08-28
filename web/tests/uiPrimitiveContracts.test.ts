@@ -155,9 +155,34 @@ describe("UI primitive contracts", () => {
     // up with the buttons and inputs beside it.
     assert.match(source, /default:\s*\n?\s*"h-\(--control-h\)/);
     assert.match(source, /icon:\s*"size-\(--control-h\)"/);
-    // --control-h is 40px, so an `h-9` (36px) lg tier would invert the scale.
-    const lg = source.match(/lg:\s*"h-(\d+)/)?.[1];
-    assert.ok(lg && Number(lg) * 4 > 40, `lg resolves to ${lg}, not larger than --control-h`);
+
+    // Every tier now names a rung on the --control-h-* ladder rather than a
+    // raw Tailwind step, so the ordering is checked against the ladder's real
+    // values in palette.css. That is the assertion this test always wanted:
+    // it used to re-derive the pixel count from the class name (`h-12` × 4)
+    // and compare it to a 40 hardcoded here, which had already drifted from
+    // the 44px --control-h it claimed to be reading.
+    const palette = await readFile(resolve("web/src/styles/tokens/palette.css"), "utf8");
+    const rung = (name: string) => {
+      const px = palette.match(new RegExp(`${name}:\\s*(\\d+)px;`))?.[1];
+      assert.ok(px, `${name} is not declared in palette.css`);
+      return Number(px);
+    };
+    const ladder = ["--control-h-2xs", "--control-h-xs", "--control-h-sm", "--control-h", "--control-h-lg"];
+    const heights = ladder.map(rung);
+    assert.deepEqual(
+      heights,
+      [...heights].sort((a, b) => a - b),
+      `the control ladder is out of order: ${ladder.map((n, i) => `${n}=${heights[i]}`).join(", ")}`,
+    );
+
+    const lgTier = source.match(/lg:\s*"h-\(([^)]+)\)/)?.[1];
+    assert.equal(lgTier, "--control-h-lg");
+    assert.ok(rung("--control-h-lg") > rung("--control-h"), "lg must sit above the pill tier");
+
+    // No size tier may reach for a raw Tailwind height step again.
+    const rawTier = source.match(/(?:^|\s)(?:"?[a-z-]+"?):\s*"(?:h|size)-\d/);
+    assert.equal(rawTier, null, `button size tier uses a raw step: ${rawTier?.[0].trim()}`);
   });
 
   it("routes every dropdown through the Select primitive, not native <select>", async () => {

@@ -1,7 +1,10 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
-import { AdminDelete } from "./icons";
+import {
+  AdminDelete,
+  ICON,
+} from "./icons";
 import { Button } from "@/components/ui/button";
 import { AgentPlacementBadge } from "./AgentPlacementBadge";
 import { placementStatusTone, type AgentPlacementDescription } from "../lib/agentPlacements";
@@ -59,7 +62,7 @@ export function PlacementList({
                 aria-label={t("admin.v2.remove_placement")}
                 title={t("admin.v2.remove_placement")}
               >
-                <AdminDelete size={13} aria-hidden="true" />
+                <AdminDelete size={ICON.sm} aria-hidden="true" />
               </Button>
             ) : null}
           </li>

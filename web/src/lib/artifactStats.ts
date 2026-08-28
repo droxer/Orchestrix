@@ -2,7 +2,7 @@ import type { RelayArtifact } from "relay-core";
 
 export type ArtifactKind = RelayArtifact["kind"];
 
-export type ArtifactStatTone = "up" | "down" | "neutral";
+export type ArtifactStatTone = "good" | "bad" | "neutral";
 
 /** A one-line, kind-aware summary derived from an artifact body. */
 export interface ArtifactStat {
@@ -47,7 +47,7 @@ function testStat(text: string): ArtifactStat {
   return {
     key: "test",
     vars: { passed, failed },
-    tone: failed > 0 ? "down" : "up",
+    tone: failed > 0 ? "bad" : "good",
   };
 }
 
@@ -59,7 +59,7 @@ function commandStat(text: string): ArtifactStat {
   return {
     key: "command",
     vars: { code },
-    tone: code === 0 ? "up" : "down",
+    tone: code === 0 ? "good" : "bad",
   };
 }
 

@@ -6,6 +6,7 @@ import type { TFunction } from "i18next";
 import type { SpaceItem } from "../../lib/threadSpace";
 import { ArtifactKindIcon } from "../artifact/ArtifactIndexStrip";
 import { Button } from "@/components/ui/button";
+import { ICON } from "../icons";
 
 function formatRowTime(value: string, locale: string | undefined): string {
   const date = new Date(value);
@@ -105,7 +106,7 @@ export function ThreadSpaceList({
               onClick={() => onSelect(artifact.id)}
             >
               <span className="thread-space-row-icon" aria-hidden="true">
-                <ArtifactKindIcon kind={artifact.kind} size={14} />
+                <ArtifactKindIcon kind={artifact.kind} size={ICON.sm} />
               </span>
               <span className="thread-space-row-copy">
                 <span className="thread-space-row-title">{artifact.title}</span>

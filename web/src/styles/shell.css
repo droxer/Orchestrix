@@ -140,7 +140,7 @@
   white-space: nowrap;
   font: var(--type-label);
   letter-spacing: var(--type-label-track);
-  font-feature-settings: "tnum" 1;
+  font-feature-settings: var(--font-features), "tnum" 1;
   font-variant-numeric: tabular-nums;
   color: var(--ink-3);
 }

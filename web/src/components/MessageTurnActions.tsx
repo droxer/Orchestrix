@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionCopy, ActionRetry, CheckIcon } from "./icons";
+import {
+  ActionCopy,
+  ActionRetry,
+  CheckIcon,
+  ICON,
+} from "./icons";
 import type { AgentName } from "../types";
 import { agentMessagePlainText } from "../lib/agentStream";
 import { Button } from "@/components/ui/button";
@@ -79,7 +84,7 @@ export function MessageTurnActions({
           aria-label={copied ? t("message.copied") : t("message.copy")}
           title={copied ? t("message.copied") : t("message.copy")}
         >
-          {copied ? <CheckIcon size={14} /> : <ActionCopy size={14} />}
+          {copied ? <CheckIcon size={ICON.sm} /> : <ActionCopy size={ICON.sm} />}
           <span className="msg-turn-action-label">{copied ? t("message.copied") : t("message.copy")}</span>
         </Button>
       ) : null}
@@ -92,7 +97,7 @@ export function MessageTurnActions({
           aria-label={t("message.retry")}
           title={t("message.retry")}
         >
-          <ActionRetry size={14} />
+          <ActionRetry size={ICON.sm} />
           <span className="msg-turn-action-label">{t("message.retry")}</span>
         </Button>
       ) : null}

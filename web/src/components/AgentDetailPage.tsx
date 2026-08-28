@@ -22,6 +22,7 @@ import {
   WorkspaceError,
 } from "./workspace/WorkspacePrimitives";
 import { RecordBand, type RecordFact } from "./workspace/RecordBand";
+import { ICON } from "./icons";
 
 export type AgentDetailTab = "profile" | "activities";
 
@@ -88,7 +89,7 @@ export function AgentDetailPage({
       label: t("admin.v2.agent_runtime"),
       value: (
         <span className="record-band-inline" translate="no">
-          <AgentMark agent={agent.executorKind} size={13} />
+          <AgentMark agent={agent.executorKind} size={ICON.sm} />
           {agentLabel(agent.executorKind)}
         </span>
       ),

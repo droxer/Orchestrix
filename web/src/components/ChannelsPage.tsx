@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionAdd } from "./icons";
+import {
+  ActionAdd,
+  ICON,
+} from "./icons";
 import { PageHeader } from "./PageHeader";
 import { ChannelsView } from "./admin/ChannelsView";
 import { Button } from "@/components/ui/button";
@@ -38,7 +41,7 @@ export function ChannelsPage() {
               title={t("admin.v2.chat_create")}
               onClick={() => setCreateOpen(true)}
             >
-              <ActionAdd size={16} aria-hidden="true" />
+              <ActionAdd size={ICON.md} aria-hidden="true" />
             </Button>
           ) : null
         }

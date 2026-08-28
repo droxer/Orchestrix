@@ -67,7 +67,7 @@
   display: grid;
   place-items: center;
   width: 26px;
-  height: 26px;
+  height: var(--control-h-2xs);
   padding: 0;
   border-radius: var(--r-1);
   color: var(--ink-3);
@@ -116,10 +116,6 @@
   color: var(--ink-1);
 }
 
-.project-member-tile-add:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
 
 .project-profile-empty {
   display: grid;
@@ -169,8 +165,8 @@
 }
 
 .project-member-tile .agent-state {
-  width: 34px;
-  height: 34px;
+  width: var(--avatar-md);
+  height: var(--avatar-md);
 }
 
 .project-member-tile-identity {

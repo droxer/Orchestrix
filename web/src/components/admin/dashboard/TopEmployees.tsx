@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { EmployeeAvatar } from "../../EmployeeAvatar";
 import type { ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../../types";
+import { AVATAR } from "../../icons";
 
 interface TopEmployeesProps {
   employees: EmployeeRecord[];
@@ -54,7 +55,7 @@ export function TopEmployees({ employees, nodes, ranked, className }: TopEmploye
           {rows.map((row, index) => (
             <li key={row.id} className="adm-dash-top-row">
               <span className="adm-dash-top-rank tnum">{index + 1}</span>
-              <EmployeeAvatar employeeId={row.id} running={false} size={28} />
+              <EmployeeAvatar employeeId={row.id} running={false} size={AVATAR.md} />
               <div className="adm-dash-top-meta">
                 <span className="adm-dash-top-name">{row.displayName}</span>
                 <span className="adm-dash-top-sub tnum">

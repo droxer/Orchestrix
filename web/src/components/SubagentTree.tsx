@@ -46,7 +46,7 @@ function SubagentNode({ node }: { node: CollaborationTreeNode }) {
       <div className="collaboration-node-body">
         {node.message ? <p>{node.message}</p> : null}
         {node.model ? (
-          <span className="collaboration-meta">
+          <span className="collaboration-meta code">
             {node.model}{node.reasoningEffort ? ` · ${node.reasoningEffort}` : ""}
           </span>
         ) : null}

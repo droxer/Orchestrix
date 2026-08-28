@@ -1,6 +1,9 @@
 "use client";
 
-import { ActionRemove } from "../icons";
+import {
+  ActionRemove,
+  ICON,
+} from "../icons";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
 
@@ -25,7 +28,7 @@ export function OverlayCloseButton({ label, onClick, className = "overlay-close"
       title={label}
       onClick={onClick}
     >
-      <ActionRemove size={16} aria-hidden="true" />
+      <ActionRemove size={ICON.md} aria-hidden="true" />
     </Button>
   );
 }

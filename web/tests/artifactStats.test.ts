@@ -41,17 +41,17 @@ describe("summarizeArtifact", () => {
 
   it("tallies passing and failing tests", () => {
     const stat = summarizeArtifact("test_output", "12 passed, 1 failed in 3.2s");
-    assert.deepEqual(stat, { key: "test", vars: { passed: 12, failed: 1 }, tone: "down" });
+    assert.deepEqual(stat, { key: "test", vars: { passed: 12, failed: 1 }, tone: "bad" });
   });
 
-  it("marks all-passing test runs as up", () => {
+  it("marks all-passing test runs as good", () => {
     const stat = summarizeArtifact("test_output", "All good: 8 passing");
-    assert.equal(stat?.tone, "up");
+    assert.equal(stat?.tone, "good");
   });
 
   it("reads command exit codes", () => {
-    assert.equal(summarizeArtifact("command_log", "process exited with code 0")?.tone, "up");
-    assert.equal(summarizeArtifact("command_log", "exit code 1")?.tone, "down");
+    assert.equal(summarizeArtifact("command_log", "process exited with code 0")?.tone, "good");
+    assert.equal(summarizeArtifact("command_log", "exit code 1")?.tone, "bad");
     assert.equal(summarizeArtifact("command_log", "no code here")?.key, "command_unknown");
   });
 });

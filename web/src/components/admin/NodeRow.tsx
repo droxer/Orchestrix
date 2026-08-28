@@ -14,7 +14,10 @@ import { NodeActions } from "./NodeActions";
 import { NodeProfileBadges, nodeOwnershipIcon } from "./NodeProfileBadges";
 import { NodePresence } from "./NodePresence";
 import { NodeRuntimeMarks } from "./NodeRuntimeMarks";
-import { AdminEmployees } from "../icons";
+import {
+  AdminEmployees,
+  ICON,
+} from "../icons";
 import { TonePill } from "../StatusPill";
 
 interface NodeRowProps {
@@ -51,7 +54,7 @@ export function NodeRow({ node, employeeName, storedTokens, colocated, onReveal,
           data-ownership={ownership}
           translate="no"
         >
-          <OwnershipMark size={16} aria-hidden="true" />
+          <OwnershipMark size={ICON.md} aria-hidden="true" />
         </span>
         <span className="adm-node-row-identity">
           <span className="adm-node-row-nameline">
@@ -80,7 +83,7 @@ export function NodeRow({ node, employeeName, storedTokens, colocated, onReveal,
       <div className="adm-node-row-employee" role="cell">
         {employeeName ? (
           <span className="adm-node-row-employee-label" translate="no">
-            <AdminEmployees size={12} className="adm-node-row-employee-icon" aria-hidden="true" />
+            <AdminEmployees size={ICON.xs} className="adm-node-row-employee-icon" aria-hidden="true" />
             {employeeName}
           </span>
         ) : null}

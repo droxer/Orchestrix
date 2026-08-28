@@ -89,6 +89,63 @@ export const ICON_STROKE = 1.75;
 // don't each pick their own number.
 export const ICON_STROKE_LARGE = 1.25;
 
+/**
+ * Glyph sizes. The one scale for anything drawn as a square picture: lucide
+ * icons, vendor AgentMarks, IdentityMarks, the Relay mark.
+ *
+ * This module already insisted on being the single source for WHICH glyph and
+ * for its stroke — "one shared value so future large icons don't each pick
+ * their own number" is the note on ICON_STROKE_LARGE, three lines up. Size was
+ * the one property left to the call site, and it went exactly where you would
+ * expect: 183 hardcoded numbers across eleven distinct values, including 24
+ * uses of a bare 13 and 12 of a bare 15 — a pixel off the neighbouring rung in
+ * each direction, with nothing to say why. The CSS half of the app has
+ * tokenised colour, spacing, radii, type, and motion; this was the last
+ * dimension still being eyeballed.
+ *
+ * Rungs are sized against the TYPE they sit beside, which is what makes a
+ * glyph look right or wrong next to a label:
+ *
+ *   xs  12  inside a badge or pill, beside --type-micro
+ *   sm  14  the default — chrome icons beside a --type-body-sm label
+ *   md  16  a standalone control glyph with no adjacent label (icon buttons,
+ *           composer actions), and vendor marks in a chip
+ *   lg  18  section- and nav-level glyphs, beside --type-heading
+ *   xl  24  a glyph that is the subject rather than a label's companion
+ *   hero 40 empty-state illustrations; pair with ICON_STROKE_LARGE so the
+ *           optical weight matches the chrome tiers
+ *
+ * Reach for `ICON.sm` by default. If a glyph looks wrong at every rung, the
+ * problem is usually the type beside it, not the scale.
+ */
+export const ICON = {
+  xs: 12,
+  sm: 14,
+  md: 16,
+  lg: 18,
+  xl: 24,
+  hero: 40,
+} as const;
+
+/**
+ * Avatar box sizes — a different question from ICON above. An avatar is a
+ * container that holds a glyph, initials, or a photograph and carries its own
+ * presence pip; a glyph is the picture inside. They ran together at 24, 28,
+ * 32, 36, 40 and 56px, so the two questions are separated here and answered
+ * once each.
+ *
+ *   sm  24  inline with a line of text
+ *   md  32  a list row's identity slot
+ *   lg  40  a card header
+ *   xl  56  an empty state or a page hero
+ */
+export const AVATAR = {
+  sm: 24,
+  md: 32,
+  lg: 40,
+  xl: 56,
+} as const;
+
 function withStandardStroke(Icon: LucideIcon, displayName: string) {
   const Wrapped = forwardRef<SVGSVGElement, LucideProps>((props, ref) => (
     <Icon ref={ref} strokeWidth={ICON_STROKE} aria-hidden="true" {...props} />

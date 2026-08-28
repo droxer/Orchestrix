@@ -1,4 +1,9 @@
-import { IdentityUser, MetricTokens, StreamAttachment } from "./icons";
+import {
+  ICON,
+  IdentityUser,
+  MetricTokens,
+  StreamAttachment,
+} from "./icons";
 import { memo, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -68,7 +73,7 @@ function PlanSummary({ steps, agentDisplayNames }: { steps: PlanStep[]; agentDis
         <li key={`${step.agent}-${index}`} className="artifact-plan-item">
           {index > 0 ? <span className="artifact-plan-arrow" aria-hidden="true">→</span> : null}
           <span className="artifact-plan-step">
-            <AgentMark agent={step.agent} size={14} />
+            <AgentMark agent={step.agent} size={ICON.sm} />
             <span className="artifact-plan-agent">{labelForExecutor(step.agent, agentDisplayNames)}</span>
           </span>
         </li>
@@ -139,7 +144,7 @@ function ArtifactChip({ artifact, sessionId, allArtifacts, onOpenArtifact }: { a
         aria-label={t("artifact.view_named", { title: artifact.title })}
       >
         <span className="artifact-chip-icon" aria-hidden="true">
-          <StreamAttachment size={15} />
+          <StreamAttachment size={ICON.sm} />
         </span>
         <span className="artifact-chip-copy">
           <span className="artifact-chip-kicker">
@@ -190,7 +195,7 @@ export const MessageBlock = memo(function MessageBlock({
     return (
       <article className="msg msg-user" aria-label={t("message.user_label")}>
         <span className="rail-node rail-node-user" aria-hidden="true">
-          <IdentityUser size={13} />
+          <IdentityUser size={ICON.sm} />
         </span>
         <div className="turn-body">
           <p className="user-text">{message.text}</p>
@@ -248,7 +253,7 @@ export const MessageBlock = memo(function MessageBlock({
                   cache: numberFormat.format(message.tokenUsage.cache),
                 })}
               >
-                <MetricTokens size={14} aria-hidden="true" />
+                <MetricTokens size={ICON.sm} aria-hidden="true" />
                 <span className="msg-turn-action-label">
                   {formatCompactTokens(message.tokenUsage.total, i18n.language)} {t("thread.tokens_short")}
                 </span>

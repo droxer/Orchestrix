@@ -75,7 +75,7 @@
   font: var(--type-display);
   letter-spacing: var(--type-display-track);
   color: var(--ink-1);
-  font-feature-settings: "tnum" 1;
+  font-feature-settings: var(--font-features), "tnum" 1;
   font-variant-numeric: tabular-nums;
   line-height: var(--leading-none);
 }
@@ -116,9 +116,9 @@
 /* Direction is carried by the glyph; brightness carries emphasis. A rising
    trend is not "good" and a falling one is not "bad" — Relay does not
    moralise its own metrics, so neither takes a status hue. */
-.adm-dash-delta.tone-up { color: var(--ink-2); }
-.adm-dash-delta.tone-down { color: var(--ink-3); }
-.adm-dash-delta.tone-flat { color: var(--ink-4); }
+.adm-dash-delta[data-direction="up"] { color: var(--ink-2); }
+.adm-dash-delta[data-direction="down"] { color: var(--ink-3); }
+.adm-dash-delta[data-direction="flat"] { color: var(--ink-4); }
 
 .adm-dash-delta-glyph {
   font-size: var(--fs-1);
@@ -154,7 +154,7 @@
   max-height: 220px;
 }
 
-.adm-dash-chart--empty { opacity: 0.85; }
+.adm-dash-chart--empty { opacity: var(--opacity-dormant); }
 
 /* Deliberately the shortest chart on the page. Token volume is supporting
    evidence, not the headline — at full height its solid bars outweighed the
@@ -178,10 +178,6 @@
   stroke: var(--surface-1);
   stroke-width: 1;
 }
-
-.adm-token-seg--output { fill: var(--ink-2); }
-.adm-token-seg--input { fill: var(--ink-3); }
-.adm-token-seg--cache { fill: var(--ink-4); }
 
 .adm-token-legend {
   display: flex;
@@ -288,11 +284,13 @@
 
 .adm-dash-bar-seg:last-child { border-right: none; }
 
-.adm-dash-bar-seg.tone-live { background: var(--live); }
-.adm-dash-bar-seg.tone-bad { background: var(--err); }
-.adm-dash-bar-seg.tone-good { background: var(--ok); }
-
-.adm-dash-bar-seg.tone-muted { background: var(--ink-4); }
+/* One rule, not four: the segment fill IS the tone. These used to be four
+   hand-written tone -> hue mappings (and a fifth spelling, `tone-muted`,
+   for the neutral the driver already had), which is how `--live` and
+   `--ink-4` ended up defined here instead of in the driver. Warn keeps its
+   own rule because it is double-encoded by TEXTURE as well as hue — five
+   states have to separate in an 8px bar. */
+.adm-dash-bar-seg { background: var(--tone, var(--ink-4)); }
 
 .adm-dash-bar-seg.tone-warn {
   background: repeating-linear-gradient(
@@ -339,25 +337,29 @@
   margin: 0;
 }
 
+/* Reads --tone directly, NOT currentColor. The dot is nested inside
+   .adm-dash-stat-label, which sets its own `color: var(--ink-3)`, so
+   `currentColor` here resolved against the label rather than the toned
+   .adm-dash-stat ancestor — an element's own colour declaration always beats
+   an inherited one. Every dot on this card rendered grey no matter its
+   state, and the hollow "bad" ring below was a grey ring. The driver
+   variable inherits past the label because --tone is not a property the
+   label sets. */
 .adm-dash-stat-dot {
-  width: 6px;
-  height: 6px;
+  width: var(--dot-sm);
+  height: var(--dot-sm);
   border-radius: var(--r-full);
-  background: currentColor;
+  background: var(--tone, var(--ink-4));
 }
 
-.adm-dash-stat.tone-good { color: var(--ok); }
-.adm-dash-stat.tone-bad  { color: var(--err); }
-.adm-dash-stat.tone-warn { color: var(--warn); }
-.adm-dash-stat.tone-muted { color: var(--ink-4); }
-
-/* The only chromatic role on the page, and only while count > 0: a live
-   node is an agent working right now. An idle fleet is entirely grey, so
-   colour density on this card is a utilisation readout. */
-.adm-dash-stat.tone-live { color: var(--live); }
+/* --live is the only chromatic role on the page, and only while count > 0:
+   an idle fleet is entirely grey, so colour density on this card reads as a
+   utilisation readout. NodeStatusCard enforces that by emitting `neutral`
+   instead of `live` at a zero count. */
+.adm-dash-stat { color: var(--tone, var(--ink-4)); }
 
 .adm-dash-stat.tone-live .adm-dash-stat-dot {
-  --pulse-color: var(--live);
+  --pulse-color: var(--tone);
   animation: pulse-ring var(--t-pulse) var(--ease) infinite;
 }
 
@@ -365,12 +367,12 @@
   .adm-dash-stat.tone-live .adm-dash-stat-dot { animation: none; }
 }
 
-/* Bad is told by shape, not brightness: at 6px a solid --err dot reads as
-   just another loud dot, not as "problem". Hollow ring instead — the same
-   shape StatusPill and the node presence dots use. */
+/* Bad is told by shape, not brightness: at the --dot-sm tier a solid --err
+   dot reads as just another loud dot, not as "problem". Hollow ring instead
+   — the same shape StatusPill and the node presence dots use. */
 .adm-dash-stat.tone-bad .adm-dash-stat-dot {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px currentColor;
+  box-shadow: inset 0 0 0 1.5px var(--tone);
 }
 
 .adm-dash-stat-value {
@@ -381,12 +383,12 @@
   line-height: var(--leading-none);
   letter-spacing: var(--track-display);
   color: var(--ink-1);
-  font-feature-settings: "tnum" 1;
+  font-feature-settings: var(--font-features), "tnum" 1;
   font-variant-numeric: tabular-nums;
 }
 
 /* The running count is the one numeral allowed to carry --live. */
-.adm-dash-stat.tone-live .adm-dash-stat-value { color: var(--live); }
+.adm-dash-stat.tone-live .adm-dash-stat-value { color: var(--tone); }
 
 /* ── Top employees ────────────────────────────────────────────────── */
 .adm-dash-top-list {
@@ -459,7 +461,7 @@
   font-weight: 700;
   letter-spacing: var(--track-0);
   color: var(--ink-1);
-  font-feature-settings: "tnum" 1;
+  font-feature-settings: var(--font-features), "tnum" 1;
   font-variant-numeric: tabular-nums;
 }
 

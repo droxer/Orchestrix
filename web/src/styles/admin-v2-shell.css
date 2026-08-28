@@ -143,8 +143,8 @@
 }
 
 .adm-live-dot {
-  width: 8px;
-  height: 8px;
+  width: var(--dot);
+  height: var(--dot);
   border-radius: var(--r-full);
   background: var(--ink-4);
   transition: background var(--t-fast) var(--ease);

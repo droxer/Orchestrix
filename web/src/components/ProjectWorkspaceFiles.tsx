@@ -13,7 +13,12 @@ import type {
   ProjectWorkspaceFilesResponse,
 } from "../types";
 import { isWorkspaceRetryableError, workspaceHomeStatus } from "../lib/workspaceHome";
-import { ActionRemove, WorkspaceFile, WorkspaceFolder } from "./icons";
+import {
+  ActionRemove,
+  ICON,
+  WorkspaceFile,
+  WorkspaceFolder,
+} from "./icons";
 import { compactDate } from "../lib/workspaceFormat";
 import {
   WorkspaceEmpty,
@@ -207,7 +212,7 @@ function WorkspaceFileBrowser({
                   title={t("workspace.close_preview")}
                   onClick={() => setSelectedKey("")}
                 >
-                  <ActionRemove size={14} aria-hidden="true" />
+                  <ActionRemove size={ICON.sm} aria-hidden="true" />
                 </Button>
               </>
             )}
@@ -264,11 +269,11 @@ function FilesPane({
         <WorkspaceLoading label={t("workspace.loading_files")} />
       ) : message ? (
         <div className="workspace-file-error">
-          <WorkspaceEmpty title={message} mark={<WorkspaceFile size={18} />} announce />
+          <WorkspaceEmpty title={message} mark={<WorkspaceFile size={ICON.lg} />} announce />
           {isWorkspaceRetryableError(error) ? <Button type="button" variant="outline" size="sm" onClick={onRetry}>{t("workspace.retry")}</Button> : null}
         </div>
       ) : data && !data.exists ? (
-        <WorkspaceEmpty title={t("workspace.files_unavailable")} mark={<WorkspaceFile size={18} />} announce />
+        <WorkspaceEmpty title={t("workspace.files_unavailable")} mark={<WorkspaceFile size={ICON.lg} />} announce />
       ) : entries.length ? (
         <ul className="workspace-pick-list">
           {entries.map((entry) => (
@@ -285,7 +290,7 @@ function FilesPane({
       ) : (
         <WorkspaceEmpty
           title={t("workspace.no_files")}
-          mark={<WorkspaceFile size={18} />}
+          mark={<WorkspaceFile size={ICON.lg} />}
           announce
         />
       )}
@@ -316,7 +321,7 @@ function WorkspaceFileRow({
       onClick={() => (isDirectory ? onOpenDirectory(entry.path) : onSelectFile(entry))}
     >
       <span className="workspace-file-icon" aria-hidden="true">
-        {isDirectory ? <WorkspaceFolder size={15} /> : <WorkspaceFile size={15} />}
+        {isDirectory ? <WorkspaceFolder size={ICON.sm} /> : <WorkspaceFile size={ICON.sm} />}
       </span>
       <span className="workspace-pick-title">{entry.name}</span>
       <span className="workspace-pick-meta tnum">

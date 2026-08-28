@@ -5,6 +5,7 @@ import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { isNodeOnline, nodeOwnershipProfile, visualStatus } from "../../lib/adminHelpers";
 import { nodeOwnershipIcon } from "./NodeProfileBadges";
 import { NodePresence } from "./NodePresence";
+import { ICON } from "../icons";
 
 /**
  * The computers assigned to one employee.
@@ -50,8 +51,8 @@ export function EmployeeComputers({
             title={title}
           >
             <NodePresence node={node} t={t} />
-            <OwnershipMark size={13} className="adm-node-chip-mark" aria-hidden="true" />
-            <span className="adm-computer-chip-name" translate="no">
+            <OwnershipMark size={ICON.sm} className="adm-node-chip-mark" aria-hidden="true" />
+            <span className="adm-computer-chip-name code" translate="no">
               {node.displayName || node.id}
             </span>
           </span>

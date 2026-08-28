@@ -5,7 +5,10 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { acquireBodyScrollLock } from "@/lib/bodyScrollLock";
 import { filterCommands, type CommandGroup, type CommandId, type CommandItem } from "@/lib/commandMenu";
-import { ActionSearch } from "./icons";
+import {
+  ActionSearch,
+  ICON,
+} from "./icons";
 
 /* ⌘K command palette — Linear-style. A thin renderer over lib/commandMenu.ts:
    the catalogue and ranking live there; this owns focus, key handling, and
@@ -129,7 +132,7 @@ export function CommandMenu({
         aria-label={t("command.title")}
       >
         <div className="command-input-row">
-          <ActionSearch size={15} aria-hidden="true" />
+          <ActionSearch size={ICON.sm} aria-hidden="true" />
           <input
             ref={inputRef}
             className="command-input"

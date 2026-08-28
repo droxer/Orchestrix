@@ -8,7 +8,10 @@ import { selectedTeamForWorkspace } from "../lib/teamWorkspace";
 import { teamAvailability } from "../lib/taskAssignment";
 import { StatusPill } from "./StatusPill";
 import type { CurrentUser } from "../types";
-import { ActionAdd } from "./icons";
+import {
+  ActionAdd,
+  ICON,
+} from "./icons";
 import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
 import { IdentityMark } from "./IdentityMark";
@@ -85,7 +88,7 @@ export function TeamsPage({
               title={t("teams.add")}
               onClick={() => setAddTeam(true)}
             >
-              <ActionAdd size={16} aria-hidden="true" />
+              <ActionAdd size={ICON.md} aria-hidden="true" />
             </Button>
           )}
         />
@@ -95,7 +98,7 @@ export function TeamsPage({
         <div className="list-filter-bar">
           <SearchInput
             className="list-filter-search"
-            iconSize={14}
+            iconSize={ICON.sm}
             label={t("teams.search_label")}
             name="teams-query"
             value={query}
@@ -140,7 +143,7 @@ export function TeamsPage({
                     className="list-virtual"
                     ref={selected ? selectedRowRef : undefined}
                   >
-                    <article className="teams-list-row" data-selected={selected ? "true" : "false"}>
+                    <article className="teams-list-row rail-row" data-selected={selected ? "true" : "false"}>
                       <Button
                         variant="ghost"
                         type="button"

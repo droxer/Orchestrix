@@ -52,6 +52,20 @@ function componentSources(): { name: string; source: string }[] {
   return out;
 }
 
+/** Remove at-rule blocks (@media/@supports/@keyframes) — nested rules are
+    sanctioned contextual overrides, not competing definitions. Bodies here
+    never nest deeper than rule > declarations. Shared by the dead-declaration
+    check and the sheet-ownership check below. */
+function stripAtRuleBlocks(source: string): string {
+  let out = source;
+  const pattern = /@[a-zA-Z-]+[^{}]*\{(?:[^{}]|\{[^{}]*\})*\}/g;
+  for (;;) {
+    const next = out.replace(pattern, "");
+    if (next === out) return out;
+    out = next;
+  }
+}
+
 describe("design grid", () => {
   it("phases Tailwind's numeric scale onto the --sp-* grid", () => {
     // base.css pins the root to 87.5%, so Tailwind's stock 0.25rem step became
@@ -119,14 +133,32 @@ describe("design grid", () => {
     // the only registry there is. 700/800/1024 each sat ~20px from a real tier.
     const palette = readStyle("tokens/palette.css");
     const registry = new Set([...palette.matchAll(/^\s*(\d{3,4})px\s{2,}/gm)].map((m) => m[1]));
-    assert.ok(registry.size >= 10, "palette.css lost its breakpoint registry block");
+    // A floor, not a pin: the point is to catch the block being deleted, not
+    // to freeze how many tiers the app happens to have. It was 10 while two
+    // rows (560, 768) were describing queries that no longer existed.
+    assert.ok(registry.size >= 8, "palette.css lost its breakpoint registry block");
 
+    // @container as well as @media. A container query is a breakpoint — the
+    // `computer` and `record` containers both turn at 768px — and sweeping
+    // only @media made that tier look orphaned when it is in active use.
     const used = new Set(
-      surfaceSheets().flatMap(({ source }) => [...source.matchAll(/\((?:max|min)-width:\s*(\d+)px\)/g)].map((m) => m[1]))
+      surfaceSheets().flatMap(({ source }) =>
+        [...source.matchAll(/@(?:media|container)[^{]*?\((?:max|min)-width:\s*(\d+)px\)/g)].map((m) => m[1]),
+      )
     );
     // 719 is the documented complementary partner of the 720 tier.
     const undocumented = [...used].filter((px) => px !== "719" && !registry.has(px)).sort();
     assert.deepEqual(undocumented, [], "add the tier to palette.css's registry, or reuse an existing one");
+
+    // The other direction, which used to go unchecked: a registry row whose
+    // query has been deleted is worse than an unlisted tier, because a reader
+    // reaching for "the nearest existing breakpoint" picks one the app does
+    // not actually use. 560px ("artifact chip row") and 768px ("admin drawer
+    // + admin shell collapse") had both outlived their queries.
+    const orphaned = [...registry]
+      .filter((px) => !used.has(px) && !used.has(String(Number(px) - 1)))
+      .sort((a, b) => Number(a) - Number(b));
+    assert.deepEqual(orphaned, [], "these registry rows have no query left — delete the row or restore the query");
   });
 
   it("keeps only z tiers that have consumers, in a usable order", () => {
@@ -197,6 +229,107 @@ describe("design grid", () => {
     );
   });
 
+  it("leaves no declaration dead behind a later copy of its own selector", () => {
+    /* Cross-sheet duplication is caught by the test below. This is the same
+       failure one scope tighter: the SAME selector written twice in one sheet,
+       where the earlier block's declarations are silently dead. It is stale
+       edit residue and it is invisible — the rule looks right, it is just not
+       the one running:
+
+         .sidenav-more-item.active      background: --surface-2  (dead)
+                                        background: --action-soft
+         .task-assignment-summary-hint  color: --ink-3           (dead)
+                                        color: --warn
+         .backlog-task                  contain-intrinsic-size: 96px (dead)
+                                        contain-intrinsic-size: 220px
+
+       Anyone editing "the active nav background" would have found the dead
+       declaration first, changed it, and seen nothing happen.
+
+       A GROUP RULE plus a narrower override (`.a, .b { }` then `.b { }`) is
+       normal authoring and is not flagged: the selectors differ, so the
+       override is visible as an override. Only an exact repeat counts. */
+    const collisions: string[] = [];
+    for (const { name, source } of surfaceSheets()) {
+      const body = stripAtRuleBlocks(stripComments(source));
+      const seen = new Map<string, Map<string, string>>();
+      for (const m of body.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const declarations = m[2]
+          .split(";")
+          .map((d) => d.trim())
+          .filter((d) => d.includes(":"))
+          .map((d) => [d.slice(0, d.indexOf(":")).trim(), d.slice(d.indexOf(":") + 1).trim()] as const);
+        // Key on the FULL selector list, so a group rule and a narrower
+        // override are different keys and only an exact repeat collides.
+        const key = m[1].split(",").map((p) => p.replace(/\s+/g, " ").trim()).sort().join(", ");
+        if (!key.includes(".")) continue;
+        const previous = seen.get(key);
+        if (!previous) {
+          seen.set(key, new Map(declarations));
+          continue;
+        }
+        for (const [prop, value] of declarations) {
+          const before = previous.get(prop);
+          if (before !== undefined && before !== value) {
+            collisions.push(`${name}: ${key} — ${prop}: ${before} is dead, ${value} wins`);
+          }
+          previous.set(prop, value);
+        }
+      }
+    }
+    assert.deepEqual(
+      collisions,
+      [],
+      `merge these into one rule:\n  ${collisions.join("\n  ")}`,
+    );
+  });
+
+  it("lets no late sheet restate an earlier sheet's declaration verbatim", () => {
+    /* The exempt sheets below (responsive/a11y/atelier) are allowed to
+       redeclare other sheets' selectors — that is what a late override layer
+       is for. What they may not do is restate a declaration with the SAME
+       value, which overrides nothing and quietly moves ownership: because the
+       late sheet wins, a change made in the owning sheet is reverted without
+       a diff anywhere to show it. atelier.css carried 15 of these, including
+       a byte-for-byte copy of shell.css's `grid-template-columns` for the
+       app's main grid.
+
+       A group rule is not flagged when any of its selectors genuinely needs
+       the declaration — `.chat-header, .page-header { border-bottom }` stays,
+       because .page-header has no earlier copy. Only a rule whose EVERY
+       selector already carries that exact declaration counts as a copy. */
+    const entry = readFileSync(path.join(repoRoot, "web", "src", "styles.css"), "utf8");
+    const order = [...entry.matchAll(/@import\s+["']\.\/styles\/([^"']+\.css)["']/g)].map((m) => m[1]);
+    const seen = new Map<string, string>(); // `${selector}|${prop}` -> value
+    const copies: string[] = [];
+
+    for (const name of order) {
+      const file = path.join(stylesDir, name);
+      if (!existsSync(file)) continue;
+      const body = stripAtRuleBlocks(stripComments(readFileSync(file, "utf8")));
+      const pending: [string, string][] = [];
+      for (const m of body.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const selectors = m[1].split(",").map((p) => p.replace(/\s+/g, " ").trim()).filter(Boolean);
+        if (!selectors.some((sel) => sel.includes("."))) continue;
+        for (const declaration of m[2].split(";")) {
+          if (!declaration.includes(":")) continue;
+          const prop = declaration.slice(0, declaration.indexOf(":")).trim();
+          const value = declaration.slice(declaration.indexOf(":") + 1).trim();
+          const redundant = selectors.every((sel) => seen.get(`${sel}|${prop}`) === value);
+          if (redundant) copies.push(`${name}: ${selectors.join(", ")} — ${prop}: ${value}`);
+          for (const sel of selectors) pending.push([`${sel}|${prop}`, value]);
+        }
+      }
+      // Applied after the sheet, so a rule does not shadow itself.
+      for (const [key, value] of pending) seen.set(key, value);
+    }
+    assert.deepEqual(
+      copies,
+      [],
+      `these restate an earlier sheet's value and override nothing — delete them:\n  ${copies.join("\n  ")}`,
+    );
+  });
+
   it("keeps each class selector owned by exactly one non-exempt sheet", () => {
     // A selector defined in two surface sheets resolves by import order, not
     // by the rule you edited — the .conversation-row / .adm-drawer-title /
@@ -216,19 +349,6 @@ describe("design grid", () => {
 
     const exempt: Record<string, true> = { "responsive.css": true, "a11y.css": true, "atelier.css": true };
     const surface = new Set(surfaceSheets().map(({ name }) => name));
-
-    /** Remove at-rule blocks (@media/@supports/@keyframes) — nested rules are
-        sanctioned contextual overrides, not competing definitions. Bodies
-        here never nest deeper than rule > declarations. */
-    const stripAtRuleBlocks = (source: string): string => {
-      let out = source;
-      const pattern = /@[a-zA-Z-]+[^{}]*\{(?:[^{}]|\{[^{}]*\})*\}/g;
-      for (;;) {
-        const next = out.replace(pattern, "");
-        if (next === out) return out;
-        out = next;
-      }
-    };
 
     const owner = new Map<string, string>();
     const duplicates: string[] = [];

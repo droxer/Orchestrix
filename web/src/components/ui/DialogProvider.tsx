@@ -10,7 +10,10 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { StatusWarn } from "../icons";
+import {
+  ICON,
+  StatusWarn,
+} from "../icons";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -214,7 +217,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
             title={t("toast.dismiss")}
             onClick={dismissAnnouncement}
           >
-            <ActionRemove size={14} aria-hidden="true" />
+            <ActionRemove size={ICON.sm} aria-hidden="true" />
           </button>
         </div>
       ) : null}
@@ -240,7 +243,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
               >
                 <div className="dialog-title-row">
                   {isDangerConfirm ? (
-                    <StatusWarn size={20} className="dialog-danger-icon" aria-hidden="true" />
+                    <StatusWarn size={ICON.lg} className="dialog-danger-icon" aria-hidden="true" />
                   ) : null}
                   <h2 id="dialog-title" className="dialog-title" translate="no">
                     {request.opts.title}

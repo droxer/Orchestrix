@@ -1,0 +1,315 @@
+/* Admin console — the AGENTS installed on a computer: the runtime marks on a
+   node card, the agent chips, their presence (filled = can take work now,
+   hollow = cannot), and the manage-agents toggle list with its skill/MCP
+   inventory.
+
+   Split out of admin-v2-nodes.css, which had grown to 863 lines. This is the
+   boundary that sheet's earlier split attempt got wrong: cutting at "computer
+   presence" separated `.adm-node-card-actions` from the card it belongs to,
+   because the agent block sits BETWEEN the card's frame and its footer. The
+   cut is around the agent block instead, and the card's footer moves up to
+   join its frame — one subject per sheet, and the node card stays whole. */
+
+.adm-agents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+/* Executor readiness is secondary detail under the hosted-agent list, so it
+   sheds the boxed-chip treatment the primary agent list wears: a bare strip of
+   vendor glyphs with no caps label (the label lives in the row's title tip).
+   The glyph shape carries identity; a single small dot per mark carries
+   readiness (the shared status tiers), matching "only the dot carries status"
+   everywhere else. The unlabelled glyph strip is the whole hierarchy point
+   against the boxed agent chips above. */
+.adm-node-runtimes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-3);
+  margin-top: var(--sp-1);
+}
+
+/* Inter-mark gap stays wider than the dot→glyph gap (sp-1) inside each mark so
+   every [dot glyph] reads as one unit rather than a run of bullet separators. */
+.adm-node-runtimes-marks {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.adm-runtime-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+/* Binary by design: ready and neutral both read as the calm dim dot. The
+   old tone-good grey (--ok) sat one ink-step from neutral (--ink-4) — a
+   distinction the eye could not resolve at 6px, so it implied a difference
+   it never showed. Only failed differs, and it differs by SHAPE (a hollow
+   ring), not by a brightness step. */
+.adm-runtime-mark .adm-agent-dot { background: var(--ink-4); }
+
+.adm-runtime-mark.tone-bad .adm-agent-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--tone);
+}
+
+.adm-runtime-mark.is-disabled {
+  opacity: var(--opacity-disabled);
+}
+
+/* ---- Agent presence on a computer ---------------------------------------
+   Same shape language as the machine's own presence dot, one level down:
+   FILLED = this agent can take work right now, HOLLOW = it cannot. The hue
+   then says why — ink for "the computer is dark or it never reported",
+   warn/err for a runtime that is itself unhappy on a live machine. Shape
+   carries the distinction because brightness alone does not survive 6px
+   (see the binary-by-design note above), and the label in `aria-label`
+   carries it for readers who get no shape at all. */
+.adm-runtime-mark[data-presence="offline"] .adm-agent-dot,
+.adm-runtime-mark[data-presence="disabled"] .adm-agent-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--ink-4);
+}
+
+/* One rule, two tones: the ring reads the driver's variable rather than
+   naming --warn and --err a second time apiece. */
+.adm-runtime-mark[data-presence="offline"].tone-warn .adm-agent-dot,
+.adm-runtime-mark[data-presence="offline"].tone-bad .adm-agent-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--tone);
+}
+
+/* On a dark machine the whole runtime row recedes with the avatar — its
+   agents are a memory of what was installed, not an offer of capacity. */
+.adm-node-card[data-online="false"] .adm-node-runtimes,
+.adm-node-row[data-online="false"] .adm-node-row-agents {
+  opacity: var(--opacity-dormant);
+}
+
+/* An agent-less node would otherwise leave a bare one-line string floating in
+   a tall card; give the empty state a quiet dashed placeholder so the card
+   reads as intentionally empty rather than unfinished. */
+.adm-agents-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: var(--sp-3);
+  color: var(--ink-3);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-3);
+  background: var(--surface-1);
+}
+
+.adm-agent-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  height: var(--control-h-2xs);
+  padding: 0 var(--sp-2);
+  font: var(--type-label-strong);
+  letter-spacing: var(--type-label-strong-track);
+  text-transform: none;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-full);
+  background: var(--surface-1);
+  color: var(--ink-3);
+  flex: none;
+}
+
+.adm-agents .adm-agent-chip {
+  flex: none;
+}
+
+/* The agent name is identity, not status — it stays the chip's neutral
+   ink/muted color regardless of tone. Only the dot carries the status hue,
+   matching "agents are differentiated by shape, never by status/brand
+   color" everywhere else in the app. */
+/* The in-chip tier. This note used to name its own two-tier scale in raw
+   px; that taxonomy is now the --dot-* scale in palette.css, which took
+   these tiers and backlog.css's "8px dot cell" and made them one thing. */
+.adm-agent-dot {
+  width: var(--dot-sm);
+  height: var(--dot-sm);
+  flex: none;
+  border-radius: var(--r-full);
+  background: var(--ink-4);
+}
+
+/* Drawer status-word chips carry an explicit label, so ready keeps its calm
+   --ok fill here; failed still switches to the shared hollow-ring shape so the
+   "problem" language stays consistent with the fleet cards. */
+.adm-agent-chip.tone-bad .adm-agent-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--tone);
+}
+
+/* ...and an agent whose computer is dark reads hollow for the same reason,
+   even though its last report said ready. */
+.adm-agent-chip[data-presence="offline"].tone-good .adm-agent-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--ink-4);
+}
+
+/* Official vendor glyph — identity, alongside the name label. Same
+   flex/opacity treatment as .chat-active-agent-mark. */
+.adm-agent-chip-mark {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+  border-radius: var(--r-full);
+  opacity: var(--opacity-mark);
+}
+
+/* Executor hue tints retired — one neutral plate behind every vendor
+   glyph; the glyph shape alone carries identity. */
+.adm-agent-chip .adm-agent-chip-mark {
+  background: var(--surface-2);
+}
+.adm-agent-chip.is-disabled {
+  opacity: var(--opacity-disabled);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.adm-agent-drawer-note {
+  margin-top: 0;
+  margin-bottom: var(--sp-4);
+}
+
+.adm-agent-toggle-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.adm-agent-toggle-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  /* Same list-row edge as .adm-assign-node / .adm-placement-item. */
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-full);
+  background: var(--surface-0);
+  transition:
+    border-color var(--t-fast) var(--ease),
+    opacity var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease);
+}
+
+.adm-agent-toggle-item.is-disabled {
+  opacity: var(--opacity-disabled);
+  background: var(--surface-1);
+}
+
+.adm-agent-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+.adm-agent-inventory {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding-top: var(--sp-1);
+  border-top: 1px solid var(--line-2);
+}
+
+.adm-agent-inventory-empty {
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+  color: var(--ink-3);
+}
+
+.adm-agent-inventory-group {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.adm-agent-inventory-label {
+  flex: none;
+  font: var(--type-label-strong);
+  letter-spacing: var(--type-label-strong-track);
+  color: var(--ink-3);
+}
+
+.adm-agent-inventory-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+.adm-agent-inventory-pill {
+  font-size: var(--fs-2);
+  padding: var(--sp-0-5) var(--sp-1-5);
+  border-radius: var(--r-full);
+  border: 1px solid var(--line-1);
+  color: var(--ink-1);
+  background: var(--surface-0);
+}
+
+.adm-agent-toggle-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.adm-agent-toggle-name {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  text-transform: uppercase;
+  color: var(--ink-1);
+}
+
+.adm-agent-toggle-mark {
+  flex: 0 0 auto;
+  opacity: var(--opacity-mark);
+}
+
+/* The toggle itself is the shared Switch primitive (data-checked track +
+   thumb); this wrapper only owns layout and the enabled/disabled caption. */
+.adm-agent-toggle-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: none;
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
+  color: var(--ink-3);
+  cursor: pointer;
+  user-select: none;
+}
+
+.adm-agent-toggle-label {
+  min-width: 4.5rem;
+  font: var(--type-label-strong);
+  color: var(--ink-2);
+}
+
+.adm-agent-toggle-switch:has([data-slot="switch"]:not([data-checked])) .adm-agent-toggle-label {
+  color: var(--ink-3);
+}

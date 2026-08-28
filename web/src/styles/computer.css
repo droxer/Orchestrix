@@ -50,7 +50,7 @@
 
 .computer-connect-usage {
   margin-left: var(--sp-1);
-  opacity: 0.7;
+  color: var(--ink-4);
 }
 
 .computer-connect-limit {
@@ -325,11 +325,10 @@ button.computer-run-open:hover {
   font: var(--type-body-sm);
 }
 
-.computer-runtime-row .adm-agent-dot { background: var(--ink-4); }
-.computer-runtime-row.tone-warn .adm-agent-dot { background: var(--warn); }
+.computer-runtime-row .adm-agent-dot { background: var(--tone, var(--ink-4)); }
 .computer-runtime-row.tone-bad .adm-agent-dot {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--err);
+  box-shadow: inset 0 0 0 1.5px var(--tone);
 }
 
 .computer-runtime-row.is-disabled {
@@ -346,18 +345,16 @@ button.computer-run-open:hover {
   box-shadow: inset 0 0 0 1.5px var(--ink-4);
 }
 
-.computer-runtime-row[data-presence="offline"].tone-warn .adm-agent-dot {
-  box-shadow: inset 0 0 0 1.5px var(--warn);
-}
-
-/* A runtime that failed keeps its loud ring: "not available" and "broken"
-   are different problems and the reader fixes them differently. */
+/* An unhappy runtime keeps its loud ring even on a dark machine: "not
+   available" and "broken" are different problems and the reader fixes them
+   differently. */
+.computer-runtime-row[data-presence="offline"].tone-warn .adm-agent-dot,
 .computer-runtime-row[data-presence="offline"].tone-bad .adm-agent-dot {
-  box-shadow: inset 0 0 0 1.5px var(--err);
+  box-shadow: inset 0 0 0 1.5px var(--tone);
 }
 
 .computer-card[data-online="false"] .computer-runtime-row {
-  opacity: 0.6;
+  opacity: var(--opacity-dormant);
 }
 
 .computer-runtime-mark {
@@ -379,11 +376,16 @@ button.computer-run-open:hover {
   letter-spacing: var(--type-micro-track);
 }
 
-.computer-runtime-version {
+/* The `font` shorthand above resets family AND font-feature-settings, so the
+   .code utility loses to it at equal specificity. Re-asserted in the
+   documented `.<class>.code` compound form (base.css names this case) rather
+   than as a second bare `.computer-runtime-version` block, which is a
+   duplicate selector in one sheet — the exact shape designGrid.test.ts
+   forbids across sheets. */
+.computer-runtime-version.code {
   font-family: var(--font-mono);
-  font-feature-settings: "tnum" 1;
+  font-feature-settings: var(--font-features), "tnum" 1;
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
   letter-spacing: var(--type-code-track);
 }
 
@@ -422,11 +424,6 @@ button.computer-run-open:hover {
 .computer-fact-path {
   display: block;
   min-width: 0;
-  font-family: var(--font-mono);
-  font-feature-settings: "tnum" 1;
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
   line-height: var(--leading-snug);
   overflow-wrap: anywhere;

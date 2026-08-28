@@ -1,0 +1,563 @@
+/* Admin console — the NODES / fleet view: node list rows, node cards, the
+   fixed action slots on a card, and the presence chrome that says whether a
+   computer is reachable and whether the agents on it can take work.
+
+   Split out of a 2145-line admin-v2-views.css that carried five unrelated
+   views. This is the one section that did NOT sub-divide cleanly: presence
+   marks and node-card chrome interleave (a card's footer actions sit between
+   the computer-presence and agent-presence blocks), and a boundary drawn
+   through them separated `.adm-node-card-actions` from the card it belongs
+   to. One cohesive 860-line sheet beats two sheets that each own half of the
+   node card, so this rung of the split stops here on purpose. */
+
+/* ── Node list (list view) — row geometry mirrors the employee list so
+   both views share one table language. ────────────────────────────────── */
+.adm-node-cols,
+.adm-node-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.4fr) minmax(120px, 1fr) minmax(0, 1.6fr) auto;
+  gap: var(--sp-6);
+}
+
+.adm-node-cols {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-0);
+  padding: 0 0 var(--sp-3);
+  border-bottom: 1px solid var(--line-1);
+}
+
+.adm-node-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.adm-node-row {
+  align-items: center;
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--line-2);
+  position: relative;
+  transition: background var(--t-fast) var(--ease);
+}
+
+.adm-node-row-id {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.adm-node-row-identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.adm-node-row-identity .adm-node-card-name,
+.adm-node-row-identity .adm-node-card-handle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Execution-profile parity with the fleet card — the tinted chip stands alone
+   in the identity stack (no wrapper box, matching the card treatment). */
+.adm-node-row-identity .adm-node-profile {
+  margin: var(--sp-1) 0 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+}
+
+.adm-node-row-agents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.adm-node-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-1);
+}
+
+.adm-node-row-employee {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.adm-node-row-employee-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 20px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-1);
+  background: var(--surface-2);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ink-2);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adm-node-row-employee-icon {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+
+.adm-node-card-employee-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 20px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  width: fit-content;
+}
+
+.adm-node-card-employee-icon {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+
+.adm-node-card-employee-badge-text {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ink-2);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 719px) {
+  .adm-node-cols {
+    display: none;
+  }
+
+  .adm-node-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-3);
+    padding: var(--sp-4) 0;
+  }
+
+  .adm-node-row-actions {
+    justify-content: flex-start;
+  }
+}
+
+.adm-node-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-3);
+  background: var(--surface-1);
+  transition: border-color var(--t-fast) var(--ease);
+  overflow: hidden;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px;
+}
+
+/* Hover strengthens the hairline, same as the Card primitive's interactive
+   variant (--line-strong), instead of hand-mixing an action tint. */
+.adm-node-card:hover {
+  border-color: var(--line-strong);
+}
+
+.adm-node-profile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+  font-size: var(--fs-2);
+  line-height: var(--leading-snug);
+}
+
+.adm-node-profile.is-compact {
+  padding-top: 0;
+  margin-bottom: var(--sp-3);
+}
+
+/* Node cards keep the profile compact and hide locality, so the bordered
+   drawer container would leave a large empty box. Drop that wrapper chrome;
+   drawer usage keeps the framed treatment and full labels. */
+.adm-node-card > .adm-node-profile {
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+}
+
+/* Ownership badge — identity, never status. Micro-caps + icon set the badge
+   apart from agent chips (vendor mark + lowercase name) and status pills
+   (tone dot + word). Both computer kinds share one hairline chip: the avatar
+   mark above already tints "Relay runs this", so a second filled slab here
+   only competed with the status pill for the loudest thing on the card.
+   Ownership now separates by glyph and by icon ink, and the status
+   brightness tiers stay reserved for health. */
+.adm-node-profile-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 20px;
+  padding: 0 var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-full);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.adm-node-profile-icon {
+  flex-shrink: 0;
+  /* Full opacity — the glyph is the ownership signal now, not decoration. */
+  opacity: 1;
+}
+
+.adm-node-profile-kind[data-kind="managed"],
+.adm-node-profile-kind[data-kind="local"] {
+  color: var(--ink-2);
+  border-color: var(--line-1);
+  background: var(--surface-2);
+}
+
+/* Cloud ownership reads through the mark: one ink step up on the glyph only,
+   so the chip stays as quiet as a local computer's. */
+.adm-node-profile-kind[data-kind="managed"] .adm-node-profile-icon {
+  color: var(--ink-2);
+}
+
+.adm-node-profile-kind[data-kind="pending"] {
+  /* ink-3, not ink-4 — pending is a meaningful state and 11px caps needs
+     the AA 4.5:1 floor in both themes. */
+  color: var(--ink-3);
+  border-color: var(--line-1);
+  border-style: dashed;
+  background: transparent;
+}
+
+.adm-node-profile-sep {
+  color: var(--ink-3);
+}
+
+.adm-node-profile-sandbox {
+  font-size: var(--fs-2);
+  color: var(--ink-2);
+}
+
+.adm-node-profile-locality {
+  font-size: var(--fs-2);
+  color: var(--ink-3);
+}
+
+.adm-cred-hint {
+  display: block;
+  margin-top: var(--sp-0-5);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+  color: var(--ink-3);
+  line-height: var(--leading-snug);
+}
+
+.adm-node-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+}
+
+/* Neutral owner monogram — the identity anchor. Node health is carried
+   by the status pill's tone dot, not by tinting the avatar (semantic
+   colors are text/dot only, never background fills). */
+.adm-node-avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  height: var(--control-h-sm);
+  border-radius: var(--r-full);
+  color: var(--ink-3);
+  background: var(--surface-2);
+  border: 1px solid var(--line-1);
+  font: var(--type-label-strong);
+  letter-spacing: var(--type-label-strong-track);
+}
+
+/* Employee cards represent people: a circular avatar that reads as a
+   profile picture, with slightly stronger ink so the person identity is
+   the anchor. */
+.adm-node-avatar.adm-emp-avatar {
+  border-radius: var(--r-full);
+  color: var(--ink-1);
+  background: var(--surface-1);
+}
+
+/* Node cards represent machines: keep the technical square container and
+   mute the icon so the status pill carries health meaning. The glyph inside
+   is the ownership mark (cloud / laptop / pending ring), so the avatar is
+   where a machine's kind reads first — the badge below only confirms it. */
+.adm-node-avatar.adm-node-avatar--machine {
+  color: var(--ink-3);
+  background: var(--surface-2);
+}
+
+/* Ownership lives on the mark, not on a fill: a Relay-run cloud computer steps
+   up one ink tier so it separates from a person's own machine at a glance,
+   while health hues stay reserved for the status dot. */
+.adm-node-avatar--machine[data-ownership="managed"] {
+  color: var(--ink-2);
+  border-color: var(--line-strong);
+}
+
+.adm-node-avatar--machine[data-ownership="pending"] {
+  color: var(--ink-4);
+  border-style: dashed;
+}
+
+.adm-node-card-identity {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-0-5);
+  min-width: 0;
+}
+
+.adm-node-card-meta-col {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-1);
+}
+
+.adm-node-card-name {
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
+  color: var(--ink-1);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* An unnamed node falls back to printing its raw id here. The `font`
+   shorthand above resets family, so .code needs to be re-asserted. */
+.adm-node-card-name.code {
+  font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
+}
+
+/* Name + presence pill share one line so the online/offline readout sits
+    directly beside the computer it describes. */
+.adm-node-card-nameline {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 100%;
+  min-width: 0;
+}
+
+.adm-node-card-nameline .adm-node-card-name {
+  flex: 0 1 auto;
+}
+
+.adm-node-card-handle {
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+  color: var(--ink-3);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Reserve the subtitle row even when the card title already is the node id.
+   Local and cloud headers then share identical internal geometry without
+   printing the same identifier twice. */
+.adm-node-card-handle.is-placeholder {
+  visibility: hidden;
+}
+
+/* ---- Computer presence (online / offline) --------------------------------
+   Brightness-tier liveness cue reused on the fleet card, list row, and assign
+   drawer. Online = a filled, calm dot (--ok, the quiet tier) with a slow
+   breathing halo — motion, not brightness, carries "alive". Offline = a
+   static, bright hollow ring (--err, the loud tier) reading as "dark / no
+   signal". Status tone lives on the dot only, never as a fill. */
+.adm-presence {
+  --presence: var(--err);
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  width: 9px;
+  height: 9px;
+}
+
+/* The dot itself: offline is a hollow ring, online fills in. */
+.adm-presence::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-full);
+  border: 1.5px solid var(--presence);
+  background: transparent;
+  transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+
+.adm-presence[data-online="true"] {
+  --presence: var(--ok);
+}
+
+/* Online fills in and breathes — reusing the app's shared pulse-ring
+   primitive (same expanding-ring motion as StatusPill and the chat/stream
+   live dots) at a slower cadence so presence reads as a heartbeat rather
+   than an alert. */
+.adm-presence[data-online="true"]::before {
+  background: var(--presence);
+  border-color: var(--presence);
+  --pulse-color: var(--presence);
+  animation: pulse-ring var(--t-pulse-calm) var(--ease) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .adm-presence[data-online="true"]::before { animation: none; }
+}
+
+/* Labeled presence pill — the explicit online/offline readout on the fleet
+   card. The same dot (hue + breathing halo when online) now sits beside an
+   uppercase label on a quiet hairline pill, so liveness is readable at a
+   glance without decoding the corner dot. Semantic hue stays on the dot;
+   the label is ink, muted when offline. */
+.adm-presence-pill {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1-5);
+  flex: none;
+  height: 20px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-full);
+  text-transform: uppercase;
+  color: var(--ink-1);
+}
+
+.adm-presence-pill[data-online="false"] {
+  color: var(--ink-3);
+}
+
+/* Offline machines recede: the avatar glyph dims so a dark computer reads as
+   dark at a glance across a grid or list. Identity text stays legible. */
+.adm-node-card[data-online="false"] .adm-node-avatar--machine,
+.adm-node-row[data-online="false"] .adm-node-avatar--machine {
+  color: var(--ink-4);
+}
+
+/* List row: name and status pill share one line so the row gains the status
+   readout the card already had. */
+.adm-node-row-nameline {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.adm-node-row-nameline .adm-node-card-name {
+  min-width: 0;
+}
+
+.adm-node-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+/* ── Card footer + actions ─────────────────────────────────────────────
+   Moved up to sit with the rest of the card. It used to follow the agent
+   chrome that now lives in admin-v2-node-agents.css, which is what made the
+   card look like two unrelated halves. */
+.adm-node-card-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  /* Pin the action row to the bottom so footers align across a grid row of
+     unequal-content cards (stretched to equal height by the grid). */
+  margin-top: auto;
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+}
+
+/* Queued-commands count is secondary meta, so it sits at the muted ink tier
+   like the node handle above it. */
+.adm-node-card-queued {
+  flex: none;
+  color: var(--ink-3);
+}
+
+/* Fixed semantic action slots keep shared controls aligned between local and
+   cloud cards. Cloud nodes leave the credentials slot empty rather than
+   shifting copy/rename/manage/delete into different positions. Every action
+   needs an explicit slot — an unslotted button auto-places and can push the
+   slotted ones onto a second row. */
+.adm-node-card-actions {
+  display: grid;
+  grid-template-columns: repeat(5, 28px);
+  align-items: center;
+  gap: var(--sp-0-5);
+  margin-left: auto;
+  flex: none;
+}
+
+.adm-node-card-actions > .adm-node-action--copy { grid-column: 1; }
+.adm-node-card-actions > .adm-node-action--rename { grid-column: 2; }
+.adm-node-card-actions > .adm-node-action--credentials { grid-column: 3; }
+.adm-node-card-actions > .adm-node-action--agents { grid-column: 4; }
+.adm-node-card-actions > .adm-node-action--delete { grid-column: 5; }
+
+/* Node card icon actions (reveal/manage/delete) use Button variant="icon"
+   size="icon-r-sm" tinted instead of a bespoke implementation. */
+.adm-node-card-icon-btn:disabled { cursor: progress; }
+
+.adm-node-card-error {
+  /* The card's flex gap already separates the error from the footer. */
+  margin: 0;
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+  color: var(--err);
+}
+
+.adm-node-row-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+  color: var(--err);
+}
