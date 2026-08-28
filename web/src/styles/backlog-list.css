@@ -48,7 +48,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  padding: var(--sp-2) var(--page-gutter) var(--sp-7);
+  padding: var(--sp-4) var(--page-gutter) var(--sp-7);
 }
 
 .backlog-rows-head {

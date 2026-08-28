@@ -234,8 +234,13 @@
   overflow: hidden;
   width: 100%;
   min-width: 0;
-  margin: 0;
-  padding: 0;
+  /* The clamp needs `overflow: hidden`, which clips at the CONTENT edge — and
+     with zero padding the first glyph of every line starts exactly there, so
+     its left side bearing was shaved off ("Split" rendered as "plit"). A 4px
+     inline pad moves the ink off the clip edge; the matching negative margin
+     keeps the title optically aligned with the badges and meta above/below. */
+  margin: 0 -4px;
+  padding: 0 4px;
   border: 0;
   background: transparent;
   color: var(--ink-1);

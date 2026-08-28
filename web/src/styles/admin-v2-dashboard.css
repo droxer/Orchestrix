@@ -179,6 +179,14 @@
   stroke-width: 1;
 }
 
+/* The ramp itself. Without these three rules every <rect> fell back to SVG's
+   default fill — pure black — so all three series rendered as one flat block
+   while the legend dots below advertised three distinct greys. The comment
+   above pointed here for the fills; they were never declared. */
+.adm-token-seg--output { fill: var(--ink-2); }
+.adm-token-seg--input { fill: var(--ink-3); }
+.adm-token-seg--cache { fill: var(--ink-4); }
+
 .adm-token-legend {
   display: flex;
   flex-wrap: wrap;

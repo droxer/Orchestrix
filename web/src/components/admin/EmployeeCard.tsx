@@ -48,6 +48,13 @@ export function EmployeeCard({
         <div className="adm-node-card-identity">
           <span className="adm-node-card-name" translate="no">{member.displayName}</span>
           <span className="adm-node-card-handle code" translate="no">@{member.id}</span>
+          {/* Department belongs to identity, not to status. Sharing the status
+              column meant it rendered on line 1 when the pill was absent and
+              line 2 when it was present, so the same card component produced
+              three different header layouts across one roster. */}
+          {member.departmentName ? (
+            <span className="adm-emp-card-dept">{member.departmentName}</span>
+          ) : null}
         </div>
         <div className="adm-node-card-meta-col">
           {/* "Ready" is the default healthy state — the good tone on the card
@@ -58,9 +65,6 @@ export function EmployeeCard({
               label={t(`admin.v2.emp_state_${key}`, { defaultValue: key })}
               live={tone === "info"}
             />
-          ) : null}
-          {member.departmentName ? (
-            <span className="adm-emp-card-dept">{member.departmentName}</span>
           ) : null}
         </div>
       </header>

@@ -144,7 +144,10 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
             x={tick.x}
             y={HEIGHT - 8}
             style={{ fontSize: 'var(--fs-1)' }}
-            textAnchor="middle"
+            /* The end ticks sit ON the plot edges, so a centred label there
+               overhangs the viewBox and is clipped — the last date rendered as
+               "Aug 2". Anchor the outer two inward; the rest stay centred. */
+            textAnchor={i === 0 ? "start" : i === xTicks.length - 1 ? "end" : "middle"}
             fill="var(--ink-4)"
             fontFamily="var(--font-sans)"
           >

@@ -15,7 +15,11 @@
 .adm-node-cols,
 .adm-node-row {
   display: grid;
-  grid-template-columns: minmax(200px, 1.4fr) minmax(120px, 1fr) minmax(0, 1.6fr) auto;
+  /* The trailing actions track is pinned rather than `auto` for the same
+     reason as .adm-emp-cols: the header and the rows are separate grid
+     containers, so a content-sized track resolves per-container and the
+     column headers drift off the cells beneath them. */
+  grid-template-columns: minmax(200px, 1.4fr) minmax(120px, 1fr) minmax(0, 1.6fr) 11rem;
   gap: var(--sp-6);
 }
 
@@ -282,10 +286,16 @@
   line-height: var(--leading-snug);
 }
 
+/* Wraps, and identity carries a flex-basis floor. Held on one line the status
+   column took its width first and the identity column absorbed the whole
+   shortfall, so a card's PRIMARY label truncated to keep a secondary pill
+   inline ("Tomás Lindqvist" rendered as "Tomás Lind…"). Below the floor the
+   status column drops to its own line instead. */
 .adm-node-card-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--sp-3);
+  gap: var(--sp-2) var(--sp-3);
 }
 
 /* Neutral owner monogram — the identity anchor. Node health is carried
@@ -340,7 +350,7 @@
 
 .adm-node-card-identity {
   display: flex;
-  flex: 1;
+  flex: 1 1 11rem;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--sp-0-5);
@@ -373,11 +383,16 @@
 }
 
 /* Name + presence pill share one line so the online/offline readout sits
-    directly beside the computer it describes. */
+    directly beside the computer it describes — but they WRAP. Held on one
+    line the pill won its width first and the name ellipsised into it
+    ("Unassigned laptop" rendered as "Unas…"): the card's primary identity
+    truncating so a secondary status could stay inline. Wrapped, a name that
+    needs the room pushes the pill to the next line instead. */
 .adm-node-card-nameline {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--sp-2);
+  gap: var(--sp-1) var(--sp-2);
   max-width: 100%;
   min-width: 0;
 }

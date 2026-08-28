@@ -155,7 +155,6 @@ function RosterRow({
           <span className="agents-roster-row-main">
             <span className="agents-roster-row-title">
               <span className="agents-roster-row-name">{agent.displayName}</span>
-              {!agent.enabled ? <Badge variant="neutral">{t("agents_page.disabled")}</Badge> : null}
             </span>
             {/* Runtime + Computers are execution metadata, not an Agent-owned
                 workspace. Keep every active Computer visible in route order. */}
@@ -197,10 +196,17 @@ function RosterRow({
               )}
             </span>
           </span>
-          {/* Explicit live status only when it adds information — "ready" is
-              the default healthy state, already carried by the badge pip.
-              Busy / Pending / Offline still get named. */}
-          {agent.enabled && agent.availability !== "ready" ? (
+          {/* One row, ONE place for status. Disabled used to render as a Badge
+              inline after the name while Busy / Pending / Offline rendered in
+              this trailing slot, so the same category of information had two
+              landing points depending on which value it took. Explicit status
+              only when it adds information — "ready" is the default healthy
+              state, already carried by the badge pip. */}
+          {!agent.enabled ? (
+            <span className="agents-roster-row-status">
+              <Badge variant="neutral">{t("agents_page.disabled")}</Badge>
+            </span>
+          ) : agent.availability !== "ready" ? (
             <span className="agents-roster-row-status">
               <StatusPill value={agent.availability} />
             </span>
