@@ -206,20 +206,40 @@
 
   /* ----- Register-invariant scales ----- */
 
-  /* Radii — the source system's geometric signature. Pills are the brand: every
-     button, tab chip, and badge takes --r-full and is NEVER squared off.
-     Containers step 4 → 8 → 16 → 24 → 32 with the larger rungs reserved for
-     photographic and promotional surfaces.
+  /* Radii — CONSOLE GEOMETRY, NOT THE BRAND'S STOREFRONT GEOMETRY.
 
-     `--r-full` is 9999px rather than the source system's literal 100px so
-     the pill holds its shape on any control height; at Relay's 28–44px
-     controls the two are visually identical. */
-  --r-1: 4px;   /* tags, micro-controls (rounded.sm) */
-  --r-2: 8px;   /* inputs, radio options, selection tiles (rounded.lg) */
-  --r-3: 16px;  /* cards, drawers, modals, FAQ items (rounded.xl) */
-  --r-4: 24px;  /* warranty/accessory tiles, ghost action cards (rounded.xxl) */
-  --r-5: 32px;  /* photographic feature cards, promo strips (rounded.xxxl) */
-  --r-full: 9999px; /* pills, tab chips, badges, dots, avatars */
+     The source system's signature is soft: 4 → 8 → 16 → 24 → 32 containers,
+     and every button, tab chip, and badge a full pill. That reads right on a
+     storefront, where a handful of large photographic cards sit on an open
+     page. This app puts dozens of small controls per screen — filter chips,
+     status pills, icon buttons, count badges, segmented toggles — and at
+     28–44px control heights a full pill has MORE corner curve than straight
+     edge. The shapes stop describing their own bounds, so a chip, a badge,
+     and a button all read as the same lozenge and the eye loses the grid the
+     layout is built on.
+
+     Three rungs, and the rule that governs them:
+
+       --r-1  4px  micro: inline code, kbd, tags, swatches, nav items
+       --r-2  6px  CONTROLS: buttons, inputs, chips, badges, tabs, segments
+       --r-3  8px  CONTAINERS: cards, drawers, modals, panels, popovers
+
+     6px on a control and 8px on the container that holds it keeps the two
+     legible as different tiers while both still read as square-cornered. The
+     24px and 32px rungs are gone: they were imported for "photographic
+     feature cards" and "promo strips", surfaces this app does not have, and
+     both measured zero references.
+
+     --r-full is now RESERVED FOR TRUE CIRCLES AND CAPSULES — status dots,
+     presence pips, avatars, speaker marks, progress and skeleton bars. It is
+     no longer the control shape. dimensionScales.test.ts leans on exactly
+     that reading: it treats a --r-full rule as a dot and holds it to the dot
+     scale, which is only sound while nothing rectangular claims the token.
+     Do not reach for --r-full to soften a button. */
+  --r-1: 4px;   /* micro: inline code, kbd, tags, swatches, nav items */
+  --r-2: 6px;   /* controls: buttons, inputs, chips, badges, tabs, segments */
+  --r-3: 8px;   /* containers: cards, drawers, modals, panels, popovers */
+  --r-full: 9999px; /* true circles and capsules only: dots, pips, avatars, bars */
 
   /* Opacity — the STATE scale. Three strengths, and the rule that governs all
      of them is on the last one.
@@ -477,29 +497,44 @@
 
   /* Type sizes — rem so browser font-size preference scales the UI
      (root pinned to 87.5% in base.css; 1rem = 14px at the default). */
-  /* The ladder is the source system's: 12 / 14 / 16 / 18 / 24 / 36 / 48, with the
-     hero display on its own clamp above. Two names share the 16px rung on
-     purpose — the source system has exactly ONE reading size between its
-     14px body-sm and its 18px subtitle, so --fs-4 aliases --fs-3 rather than
-     inventing a 15px step the brand does not have. The names survive because
-     call sites mean different things by them (dense prose vs body copy), and
-     the compact density scope below moves --fs-4 down a rung on its own.
+  /* APPLICATION LADDER, NOT THE BRAND'S MARKETING LADDER: 12 / 13 / 15 / 16 /
+     18 / 20 / 24 / 32, with the hero display on its own clamp above.
+
+     The source system publishes 12/14/16/18/24/36/48 — a ladder drawn for a
+     single-column commerce page where a product title owns the viewport. This
+     app is a four-rail console: a 318px thread rail, a filter band, a
+     transcript, and a dossier, all on screen at once. Importing the brand's
+     rungs wholesale set 24px pane titles over 14px rail rows and 36px KPI
+     numerals inside admin tiles, and the whole UI read a full step too loud.
+     The rungs below are the ones this app was built against — every density
+     decision in the surface CSS (13px rail titles over 12px meta, the 15px
+     dense-prose tier, the 20px pane title) is written to them.
+
+     The brand relationship is kept where it matters and dropped where it does
+     not: the FACE, the weights, the tracking, and the role architecture in
+     roles.css are all the source system's. Only the absolute sizes are pulled
+     down to console density — which is what "adopt a design system" means for
+     an app that is not a storefront.
+
+     --fs-3 and --fs-4 are two rungs again, not an alias. They mean different
+     things (dense prose vs body copy) and the compact density scope steps
+     --fs-4 down onto --fs-3, which an alias silently made a no-op.
 
      Most sizing flows through the --type-* roles in roles.css rather than
      these tokens directly, so a low direct-var count does not by itself mean
      a dead rung. Recount before deleting anything. */
   --fs-1: 0.8571rem; /* 12px — caption: badges, legal microcopy, compact metadata */
-  --fs-2: 1rem;      /* 14px — body-sm: labels, chrome, button and pill-tab text */
-  --fs-3: 1.1429rem; /* 16px — body-md: the primary reading size */
-  --fs-4: var(--fs-3); /* 16px — body copy; see the note above */
+  --fs-2: 0.9286rem; /* 13px — body-sm: labels, chrome, button and pill-tab text */
+  --fs-3: 1.0714rem; /* 15px — dense prose, the compact scope's body rung */
+  --fs-4: 1.1429rem; /* 16px — body copy: the primary reading size */
   --fs-heading: 1.2857rem; /* 18px — subtitle-lg: section headings, in-message h1 */
-  --fs-title: 1.7143rem;   /* 24px — heading-sm: card titles, pane and page titles */
-  --fs-5: 2.5714rem; /* 36px — heading-lg: KPI numerals, subsection headlines */
-  --fs-6: 3.4286rem; /* 48px — display-lg: section-opener display */
-  /* Hero display — the source system's 64px homepage hero, which drops to the 36px
-     heading tier below 768px. A clamp, not a rung: it tracks the viewport
-     between those two published sizes and never joins the ladder. */
-  --fs-hero: clamp(2.5714rem, 5vw, 4.5714rem);
+  --fs-title: 1.4286rem;   /* 20px — card titles, pane and page titles */
+  --fs-5: 1.7143rem; /* 24px — KPI numerals, subsection headlines */
+  --fs-6: 2.2857rem; /* 32px — display: section-opener display */
+  /* Hero display — the one place a headline owns the viewport (login, empty
+     section openers). A clamp, not a rung: it tracks the viewport between the
+     24px KPI tier and 40px and never joins the ladder. */
+  --fs-hero: clamp(1.7143rem, 4vw, 2.8571rem);
 
   /* Leading — the source system's published line heights: 1.16 hero, 1.17 display,
      1.28 heading-lg, 1.25 heading-sm, 1.44 subtitle, 1.50 body, 1.43 body-sm.
@@ -761,7 +796,7 @@ html:lang(zh-TW) {
   --leading-loose: 1.5;
   --sp-row: var(--sp-2);
   /* The dense reading tier runs one rung down: the compact scope's --fs-4
-     becomes the ladder's 14px body-sm rung. Heading tiers are untouched —
+     becomes the ladder's 15px dense-prose rung. Heading tiers are untouched —
      density compresses rows, not hierarchy.
 
      REDECLARING THE ROLES IS LOAD-BEARING, NOT REDUNDANT. A custom property is
@@ -776,7 +811,7 @@ html:lang(zh-TW) {
      it is the app's supporting-text tier (hints, meta lines, empty-state copy),
      so a dense admin table would otherwise print its meta at the same size as
      the names beside it. */
-  --fs-4: var(--fs-2);
+  --fs-4: var(--fs-3);
   --type-body: 400 var(--fs-4)/1.43 var(--font-sans);
   --type-name: 700 var(--fs-4)/1.43 var(--font-sans);
   --type-body-sm: 400 var(--fs-1)/1.43 var(--font-sans);

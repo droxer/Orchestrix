@@ -185,7 +185,7 @@
 }
 
 .agent-thinking-toggle:focus-visible {
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
 }
 
 /* Tool / command lines — inline `⏺` mono lines, not bordered chips. A run of

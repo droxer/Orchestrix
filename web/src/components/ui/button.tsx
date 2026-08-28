@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import { NavRefresh } from "@/components/icons"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-full border border-transparent bg-clip-padding text-xs font-bold whitespace-nowrap transition-[color,background-color,border-color,box-shadow,transform] duration-(--t-fast) ease-(--ease) outline-none select-none focus-visible:border-ring focus-visible:[outline:var(--focus-outline)] focus-visible:[outline-offset:var(--focus-offset)] active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:[outline:var(--focus-outline-danger)] aria-invalid:[outline-offset:var(--focus-offset)] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-xs font-bold whitespace-nowrap transition-[color,background-color,border-color,box-shadow,transform] duration-(--t-fast) ease-(--ease) outline-none select-none focus-visible:border-ring focus-visible:[outline:var(--focus-outline)] focus-visible:[outline-offset:var(--focus-offset)] active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:[outline:var(--focus-outline-danger)] aria-invalid:[outline-offset:var(--focus-offset)] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -56,11 +56,13 @@ const buttonVariants = cva(
         default:
           "h-(--control-h) gap-1.5 px-6 has-data-[icon=inline-end]:pr-4 has-data-[icon=inline-start]:pl-4",
         /* The text tier climbs with the size tier: xs 12px (caption) → sm and
-           default 14px (the source system's button-md, the base `text-xs`). Every
-           tier keeps the pill — "buttons are NEVER squared in Meta's system",
-           and that holds for the dense in-row tiers too. */
-        xs: "h-(--control-h-2xs) gap-1 rounded-full px-3 text-micro in-data-[slot=button-group]:rounded-full has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-(--control-h-xs) gap-1 rounded-full px-4 text-xs in-data-[slot=button-group]:rounded-full has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
+           default 14px (the source system's button-md, the base `text-xs`).
+           Every tier takes the CONTROL radius (--r-2, 6px) from the base, not
+           a pill: see the radii block in palette.css for why this app squares
+           off the brand's lozenge. These tiers restate it only to win the
+           tailwind-merge conflict inside a button group. */
+        xs: "h-(--control-h-2xs) gap-1 rounded-md px-3 text-micro in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg:not([class*='size-'])]:size-3",
+        sm: "h-(--control-h-xs) gap-1 rounded-md px-4 text-xs in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
         /* One step ABOVE `default`, on the --control-h-lg rung, for hero and
            dual-CTA pairs where the pill carries a marketing weight. */
         lg: "h-(--control-h-lg) gap-2 px-7 has-data-[icon=inline-end]:pr-5 has-data-[icon=inline-start]:pl-5",
@@ -80,14 +82,17 @@ const buttonVariants = cva(
            `icon-sm`/`icon-xs` remain the dense tiers for in-row chrome. */
         icon: "size-(--control-h)",
         "icon-xs":
-          "size-(--control-h-2xs) rounded-full in-data-[slot=button-group]:rounded-full [&_svg:not([class*='size-'])]:size-3",
+          "size-(--control-h-2xs) rounded-md in-data-[slot=button-group]:rounded-md [&_svg:not([class*='size-'])]:size-3",
         "icon-sm":
-          "size-(--control-h-xs) rounded-full in-data-[slot=button-group]:rounded-full",
+          "size-(--control-h-xs) rounded-md in-data-[slot=button-group]:rounded-md",
         "icon-lg": "size-(--control-h-lg)",
-        /* Round footprints for the `icon` variant: --control-h tracks the
-           pill; --control-h-xs is the dense card-footer/toolbar tier. */
-        "icon-r": "size-(--control-h) rounded-full",
-        "icon-r-sm": "size-(--control-h-xs) rounded-full",
+        /* Formerly the ROUND footprints for the `icon` variant. A toolbar
+           icon button is a control, not an avatar, so it now takes the same
+           --r-2 corner as every other button and these are size aliases of
+           `icon` / `icon-sm`. Kept rather than deleted because ~12 call sites
+           name them; collapse them in a follow-up rather than mid-review. */
+        "icon-r": "size-(--control-h) rounded-md",
+        "icon-r-sm": "size-(--control-h-xs) rounded-md",
       },
       /* Tinted hover for the `icon` variant — the icon communicates a colored
          action instead of the neutral ink hover. Declared after `variant` so

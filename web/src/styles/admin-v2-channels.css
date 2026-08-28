@@ -479,7 +479,7 @@
   width: 28px;
   height: var(--control-h-xs);
   border: none;
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: transparent;
   color: var(--ink-3);
   cursor: pointer;

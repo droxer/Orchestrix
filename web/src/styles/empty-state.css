@@ -189,7 +189,7 @@ html[data-theme="dark"] .relay-bleed-mark {
   gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-4);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: var(--surface-1);
   color: var(--ink-2);
   font: var(--type-label-strong);

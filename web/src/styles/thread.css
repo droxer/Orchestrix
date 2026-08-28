@@ -52,7 +52,7 @@
    list page carries. */
 
 .conversation-list {
-  /* The rails carry data-density="compact" for TYPE (13px names, 13px meta),
+  /* The rails carry data-density="compact" for TYPE (13px names, 12px meta),
      but a two-line selectable object is not a dense table row, so the dense
      --sp-row (8px) left name and meta touching their own row edges. Restate
      the standard row rhythm for the rail's descendants; density keeps the
@@ -218,7 +218,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--ink-1);
-  /* Same 13px/600 list-rail identity as the thread rows it contains. */
+  /* Same 13px/700 list-rail identity as the thread rows it contains. */
   font: var(--type-label-strong);
   letter-spacing: var(--type-label-strong-track);
   text-overflow: ellipsis;
@@ -240,7 +240,7 @@
   width: 26px;
   height: var(--control-h-2xs);
   border: 0;
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   color: var(--ink-4);
   background: transparent;
   cursor: pointer;
@@ -505,10 +505,10 @@
 .conversation-name strong {
   min-width: 0;
   color: var(--ink-1);
-  /* List-rail identity: 13px/600, one rung under --type-name. A rail of
-     15px semibold titles reads shouty at 318px — and CJK glyphs at 15px
-     semibold more so — so rows here wear the strong-label role and let
-     weight, not size, separate title from meta. */
+  /* List-rail identity: 13px/700, one rung under --type-name. A rail of
+     16px bold titles reads shouty at 318px — and CJK glyphs at 16px bold
+     more so — so rows here wear the strong-label role and let weight, not
+     size, separate title from meta. */
   font: var(--type-label-strong);
   letter-spacing: var(--type-label-strong-track);
   overflow: hidden;
@@ -590,7 +590,7 @@
   height: var(--control-h-2xs);
   padding: 0;
   border: 0;
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: transparent;
   color: var(--ink-3);
   cursor: pointer;

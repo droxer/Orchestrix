@@ -79,7 +79,9 @@ body {
   color: var(--ink-2);
 }
 
-.sidenav-btn { width: var(--touch-target); height: var(--touch-target); border-radius: var(--r-3); color: var(--ink-3); }
+/* A nav button is a CONTROL, not a container: --r-2 puts it on the same
+   corner as every other button instead of the 8px the menus it opens use. */
+.sidenav-btn { width: var(--touch-target); height: var(--touch-target); border-radius: var(--r-2); color: var(--ink-3); }
 .sidenav-btn:hover { background: var(--surface-3); border-color: transparent; color: var(--ink-1); }
 /* Active route reads as selected the same way a conversation row does: a
    soft wash + full-strength ink + a 2px left accent bar. Reserving the solid

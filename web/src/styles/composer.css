@@ -33,7 +33,7 @@
   height: var(--control-h-xs);
   padding: 0 var(--sp-2);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: var(--surface-2);
   color: var(--ink-2);
 }
@@ -305,7 +305,7 @@
   height: var(--control-h-sm);
   padding: 0 var(--sp-3);
   border: 1px solid var(--line-2);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   color: var(--ink-2);
   background: var(--surface-2);
   font: var(--type-label-strong);
@@ -431,7 +431,7 @@
      bleed closes that gap so the pair reads as one plate. */
   margin-inline: calc(-1 * var(--sp-hairline));
   padding-inline: var(--sp-hairline);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: color-mix(in srgb, var(--ink-1) 13%, transparent);
   /* A pill split across two lines keeps its full shape on both halves. */
   box-decoration-break: clone;

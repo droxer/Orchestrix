@@ -88,7 +88,7 @@
   border: 0;
   background: transparent;
   padding: var(--sp-0-5) var(--sp-1);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   color: var(--ink-3);
   cursor: pointer;
   font-family: var(--font-mono);
@@ -489,7 +489,7 @@
   padding: var(--sp-hairline) var(--sp-2);
   border: 1px dashed var(--tone-line);
   --tone: var(--info);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   color: color-mix(in srgb, var(--info) 80%, transparent);
   font: var(--type-label-strong);
   letter-spacing: var(--track-0);

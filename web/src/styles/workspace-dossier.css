@@ -326,7 +326,7 @@
   height: var(--control-h-xs);
   padding: 0 var(--sp-2);
   border: 1px solid var(--line-2);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: transparent;
   color: var(--ink-3);
   cursor: pointer;

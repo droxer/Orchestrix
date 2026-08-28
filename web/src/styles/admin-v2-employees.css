@@ -250,7 +250,7 @@
   height: var(--control-h-xs);
   padding: 0 var(--sp-3);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: var(--surface-0);
   color: var(--ink-1);
   font: var(--type-label);
@@ -417,7 +417,7 @@
   gap: var(--sp-2);
   padding: var(--sp-1) var(--sp-2);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: transparent;
   color: var(--ink-2);
   font: var(--type-label-strong);
@@ -496,7 +496,7 @@
   min-width: 2rem;
   padding: var(--sp-1) var(--sp-2);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   color: var(--ink-3);
   font: var(--type-micro);
   letter-spacing: var(--type-micro-track);

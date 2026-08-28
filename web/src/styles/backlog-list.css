@@ -11,7 +11,7 @@
   gap: 0;
   padding: var(--sp-0-5);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: var(--surface-1);
 }
 
@@ -307,7 +307,7 @@
      the 40px control height — a lone action (routine) looked tall/narrow. */
   height: var(--control-h-xs);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: var(--surface-0);
   padding: 0 var(--sp-2);
   color: var(--ink-1);
@@ -404,7 +404,7 @@
   .backlog-row-actions .backlog-action-icon:not([data-variant="icon"]) {
     min-height: var(--control-h-xs);
     min-width: 36px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-2);
   }
 
   .backlog-row-actions [data-variant="icon"] {
