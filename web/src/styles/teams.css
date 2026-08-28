@@ -337,9 +337,9 @@
 }
 
 /* Chained with .team-member-options so the scroll override wins over the
-   base rule's `overflow: hidden` (admin-v2-views.css) regardless of import
+   base rule's `overflow: hidden` (admin-v2-employees.css) regardless of import
    order — equal-specificity single classes would otherwise resolve by source
-   order, and admin-v2-views.css loads after this file. */
+   order, and admin-v2-employees.css loads after this file. */
 .team-member-options.team-profile-member-options {
   max-height: 280px;
   overflow-y: auto;
