@@ -43,8 +43,7 @@ const buttonVariants = cva(
           "border-destructive/45 text-destructive hover:border-destructive hover:bg-destructive hover:text-destructive-foreground focus-visible:border-destructive focus-visible:[outline:var(--focus-outline-danger)] focus-visible:[outline-offset:var(--focus-offset)] disabled:opacity-100 disabled:border-(--line-1) disabled:text-(--ink-4)",
         /* Circular icon-only action — the source system's 40px button-icon-circular:
            ink-3 idle; a control wash + line-2 + ink-1 on hover. Always paired
-           with the round `icon-r` (--control-h) / `icon-r-sm` (--control-h-xs)
-           sizes.
+           with the `icon` (--control-h) / `icon-sm` (--control-h-xs) sizes.
            `tinted` swaps the hover to an --action wash; the `danger` modifier
            re-tints it to --err and adds the hairline that keeps the
            destructive signal alive under forced-colors. */
@@ -87,13 +86,6 @@ const buttonVariants = cva(
         "icon-sm":
           "size-(--control-h-xs) rounded-md in-data-[slot=button-group]:rounded-md",
         "icon-lg": "size-(--control-h-lg)",
-        /* Formerly the ROUND footprints for the `icon` variant. A toolbar
-           icon button is a control, not an avatar, so it now takes the same
-           --r-2 corner as every other button and these are size aliases of
-           `icon` / `icon-sm`. Kept rather than deleted because ~12 call sites
-           name them; collapse them in a follow-up rather than mid-review. */
-        "icon-r": "size-(--control-h) rounded-md",
-        "icon-r-sm": "size-(--control-h-xs) rounded-md",
       },
       /* Tinted hover for the `icon` variant — the icon communicates a colored
          action instead of the neutral ink hover. Declared after `variant` so

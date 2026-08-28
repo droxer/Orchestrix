@@ -225,7 +225,7 @@ export function ComputerCard({
                 <Button
                   type="button"
                   variant="icon"
-                  size="icon-r-sm"
+                  size="icon-sm"
                   tinted
                   onClick={() => void handleCopyId()}
                   aria-label={copied ? t("admin.copied") : t("admin.copy_node_id")}

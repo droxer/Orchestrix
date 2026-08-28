@@ -19,7 +19,7 @@ export function ArtifactNavButton({ artifactCount, onOpenArtifacts, expanded, di
   return (
     <Button
       variant="icon"
-      size="icon-r"
+      size="icon"
       className={className}
       type="button"
       aria-label={t("space.toggle")}

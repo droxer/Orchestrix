@@ -559,7 +559,7 @@
 .adm-node-card-actions > .adm-node-action--delete { grid-column: 5; }
 
 /* Node card icon actions (reveal/manage/delete) use Button variant="icon"
-   size="icon-r-sm" tinted instead of a bespoke implementation. */
+   size="icon-sm" tinted instead of a bespoke implementation. */
 .adm-node-card-icon-btn:disabled { cursor: progress; }
 
 .adm-node-card-error {

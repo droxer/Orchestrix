@@ -197,7 +197,7 @@ function RoutineStartButton({
   return (
     <Button
       variant="icon"
-      size="icon-r-sm"
+      size="icon-sm"
       tinted
       type="button"
       className="backlog-action-icon"

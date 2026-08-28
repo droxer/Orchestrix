@@ -51,7 +51,7 @@ export function ThreadHeader({ activeSession, participants, artifactCount, space
         {spaceOpen ? (
           <Button
             variant="icon"
-            size="icon-r"
+            size="icon"
             type="button"
             className="chat-threadlist-button"
             aria-label={t("space.toggle_threads")}

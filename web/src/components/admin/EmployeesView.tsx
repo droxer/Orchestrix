@@ -290,7 +290,7 @@ export function EmployeesView({
                   <div className="adm-emp-actions" role="cell">
                     {onEditEmployee ? (
                       <Button variant="icon"
-                        size="icon-r-sm"
+                        size="icon-sm"
                         tinted
                         type="button"
                         className="adm-node-card-icon-btn"
@@ -306,7 +306,7 @@ export function EmployeesView({
                     ) : null}
                     {onDeleteEmployee ? (
                       <Button variant="icon"
-                        size="icon-r-sm"
+                        size="icon-sm"
                         tinted
                         type="button"
                         danger
