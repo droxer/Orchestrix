@@ -24,7 +24,7 @@
   flex-wrap: wrap;
   align-items: baseline;
   margin: 0;
-  padding: var(--sp-3) var(--page-gutter);
+  padding: var(--sp-4) var(--page-gutter);
   border-bottom: 1px solid var(--line-1);
   background: var(--surface-0);
 }
@@ -80,7 +80,7 @@
   display: flex;
   align-items: center;
   gap: var(--sp-3);
-  padding: var(--sp-3) var(--page-gutter);
+  padding: var(--sp-4) var(--page-gutter);
 }
 
 .backlog-filter-search-wrap {
@@ -194,7 +194,7 @@
   display: grid;
   grid-template-columns: repeat(5, minmax(120px, 1fr));
   gap: var(--sp-2);
-  padding: 0 var(--page-gutter) var(--sp-3);
+  padding: 0 var(--page-gutter) var(--sp-4);
 }
 
 /* Filters are <FilterSelect> (the shadcn Select) and <Input> now, so they carry
@@ -320,7 +320,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-2);
-  padding: var(--sp-3) var(--sp-4);
+  padding: var(--sp-4);
   border-bottom: 1px solid var(--line-2);
   background: var(--surface-0);
 }
@@ -348,8 +348,8 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-3) var(--sp-4);
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-3) var(--sp-7);
 }
 
 /* ── Task cards ──────────────────────────────────────────────────────── */

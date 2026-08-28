@@ -43,6 +43,13 @@ function filterLabel(filter: NodeQuickFilter, t: TFunction): string {
   if (filter === "all") return t("admin.v2.filter_all");
   if (filter === "unassigned") return t("admin.unassigned");
   if (filter === "failed") return t("admin.v2.filter_failed");
+  // NOT status.running. This slice is "the Computer process is up" — see
+  // matchesNodeQuickFilter — which makes it a SUPERSET of Ready, so labelling
+  // it "Running" put two pills reading `Ready 3 · Running 3` side by side in a
+  // row that looks like a partition, and collided with the dashboard's
+  // Running tile, where the same word counts computers executing an agent
+  // right now. The predicate is deliberate and tested; the word was wrong.
+  if (filter === "running") return t("admin.v2.filter_running");
   return t(`status.${filter}`, { defaultValue: filter });
 }
 

@@ -376,8 +376,9 @@ through to the system sans by design rather than shipping a second file.
   pill holds its shape at any control height; at Relay's 28–44px controls the
   two are visually identical.
 - **Spacing:** 4px base — `--sp-1` 4 · `--sp-2` 8 · `--sp-3` 12 · `--sp-4`
-  16 · `--sp-5` 20 · `--sp-6` 24 · `--sp-7` 32 · `--sp-8` 48 · `--sp-9` 64
-  (product-section rhythm) · `--sp-10` 80 (marketing-section rhythm). Below
+  16 · `--sp-5` 20 · `--sp-6` 24 · `--sp-7` 32 · `--sp-8` 48. The scale stops
+  there: the source system's 64/80px section rungs shipped with no call site
+  and were removed. Below
   the base sit exactly two micro steps, `--sp-0-5` 2 and `--sp-1-5` 6, for
   glyph-tight pairs (dot ↔ label, icon ↔ text, stacked meta lines). They are
   the only sanctioned sub-4px gaps. `--sp-row` (12px, compact 8px via

@@ -216,7 +216,8 @@ export function EmployeesView({
             <span className="adm-col-label" role="columnheader">{t("admin.col_employee")}</span>
             <span className="adm-col-label" role="columnheader">{t("admin.v2.col_computers")}</span>
             <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_local_limit")}</span>
-            <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_metrics")}</span>
+            <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_running")}</span>
+            <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_ready")}</span>
             <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_actions")}</span>
           </div>
           <ul className="adm-emp-list" role="rowgroup">
@@ -233,11 +234,17 @@ export function EmployeesView({
                   <div className="adm-emp-id" role="cell">
                     <div className="adm-emp-id-line">
                       <p className="adm-emp-name" translate="no">{member.displayName}</p>
-                      <TonePill
-                        tone={tone}
-                        label={t(`admin.v2.emp_state_${key}`, { defaultValue: key })}
-                        live={tone === "info"}
-                      />
+                      {/* Same rule as EmployeeCard: "ready" is the default
+                          healthy state and goes unnamed. The list used to pill
+                          it, so one employee read as Ready on this view and as
+                          nothing at all on the card view. */}
+                      {key !== "ready" ? (
+                        <TonePill
+                          tone={tone}
+                          label={t(`admin.v2.emp_state_${key}`, { defaultValue: key })}
+                          live={tone === "info"}
+                        />
+                      ) : null}
                     </div>
                     <p className="adm-emp-meta code">
                       <span translate="no">@{member.id}</span>
@@ -262,23 +269,19 @@ export function EmployeesView({
                       ) : null}
                     </div>
                   </div>
-                  <div
-                    className="adm-emp-metrics"
-                    role="cell"
-                    aria-label={t("admin.v2.emp_metrics_aria", {
-                      running: member.runningCount,
-                      ready: member.readyCount,
-                      total: member.nodeCount,
-                    })}
-                  >
+                  {/* Two columns, not one cell carrying its own caps
+                      sub-headers: those labels sat in the same micro-caps
+                      register as the column header above them, so the table
+                      appeared to have a second header row inside every row. */}
+                  <div className="adm-emp-metrics" role="cell">
                     <div className="adm-emp-metric">
-                      <span className="adm-emp-metric-label">{t("admin.v2.col_running")}</span>
                       <span className={`adm-emp-running tnum ${member.runningCount > 0 ? "ink-strong" : "ink-dim"}`}>
                         {member.runningCount}
                       </span>
                     </div>
+                  </div>
+                  <div className="adm-emp-metrics" role="cell">
                     <div className="adm-emp-metric">
-                      <span className="adm-emp-metric-label">{t("admin.v2.col_ready")}</span>
                       <span className="adm-emp-ratio tnum ink-dim">
                         {member.readyCount}/{member.nodeCount}
                       </span>

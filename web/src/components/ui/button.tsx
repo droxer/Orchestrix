@@ -10,7 +10,14 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary-active",
+        /* Disabled drops OUT of the fill rather than fading through it. The
+           shared `disabled:opacity-50` is right for ghost/outline/link, where
+           the label sits on the page's own surface, but half-opacity white on
+           cobalt measures ~2.2:1 — and a filled CTA is exactly the button that
+           spends most of its life disabled (admin Settings' Save is disabled
+           until its field is dirty). */
+        default:
+          "bg-primary text-primary-foreground hover:bg-primary-active disabled:opacity-100 disabled:border-(--line-1) disabled:bg-(--surface-2) disabled:text-(--ink-4)",
         /* The neutral tiers wash with --control-fill rather than --surface-2.
            See the role's note in roles.css: a fixed surface step only lifts on
            the one plane it was sized against, and inverted on the --surface-3
@@ -33,7 +40,7 @@ const buttonVariants = cva(
            is kept alongside the hue so the variant survives forced-colors
            mode, where the red is dropped. */
         destructive:
-          "border-destructive/45 text-destructive hover:border-destructive hover:bg-destructive hover:text-destructive-foreground focus-visible:border-destructive focus-visible:[outline:var(--focus-outline-danger)] focus-visible:[outline-offset:var(--focus-offset)]",
+          "border-destructive/45 text-destructive hover:border-destructive hover:bg-destructive hover:text-destructive-foreground focus-visible:border-destructive focus-visible:[outline:var(--focus-outline-danger)] focus-visible:[outline-offset:var(--focus-offset)] disabled:opacity-100 disabled:border-(--line-1) disabled:text-(--ink-4)",
         /* Circular icon-only action — the source system's 40px button-icon-circular:
            ink-3 idle; a control wash + line-2 + ink-1 on hover. Always paired
            with the round `icon-r` (--control-h) / `icon-r-sm` (--control-h-xs)

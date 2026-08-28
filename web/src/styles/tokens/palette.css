@@ -273,8 +273,11 @@
      the *only* sanctioned sub-4px gaps: they bind glyph-tight pairs (dot ↔
      label, icon ↔ text, stacked meta lines) where a full 4px step reads as
      a separation rather than a pairing. Anything larger uses the 4px scale.
-     The top two rungs are the source system's section rhythm: 64px between product
-     sections, 80px between marketing sections.
+     The scale stops at 48px. The source system's 64px/80px section rungs were
+     declared here with ZERO consumers — Relay is an app shell, not a marketing
+     page, and its largest real separation is --sp-7 between board sections and
+     --sp-8 at a scroll region's tail. Re-add them only together with a call
+     site in the same change.
 
      --sp-hairline (1px) is NOT a gap — it is the width of a 1px visual
      construct expressed as spacing: padding that lets a 1px border/hairline
@@ -291,8 +294,6 @@
   --sp-6: 24px;
   --sp-7: 32px;
   --sp-8: 48px;
-  --sp-9: 64px;  /* product-section rhythm */
-  --sp-10: 80px; /* marketing-section rhythm */
   --sp-row: var(--sp-3); /* dense row rhythm */
 
   /* Control heights — the source system renders form inputs and primary pills at

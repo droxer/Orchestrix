@@ -3,16 +3,21 @@
 
 /* ── Settings view ───────────────────────────────────────────────────── */
 
-/* A flat list of independent org-wide defaults on the bare canvas — no card
-   chrome. A hairline between items carries the grouping, and the control row
-   keeps input, save, and confirmation on one line. */
+/* Independent org-wide defaults, one card each, in the same intrinsically
+   responsive grid the Employees and Computers views use. It was a 560px
+   single column pinned to the left edge, which on a 1440px console left ~800px
+   of dead canvas beside three short forms — the settings view was the only
+   admin surface that did not use its width. `auto-fill` + `minmax` reflows
+   without a media query, so no breakpoint joins the registry for this. */
 .adm-settings {
-  display: flex;
-  flex-direction: column;
-  max-width: 560px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  align-items: start;
+  gap: var(--sp-4);
 }
 
 .adm-settings > .adm-view-error {
+  grid-column: 1 / -1;
   margin: 0 0 var(--sp-4);
 }
 
@@ -20,11 +25,10 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-4);
-  padding: var(--sp-6) 0;
-}
-
-.adm-settings-item + .adm-settings-item {
-  border-top: 1px solid var(--line-1);
+  padding: var(--sp-6);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-3);
+  background: var(--surface-1);
 }
 
 .adm-settings-head {

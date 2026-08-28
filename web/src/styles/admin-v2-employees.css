@@ -144,8 +144,14 @@
   content-visibility: auto;
   contain-intrinsic-size: auto 96px;
   display: grid;
-  /* identity / computers / limit / activity / actions */
-  grid-template-columns: minmax(220px, 1.2fr) minmax(0, 2fr) auto auto auto;
+  /* identity / computers / limit / running / ready / actions.
+     The four trailing tracks are PINNED, not `auto`. The header and each row
+     are separate grid containers, so a content-sized track resolves against
+     whatever that one container holds: the caps labels sized the header's
+     tracks and the numerals sized the rows', putting LIMIT ~90px right of the
+     value under it. Sharing this declaration is not enough — only tracks that
+     resolve without reading content give the two grids the same columns. */
+  grid-template-columns: minmax(220px, 1.2fr) minmax(0, 2fr) 3.5rem 4.5rem 4.5rem 4.5rem;
   gap: var(--sp-6);
 }
 
@@ -311,6 +317,8 @@
   min-width: 3.5rem;
 }
 
+/* Card-only. The list view carries these as real column headers now — see
+   .adm-emp-cols — so this label must not come back to the table. */
 .adm-emp-metric-label {
   font: var(--type-micro);
   letter-spacing: var(--type-micro-track);
@@ -622,8 +630,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 100%;
   color: var(--ink-3);
-  text-align: right;
+  /* Reads down the identity column now, not in from the status column. */
+  text-align: left;
 }
 
 .adm-emp-card-email {
