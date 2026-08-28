@@ -32,6 +32,7 @@ const lightRegister = palette.slice(palette.indexOf(lightMarker));
 // Declarations only — palette.css documents rejected values in prose on
 // purpose, and a substring check would read its own explanations as code.
 const paletteCode = palette.replace(/\/\*[\s\S]*?\*\//g, "");
+const stripStyleComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, "");
 
 /** WCAG 2.x relative luminance / contrast, so the ramp is checked as a
  *  property rather than pinned as a list of hexes that says nothing about
@@ -321,6 +322,84 @@ describe("theme color ownership", () => {
   });
 });
 
+describe("opacity never dims text", () => {
+  /* The ink ramp's AA guarantee — the suite directly below — is proved on the
+     TOKEN. Opacity is applied at the CALL SITE, and it composites the ink
+     toward whatever plane it lands on, so a rule that sets both `color` and an
+     opacity below 1 silently discards the guarantee the next suite finishes
+     proving. Seven rules did, and all seven failed:
+
+       .artifact-diff-ln           --ink-3 @0.45   2.90:1 dark / 2.24:1 light
+       .artifact-diff-line.is-meta --ink-3 @0.55   3.69 / 2.76
+       .code-view .code-gutter     --ink-3 @0.55   3.78 / 2.67
+       .relay-empty-marginalia     --ink-3 @0.6    3.60 / 2.98
+       .computer-connect-usage             @0.7    4.34 / 3.75
+       .msg-tokens                 --ink-4 @0.75   4.06 / 3.31
+       .artifact-diff-sign         --ink-1 @0.5    5.21 / 3.50
+
+     Three are under 3:1, the floor for content being perceivable at all, and
+     every one started from an ink tier that passes.
+
+     The ramp already answers "quieter": --ink-4 is its dim tier and exists
+     because it is the dimmest value that still clears AA. Reaching past it
+     with opacity is reaching past the floor by construction, which is why
+     this is a structural rule rather than a per-value contrast check. */
+  const stateTokens = [
+    "--opacity-disabled",
+    "--opacity-dormant",
+    "--opacity-ghost",
+    "--opacity-mark",
+    "--opacity-underlay",
+  ];
+
+  const rules = (source: string) =>
+    [...stripStyleComments(source).matchAll(/([^{}]*?)\{([^{}]*)\}/g)]
+      .map((m) => ({ selector: m[1].trim().split("\n").pop()?.trim() ?? "", body: m[2] }))
+      .filter((r) => r.selector.length > 0);
+
+  it("declares the state scale with no two rungs sharing a value", () => {
+    const values = stateTokens.map((name) => {
+      const raw = paletteCode.match(new RegExp(`${name}:\\s*([0-9.]+);`))?.[1];
+      assert.ok(raw, `${name} is not declared in palette.css`);
+      return Number(raw);
+    });
+    for (const v of values) assert.ok(v > 0 && v < 1, `${v} is not a dimming value`);
+    assert.equal(new Set(values).size, values.length, `two rungs share a value: ${values.join(", ")}`);
+  });
+
+  it("sets no opacity on a rule that also sets a text colour", () => {
+    const offenders: string[] = [];
+    for (const name of surfaceSheetNames()) {
+      for (const { selector, body } of rules(readStyle(name))) {
+        const opacity = body.match(/\n\s*opacity:\s*(0\.\d+)\s*;/);
+        if (!opacity) continue;
+        if (!/\n\s*color:\s*/.test(body)) continue;
+        offenders.push(`${name}: ${selector} sets color and opacity ${opacity[1]}`);
+      }
+    }
+    assert.deepEqual(
+      offenders,
+      [],
+      `step the --ink-* ramp instead of dimming text:\n  ${offenders.join("\n  ")}`,
+    );
+  });
+
+  it("spells every disabled state with the one token", () => {
+    // Nine rules read --opacity-disabled while three others hand-picked 0.6,
+    // 0.65 and 0.72 for the identical state — under a token whose own comment
+    // claimed "no call site picks its own".
+    const offenders: string[] = [];
+    for (const name of surfaceSheetNames()) {
+      for (const { selector, body } of rules(readStyle(name))) {
+        if (!/:disabled|\bis-disabled\b|\[disabled\]/.test(selector)) continue;
+        const raw = body.match(/\n\s*opacity:\s*(0\.\d+)\s*;/);
+        if (raw) offenders.push(`${name}: ${selector} uses ${raw[1]}`);
+      }
+    }
+    assert.deepEqual(offenders, [], `disabled is --opacity-disabled, once:\n  ${offenders.join("\n  ")}`);
+  });
+});
+
 describe("ink ramp legibility", () => {
   // The bar is the WORST plane a tier can land on, not the canvas: meta text
   // sits on drawers and inset wells too, and those are the planes closest to
@@ -415,6 +494,49 @@ describe("focus contract", () => {
     assert.deepEqual(shadowRings, [], "focus rings are outlines now — do not paint one as a box-shadow");
   });
 
+  it("draws the ring in exactly one place", () => {
+    /* base.css calls this "a single ring contract" and then 29 component
+       rules copied its two declarations verbatim — `.md-table`,
+       `.sidenav-resize`, `.pref-modal`, `.dialog-input`, and 25 more. Most
+       sat on native buttons and inputs the contract ALREADY covered, so each
+       copy overrode the shared rule with the shared rule's own value: the ring
+       looked component-owned while being identical everywhere, and a change to
+       --focus-outline would have been silently reverted 29 times.
+
+       The contract now matches `[tabindex]` and `summary` as well as the
+       native tags, so a hand-focusable div is covered without a copy. A
+       component may still add to the focused state — a border tint, a
+       box-shadow, a z-index — it just may not restate the ring itself. */
+    let copies: string[] = [];
+    for (const name of surfaceSheetNames()) {
+      const source = stripStyleComments(readStyle(name));
+      for (const m of source.matchAll(/([^{}]*?:focus-visible[^{}]*?)\{([^{}]*)\}/g)) {
+        if (!/outline:\s*var\(--focus-outline\)/.test(m[2])) continue;
+        copies.push(`${name}: ${m[1].replace(/\s+/g, " ").trim()}`);
+      }
+    }
+    assert.deepEqual(
+      copies,
+      [],
+      `the ring lives in tokens/base.css only — these restate it:\n  ${copies.join("\n  ")}`,
+    );
+
+    // And the forced-colors restatement must cover the same elements, or the
+    // ring silently disappears in that mode for whatever the two lists differ on.
+    const base = stripStyleComments(readStyle("tokens/base.css"));
+    const contract = base.match(/([^{}]*?):focus-visible[^{}]*\{[^{}]*outline:\s*var\(--focus-outline\)/);
+    const forced = base.match(/forced-colors[\s\S]*?\{\s*([\s\S]*?)\{[^{}]*CanvasText/);
+    assert.ok(contract && forced, "could not locate both focus blocks in base.css");
+    const selectorsOf = (block: string) =>
+      block.split(",").map((p) => p.replace(/\s+/g, " ").trim())
+        .filter(Boolean).map((p) => p.replace(/:focus-visible$/, "")).sort();
+    assert.deepEqual(
+      selectorsOf(contract[0].slice(0, contract[0].indexOf("{"))),
+      selectorsOf(forced[1]),
+      "the forced-colors ring covers a different set of elements than the contract",
+    );
+  });
+
   it("distinguishes the danger ring by colour AND shape", () => {
     // The critical red is its own hue now, so the danger ring can differ by
     // colour — but it keeps the dashed stroke it wore through the monochrome
@@ -443,23 +565,32 @@ function surfaceSheetNames(): string[] {
 describe("workspace status colors", () => {
   const workspace = readStyle("workspace.css");
 
-  it("uses the neutral info token instead of the action token", () => {
-    assert.match(workspace, /\.workspace-status-pip\.tone-info\s*\{\s*color:\s*var\(--info\);\s*\}/);
+  // These two used to enumerate a per-tone rule per status — `.tone-good`,
+  // `.tone-info`, … each naming its own hue on the pip. That shape is what the
+  // tone driver exists to prevent: it is a second copy of the tone -> hue
+  // mapping, and copies drift (the same enumeration in admin-v2-dashboard.css
+  // resolved `neutral` to a different ink than the one here). The pip now reads
+  // --tone, so "info is --info, never --action" is enforced once, in base.css,
+  // for every consumer at the same time — and toneDriver.test.ts checks that no
+  // sheet re-derives it.
+  it("reads the tone driver instead of re-deriving a hue per status", () => {
+    assert.match(
+      workspace,
+      /\.workspace-status-pip\s*\{[^}]*background:\s*var\(--tone,\s*var\(--ink-4\)\);/,
+      "the workspace status pip must take its colour from --tone",
+    );
+    assert.doesNotMatch(
+      workspace,
+      /\.workspace-status-pip\.tone-/,
+      "no per-tone override on the pip — that is the driver's job",
+    );
   });
 
-  it("keeps every workspace status tone free of a tinted fill", () => {
-    // The contract — a status tone colours ink, never a fill — is asserted for
-    // whatever tones exist.
+  it("keeps status out of a tinted plate", () => {
     assert.doesNotMatch(
       workspace,
       /\.workspace-status-pill\b/,
       "the status pill is gone; status lives in the RecordBand",
     );
-    const tones = ["good", "info", "warn", "bad", "neutral"];
-    for (const tone of tones) {
-      const rule = workspace.match(new RegExp(`\\.workspace-status-pip\\.tone-${tone}\\s*\\{([^}]*)\\}`));
-      assert.ok(rule, `missing ${tone} workspace status rule`);
-      assert.ok(!rule[1].includes("background"), `${tone} workspace status must not use a tinted fill`);
-    }
   });
 });

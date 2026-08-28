@@ -7,7 +7,10 @@ import { useNodeMetrics } from "../hooks/useNodeMetrics";
 import { useTranslation } from "react-i18next";
 import { useMutationError } from "../hooks/useMutationError";
 import { Button } from "@/components/ui/button";
-import { ActionAdd } from "./icons";
+import {
+  ActionAdd,
+  ICON,
+} from "./icons";
 import { getOrgSettings, deleteControlPanelDaemonNode, deleteControlPanelEmployee, deleteManagedNode, getAuthStatus, getMe, listManagedNodes, permanentlyDeleteManagedNode, recoverManagedNode, RelayApiError, unassignControlPanelDaemonNode, updateComputerDisplayName, updateControlPanelDaemonNodeDisabledAgents, updateManagedNodeDisplayName } from "../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
@@ -466,7 +469,7 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
                 aria-label={t("admin.v2.add_employee_cta")}
                 title={t("admin.v2.add_employee_cta")}
               >
-                <ActionAdd size={16} aria-hidden="true" />
+                <ActionAdd size={ICON.md} aria-hidden="true" />
               </Button>
             ) : null}
             {view === "nodes" ? (
@@ -478,7 +481,7 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
                 aria-label={t("admin.v2.add_node_cta")}
                 title={t("admin.v2.add_node_cta")}
               >
-                <ActionAdd size={16} aria-hidden="true" />
+                <ActionAdd size={ICON.md} aria-hidden="true" />
               </Button>
             ) : null}
           </>

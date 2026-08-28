@@ -45,10 +45,6 @@
   background: var(--line-strong);
 }
 
-.thread-panel-resize:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
 
 /* The rail's header is the shared <PageHeader> (shell.css) and its filter
    band is .list-filter-bar (inputs.css); the header's create button is the
@@ -192,8 +188,8 @@
   position: absolute;
   right: -2px;
   bottom: -1px;
-  width: 6px;
-  height: 6px;
+  width: var(--dot);
+  height: var(--dot);
   border-radius: var(--r-full);
 }
 
@@ -236,7 +232,7 @@
   place-items: center;
   flex: 0 0 auto;
   width: 26px;
-  height: 26px;
+  height: var(--control-h-2xs);
   border: 0;
   border-radius: var(--r-full);
   color: var(--ink-4);
@@ -263,11 +259,6 @@
   background: var(--surface-2);
 }
 
-.project-folder-select:focus-visible,
-.project-folder-toggle:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
 
 .project-folder-threads {
   display: grid;
@@ -301,7 +292,7 @@
 }
 
 .project-folder-threads .conversation-row-inner {
-  min-height: 32px;
+  min-height: var(--control-h-xs);
   padding: var(--sp-0-5) var(--sp-2);
   gap: var(--sp-2);
 }
@@ -410,25 +401,8 @@
   background: var(--row-hover);
 }
 
-.conversation-row[data-selected="true"] {
-  background: var(--action-soft);
-}
-
-/* Selected row reads as selected: a soft wash + a 2px left accent bar —
-   selection is calm, action is loud (one flat hierarchy). Keyed on
-   data-selected, the same contract as .agents-roster-row and .teams-list-row. */
-.conversation-row[data-selected="true"]::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  /* Inset holds the bar at ~55% of the one-line row height (was 14px at the
-     old 64px floor). */
-  top: 10px;
-  bottom: 10px;
-  width: 2px;
-  border-radius: calc(var(--r-1) / 2);
-  background: var(--action);
-}
+/* Selection (wash + leading accent bar) comes from `.rail-row` in
+   tokens/base.css — one definition shared with the agents and teams rails. */
 
 /* <RelayEmptyState> in a 318px rail: the component's --sp-8/--sp-7 padding
    is sized for a full pane and would leave the title two words wide here. */
@@ -553,8 +527,8 @@
    fill rules). */
 .conversation-state-dot {
   flex: none;
-  width: 7px;
-  height: 7px;
+  width: var(--dot);
+  height: var(--dot);
   border-radius: var(--r-full);
 }
 
@@ -607,7 +581,7 @@
   align-items: center;
   justify-content: center;
   width: 24px;
-  height: 24px;
+  height: var(--control-h-2xs);
   padding: 0;
   border: 0;
   border-radius: var(--r-full);
@@ -709,8 +683,8 @@
 .conversation-group[data-tone="attn"] .conversation-group-label::before {
   content: "";
   flex: none;
-  width: 6px;
-  height: 6px;
+  width: var(--dot-sm);
+  height: var(--dot-sm);
   border-radius: var(--r-full);
   background: var(--warn);
 }

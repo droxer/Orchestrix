@@ -6,6 +6,7 @@ import { agentLabel } from "../lib/plan";
 import type { AgentName, AgentPlacement } from "../types";
 import { OWNERSHIP_ICON } from "./AgentPlacementBadge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ICON } from "./icons";
 
 /* One team-member pick row. TeamDrawer and TeamWorkspacePage both used to
    render this label+checkbox+name+kind anatomy by hand; the checkbox is the
@@ -49,11 +50,11 @@ export function TeamMemberOption({
       />
       <span className="team-member-option-main">
         <span className="team-member-option-name">{displayName}</span>
-        <span className="team-member-option-meta">
+        <span className="team-member-option-meta code">
           <span>{agentLabel(executorKind)}</span>
           {computer && ComputerIcon ? (
             <span className="team-member-option-computer" translate="no" title={computerTitle}>
-              <ComputerIcon size={12} aria-hidden="true" />
+              <ComputerIcon size={ICON.xs} aria-hidden="true" />
               {computer.nodeName}
             </span>
           ) : (

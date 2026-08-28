@@ -13,18 +13,23 @@ describe("Admin channel setup navigation", () => {
     assert.doesNotMatch(storeSource, /"integrations"/);
     assert.doesNotMatch(adminPageSource, /ChannelsView/);
     assert.doesNotMatch(toggleSource, /nav_integrations/);
+    // The form and its presentation primitives moved to ChannelPrimitives.tsx
+    // when ChannelsView.tsx was split; the assertions follow them rather than
+    // pinning the file they used to share.
     const setupSource = await readFile(resolve("web/src/components/admin/ChannelsView.tsx"), "utf8");
+    const primitives = await readFile(resolve("web/src/components/admin/ChannelPrimitives.tsx"), "utf8");
     const channelsPage = await readFile(resolve("web/src/components/ChannelsPage.tsx"), "utf8");
     const englishCopy = await readFile(resolve("web/src/i18n/locales/en/translation.json"), "utf8");
-    assert.match(setupSource, /\$\{idPrefix\}-public-base-url/);
-    assert.match(setupSource, /chat-edit-public-base-url/);
-    assert.match(setupSource, /updateChatIntegration/);
-    assert.match(setupSource, /adm-chat-provider-static/);
+    assert.match(primitives, /\$\{idPrefix\}-public-base-url/);
+    assert.match(primitives, /chat_field_bot_token/);
+    assert.match(primitives, /idPrefix = "chat"/);
+    assert.match(primitives, /adm-chat-section/);
+    assert.match(primitives, /adm-chat-provider-static/);
+    const detail = await readFile(resolve("web/src/components/admin/ChannelDetail.tsx"), "utf8");
+    assert.match(detail, /chat-edit-public-base-url/);
+    assert.match(detail, /updateChatIntegration/);
     assert.match(setupSource, /adm-chat-stage/);
-    assert.match(setupSource, /adm-chat-section/);
     assert.match(setupSource, /Drawer/);
-    assert.match(setupSource, /chat_field_bot_token/);
-    assert.match(setupSource, /idPrefix = "chat"/);
     assert.match(channelsPage, /ChannelsView/);
     assert.match(channelsPage, /showToolbarCreate=\{false\}/);
     assert.doesNotMatch(setupSource, /value="lark"/);

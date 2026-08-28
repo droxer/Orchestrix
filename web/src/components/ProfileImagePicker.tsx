@@ -2,7 +2,11 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionImage, ActionRemove } from "./icons";
+import {
+  ActionImage,
+  ActionRemove,
+  ICON,
+} from "./icons";
 
 const ACCEPTED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const MAX_PROFILE_IMAGE_BYTES = 2 * 1024 * 1024;
@@ -107,7 +111,7 @@ export function ProfileImagePicker({
           >
             {image}
             <span className="profile-image-picker-action" aria-hidden="true">
-              <ActionImage size={14} />
+              <ActionImage size={ICON.sm} />
             </span>
           </button>
           {imageUrl ? (
@@ -119,7 +123,7 @@ export function ProfileImagePicker({
               disabled={disabled}
               onClick={() => void removeImage()}
             >
-              <ActionRemove size={12} />
+              <ActionRemove size={ICON.xs} />
             </button>
           ) : null}
         </>

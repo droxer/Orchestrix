@@ -40,10 +40,15 @@ describe("composer team targeting", () => {
 describe("composer agent selection", () => {
   it("names the same agents in `@` as in the footer picker", async () => {
     const app = await readFile(resolve("web/src/App.tsx"), "utf8");
-    // Both surfaces read one effective list: ordinary threads use placements;
-    // project rooms narrow that list to the project's fixed roster.
+    // The placement-derived list moved into useThreadTargets when App.tsx was
+    // broken up; the assertion follows it rather than pinning the file it
+    // used to live in. Both surfaces still read ONE effective list — ordinary
+    // threads use placements, project rooms narrow that list to the project's
+    // fixed roster — which is the property under test.
+    const targets = await readFile(resolve("web/src/hooks/useThreadTargets.ts"), "utf8");
+    assert.match(targets, /agentsForThreadNode\(logicalAgents,\s*selectedThreadNodeId\)/);
     assert.match(app, /mentionCandidates\(effectiveSelectableLogicalAgents\)/);
-    assert.match(app, /logicalAgents,\s*selectedThreadNodeId/);
+    assert.match(app, /effectiveSelectableLogicalAgents = useMemo/);
     assert.match(app, /activeProject\.members\.filter/);
   });
 

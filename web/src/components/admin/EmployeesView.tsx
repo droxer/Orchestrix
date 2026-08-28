@@ -3,7 +3,13 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { ActionEdit, AdminDelete, AdminEmployees, ICON_STROKE_LARGE } from "../icons";
+import {
+  ActionEdit,
+  AdminDelete,
+  AdminEmployees,
+  ICON,
+  ICON_STROKE_LARGE,
+} from "../icons";
 import { Button } from "@/components/ui/button";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
@@ -133,7 +139,7 @@ export function EmployeesView({
         fill
         title={t("admin.v2.empty_employees_title")}
         body={t("admin.v2.empty_employees_body")}
-        illustration={<AdminEmployees size={40} strokeWidth={ICON_STROKE_LARGE} aria-hidden="true" />}
+        illustration={<AdminEmployees size={ICON.hero} strokeWidth={ICON_STROKE_LARGE} aria-hidden="true" />}
         actions={(
           <Button type="button" onClick={onAddEmployee}>
             {t("admin.v2.add_employee_cta")}
@@ -228,7 +234,7 @@ export function EmployeesView({
                     <div className="adm-emp-id-line">
                       <p className="adm-emp-name" translate="no">{member.displayName}</p>
                       <TonePill
-                        tone={tone === "muted" ? "neutral" : tone}
+                        tone={tone}
                         label={t(`admin.v2.emp_state_${key}`, { defaultValue: key })}
                         live={tone === "info"}
                       />
@@ -244,7 +250,7 @@ export function EmployeesView({
                   </div>
                   <div className="adm-emp-metrics" role="cell">
                     <div className="adm-emp-metric">
-                      <span className={`adm-emp-ratio tnum ${isOverLocalComputerLimit(member) ? "" : "tone-muted"}`}>
+                      <span className={`adm-emp-ratio tnum ${isOverLocalComputerLimit(member) ? "" : "ink-dim"}`}>
                         {localComputerUsageLabel(member)}
                       </span>
                       {isOverLocalComputerLimit(member) ? (
@@ -267,13 +273,13 @@ export function EmployeesView({
                   >
                     <div className="adm-emp-metric">
                       <span className="adm-emp-metric-label">{t("admin.v2.col_running")}</span>
-                      <span className={`adm-emp-running tnum ${member.runningCount > 0 ? "tone-neutral" : "tone-muted"}`}>
+                      <span className={`adm-emp-running tnum ${member.runningCount > 0 ? "ink-strong" : "ink-dim"}`}>
                         {member.runningCount}
                       </span>
                     </div>
                     <div className="adm-emp-metric">
                       <span className="adm-emp-metric-label">{t("admin.v2.col_ready")}</span>
-                      <span className="adm-emp-ratio tnum tone-muted">
+                      <span className="adm-emp-ratio tnum ink-dim">
                         {member.readyCount}/{member.nodeCount}
                       </span>
                     </div>
@@ -292,7 +298,7 @@ export function EmployeesView({
                         aria-label={t("admin.v2.edit_employee_action")}
                         title={t("admin.v2.edit_employee_action")}
                       >
-                        <ActionEdit size={14} aria-hidden="true" />
+                        <ActionEdit size={ICON.sm} aria-hidden="true" />
                       </Button>
                     ) : null}
                     {onDeleteEmployee ? (
@@ -306,7 +312,7 @@ export function EmployeesView({
                         aria-label={t("admin.v2.delete_employee_action")}
                         title={t("admin.v2.delete_employee_action")}
                       >
-                        <AdminDelete size={14} aria-hidden="true" />
+                        <AdminDelete size={ICON.sm} aria-hidden="true" />
                       </Button>
                     ) : null}
                   </div>

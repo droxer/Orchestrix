@@ -2,10 +2,9 @@
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { logout, updateUserPreferences } from "./api";
+import { logout } from "./api";
 import type { AgentName, AgentTeam, CurrentUser, DaemonNodeMonitorRecord, EmployeeAgent, RelayArtifact, RelaySession } from "./types";
 import { LoginScreen } from "./components/LoginScreen";
-import { type Theme, type Language } from "./components/PreferencesPanel";
 import type { ThreadItem } from "./components/ThreadRow";
 import { useRelayData } from "./hooks/useRelayData";
 import { useRelayMutations } from "./hooks/useRelayMutations";
@@ -23,15 +22,20 @@ import {
   threadMessageOperationKey,
 } from "./lib/messageRouting";
 import { mentionCandidates } from "./lib/mentions";
-import { applyTheme, readLanguage, readSidenavExpanded, readSidenavWidth, readTheme, readThreadListWidth, readThreadSpaceWidth, readTokens, selectedEmployeeKey, writeLanguage, writeSidenavExpanded, writeSidenavWidth, writeTheme, writeThreadListWidth, writeThreadSpaceWidth } from "./lib/appStorage";
-import { clampSidenavWidth, SIDENAV_WIDTH_DEFAULT } from "./lib/sidenav";
+import { applyTheme, readTokens, selectedEmployeeKey } from "./lib/appStorage";
 import { canUseLocalControlPanel } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { useClientMounted } from "./hooks/useClientMounted";
 import { useActiveSession } from "./hooks/useActiveSession";
+import { useTranscriptPin } from "./hooks/useTranscriptPin";
+import { useThreadDirectory } from "./hooks/useThreadDirectory";
+import { useThreadTargets } from "./hooks/useThreadTargets";
+import { useUserPreferences } from "./hooks/useUserPreferences";
+import { usePanelLayout } from "./hooks/usePanelLayout";
+import { useThreadSpace } from "./hooks/useThreadSpace";
 import { chooseSendAction, sendThreadSessionId, suppressActiveSessionDuringPendingSend } from "./lib/sendAction";
-import { matchesThreadQuery, myThreadSessions, pickActiveThreadSession, threadsForDirectory } from "./lib/threads";
+import { myThreadSessions, pickActiveThreadSession } from "./lib/threads";
 import { shouldTailSessionEvents } from "./lib/sessionEventStream";
 import { useEmployeeProvisioning } from "./hooks/useEmployeeProvisioning";
 import { useEmployeeAgents } from "./hooks/useEmployeeAgents";
@@ -62,11 +66,7 @@ import {
   threadNodeOffline,
   threadRuntimeNodeId,
 } from "./lib/threadRuntime";
-import { useStableValue } from "./hooks/useStableValue";
-import { useUrlSearchState } from "./hooks/useUrlSearchState";
 import { validatedReturnTo } from "./lib/appRoute";
-import { clampSpaceWidth, SPACE_WIDTH_DEFAULT } from "./lib/threadSpace";
-import { clampThreadListWidth, THREAD_LIST_WIDTH_DEFAULT } from "./lib/threadList";
 import { showThreadChrome } from "./lib/projectPage";
 
 const AdminPage = lazy(() => import("./components/AdminPage").then((m) => ({ default: m.AdminPage })));
@@ -93,16 +93,6 @@ function useStableEvent<TArgs extends unknown[], TResult>(handler: (...args: TAr
     handlerRef.current = handler;
   });
   return useCallback((...args: TArgs) => handlerRef.current(...args), []);
-}
-
-interface PreferenceRequestState {
-  generation: number;
-  latestRequestId: number;
-  queue: Promise<void>;
-}
-
-function newPreferenceRequestState(generation = 0): PreferenceRequestState {
-  return { generation, latestRequestId: 0, queue: Promise.resolve() };
 }
 
 // ── App ───────────────────────────────────────────────────────────────────────
@@ -138,30 +128,9 @@ export function App() {
   const [projectRoomTarget, setProjectRoomTarget] = useState(true);
   const [threadQuery, setThreadQuery] = useState("");
   const [prefsOpen, setPrefsOpen] = useState(false);
-  const [sidenavExpanded, setSidenavExpanded] = useState(false);
-  const [sidenavWidth, setSidenavWidth] = useState(SIDENAV_WIDTH_DEFAULT);
   const [sidenavResizing, setSidenavResizing] = useState(false);
-  const [theme, setTheme] = useState<Theme>("system");
-  const [language, setLanguage] = useState<Language>("en");
   const [handoffOpen, setHandoffOpen] = useState(false);
-  // The thread space panel is URL-driven (?space=1&artifact=<id>) so the view
-  // survives reload and can be shared.
-  const [spaceOpen, setSpaceOpen] = useUrlSearchState<boolean>(
-    "space",
-    false,
-    (value) => value === "1",
-    (value) => (value ? "1" : null),
-  );
-  const [spaceArtifactId, setSpaceArtifactId] = useUrlSearchState<string | null>(
-    "artifact",
-    null,
-    (value) => value,
-    (value) => value,
-  );
-  const [threadListHidden, setThreadListHidden] = useState(false);
-  const [spaceWidth, setSpaceWidth] = useState(SPACE_WIDTH_DEFAULT);
   const [spaceResizing, setSpaceResizing] = useState(false);
-  const [threadListWidth, setThreadListWidth] = useState(THREAD_LIST_WIDTH_DEFAULT);
   const [threadListResizing, setThreadListResizing] = useState(false);
   const [handoffAgentId, setHandoffAgentId] = useState<string>("");
   const [handoffNote, setHandoffNote] = useState("");
@@ -178,16 +147,19 @@ export function App() {
   const [pendingUserMessage, setPendingUserMessage] = useState<{ id: string; text: string } | null>(null);
   const { user, authChecked, setUser } = useAuthSession();
   const mounted = useClientMounted();
+  const panels = usePanelLayout(mounted);
+  const preferences = useUserPreferences({
+    mounted,
+    i18n,
+    setUser,
+    reportMutationError,
+    saveErrorMessage: t("errors.save_preferences"),
+  });
   const { agents: logicalAgents } = useEmployeeAgents(user?.employeeId);
   const { teams } = useTeams(user?.employeeId);
   const localNodeAdoptionStartedRef = useRef(false);
   const [preferencesUserId, setPreferencesUserId] = useState<string | null>(null);
-  const authenticatedUserIdRef = useRef<string | null>(null);
-  const themePreferenceRequestRef = useRef<PreferenceRequestState>(newPreferenceRequestState());
-  const languagePreferenceRequestRef = useRef<PreferenceRequestState>(newPreferenceRequestState());
   const composerRef = useRef<ComposerHandle>(null);
-  const transcriptRef = useRef<HTMLDivElement>(null);
-  const atBottomRef = useRef(true);
   const messageProjectorRef = useRef(new ProjectMessagesAccumulator());
   const messageOperationIdsRef = useRef(new Map<string, string>());
   const recoveryOperationIdsRef = useRef(new Map<string, string>());
@@ -236,92 +208,27 @@ export function App() {
     }),
     [activeSessionId, composingNew, myThreads, selectedSessionId],
   );
-  // Every machine this employee could run on, live or not. A pick is allowed
-  // to survive inside this set and nowhere else: the fleet list spans
-  // employees and keeps tombstones for deleted nodes, so "still listed" is not
-  // "still mine to use".
-  const assignableComputers = useMemo(
-    () => assignableThreadComputers(runtimeNodes, selectedEmployee),
-    [runtimeNodes, selectedEmployee],
-  );
-  const selectableComputers = useMemo(
-    () => selectableThreadComputers(runtimeNodes, selectedEmployee),
-    [runtimeNodes, selectedEmployee],
-  );
-  // Held stable across polls: the picker only reads ids and display names, so
-  // a heartbeat that merely refreshed `lastSeenAt` must not hand it a new
-  // array and re-render the composer every few seconds.
-  const threadComputers = useStableValue(
-    selectableComputers,
-    threadComputerSignature(selectableComputers),
-  );
-  const activeThreadNodeId = threadRuntimeNodeId(activeSession, logicalAgents, runtimeNodes);
-  const initializingThread = threadNeedsRuntimeSelection(
+  const space = useThreadSpace(activeSession?.id);
+  const {
+    assignableComputers,
+    threadComputers,
+    initializingThread,
+    selectedThreadNodeId,
+    activeRuntimeNode,
+    selectedThreadComputer,
+    selectableLogicalAgents,
+    composerTeams,
+    threadParticipants,
+  } = useThreadTargets({
     activeSession,
     composingNew,
     logicalAgents,
+    newThreadNodeId,
     runtimeNodes,
-  );
-  const selectedThreadNodeId = initializingThread
-    ? newThreadNodeId
-    : activeThreadNodeId ?? null;
-  // Resolved from the unfiltered runtime list, not `threadComputers`: a thread
-  // stays pinned to its computer even after that machine goes busy or offline,
-  // and those are exactly the moments the readout has to keep naming it.
-  const activeRuntimeNode = useMemo(
-    () => (initializingThread || !activeThreadNodeId
-      ? null
-      : runtimeNodes.find((node) => node.id === activeThreadNodeId) ?? null),
-    [activeThreadNodeId, initializingThread, runtimeNodes],
-  );
-  // Same resolution for the pick on a not-yet-started thread, so the trigger
-  // keeps naming the chosen computer through a poll that drops it from the
-  // selectable set — but only within this employee's own machines, so the
-  // trigger can never name someone else's. Held stable so the memoized picker
-  // ignores heartbeats.
-  const selectedThreadComputer = useMemo(
-    () => (initializingThread && selectedThreadNodeId
-      ? assignableComputers.find((node) => node.id === selectedThreadNodeId) ?? null
-      : null),
-    [assignableComputers, initializingThread, selectedThreadNodeId],
-  );
-  const stableSelectedThreadComputer = useStableValue(
-    selectedThreadComputer,
-    selectedThreadComputer
-      ? threadComputerSignature([selectedThreadComputer])
-      : "",
-  );
-  const selectableLogicalAgents = useMemo(
-    () => agentsForThreadNode(logicalAgents, selectedThreadNodeId),
-    [logicalAgents, selectedThreadNodeId],
-  );
-  // Teams follow the same rule as agents: only offer a team whose whole
-  // roster is placed on the picked computer. A started team thread keeps its
-  // team listed so the locked picker still names it even if a placement moved.
-  const startedThreadTeamId = activeSession?.teamId ?? null;
-  const composerTeams = useMemo(
-    () => {
-      const nodeTeams = teamsForThreadNode(teams, logicalAgents, selectedThreadNodeId);
-      if (startedThreadTeamId && !nodeTeams.some((team) => team.id === startedThreadTeamId)) {
-        const started = teams.find((team) => team.id === startedThreadTeamId && !team.deletedAt);
-        if (started) return [started, ...nodeTeams];
-      }
-      return nodeTeams;
-    },
-    [teams, logicalAgents, selectedThreadNodeId, startedThreadTeamId],
-  );
-  // `@` names exactly the agents the footer picker offers: the ones placed on
-  // the thread's computer. One list keeps the two selections in sync — the
-  // agent a mention addresses is always one the composer could have picked.
-  // The room, in join order. Ids the roster names but the agent list does not
-  // know (deleted, or another employee's) are dropped rather than rendered as
-  // a nameless chip.
-  const threadParticipants = useMemo(
-    () => (activeSession?.participantAgentIds ?? [])
-      .map((agentId) => logicalAgents.find((agent) => agent.id === agentId))
-      .filter((agent): agent is EmployeeAgent => Boolean(agent)),
-    [activeSession?.participantAgentIds, logicalAgents],
-  );
+    selectedEmployee,
+    teams,
+  });
+
   const visibleArtifacts = useMemo(() => visibleThreadArtifacts(activeSession), [activeSession]);
 
   useEffect(() => {
@@ -476,6 +383,11 @@ export function App() {
       { kind: "user", id: pendingUserMessage.id, timestamp: new Date().toISOString(), text: pendingUserMessage.text },
     ];
   }, [messages, pendingUserMessage]);
+
+  // Declared after displayMessages: the pin re-runs on block count and
+  // session id, both of which are derived above.
+  const transcript = useTranscriptPin(displayMessages.length, activeSession?.id);
+
   useEffect(() => {
     if (!pendingUserMessage) return;
     const present = messages.some(
@@ -502,44 +414,19 @@ export function App() {
   const threadChromeVisible = showThreadChrome(showProjectOverview);
   const spaceVisible = threadChromeVisible
     && (route === "main" || route === "projects")
-    && spaceOpen
+    && space.open
     && Boolean(activeSession);
 
-  const threadItems = useMemo<ThreadItem[]>(() => {
-    const runningBy = new Map(visibleNodes.flatMap((node) => node.activeRuns.map((run) => [run.sessionId, run.agent] as const)));
-    return myThreads.map((session) => ({
-      session,
-      runningAgent: runningBy.get(session.id),
-      nodeOffline: threadNodeOffline(session, logicalAgents, runtimeNodes),
-    }));
-  }, [myThreads, visibleNodes, logicalAgents, runtimeNodes]);
-  const filteredThreads = useMemo(
-    () => threadItems.filter((item) => matchesThreadQuery(item.session, threadQuery)),
-    [threadItems, threadQuery],
-  );
-  const directoryProjects = useMemo(() => {
-    if (route !== "projects") return [];
-    const query = threadQuery.trim().toLowerCase();
-    if (!query) return projects;
-    const matchingProjectIds = new Set(
-      projects.filter((project) => project.name.toLowerCase().includes(query)).map((project) => project.id),
-    );
-    return projects.filter((project) => project.id === routedProjectId || matchingProjectIds.has(project.id) || threadItems.some(
-      (item) => item.session.projectId === project.id && matchesThreadQuery(item.session, threadQuery),
-    ));
-  }, [projects, route, routedProjectId, threadItems, threadQuery]);
-  const directoryThreads = useMemo(() => {
-    if (route !== "projects") return threadsForDirectory(filteredThreads, projects, "threads");
-    const query = threadQuery.trim().toLowerCase();
-    const matchingProjectIds = new Set(
-      projects.filter((project) => project.name.toLowerCase().includes(query)).map((project) => project.id),
-    );
-    const projectFilteredThreads = threadItems.filter((item) => {
-      if (!item.session.projectId || !projects.some((project) => project.id === item.session.projectId)) return false;
-      return !query || matchingProjectIds.has(item.session.projectId) || matchesThreadQuery(item.session, threadQuery);
-    });
-    return projectFilteredThreads;
-  }, [filteredThreads, projects, route, threadItems, threadQuery]);
+  const { threadItems, filteredThreads, directoryProjects, directoryThreads } = useThreadDirectory({
+    route,
+    myThreads,
+    projects,
+    routedProjectId,
+    threadQuery,
+    visibleNodes,
+    runtimeNodes,
+    logicalAgents,
+  });
 
   const refreshWithToken = useCallback(async (tokenOverride?: string) => {
     await refresh(undefined, tokenOverride);
@@ -553,27 +440,7 @@ export function App() {
   });
 
   useEffect(() => {
-    if (!mounted) return;
-    setTheme(readTheme());
-    setLanguage(readLanguage());
-    // Read after mount, not in the initializer: the export is prerendered,
-    // so touching localStorage during the first render mismatches hydration.
-    setSidenavExpanded(readSidenavExpanded());
-    setSpaceWidth(clampSpaceWidth(readThreadSpaceWidth() ?? SPACE_WIDTH_DEFAULT));
-    setThreadListWidth(clampThreadListWidth(readThreadListWidth() ?? THREAD_LIST_WIDTH_DEFAULT));
-    setSidenavWidth(clampSidenavWidth(readSidenavWidth() ?? SIDENAV_WIDTH_DEFAULT));
-  }, [mounted]);
-
-  // Persisted on toggle rather than in an effect on `sidenavExpanded`: the
-  // effect would also fire for the hydration read above and write the
-  // pre-read default back over the stored value.
-  const applySidenavExpanded = useCallback((expanded: boolean) => {
-    setSidenavExpanded(expanded);
-    writeSidenavExpanded(expanded);
-  }, []);
-
-  useEffect(() => {
-    invalidatePreferenceRequests(user?.id ?? null);
+    preferences.invalidate(user?.id ?? null);
   }, [user?.id]);
 
   useEffect(() => {
@@ -586,8 +453,7 @@ export function App() {
 
     const nextTheme = user.theme ?? "system";
     const nextLanguage = user.language ?? "en";
-    setTheme(nextTheme);
-    setLanguage(nextLanguage);
+    preferences.adopt({ theme: nextTheme, language: nextLanguage });
     applyTheme(nextTheme);
     document.documentElement.lang = nextLanguage;
     const languageChange = i18n.language === nextLanguage
@@ -643,136 +509,6 @@ export function App() {
       navigateToRoute("main");
     }
   }, [navigateToRoute, route, user]);
-  useEffect(() => {
-    const el = transcriptRef.current;
-    if (el && atBottomRef.current) el.scrollTop = el.scrollHeight;
-  }, [displayMessages.length, activeSession?.id]);
-
-  // The effect above only fires when a block is added or the session changes.
-  // A single agent turn streaming a long response grows one block's height
-  // without changing the count, so in a thread tall enough to overflow
-  // the transcript the new output scrolls below the fold and the view freezes
-  // at the start of the response. Observe the content height and keep the
-  // transcript pinned to the newest output whenever the user is at the bottom.
-  useEffect(() => {
-    const el = transcriptRef.current;
-    const content = el?.firstElementChild;
-    if (!el || !content || typeof ResizeObserver === "undefined") return;
-    let frame: number | undefined;
-    const observer = new ResizeObserver(() => {
-      if (!atBottomRef.current || frame !== undefined) return;
-      frame = window.requestAnimationFrame(() => {
-        frame = undefined;
-        if (atBottomRef.current) el.scrollTop = el.scrollHeight;
-      });
-    });
-    observer.observe(content);
-    return () => {
-      observer.disconnect();
-      if (frame !== undefined) window.cancelAnimationFrame(frame);
-    };
-  }, [activeSession?.id]);
-
-  useEffect(() => {
-    // Session switches navigate to a new path, which drops the space/artifact
-    // search params; only the local thread-rail collapse needs resetting.
-    setThreadListHidden(false);
-  }, [activeSession?.id]);
-
-  useEffect(() => {
-    // Wait for the stored preference to be read (the [mounted] effect above)
-    // before applying/persisting; otherwise the default "system" state
-    // clobbers the saved theme on every load. Pre-paint theming is handled
-    // by the inline script in layout.tsx.
-    if (!mounted) return;
-    applyTheme(theme);
-    writeTheme(theme);
-    // Re-resolve "system" when the OS color scheme changes.
-    if (theme !== "system" || typeof window === "undefined" || !window.matchMedia) return;
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => applyTheme(theme);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, [mounted, theme]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    writeLanguage(language);
-    document.documentElement.lang = language;
-    document.title = i18n.t("app.title");
-    if (i18n.language !== language) {
-      void i18n.changeLanguage(language);
-    }
-  }, [i18n, language, mounted]);
-
-  function handleThemeChange(nextTheme: Theme): void {
-    if (nextTheme === theme) return;
-    const previousTheme = theme;
-    setTheme(nextTheme);
-    persistPreference(
-      { theme: nextTheme },
-      themePreferenceRequestRef,
-      () => setTheme(previousTheme),
-      "Failed to save theme preference",
-    );
-  }
-
-  function handleLanguageChange(nextLanguage: Language): void {
-    if (nextLanguage === language) return;
-    const previousLanguage = language;
-    setLanguage(nextLanguage);
-    persistPreference(
-      { language: nextLanguage },
-      languagePreferenceRequestRef,
-      () => setLanguage(previousLanguage),
-      "Failed to save language preference",
-    );
-  }
-
-  function persistPreference(
-    patch: { theme: Theme } | { language: Language },
-    requestRef: { current: PreferenceRequestState },
-    rollback: () => void,
-    context: string,
-  ): void {
-    const originatingUserId = authenticatedUserIdRef.current;
-    if (!originatingUserId) return;
-    const generation = requestRef.current.generation;
-    const requestId = ++requestRef.current.latestRequestId;
-    const isCurrentRequest = () => (
-      generation === requestRef.current.generation
-      && requestId === requestRef.current.latestRequestId
-      && originatingUserId === authenticatedUserIdRef.current
-    );
-    const queued = requestRef.current.queue.then(async () => {
-      if (!isCurrentRequest()) return;
-      try {
-        const { user: updatedUser } = await updateUserPreferences(patch);
-        if (isCurrentRequest()) setUser(updatedUser);
-      } catch (error) {
-        if (!isCurrentRequest()) return;
-        rollback();
-        reportMutationError(context, error, t("errors.save_preferences"));
-      }
-    });
-    requestRef.current.queue = queued;
-  }
-
-  function invalidatePreferenceRequests(nextUserId: string | null): void {
-    authenticatedUserIdRef.current = nextUserId;
-    themePreferenceRequestRef.current = newPreferenceRequestState(
-      themePreferenceRequestRef.current.generation + 1,
-    );
-    languagePreferenceRequestRef.current = newPreferenceRequestState(
-      languagePreferenceRequestRef.current.generation + 1,
-    );
-  }
-
-  function handleTranscriptScroll(): void {
-    const el = transcriptRef.current;
-    if (el) atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
-  }
-
   function openThread(sessionId: string, replace = false) {
     const session = myThreads.find((candidate) => candidate.id === sessionId);
     setComposingNew(false);
@@ -792,7 +528,7 @@ export function App() {
     // only a machine that is no longer this employee's drops it.
     setNewThreadNodeId((current) => resolveNewThreadComputer(current, threadComputers, assignableComputers));
     composerRef.current?.clear();
-    atBottomRef.current = true;
+    transcript.pinToBottom();
     syncThreadUrl(null, false, projectId);
   }
 
@@ -806,45 +542,6 @@ export function App() {
 
   function openAgentDetail(agent: EmployeeAgent) {
     navigateToAgent(agent.id);
-  }
-
-  function openThreadSpace(artifact?: RelayArtifact) {
-    if (!activeSession) return;
-    setThreadListHidden(true);
-    // space=1 must land first: the canonical URL keeps ?artifact only while
-    // the panel is open, so writing the selection first would drop it.
-    setSpaceOpen(true);
-    setSpaceArtifactId(artifact?.id ?? null);
-  }
-
-  function toggleThreadSpace() {
-    if (!activeSession) return;
-    if (spaceOpen) closeThreadSpace();
-    else openThreadSpace();
-  }
-
-  function closeThreadSpace() {
-    setSpaceOpen(false);
-    setSpaceArtifactId(null);
-    setThreadListHidden(false);
-  }
-
-  function handleSpaceResize(width: number, commit: boolean) {
-    const clamped = clampSpaceWidth(width);
-    setSpaceWidth(clamped);
-    if (commit) writeThreadSpaceWidth(clamped);
-  }
-
-  function handleSidenavResize(width: number, commit: boolean) {
-    const clamped = clampSidenavWidth(width);
-    setSidenavWidth(clamped);
-    if (commit) writeSidenavWidth(clamped);
-  }
-
-  function handleThreadListResize(width: number, commit: boolean) {
-    const clamped = clampThreadListWidth(width);
-    setThreadListWidth(clamped);
-    if (commit) writeThreadListWidth(clamped);
   }
 
   async function renameThread(session: RelaySession) {
@@ -968,7 +665,7 @@ export function App() {
     setPendingUserMessage({ id: userMessageId, text: goal });
     setIsRunning(true);
     composerRef.current?.clear();
-    atBottomRef.current = true;
+    transcript.pinToBottom();
     try {
       const done = sessionId
         ? await submitThreadMessageMutation.mutateAsync({
@@ -1038,7 +735,7 @@ export function App() {
   const handleComposerSend = useStableEvent(() => { void sendMessage(); });
   const handleCancelRun = useStableEvent(() => { void cancelActiveRun(); });
   const handleRetryAgent = useStableEvent((agent: AgentName, agentId?: string) => { void retryAgentMessage(agent, agentId); });
-  const handleOpenThreadSpace = useStableEvent((artifact?: RelayArtifact) => openThreadSpace(artifact));
+  const handleOpenThreadSpace = useStableEvent((artifact?: RelayArtifact) => space.openSpace(artifact?.id ?? null));
   const handleProjectRoomPicked = useStableEvent(() => {
     setProjectRoomTarget(true);
   });
@@ -1087,7 +784,7 @@ export function App() {
         setActiveLogicalAgentId(logicalAgent.id);
         setSelectedSessionId(activeSession.id);
         navigateToRoute("main");
-        atBottomRef.current = true;
+        transcript.pinToBottom();
         const recoveryKey = `${activeSession.id}:rerun:${logicalAgent.id}`;
         const done = await requestThreadRecoveryMutation.mutateAsync({
           sessionId: activeSession.id,
@@ -1145,7 +842,7 @@ export function App() {
       setActiveLogicalAgentId(logicalAgent.id);
       setSelectedSessionId(activeSession.id);
       navigateToRoute("main");
-      atBottomRef.current = true;
+      transcript.pinToBottom();
       const recoveryKey = `${activeSession.id}:rerun:${logicalAgent.id}`;
       const done = await requestThreadRecoveryMutation.mutateAsync({
         sessionId: activeSession.id,
@@ -1207,7 +904,7 @@ export function App() {
 
 
   async function handleLogout() {
-    invalidatePreferenceRequests(null);
+    preferences.invalidate(null);
     try {
       await logout();
     } catch {
@@ -1241,35 +938,35 @@ export function App() {
         if (view === "threads" && showProjectOverview) navigateToProject(null);
         else navigateToMobileView(view);
       }}
-      sidenavExpanded={sidenavExpanded}
-      setSidenavExpanded={applySidenavExpanded}
-      sidenavWidth={sidenavWidth}
+      sidenavExpanded={panels.sidenavExpanded}
+      setSidenavExpanded={panels.setSidenavExpanded}
+      sidenavWidth={panels.sidenavWidth}
       sidenavResizing={sidenavResizing}
-      onSidenavResize={handleSidenavResize}
+      onSidenavResize={panels.resizeSidenav}
       onSidenavResizeActive={setSidenavResizing}
       prefsOpen={prefsOpen}
       setPrefsOpen={setPrefsOpen}
       skipLinkHref={skipLinkHref}
       activeThreadLabel={activeThreadLabel}
       threadSpaceOpen={spaceVisible}
-      threadSpaceWidth={spaceWidth}
+      threadSpaceWidth={panels.spaceWidth}
       threadSpaceResizing={spaceResizing}
-      threadListHidden={threadListHidden}
-      threadListWidth={threadListWidth}
+      threadListHidden={space.threadListHidden}
+      threadListWidth={panels.threadListWidth}
       threadListResizing={threadListResizing}
       mobileChatChrome={threadChromeVisible ? {
         artifactCount: visibleArtifacts.length,
         spaceOpen: spaceVisible,
         spaceDisabled: !activeSession,
-        onToggleSpace: toggleThreadSpace,
+        onToggleSpace: space.toggleSpace,
       } : null}
       user={user}
       onLogout={() => void handleLogout()}
       onNewThread={startNewThread}
-      theme={theme}
-      onThemeChange={handleThemeChange}
-      language={language}
-      onLanguageChange={handleLanguageChange}
+      theme={preferences.theme}
+      onThemeChange={preferences.setTheme}
+      language={preferences.language}
+      onLanguageChange={preferences.setLanguage}
     >
       <Suspense fallback={<RouteFallback />}>
         {notFound ? (
@@ -1334,9 +1031,9 @@ export function App() {
             pendingUserMessage={pendingUserMessage}
             displayMessages={displayMessages}
             awaitingDecision={awaitingDecision}
-            transcriptRef={transcriptRef}
+            transcriptRef={transcript.ref}
             composerRef={composerRef}
-            onTranscriptScroll={handleTranscriptScroll}
+            onTranscriptScroll={transcript.onScroll}
             onSelectThread={openThread}
             onSelectProject={selectProject}
             onNewThread={startNewThread}
@@ -1354,19 +1051,19 @@ export function App() {
             artifactCount={visibleArtifacts.length}
             visibleArtifacts={visibleArtifacts}
             spaceOpen={spaceVisible}
-            spaceArtifactId={spaceArtifactId}
-            spaceWidth={spaceWidth}
-            threadListHidden={threadListHidden}
-            threadListWidth={threadListWidth}
-            onThreadListResize={handleThreadListResize}
+            spaceArtifactId={space.artifactId}
+            spaceWidth={panels.spaceWidth}
+            threadListHidden={space.threadListHidden}
+            threadListWidth={panels.threadListWidth}
+            onThreadListResize={panels.resizeThreadList}
             onThreadListResizeActive={setThreadListResizing}
             onOpenArtifacts={handleOpenThreadSpace}
-            onToggleSpace={toggleThreadSpace}
-            onCloseSpace={closeThreadSpace}
-            onSelectSpaceArtifact={setSpaceArtifactId}
-            onSpaceResize={handleSpaceResize}
+            onToggleSpace={space.toggleSpace}
+            onCloseSpace={space.closeSpace}
+            onSelectSpaceArtifact={space.selectArtifact}
+            onSpaceResize={panels.resizeSpace}
             onSpaceResizeActive={setSpaceResizing}
-            onToggleThreadList={() => setThreadListHidden((hidden) => !hidden)}
+            onToggleThreadList={() => space.setThreadListHidden(!space.threadListHidden)}
             onBackToThreads={() => navigateToMobileView("threads")}
             selectedEmployee={selectedEmployee}
             initializingThread={requiresRuntimeSelection}
@@ -1377,7 +1074,7 @@ export function App() {
             projectReadOnly={projectDispatchDisabled}
             runtimeNodes={threadComputers}
             runtimeNodeId={selectedThreadNodeId}
-            selectedRuntimeNode={stableSelectedThreadComputer}
+            selectedRuntimeNode={selectedThreadComputer}
             activeRuntimeNode={activeRuntimeNode}
             mentionCandidates={threadMentionCandidates}
             threadParticipants={threadParticipants}

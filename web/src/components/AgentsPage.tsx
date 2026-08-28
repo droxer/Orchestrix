@@ -8,7 +8,10 @@ import { useDialogs } from "@/components/ui/DialogProvider";
 import type { AgentName, CurrentUser, EmployeeAgent, LogicalAgentAvailability } from "../types";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { AgentMark } from "./AgentMark";
-import { ActionAdd } from "./icons";
+import {
+  ActionAdd,
+  ICON,
+} from "./icons";
 import { StatusPill, TonePill } from "./StatusPill";
 import { AgentDetailPage } from "./AgentDetailPage";
 import { PageHeader } from "./PageHeader";
@@ -77,7 +80,7 @@ function RosterFilterBar({
     <div className="list-filter-bar" role="group" aria-label={t("agents_page.filters")}>
       <SearchInput
         className="list-filter-search"
-        iconSize={14}
+        iconSize={ICON.sm}
         label={t("agents_page.search_label")}
         name="agents-query"
         value={query}
@@ -129,7 +132,7 @@ function RosterRow({
   return (
     <li className="list-virtual">
       <article
-        className="agents-roster-row"
+        className="agents-roster-row rail-row"
         data-availability={agent.availability}
         data-selected={selected ? "true" : "false"}
       >
@@ -165,7 +168,7 @@ function RosterRow({
               <span className="agents-roster-row-runtime">
                 <span className="sr-only">{t("agents_page.runtime")}: </span>
                 <span className="agents-roster-row-runtime-mark" aria-hidden="true">
-                  <AgentMark agent={agent.executorKind} size={12} />
+                  <AgentMark agent={agent.executorKind} size={ICON.xs} />
                 </span>
                 <span className="agents-roster-row-runtime-label" translate="no">{runtime}</span>
               </span>
@@ -183,7 +186,7 @@ function RosterRow({
                         {index > 0 ? (
                           <span className="agents-roster-row-computer-separator" aria-hidden="true">,</span>
                         ) : null}
-                        <ComputerIcon size={12} aria-hidden="true" />
+                        <ComputerIcon size={ICON.xs} aria-hidden="true" />
                         <span translate="no">{description.nodeName}</span>
                       </span>
                     );
@@ -315,7 +318,7 @@ export function AgentsPage({
                 title={t("agents_page.create_action")}
                 onClick={() => setCreateOpen(true)}
               >
-                <ActionAdd size={16} aria-hidden="true" />
+                <ActionAdd size={ICON.md} aria-hidden="true" />
               </Button>
             ) : null
           }

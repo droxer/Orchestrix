@@ -56,8 +56,13 @@
 
 @import "./styles/login.css" layer(relay);
 @import "./styles/workspace.css" layer(relay);
+@import "./styles/workspace-files.css" layer(relay);
+@import "./styles/workspace-dossier.css" layer(relay);
 @import "./styles/project-page.css" layer(relay);
 @import "./styles/backlog.css" layer(relay);
+@import "./styles/task-status.css" layer(relay);
+@import "./styles/task-drawer.css" layer(relay);
+@import "./styles/backlog-list.css" layer(relay);
 @import "./styles/agents.css" layer(relay);
 @import "./styles/teams.css" layer(relay);
 @import "./styles/computer.css" layer(relay);
@@ -67,8 +72,13 @@
 @import "./styles/preferences.css" layer(relay);
 @import "./styles/dialog.css" layer(relay);
 @import "./styles/admin-v2-shell.css" layer(relay);
-@import "./styles/admin-v2-views.css" layer(relay);
+@import "./styles/admin-v2-employees.css" layer(relay);
+@import "./styles/admin-v2-nodes.css" layer(relay);
+@import "./styles/admin-v2-node-agents.css" layer(relay);
+@import "./styles/admin-v2-channels.css" layer(relay);
+@import "./styles/admin-v2-settings.css" layer(relay);
 @import "./styles/admin-v2-drawers.css" layer(relay);
+@import "./styles/admin-v2-provision.css" layer(relay);
 @import "./styles/admin-v2-dashboard.css" layer(relay);
 @import "./styles/mobile-overlays.css" layer(relay);
 

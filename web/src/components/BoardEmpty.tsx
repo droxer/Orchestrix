@@ -1,7 +1,10 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ActionCompose } from "./icons";
+import {
+  ActionCompose,
+  ICON,
+} from "./icons";
 import { RelayDoodleOrbit } from "./marginalia";
 
 // Shared empty-state for task boards (Backlog + Routine). Left-aligned,
@@ -32,7 +35,7 @@ export function BoardEmpty({
         // The board's one move earns the full 40px default tier — same as
         // every other empty-state primary; the clear action stays demoted.
         <Button onClick={onCreate}>
-          <ActionCompose size={14} />
+          <ActionCompose size={ICON.sm} />
           {createLabel}
         </Button>
       ) : onClear && clearLabel ? (

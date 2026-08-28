@@ -1,0 +1,549 @@
+/* Admin console — the PROVISION forms (add employee / add node), the run-mode
+   segmented control, the agent-profile drawer's runtime placement list, the
+   credentials drawer rows, the auth screens, and this surface's responsive
+   rules. Split out of a 1053-line admin-v2-drawers.css; the drawer shell,
+   the shared form stack, and the assign-node drawer stay there. */
+
+/* ── Provision forms (add employee / add node) ────────────────────── */
+.adm-provision-form {
+  gap: var(--sp-7);
+}
+
+.adm-provision-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.adm-provision-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding-bottom: var(--sp-1);
+  border-bottom: 1px dotted var(--line-1);
+}
+
+.adm-provision-section-title {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
+  margin: 0;
+  color: var(--ink-3);
+}
+
+.adm-provision-section-meta {
+  font: var(--type-label-strong);
+  letter-spacing: var(--type-label-strong-track);
+  color: var(--ink-4);
+}
+
+.create-agent-computer-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-width: 0;
+}
+
+.create-agent-computer-option > svg {
+  color: var(--ink-3);
+}
+
+.create-agent-computer-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.create-agent-computer-kind {
+  color: var(--ink-3);
+  font: var(--type-label);
+  white-space: nowrap;
+}
+
+.create-agent-runtime-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-2);
+}
+
+.create-agent-runtime-option {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 70px;
+  padding: var(--sp-3);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+  color: var(--ink-1);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease),
+    transform var(--t-fast) var(--ease);
+}
+
+.create-agent-runtime-option:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+  transform: translateY(-1px);
+}
+
+
+.create-agent-runtime-option.is-selected {
+  border-color: var(--action);
+  /* Selection is a sanctioned action job, but the wash ratio is the token's
+     (24%/16%), not a hand-mix. */
+  background: var(--action-soft);
+}
+
+.create-agent-runtime-option:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+.create-agent-runtime-mark {
+  display: grid;
+  width: var(--avatar-md);
+  height: var(--avatar-md);
+  place-items: center;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-1);
+  background: var(--surface-0);
+  color: var(--ink-1);
+}
+
+.create-agent-runtime-option.is-selected .create-agent-runtime-mark {
+  --tone: var(--action);
+  border-color: var(--tone-line);
+  color: var(--action);
+}
+
+.create-agent-runtime-option-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-1-5);
+}
+
+.create-agent-runtime-option-name {
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.create-agent-runtime-option-meta {
+  color: var(--ink-3);
+  font: var(--type-label);
+}
+
+.create-agent-runtime-check {
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--ink-4);
+  border-radius: var(--r-full);
+}
+
+.create-agent-runtime-option.is-selected .create-agent-runtime-check {
+  border: 3px solid var(--action);
+  background: var(--surface-1);
+}
+
+.adm-provision-preview {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-6);
+  border: 1px dashed var(--line-1);
+  border-radius: var(--r-3);
+  background: var(--surface-0);
+  opacity: var(--opacity-disabled);
+  transition:
+    opacity var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease),
+    border-style var(--t-fast) var(--ease);
+}
+
+.adm-provision-preview.is-live {
+  opacity: 1;
+  border-style: solid;
+  border-left: var(--accent-bar-w) solid var(--action);
+}
+
+.adm-provision-preview-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-0-5);
+  min-width: 0;
+}
+
+.adm-provision-preview-handle {
+  font: var(--type-heading);
+  letter-spacing: var(--type-heading-track);
+  color: var(--ink-1);
+  word-break: break-all;
+}
+
+.adm-provision-preview:not(.is-live) .adm-provision-preview-handle {
+  color: var(--ink-3);
+  font-weight: 400;
+}
+
+.adm-provision-preview-name {
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+  color: var(--ink-3);
+}
+
+.adm-provision-outcome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-2);
+  border: 1px solid var(--line-2);
+  background: var(--surface-1);
+  border-left: var(--accent-bar-w) solid var(--ink-4);
+}
+
+.adm-provision-outcome.is-managed {
+  /* Ownership is an ink tier, not the action hue: managed sits one step above
+     local's --info (= ink-3) so the accent bar keeps the hierarchy. */
+  border-left-color: var(--ink-2);
+}
+
+.adm-provision-outcome.is-local {
+  border-left-color: var(--info);
+}
+
+.adm-provision-outcome-label {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
+  color: var(--ink-1);
+}
+
+.adm-provision-outcome-body {
+  margin: 0;
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+  line-height: var(--leading-normal);
+  color: var(--ink-3);
+}
+
+/* ── Run mode segmented control ───────────────────────────────────── */
+.adm-profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.adm-profile-segment {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-0-5);
+  padding: var(--sp-0-5);
+  border-radius: var(--r-full);
+  background: var(--surface-1);
+  border: 1px solid var(--line-2);
+}
+
+.adm-profile-segment-option {
+  display: block;
+  position: relative;
+}
+
+.adm-profile-segment-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.adm-profile-segment-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  width: 100%;
+  height: var(--control-h-sm);
+  padding: 0 var(--sp-3);
+  border: none;
+  border-radius: calc(var(--r-2) - 2px);
+  background: transparent;
+  color: var(--ink-3);
+  font: var(--type-label);
+  cursor: pointer;
+  transition:
+    background var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease),
+    box-shadow var(--t-fast) var(--ease);
+}
+
+.adm-profile-segment-btn:hover {
+  color: var(--ink-1);
+}
+
+
+.adm-profile-segment-input:disabled + .adm-profile-segment-btn {
+  cursor: default;
+  opacity: var(--opacity-disabled);
+}
+
+.adm-profile-segment-btn.active,
+.adm-profile-segment-btn[data-active="true"] {
+  background: var(--surface-0);
+  color: var(--ink-1);
+  box-shadow: inset 0 0 0 1px var(--line-1);
+}
+
+.adm-profile-segment-dot {
+  width: var(--dot-sm);
+  height: var(--dot-sm);
+  border-radius: var(--r-full);
+  flex-shrink: 0;
+}
+
+/* Ownership is carried by the segment label and active shape, not hue — both
+   kinds read as quiet ink-3 dots. */
+.adm-profile-segment-dot[data-kind="managed"] { background: var(--ink-3); }
+.adm-profile-segment-dot[data-kind="local"] { background: var(--ink-3); }
+
+.adm-profile-field > .adm-form-hint {
+  margin: 0;
+}
+
+/* ── Agent profile drawer — runtime placement list ────────────────── */
+.adm-placement-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.adm-placement-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface-0);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+}
+
+/* No remove action to anchor on the right (e.g. a non-admin viewer) — drop
+   the trailing grid column instead of leaving a wide empty gap. */
+.adm-placement-item--compact {
+  grid-template-columns: auto 1fr;
+}
+
+.adm-placement-dot {
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: var(--r-full);
+  background: var(--tone, var(--ink-4));
+  flex-shrink: 0;
+}
+
+.adm-placement-dot:not(.tone-neutral) {
+  box-shadow: var(--ring-halo);
+}
+
+.adm-placement-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-0-5);
+  min-width: 0;
+}
+
+.adm-placement-status-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.adm-placement-status {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
+  color: var(--tone, var(--ink-3));
+}
+
+.adm-placement-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h-xs);
+  height: var(--control-h-xs);
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-2);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+
+.adm-placement-remove:hover:not(:disabled) {
+  /* Tone stays on the icon; status hues never fill. */
+  background: var(--row-hover);
+  color: var(--err);
+}
+
+.adm-placement-remove:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: progress;
+}
+
+/* ── Credentials drawer rows ──────────────────────────────────────── */
+.adm-cred-row {
+  padding: var(--sp-4) 0;
+  border-bottom: 1px solid var(--line-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.adm-cred-row:last-of-type { border-bottom: none; }
+
+.adm-cred-label {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.adm-cred-value-line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+}
+
+.adm-cred-value {
+  flex: 1;
+  color: var(--ink-1);
+  font-size: var(--fs-3);
+  word-break: break-all;
+  background: transparent;
+  padding: 0;
+}
+
+/* Compact filled pill for value-row micro-actions (copy, rename confirm).
+   Painted in the cobalt action, so call sites pair it with variant="default" — the variant
+   prop names the rendered plate; this class only shrinks the geometry and
+   adds the `.copied` success state. */
+.adm-copy-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--control-h-xs);
+  padding: 0 var(--sp-3);
+  border: 1px solid transparent;
+  border-radius: var(--r-full);
+  background: var(--action);
+  color: var(--on-action);
+  font: var(--type-label-strong);
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+  flex-shrink: 0;
+}
+
+.adm-copy-pill:hover { background: var(--action-hover); }
+.adm-copy-pill.copied {
+  --tone: var(--ok);
+  background: var(--surface-0);
+  border-color: var(--tone-line);
+  color: var(--ok);
+}
+
+.adm-cred-note {
+  margin: var(--sp-4) 0 0;
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+  color: var(--ink-3);
+  line-height: var(--leading-loose);
+}
+
+.adm-cred-empty {
+  margin: 0;
+  padding: var(--sp-4);
+  font-size: var(--fs-3);
+  color: var(--ink-3);
+  border: 1px dashed var(--line-1);
+  border-radius: var(--r-3);
+  text-align: center;
+  line-height: var(--leading-loose);
+}
+
+/* ── Auth screens ─────────────────────────────────────────────────── */
+.adm-auth-shell {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.adm-auth-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--surface-0);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-3);
+  padding: var(--sp-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  box-shadow: var(--accent-bar), var(--shadow-2);
+}
+
+.adm-auth-brand {
+  display: flex;
+  align-items: center;
+  color: var(--ink-1);
+}
+
+.adm-auth-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.adm-auth-title {
+  margin: 0;
+  font: var(--type-display);
+  letter-spacing: var(--type-display-track);
+  color: var(--ink-1);
+}
+
+.adm-auth-sub {
+  margin: 0;
+  font-size: var(--fs-3);
+  color: var(--ink-3);
+  line-height: var(--leading-loose);
+}
+
+/* ── Responsive ───────────────────────────────────────────────────── */
+/* Drawer width on small screens is owned by the 820px full-viewport takeover
+   in mobile-overlays.css (width 100% + dvh + safe-area) — one component, one
+   breakpoint. */
+
+/* Reduced motion: covered by the global reset in a11y.css (loads last, wins). */

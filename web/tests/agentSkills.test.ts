@@ -36,7 +36,7 @@ describe("agent skills on the agent record", () => {
   });
 
   it("styles the skill list from palette tokens only", async () => {
-    const css = await readFile(resolve("web/src/styles/workspace.css"), "utf8");
+    const css = await readFile(resolve("web/src/styles/workspace-dossier.css"), "utf8");
     const block = css.slice(css.indexOf(".agent-skill-list"));
     assert.match(block, /\.agent-skill-name \{/);
     assert.match(block, /\.agent-skill-description \{/);

@@ -2,9 +2,22 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type MouseEven
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
-  ActionSearch, NavAdmin, NavAgents, NavBacklog, NavChannels, NavComputer, NavLogout, NavMore, NavPreferences, NavThreads,
+  ActionSearch,
+  ICON,
+  NavAdmin,
+  NavAgents,
+  NavBacklog,
+  NavChannels,
+  NavComputer,
+  NavLogout,
+  NavMore,
+  NavPreferences,
+  NavRoutine,
+  NavSidebarCollapse,
+  NavSidebarExpand,
   NavTeams,
-  NavRoutine, NavSidebarCollapse, NavSidebarExpand, WorkspaceFolder,
+  NavThreads,
+  WorkspaceFolder,
 } from "./icons";
 import { RelayMark } from "./RelayMark";
 import { commandShortcutLabel } from "../lib/shortcuts";
@@ -292,7 +305,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
             onFocus={(e) => showNavTooltip(t("nav.threads"), e.currentTarget)}
             onBlur={hideNavTooltip}
           >
-            <NavThreads size={18} />
+            <NavThreads size={ICON.lg} />
             <span className="sidenav-label sr-only">{t("nav.threads")}</span>
           </a>
           <a
@@ -307,7 +320,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
             onFocus={(e) => showNavTooltip(t("project.projects"), e.currentTarget)}
             onBlur={hideNavTooltip}
           >
-            <WorkspaceFolder size={18} />
+            <WorkspaceFolder size={ICON.lg} />
             <span className="sidenav-label sr-only">{t("project.projects")}</span>
           </a>
         </div>
@@ -325,7 +338,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
             onFocus={(e) => showNavTooltip(t("nav.backlog"), e.currentTarget)}
             onBlur={hideNavTooltip}
           >
-            <NavBacklog size={18} />
+            <NavBacklog size={ICON.lg} />
             <span className="sidenav-label sr-only">{t("nav.backlog")}</span>
           </a>
           <a
@@ -340,7 +353,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
             onFocus={(e) => showNavTooltip(t("nav.routine"), e.currentTarget)}
             onBlur={hideNavTooltip}
           >
-            <NavRoutine size={18} />
+            <NavRoutine size={ICON.lg} />
             <span className="sidenav-label sr-only">{t("nav.routine")}</span>
           </a>
         </div>
@@ -358,7 +371,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
             onFocus={(e) => showNavTooltip(t("nav.agents"), e.currentTarget)}
             onBlur={hideNavTooltip}
           >
-            <NavAgents size={18} />
+            <NavAgents size={ICON.lg} />
             <span className="sidenav-label sr-only">{t("nav.agents")}</span>
           </a>
           <a
@@ -373,7 +386,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
             onFocus={(event) => showNavTooltip(t("nav.teams"), event.currentTarget)}
             onBlur={hideNavTooltip}
           >
-            <NavTeams size={18} />
+            <NavTeams size={ICON.lg} />
             <span className="sidenav-label sr-only">{t("nav.teams")}</span>
           </a>
         </div>
@@ -391,7 +404,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
             onFocus={(e) => showNavTooltip(t("nav.computer"), e.currentTarget)}
             onBlur={hideNavTooltip}
           >
-            <NavComputer size={18} aria-hidden="true" />
+            <NavComputer size={ICON.lg} aria-hidden="true" />
             <span className="sidenav-label sr-only">{t("nav.computer")}</span>
           </a>
           {/* Keeps role=button + aria-disabled so assistive tech still
@@ -408,7 +421,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
             onMouseEnter={(e) => showNavTooltip(channelsHint, e.currentTarget)}
             onMouseLeave={hideNavTooltip}
           >
-            <NavChannels size={18} />
+            <NavChannels size={ICON.lg} />
             <span className="sidenav-label sr-only">{t("nav.channels")}</span>
             <span className="sidenav-badge" aria-hidden="true">{t("nav.coming_soon_short")}</span>
           </span>
@@ -425,7 +438,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
               onFocus={(e) => showNavTooltip(t("nav.admin"), e.currentTarget)}
               onBlur={hideNavTooltip}
             >
-              <NavAdmin size={18} />
+              <NavAdmin size={ICON.lg} />
               <span className="sidenav-label sr-only">{t("nav.admin")}</span>
             </a>
           ) : null}
@@ -444,7 +457,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
             onFocus={(e) => showNavTooltip(t("nav.more"), e.currentTarget)}
             onBlur={hideNavTooltip}
           >
-            <NavMore size={18} />
+            <NavMore size={ICON.lg} />
             <span className="sidenav-label sr-only">{t("nav.more")}</span>
           </Button>
         </div>
@@ -469,7 +482,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
           onFocus={(e) => showNavTooltip(commandMenuHint, e.currentTarget)}
           onBlur={hideNavTooltip}
         >
-          <ActionSearch size={18} />
+          <ActionSearch size={ICON.lg} />
           <span className="sidenav-label sr-only">{t("command.title")}</span>
         </Button>
         <Button
@@ -485,7 +498,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
           onFocus={(e) => showNavTooltip(sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar"), e.currentTarget)}
           onBlur={hideNavTooltip}
         >
-          {sidenavExpanded ? <NavSidebarCollapse size={18} /> : <NavSidebarExpand size={18} />}
+          {sidenavExpanded ? <NavSidebarCollapse size={ICON.lg} /> : <NavSidebarExpand size={ICON.lg} />}
           <span className="sidenav-label sr-only">{sidenavExpanded ? t("nav.collapse") : t("nav.expand")}</span>
         </Button>
         <Button
@@ -503,7 +516,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
           onFocus={(e) => showNavTooltip(t("nav.preferences"), e.currentTarget)}
           onBlur={hideNavTooltip}
         >
-          <NavPreferences size={18} />
+          <NavPreferences size={ICON.lg} />
           <span className="sidenav-label sr-only">{t("nav.preferences")}</span>
         </Button>
       </div>
@@ -519,11 +532,11 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
           style={{ top: preferencesMenu.y, left: preferencesMenu.x }}
         >
           <Button type="button" variant="ghost" role="menuitem" onClick={openPreferences}>
-            <NavPreferences size={16} />
+            <NavPreferences size={ICON.md} />
             <span>{t("nav.preferences")}</span>
           </Button>
           <Button type="button" variant="ghost" role="menuitem" className="danger" onClick={handleLogout}>
-            <NavLogout size={16} />
+            <NavLogout size={ICON.md} />
             <span>{t("nav.logout")}</span>
           </Button>
         </div>,
@@ -538,7 +551,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
           style={{ top: moreMenu.y, left: moreMenu.x }}
         >
           <span className="sidenav-more-item" role="menuitem" aria-disabled="true">
-            <NavChannels size={16} />
+            <NavChannels size={ICON.md} />
             <span>{t("nav.channels")}</span>
             <span className="sidenav-badge" aria-hidden="true">{t("nav.coming_soon_short")}</span>
           </span>
@@ -550,7 +563,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
               aria-current={route === "admin" ? "page" : undefined}
               onClick={(event) => handleRouteClick(event, "admin")}
             >
-              <NavAdmin size={16} />
+              <NavAdmin size={ICON.md} />
               <span>{t("nav.admin")}</span>
             </a>
           ) : null}

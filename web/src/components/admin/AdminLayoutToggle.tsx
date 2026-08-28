@@ -2,7 +2,11 @@
 
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { ViewGrid, ViewList } from "../icons";
+import {
+  ICON,
+  ViewGrid,
+  ViewList,
+} from "../icons";
 
 export type AdminLayout = "card" | "list";
 
@@ -27,7 +31,7 @@ export function AdminLayoutToggle({ layout, onChange }: AdminLayoutToggleProps) 
         title={t("admin.v2.view_card")}
         onClick={() => onChange("card")}
       >
-        <ViewGrid size={15} aria-hidden="true" />
+        <ViewGrid size={ICON.sm} aria-hidden="true" />
       </Button>
       <Button
         variant="ghost"
@@ -39,7 +43,7 @@ export function AdminLayoutToggle({ layout, onChange }: AdminLayoutToggleProps) 
         title={t("admin.v2.view_list")}
         onClick={() => onChange("list")}
       >
-        <ViewList size={15} aria-hidden="true" />
+        <ViewList size={ICON.sm} aria-hidden="true" />
       </Button>
     </div>
   );

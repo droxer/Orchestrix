@@ -22,7 +22,10 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { AdminDelete } from "./icons";
+import {
+  AdminDelete,
+  ICON,
+} from "./icons";
 
 type MemberDraft = {
   agentId: string;
@@ -318,7 +321,7 @@ export function ProjectMemberEditor({
                 onClick={() => void remove()}
                 disabled={busy}
               >
-                <AdminDelete size={14} aria-hidden="true" />
+                <AdminDelete size={ICON.sm} aria-hidden="true" />
                 {t("project.member_remove")}
               </Button>
             </div>

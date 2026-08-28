@@ -2,7 +2,10 @@
 
 import { useEffect, useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionEdit } from "./icons";
+import {
+  ActionEdit,
+  ICON,
+} from "./icons";
 import { Markdown } from "./Markdown";
 import { TonePill } from "./StatusPill";
 import { Button } from "@/components/ui/button";
@@ -91,7 +94,7 @@ export function AgentProfileEditor({
             className="agent-personality-edit-action"
             onClick={onStartEdit}
           >
-            <ActionEdit size={13} aria-hidden="true" />
+            <ActionEdit size={ICON.sm} aria-hidden="true" />
             {hasCustomPersonality
               ? t("agents_page.edit_profile")
               : t("agents_page.write_profile")}

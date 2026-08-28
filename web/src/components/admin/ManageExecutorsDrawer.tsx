@@ -18,6 +18,7 @@ import { Drawer } from "@/components/ui/Drawer";
 import { agentStatusTone, nodeAgentPresence } from "./helpers";
 import { NodeProfileBadges } from "./NodeProfileBadges";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { ICON } from "../icons";
 
 interface ManageExecutorsDrawerProps {
   open: boolean;
@@ -163,7 +164,7 @@ export function ManageExecutorsDrawer({ open, onClose, node, onUpdated, onSave }
               <div className="adm-agent-toggle-row">
                 <div className="adm-agent-toggle-meta">
                   <span className="adm-agent-toggle-name" translate="no">
-                    <AgentMark agent={agent} size={14} className="adm-agent-toggle-mark" />
+                    <AgentMark agent={agent} size={ICON.sm} className="adm-agent-toggle-mark" />
                     {agent}
                   </span>
                   <span className={`adm-agent-chip tone-${tone}`} data-presence={presence}>
@@ -200,7 +201,7 @@ export function ManageExecutorsDrawer({ open, onClose, node, onUpdated, onSave }
                         <span className="adm-agent-inventory-label">{t("admin.v2.agent_skills", { count: skills.length })}</span>
                         <span className="adm-agent-inventory-pills">
                           {skills.map((skill) => (
-                            <span key={`${skill.namespace ?? ""}/${skill.name}`} className="adm-agent-inventory-pill" title={skill.description ?? skill.name}>
+                            <span key={`${skill.namespace ?? ""}/${skill.name}`} className="adm-agent-inventory-pill code" title={skill.description ?? skill.name}>
                               {skill.name}
                             </span>
                           ))}
@@ -212,7 +213,7 @@ export function ManageExecutorsDrawer({ open, onClose, node, onUpdated, onSave }
                         <span className="adm-agent-inventory-label">{t("admin.v2.agent_mcp", { count: mcpServers.length })}</span>
                         <span className="adm-agent-inventory-pills">
                           {mcpServers.map((server) => (
-                            <span key={server.name} className="adm-agent-inventory-pill" title={server.command ?? server.name}>
+                            <span key={server.name} className="adm-agent-inventory-pill code" title={server.command ?? server.name}>
                               {server.name}
                             </span>
                           ))}

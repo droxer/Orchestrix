@@ -35,8 +35,6 @@
 
 .dialog-modal:focus-visible {
   box-shadow: var(--shadow-2);
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
 }
 
 .dialog-modal.is-closing {
@@ -90,8 +88,6 @@
 
 .dialog-input:focus-visible {
   border-color: var(--link);
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
 }
 
 .dialog-actions {
@@ -112,7 +108,7 @@
   gap: var(--sp-3);
   padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
   border: 1px solid var(--line-1);
-  border-left: 3px solid var(--info);
+  border-left: var(--accent-bar-block-w) solid var(--info);
   border-radius: var(--r-3);
   background: var(--surface-3);
   color: var(--ink-1);
@@ -134,7 +130,7 @@
   display: inline-grid;
   place-items: center;
   width: 32px;
-  height: 32px;
+  height: var(--control-h-xs);
   margin: calc(-1 * var(--sp-1));
   padding: 0;
   border-radius: var(--r-full);

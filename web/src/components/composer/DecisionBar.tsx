@@ -2,7 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { EmployeeAgent } from "../../types";
 import { isEmployeeAgentRoutable } from "../../lib/agentDisplayNames";
-import { ActionApprove, ActionHandoff, ActionRoute } from "../icons";
+import {
+  ActionApprove,
+  ActionHandoff,
+  ActionRoute,
+  ICON,
+} from "../icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -77,18 +82,18 @@ export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHando
   return (
     <>
       <div className="decision-bar">
-        <Button variant="default" type="button" ref={approveRef} disabled={busy} loading={pendingAction === "approve"} loadingLabel={pendingLabel} onClick={() => void runAction("approve", () => sendDecision("approve"))}><ActionApprove size={14} /> {t("decision.approve")}</Button>
+        <Button variant="default" type="button" ref={approveRef} disabled={busy} loading={pendingAction === "approve"} loadingLabel={pendingLabel} onClick={() => void runAction("approve", () => sendDecision("approve"))}><ActionApprove size={ICON.sm} /> {t("decision.approve")}</Button>
         <Button variant="ghost" type="button" disabled={busy} loading={pendingAction === "rerun"} loadingLabel={pendingLabel} onClick={() => void runAction("rerun", () => sendDecision("rerun"))}>{t("decision.rerun")}</Button>
         <Button variant="ghost" type="button" disabled={busy} loading={pendingAction === "mark_done"} loadingLabel={pendingLabel} onClick={() => void runAction("mark_done", () => sendDecision("mark_done"))}>{t("decision.mark_done")}</Button>
         <Button variant="destructive" type="button" disabled={busy} loading={pendingAction === "reject"} loadingLabel={pendingLabel} onClick={() => void handleReject()}>{t("decision.reject")}</Button>
         <Button variant="ghost" type="button" disabled={busy} aria-controls={handoffOpen ? "handoff-panel" : undefined} aria-expanded={handoffOpen} onClick={() => setHandoffOpen(!handoffOpen)}>
-          <ActionHandoff size={14} /> {t("decision.handoff")}
+          <ActionHandoff size={ICON.sm} /> {t("decision.handoff")}
         </Button>
       </div>
       {handoffOpen ? (
         <div id="handoff-panel" className="handoff-panel">
           <div className="handoff-panel-head">
-            <span className="handoff-panel-mark" aria-hidden="true"><ActionRoute size={14} /></span>
+            <span className="handoff-panel-mark" aria-hidden="true"><ActionRoute size={ICON.sm} /></span>
             <span className="handoff-panel-title">{t("handoff.title")}</span>
           </div>
           <div className="handoff-row">

@@ -1,0 +1,544 @@
+/* Agent workspace — the profile DOSSIER (the workspace variant), the loading
+   skeleton and error state, this surface's responsive rules, and the agent
+   skills list. Split out of a 1712-line workspace.css. */
+
+/* ---- profile dossier (workspace variant) ---------------------------- */
+
+.workspace-dossier-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.workspace-dossier-rename {
+  display: flex;
+  max-width: 320px;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+/* The profile's durable inner character. Its slightly editorial treatment
+   keeps identity separate from runtime configuration. */
+.agent-personality-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  padding: var(--sp-6);
+  overflow: hidden;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-3);
+  background: transparent;
+  transition:
+    border-color var(--t-fast) var(--ease),
+    background-color var(--t-fast) var(--ease);
+}
+
+.agent-personality-card.is-editing {
+  border-color: var(--line-1);
+  background: var(--surface-2);
+}
+
+/* In the admin drawer the card is one block among many and earns its box.
+   On the record surface it IS the document column — the only thing in it —
+   so the box is chrome around nothing, drawn against two flush neighbours.
+   Editing still gets the plate, because there the border marks a live field. */
+.workspace-dossier-doc .agent-personality-card:not(.is-editing) {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.agent-personality-card-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.agent-personality-title-block {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-1-5);
+}
+
+.agent-personality-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+/* Section title inside a tab panel. --type-title is the PAGE title role
+   (700, tight-tracked) — used here it printed louder than the agent's own
+   name in the header (--type-title-content, 20px sans 600) one band above.
+   Takes the same role as .workspace-pane-head h2 so all three tabs of the
+   record agree. */
+.agent-personality-title-row h2 {
+  margin: 0;
+  color: var(--ink-1);
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
+}
+
+.agent-personality-help {
+  max-width: var(--measure);
+  color: var(--ink-3);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+  text-wrap: pretty;
+}
+
+.agent-personality-edit-action {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.agent-personality-document {
+  position: relative;
+  z-index: 1;
+  padding: var(--sp-5) 0 0;
+  border-top: 1px solid var(--line-2);
+}
+
+.agent-personality-empty {
+  position: relative;
+  z-index: 1;
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--line-2);
+}
+
+.agent-personality-empty > p,
+.agent-personality-empty > span {
+  display: block;
+  max-width: var(--measure);
+  margin: 0;
+}
+
+.agent-personality-empty-lede {
+  color: var(--ink-1);
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
+  text-wrap: balance;
+}
+
+.agent-personality-empty > span {
+  margin-top: var(--sp-2);
+  color: var(--ink-3);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+  text-wrap: pretty;
+}
+
+.agent-personality-editor-guide ol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin: var(--sp-4) 0 0;
+  padding: 0;
+  border-top: 1px solid var(--line-2);
+  list-style: none;
+}
+
+.agent-personality-editor-guide li {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-items: start;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) 0;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.agent-personality-editor-guide li:nth-child(odd) {
+  margin-right: var(--sp-3);
+  border-right: 1px solid var(--line-2);
+}
+
+/* Ordinal markers — technical text (mono, quiet ink), not the action
+   color; they are labels, not links. */
+.agent-personality-editor-guide li > span {
+  color: var(--ink-4);
+  font-family: var(--font-mono);
+  letter-spacing: var(--type-code-track);
+  font-size: var(--fs-1);
+  line-height: var(--leading-loose);
+}
+
+.agent-personality-editor-guide li strong {
+  color: var(--ink-2);
+  font: var(--type-label-strong);
+}
+
+.agent-personality-editor {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--line-2);
+}
+
+.agent-profile-name-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.agent-personality-editor-guide {
+  padding: var(--sp-4);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+}
+
+.agent-personality-editor-guide > p {
+  margin: 0;
+  color: var(--ink-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+}
+
+.agent-personality-editor-guide li div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-0-5);
+}
+
+.agent-personality-editor-guide li small {
+  color: var(--ink-3);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  line-height: var(--leading-normal);
+}
+
+.agent-personality-editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 28px;
+  color: var(--ink-3);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
+}
+
+.agent-personality-editor-toolbar button {
+  height: auto;
+  padding: var(--sp-0-5) 0;
+  border: 0;
+  background: transparent;
+  /* Color and hover come from the primitive: these are Button
+     variant="ghost", and forcing --action text onto them painted action
+     yellow onto a non-action control (and failed AA on the light register,
+     where the raw yellow is fill-only). */
+  font: var(--type-label-strong);
+  letter-spacing: var(--track-0);
+  text-transform: none;
+  cursor: pointer;
+}
+
+.agent-personality-editor-toolbar button:hover {
+  /* The rule above keeps the plate transparent (this layer outranks the
+     variant's hover wash), so the underline is the hover affordance —
+     ghost itself supplies none. */
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+
+.agent-personality-textarea {
+  min-height: 320px;
+  resize: vertical;
+  border-color: var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-0);
+  font-size: var(--fs-3);
+  line-height: var(--leading-prose);
+  tab-size: 2;
+}
+
+.agent-personality-editor-foot {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.agent-personality-count,
+.agent-personality-save-hint {
+  color: var(--ink-3);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+}
+
+.agent-personality-save-hint {
+  text-align: right;
+}
+
+.agent-personality-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+@media (max-width: 820px) {
+  .agent-personality-card {
+    padding: var(--sp-5);
+  }
+
+  .agent-personality-card-head {
+    flex-direction: column;
+  }
+
+  .agent-personality-edit-action {
+    align-self: flex-start;
+  }
+
+  .agent-personality-editor-guide ol {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-personality-editor-guide li:nth-child(odd) {
+    margin-right: 0;
+    border-right: 0;
+  }
+
+  .agent-personality-editor-foot {
+    grid-template-columns: 1fr auto;
+  }
+
+  .agent-personality-save-hint {
+    display: none;
+  }
+}
+
+.workspace-dossier-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  min-width: 28px;
+  height: var(--control-h-xs);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition:
+    color var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease);
+}
+
+.workspace-dossier-icon-btn:hover {
+  color: var(--ink-1);
+  border-color: var(--line-1);
+  background: var(--surface-1);
+}
+
+
+.workspace-dossier-icon-btn:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+/* The name field of the facts rail. It is a rail VALUE, not a title: the page
+   header already prints this name at display scale, so a second display-tier
+   copy one band below would fight it. It therefore rides the same
+   --type-body-sm size as its sibling .workspace-dossier-field-value and marks
+   itself as the identity field with weight alone.
+   The rail is the only place this class renders (verified against the DOM on
+   /teams/<id>); a second display-tier rule for the non-rail case used to
+   sit here describing markup that does not exist. */
+.workspace-dossier-name-value {
+  margin: 0;
+  color: var(--ink-1);
+  font: var(--type-body-sm);
+  font-weight: 500;
+  letter-spacing: var(--type-body-sm-track);
+}
+
+.workspace-dossier-rename-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+
+.workspace-dossier-section-title {
+  margin: 0 0 var(--sp-3);
+  color: var(--ink-3);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
+}
+
+/* ---- loading skeleton + error -------------------------------------- */
+
+.workspace-skeleton {
+  border-radius: var(--r-2);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--line-2) 82%, transparent),
+    color-mix(in srgb, var(--surface-1) 70%, transparent),
+    color-mix(in srgb, var(--line-2) 82%, transparent)
+  );
+  background-size: 220% 100%;
+  animation: workspace-skeleton var(--t-draw) var(--ease) infinite;
+}
+
+.workspace-skeleton-pane {
+  padding: var(--sp-4);
+  gap: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-skeleton-line {
+  width: 80%;
+  height: 14px;
+}
+
+.workspace-skeleton-line.short {
+  width: 44%;
+}
+
+.workspace-error {
+  max-width: 680px;
+  padding: var(--sp-7);
+}
+
+.workspace-eyebrow {
+  display: block;
+  margin-bottom: var(--sp-2);
+  color: var(--ink-3);
+  font: var(--type-micro);
+  letter-spacing: var(--track-0);
+}
+
+.workspace-error p {
+  margin: var(--sp-3) 0 var(--sp-4);
+  color: var(--ink-2);
+}
+
+
+@keyframes workspace-skeleton {
+  0% { background-position: 120% 0; }
+  100% { background-position: -120% 0; }
+}
+
+/* ---- responsive ----------------------------------------------------- */
+
+@media (pointer: coarse) {
+  .workspace-pick,
+  .workspace-file-up,
+  .workspace-page .workspace-page-tab,
+  .workspace-path-segment {
+    min-height: var(--control-h);
+  }
+}
+
+@media (max-width: 1100px) {
+  .workspace-inspect {
+    overflow-y: auto;
+  }
+
+  .workspace-panes {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .workspace-pane {
+    border-right: 0;
+    border-bottom: 1px solid var(--line-1);
+    min-height: 240px;
+  }
+
+  .workspace-pane-preview {
+    border-bottom: 0;
+    min-height: 320px;
+  }
+
+  .workspace-pane-preview .workspace-pane-head {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+  }
+
+  .workspace-pane-body {
+    overflow-y: visible;
+  }
+}
+
+@media (max-width: 640px) {
+  .workspace-page .workspace-page-tabs {
+    width: 100%;
+  }
+
+  .workspace-page .workspace-page-tab {
+    flex: 1;
+    min-width: 0;
+    padding: 0 var(--sp-3);
+  }
+
+  .workspace-page .workspace-page-tab-count {
+    display: none;
+  }
+
+  .workspace-profile {
+    padding: var(--sp-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-activity-section {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .artifacts-empty-ghost {
+    animation: none;
+  }
+
+  .workspace-loading-bar::after {
+    animation: none;
+  }
+}
+
+/* ---- agent skills ---------------------------------------------------
+   Node-reported inventory printed as a read-only list on the agent record:
+   the qualified skill id in mono (it is an identifier, like the record's
+   other technical facts), its one-line description as supporting text. */
+
+.agent-skill-list {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-skill {
+  display: grid;
+  gap: var(--sp-0-5);
+  min-width: 0;
+}
+
+.agent-skill-name {
+  color: var(--ink-1);
+  font-size: var(--fs-2);
+  letter-spacing: var(--type-code-track);
+  overflow-wrap: anywhere;
+}
+
+.agent-skill-description {
+  color: var(--ink-3);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+}

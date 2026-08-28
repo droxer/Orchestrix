@@ -36,7 +36,8 @@ const buttonVariants = cva(
           "border-destructive/45 text-destructive hover:border-destructive hover:bg-destructive hover:text-destructive-foreground focus-visible:border-destructive focus-visible:[outline:var(--focus-outline-danger)] focus-visible:[outline-offset:var(--focus-offset)]",
         /* Circular icon-only action — the source system's 40px button-icon-circular:
            ink-3 idle; a control wash + line-2 + ink-1 on hover. Always paired
-           with the round `icon-r` (--control-h) / `icon-r-sm` (28px) sizes.
+           with the round `icon-r` (--control-h) / `icon-r-sm` (--control-h-xs)
+           sizes.
            `tinted` swaps the hover to an --action wash; a `danger` className
            re-tints it to --err. */
         icon: "text-(--ink-3) hover:border-(--line-2) hover:bg-(--control-fill-hover) hover:text-(--ink-1)",
@@ -51,11 +52,11 @@ const buttonVariants = cva(
            default 14px (the source system's button-md, the base `text-xs`). Every
            tier keeps the pill — "buttons are NEVER squared in Meta's system",
            and that holds for the dense in-row tiers too. */
-        xs: "h-6 gap-1 rounded-full px-3 text-micro in-data-[slot=button-group]:rounded-full has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1 rounded-full px-4 text-xs in-data-[slot=button-group]:rounded-full has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
-        /* One step ABOVE `default`: 48px against the 44px --control-h, for
-           hero and dual-CTA pairs where the pill carries a marketing weight. */
-        lg: "h-12 gap-2 px-7 has-data-[icon=inline-end]:pr-5 has-data-[icon=inline-start]:pl-5",
+        xs: "h-(--control-h-2xs) gap-1 rounded-full px-3 text-micro in-data-[slot=button-group]:rounded-full has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg:not([class*='size-'])]:size-3",
+        sm: "h-(--control-h-xs) gap-1 rounded-full px-4 text-xs in-data-[slot=button-group]:rounded-full has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
+        /* One step ABOVE `default`, on the --control-h-lg rung, for hero and
+           dual-CTA pairs where the pill carries a marketing weight. */
+        lg: "h-(--control-h-lg) gap-2 px-7 has-data-[icon=inline-end]:pr-5 has-data-[icon=inline-start]:pl-5",
         /* Drawer/footer call-to-action: full control height with stronger
            label typography. Replaces the old `.adm-form-actions` descendant
            override so footer buttons are styled explicitly.
@@ -68,18 +69,18 @@ const buttonVariants = cva(
         cta: "h-(--control-h) gap-2 px-7",
         /* Square counterpart of `default`: the toolbar refresh buttons sit
            directly beside default-size buttons, so the icon tier tracks
-           --control-h instead of a fixed 32px that rendered 8px short.
+           --control-h instead of a fixed height that rendered 8px short.
            `icon-sm`/`icon-xs` remain the dense tiers for in-row chrome. */
         icon: "size-(--control-h)",
         "icon-xs":
-          "size-6 rounded-full in-data-[slot=button-group]:rounded-full [&_svg:not([class*='size-'])]:size-3",
+          "size-(--control-h-2xs) rounded-full in-data-[slot=button-group]:rounded-full [&_svg:not([class*='size-'])]:size-3",
         "icon-sm":
-          "size-7 rounded-full in-data-[slot=button-group]:rounded-full",
-        "icon-lg": "size-12",
+          "size-(--control-h-xs) rounded-full in-data-[slot=button-group]:rounded-full",
+        "icon-lg": "size-(--control-h-lg)",
         /* Round footprints for the `icon` variant: --control-h tracks the
-           44px pill; 28px is the dense card-footer/toolbar tier. */
+           pill; --control-h-xs is the dense card-footer/toolbar tier. */
         "icon-r": "size-(--control-h) rounded-full",
-        "icon-r-sm": "size-7 rounded-full",
+        "icon-r-sm": "size-(--control-h-xs) rounded-full",
       },
       /* Tinted hover for the `icon` variant — the icon communicates a colored
          action instead of the neutral ink hover. Declared after `variant` so

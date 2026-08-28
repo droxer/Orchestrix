@@ -3,7 +3,13 @@
 import type { TFunction } from "i18next";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { Button } from "@/components/ui/button";
-import { ActionEdit, ActionKey, AdminDelete, AdminManageExecutors } from "../icons";
+import {
+  ActionEdit,
+  ActionKey,
+  AdminDelete,
+  AdminManageExecutors,
+  ICON,
+} from "../icons";
 
 interface NodeActionsProps {
   node: ControlPanelDaemonNodeRecord;
@@ -30,7 +36,7 @@ export function NodeActions({ node, onReveal, onRename, onManageExecutors, onDel
         aria-label={t("admin.v2.rename_computer_for", { id: node.id })}
         title={t("thread.rename_computer")}
       >
-        <ActionEdit size={14} aria-hidden="true" />
+        <ActionEdit size={ICON.sm} aria-hidden="true" />
       </Button>
       {node.managedNodeId || !onReveal ? null : (
         <Button
@@ -43,7 +49,7 @@ export function NodeActions({ node, onReveal, onRename, onManageExecutors, onDel
           aria-label={t("admin.v2.reveal_credentials_for", { id: node.id })}
           title={t("admin.v2.reveal_credentials")}
         >
-          <ActionKey size={14} aria-hidden="true" />
+          <ActionKey size={ICON.sm} aria-hidden="true" />
         </Button>
       )}
       {!node.provisioningPlaceholder ? (
@@ -57,7 +63,7 @@ export function NodeActions({ node, onReveal, onRename, onManageExecutors, onDel
           aria-label={t("admin.v2.manage_executors_for", { id: node.id })}
           title={t("admin.v2.manage_executors")}
         >
-          <AdminManageExecutors size={14} aria-hidden="true" />
+          <AdminManageExecutors size={ICON.sm} aria-hidden="true" />
         </Button>
       ) : null}
       {onDelete ? (
@@ -72,7 +78,7 @@ export function NodeActions({ node, onReveal, onRename, onManageExecutors, onDel
           aria-label={t("admin.v2.delete_node_for", { id: node.id })}
           title={t("admin.v2.delete_action")}
         >
-          <AdminDelete size={14} aria-hidden="true" />
+          <AdminDelete size={ICON.sm} aria-hidden="true" />
         </Button>
       ) : null}
     </>

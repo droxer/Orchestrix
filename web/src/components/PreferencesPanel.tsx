@@ -9,7 +9,11 @@ import {
   type Theme,
 } from "../lib/appStorage";
 import { moveRadioSelection } from "../lib/radioGroupKeyboard";
-import { PrefAppearance, PrefLanguage } from "./icons";
+import {
+  ICON,
+  PrefAppearance,
+  PrefLanguage,
+} from "./icons";
 
 export type { Language, Theme };
 export { SUPPORTED_LANGUAGES, SUPPORTED_THEMES };
@@ -264,7 +268,7 @@ export function PreferencesPanel({
             data-modal-initial-focus={active === id ? "" : undefined}
             onClick={() => setActive(id)}
           >
-            <Icon size={14} />
+            <Icon size={ICON.sm} />
             <span className="pref-nav-label">{t(labelKey)}</span>
           </button>
         ))}

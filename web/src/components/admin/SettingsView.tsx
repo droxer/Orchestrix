@@ -4,7 +4,10 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { getOrgSettings, reissueAdminToken, updateOrgSettings } from "../../api";
-import { CheckIcon } from "../icons";
+import {
+  CheckIcon,
+  ICON,
+} from "../icons";
 import { CredCopyRow } from "./CredCopyRow";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
 import { useDialogs } from "@/components/ui/DialogProvider";
@@ -293,7 +296,7 @@ function NumberSettingCard({
           ) : null}
           {savedAt !== null && !isDirty ? (
             <span className="adm-settings-saved" role="status">
-              <CheckIcon size={14} aria-hidden="true" />
+              <CheckIcon size={ICON.sm} aria-hidden="true" />
               {t("admin.v2.settings_saved")}
             </span>
           ) : null}

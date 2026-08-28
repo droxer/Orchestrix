@@ -1,0 +1,416 @@
+/* Task board — the STATUS VOCABULARY: the agent-state chip, the priority
+   badge, the state mark (the shape half of the vocabulary), and the routine
+   state pill.
+
+   Split out of backlog.css. This is not board layout — it is the shared
+   language the board, the list view (backlog-list.css) and the routines page
+   all speak, which is why it reads as its own subject rather than as the
+   bottom of a layout sheet. */
+
+/* ── Agent-state chip — glyph carries identity, pip carries readiness ───
+   The textual label ("claude · ready") lives in the title/aria-label so the
+   board stays scannable. Status tone is reserved for the readiness pip only;
+   the glyph chip is ink-on-neutral, matching .agent-avatar. */
+.agent-state {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: var(--avatar-sm);
+  height: var(--avatar-sm);
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--ink-1);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+
+.agent-state > svg {
+  display: block;
+}
+
+.agent-state::after {
+  content: "";
+  position: absolute;
+  /* -3px: the pip straddles the glyph's corner edge — half on, half off — so
+     it reads as attached to the avatar rather than floating beside it. */
+  right: -3px;
+  bottom: -3px;
+  width: var(--dot-lg);
+  height: var(--dot-lg);
+  border: 2px solid var(--surface-0);
+  border-radius: var(--r-full);
+  background: var(--tone, var(--ink-4));
+}
+
+/* Offline is told by shape, not brightness: at pip size a solid --err fill
+   reads as just another bright dot, so the offline pip is a hollow ring
+   instead — the same "dark / no signal" shape the fleet presence + node
+   status dots use, so the agent list speaks the same status language as the
+   computers. */
+.agent-state.tone-bad::after {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--tone);
+}
+
+/* Unassigned slot — dashed placeholder, no readiness pip. */
+.agent-state--empty {
+  background: transparent;
+  box-shadow: none;
+  border: 1px dashed color-mix(in srgb, var(--line-1) 85%, var(--ink-4));
+}
+
+.agent-state--empty::after {
+  content: none;
+}
+
+.agent-state--empty::before {
+  content: "";
+  width: var(--dot-sm);
+  height: var(--dot-sm);
+  border-radius: var(--r-full);
+  background: var(--ink-4);
+  opacity: var(--opacity-ghost);
+}
+
+/* ── Priority badge — rank, not status ──────────────────────────────────
+   Three ascending bars filled to the level (low 1 / normal 2 / high 3) so
+   priority reads as a rank at a glance, distinct from the leading-dot status
+   badges. The accent escalates muted → ink → danger to match the card rail. */
+.priority-badge {
+  --prio-accent: var(--ink-4);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-0-5) var(--sp-2) var(--sp-0-5) var(--sp-1-5);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-full);
+  background: var(--surface-0);
+  color: var(--ink-2);
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
+}
+
+.priority-badge[data-priority="normal"] {
+  --prio-accent: var(--ink-1);
+}
+
+.priority-badge[data-priority="high"] {
+  --prio-accent: var(--warn);
+  --tone: var(--warn);
+  border-color: var(--tone-line);
+  color: var(--warn);
+}
+
+.priority-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: var(--sp-0-5);
+  height: 11px;
+}
+
+.priority-bars > i {
+  width: 3px;
+  border-radius: var(--r-1);
+  background: var(--line-1);
+}
+
+.priority-bars > i:nth-child(1) { height: 4px; }
+.priority-bars > i:nth-child(2) { height: 7px; }
+.priority-bars > i:nth-child(3) { height: 11px; }
+
+.priority-badge[data-priority="low"] .priority-bars > i:nth-child(-n+1),
+.priority-badge[data-priority="normal"] .priority-bars > i:nth-child(-n+2),
+.priority-badge[data-priority="high"] .priority-bars > i:nth-child(-n+3) {
+  background: var(--prio-accent);
+}
+
+/* ── State mark — the shape half of the state vocabulary ────────────────
+   Status tones stay small text/dot accents and the surfaces stay a neutral
+   brightness ramp, so six states cannot be told apart by colour alone.
+   Brightness carries the step (loud → calm) and shape carries the class:
+
+     solid   on track            dashed  nothing set (unscheduled, backlog)
+     live    working right now   muted   out of play (paused, done)
+     ring    a problem (blocked, overdue)
+
+   The accent is inherited from --mark-accent, which the host rule owns — a
+   mark never picks its own colour, so a row's rail and its label always
+   agree. Sized to --dot, the row tier — this rule's "8px dot cell the list
+   rows already reserve" is where that rung in the scale came from. */
+.state-mark {
+  --mark-accent: var(--ink-4);
+  /* The halo token reads --tone; a mark's accent is owned by the host rule
+     via --mark-accent, so alias it rather than re-tinting the halo. */
+  --tone: var(--mark-accent);
+  position: relative;
+  flex: none;
+  display: inline-block;
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: var(--r-full);
+  background: var(--mark-accent);
+  box-shadow: var(--ring-halo);
+}
+
+/* Hollow, not filled: shape carries the alarm, not brightness — a solid
+   bright dot at this size reads as just another accent, so the bad tier is
+   told by the ring. Same ring shape the node status dots and StatusPill use. */
+.state-mark[data-shape="ring"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--mark-accent);
+}
+
+.state-mark[data-shape="dashed"] {
+  background: transparent;
+  border: 1px dashed var(--mark-accent);
+  box-shadow: none;
+}
+
+.state-mark[data-shape="muted"] {
+  box-shadow: none;
+  opacity: var(--opacity-dormant);
+}
+
+/* Compositor-friendly pulse: the dot keeps a static ring; a faint outer
+   pseudo breathes via opacity instead of animating box-shadow. */
+.state-mark[data-shape="live"] {
+  --mark-accent: var(--live);
+}
+
+.state-mark[data-shape="live"]::after {
+  content: "";
+  position: absolute;
+  /* -5px: the halo rides proud of the dot so the pulsing ring clears the
+     static mark instead of hugging it. */
+  inset: -5px;
+  border-radius: var(--r-full);
+  border: 2px solid color-mix(in srgb, var(--mark-accent) 30%, transparent);
+  animation: blink var(--t-pulse) var(--ease) infinite;
+  pointer-events: none;
+}
+
+/* ── Routine state — schedule health, in the shared status-pill grammar ──
+   A routine never moves through the board, so it gets its own vocabulary:
+   running · overdue · due today · scheduled · unscheduled · paused. The two
+   "not really scheduled" states are separated by *which* thing is dashed —
+   unscheduled dashes the mark (the schedule is on, the date is missing),
+   paused dashes the pill border (the whole schedule is off). */
+.routine-state {
+  --state-accent: var(--ink-3);
+  --tone: var(--state-accent);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-0-5) var(--sp-2);
+  border: 1px solid var(--tone-line);
+  border-radius: var(--r-full);
+  color: var(--ink-2);
+  font: var(--type-label);
+}
+
+.routine-state .state-mark { --mark-accent: var(--state-accent); }
+
+.routine-state[data-state="running"] { --state-accent: var(--live); color: var(--ink-1); }
+.routine-state[data-state="overdue"] { --state-accent: var(--err); color: var(--ink-1); }
+.routine-state[data-state="due"] { --state-accent: var(--warn); }
+.routine-state[data-state="scheduled"] { --state-accent: var(--ink-3); }
+.routine-state[data-state="unscheduled"] { --state-accent: var(--ink-4); color: var(--ink-3); }
+
+.routine-state[data-state="paused"] {
+  --state-accent: var(--ink-4);
+  border-style: dashed;
+  color: var(--ink-3);
+}
+
+/* The title is a Button, so it arrives with the primitive's `whitespace-nowrap`
+   and `shrink-0`. Left alone a long title is sliced at the card edge with no
+   ellipsis (text-overflow defaults to `clip`), hiding over half the text with
+   no cue. Wrap to two lines and clamp, matching .backlog-description. */
+.backlog-task-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-1);
+  font: var(--type-name);
+  letter-spacing: var(--type-name-track);
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.backlog-task-title:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.backlog-description {
+  margin: var(--sp-2) 0 0;
+  color: var(--ink-2);
+  font: var(--type-body-sm);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.backlog-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+  color: var(--ink-3);
+  font: var(--type-label);
+}
+
+.backlog-meta-sep {
+  color: var(--ink-4);
+}
+
+.backlog-due {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.backlog-due.warn { color: var(--warn); }
+.backlog-due.bad { color: var(--err); }
+
+/* Actions overlay the card's bottom on hover — absolutely positioned, so the
+   resting card carries no reserved (invisible) footer. The overlay reads
+   --surface-1 to match the card, plus a hairline and the card's inner bottom
+   radius. */
+.backlog-task-actions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--line-2);
+  background: var(--surface-1);
+  border-radius: 0 0 calc(var(--r-3) - 1px) calc(var(--r-3) - 1px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-fast) var(--ease);
+}
+
+.backlog-task:hover .backlog-task-actions,
+.backlog-task:focus-within .backlog-task-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Toolbar clusters — dispatch (assign + start) · navigation · state change —
+   separated by a hairline so it reads as distinct groups of actions rather
+   than one undifferentiated strip. */
+.backlog-action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.backlog-action-group + .backlog-action-group {
+  margin-left: var(--sp-1);
+  padding-left: calc(var(--sp-2) + var(--sp-1));
+  border-left: 1px solid var(--line-1);
+}
+
+.backlog-task-actions select,
+.backlog-task-actions button:not([data-variant="icon"]) {
+  min-height: var(--control-h-xs);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-full);
+  background: var(--surface-0);
+  padding: 0 var(--sp-2);
+  color: var(--ink-1);
+  font: var(--type-label);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+
+.backlog-task-actions select {
+  max-width: 96px;
+}
+
+.backlog-task-actions button:not([data-variant="icon"]):hover:not(:disabled) {
+  background: var(--control-fill-hover);
+  border-color: var(--line-strong);
+}
+
+/* Disabled comes from the button base (opacity-50 + pointer-events-none).
+   A local 0.45 + cursor:not-allowed made these rows fade one step harder than
+   every other disabled button, and the cursor never rendered anyway —
+   pointer-events-none means the element receives no hover to style. */
+
+/* Filled only while actionable; a disabled start recedes to a ghost icon so
+   Done/running rows don't scatter faded action blocks. The fill itself comes
+   from the `default` button variant the call site already selects — see
+   BacklogPage's variant={startDisabled ? "ghost" : "default"}. It used to be
+   restated here too, which meant this block silently outranked the variant and
+   any future change to primary would not have reached the backlog. */
+
+/* Icon-only action — square button, glyph centered, label in the tooltip. */
+.backlog-task-actions .backlog-action-icon,
+.backlog-row-actions .backlog-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  padding: 0;
+}
+
+/* The play glyph is lucide's stroked outline by default; in a solid primary
+   button it should read as a confident filled triangle. The 0.5px nudge
+   optically centres the triangle (its visual mass sits left of geometric
+   centre), and it eases forward on hover to give the run action a "go" cue. */
+.backlog-action-primary.backlog-action-icon svg {
+  fill: currentColor;
+  transform: translateX(0.5px);
+  transition: transform var(--t-fast) var(--ease);
+}
+
+.backlog-action-primary.backlog-action-icon:hover:not(:disabled) svg {
+  transform: translateX(1.5px);
+}
+
+/* Secondary actions carry meaning on hover — completing (success) and
+   blocking (caution) read differently from neutral navigation. The tone rides
+   the icon/text only; status hues never fill, so the wash stays the neutral
+   row hover. Reopen reuses the neutral hover since reopening is
+   constructive. */
+.backlog-task-actions .backlog-action-done:hover:not(:disabled),
+.backlog-row-actions .backlog-action-done:hover:not(:disabled) {
+  background: var(--row-hover);
+  color: var(--ok);
+}
+
+.backlog-task-actions .backlog-action-block:hover:not(:disabled),
+.backlog-row-actions .backlog-action-block:hover:not(:disabled) {
+  background: var(--row-hover);
+  color: var(--err);
+}
+
+.backlog-empty {
+  margin: 0;
+  padding: var(--sp-6) var(--sp-3);
+  border: 1px dashed color-mix(in srgb, var(--line-1) 80%, transparent);
+  border-radius: var(--r-3);
+  color: var(--ink-4);
+  font: var(--type-body-sm);
+  text-align: center;
+}

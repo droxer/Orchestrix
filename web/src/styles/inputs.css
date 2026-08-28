@@ -39,15 +39,6 @@
   font-size: var(--fs-3);
 }
 
-/* Standalone fallback: the wrapper normally carries the ring via
-   :focus-within, but an input used outside it still needs its own. The
-   :focus-within rules below strip it again when the wrapper is present so
-   the two rings never double up. */
-.relay-search input:focus-visible,
-.adm-search-input:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
 
 .relay-search:focus-within input:focus-visible,
 .adm-search:focus-within .adm-search-input:focus-visible {
@@ -104,10 +95,6 @@
   color: var(--ink-3);
 }
 
-.list-filter-search input:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
 
 .employee-avatar,
 .agent-avatar {
@@ -139,25 +126,21 @@
   position: absolute;
   right: -1px;
   bottom: -1px;
-  width: 10px;
-  height: 10px;
+  width: var(--dot-lg);
+  height: var(--dot-lg);
   border: 2px solid var(--surface-0);
   border-radius: var(--r-full);
-  background: var(--ink-4);
+  background: var(--tone, var(--ink-4));
   z-index: 2;
   transition: background var(--t-fast) var(--ease);
 }
 
-.employee-avatar.tone-good::after    { background: var(--ok); }
-.employee-avatar.tone-info::after    { background: var(--info); }
 /* Bad shares its brightness with --action/--ink-1; use the hollow-ring
    shape (same as fleet presence + node status dots) instead of a fill. */
 .employee-avatar.tone-bad::after {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--err);
+  box-shadow: inset 0 0 0 1.5px var(--tone);
 }
-.employee-avatar.tone-warn::after    { background: var(--warn); }
-.employee-avatar.tone-neutral::after { background: var(--ink-4); }
 
 /* Running state — concentric pulse ring around the pip. */
 .employee-avatar.running::before {
@@ -187,8 +170,8 @@
 }
 
 .agent-avatar {
-  width: 32px;
-  height: 32px;
+  width: var(--avatar-md);
+  height: var(--avatar-md);
   color: var(--ink-1);
   font-size: var(--fs-3);
 }

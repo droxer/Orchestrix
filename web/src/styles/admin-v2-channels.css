@@ -1,0 +1,525 @@
+/* Admin console — chat integrations / Channels view. Split out of
+   admin-v2-views.css. */
+
+/* ── Chat integrations / Channels ─────────────────────────────────── */
+.adm-chat {
+  gap: var(--sp-6);
+}
+
+.adm-view-notice {
+  --tone: var(--ok);
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--tone-line);
+  border-radius: var(--r-2);
+  color: var(--ok);
+}
+
+.adm-chat-panel-head p {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: var(--fs-3);
+  line-height: var(--leading-normal);
+}
+
+/* Empty connect stage — one composition: mark, copy, credentials. */
+.adm-chat-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--sp-6);
+  max-width: 460px;
+  margin: 0 auto;
+  padding: var(--sp-7);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-3);
+  background: var(--surface-3);
+}
+
+.adm-chat-stage-intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+/* Wide viewports: split the onboarding stage into pitch + form so it reads as
+   an intentional two-up rather than a lone card floating in a large canvas.
+   Collapses back to the single stacked card below the breakpoint. */
+@media (min-width: 1040px) {
+  .adm-chat-stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--sp-8);
+    max-width: 880px;
+    padding: var(--sp-8);
+  }
+
+  .adm-chat-stage-form {
+    padding-top: 0;
+    padding-left: var(--sp-8);
+    border-top: none;
+    border-left: 1px solid var(--line-2);
+  }
+
+  .adm-chat-stage-mark {
+    justify-content: flex-start;
+  }
+}
+
+.adm-chat-stage-mark {
+  display: flex;
+  justify-content: center;
+}
+
+.adm-chat-stage-empty {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.adm-chat-stage-empty .relay-empty-title {
+  font: var(--type-title);
+  letter-spacing: var(--type-title-track);
+}
+
+.adm-chat-stage-form {
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--line-2);
+}
+
+.adm-chat-stage-form .adm-chat-form {
+  padding-top: var(--sp-4);
+}
+
+/* Populated chrome — metrics pulse + primary create. */
+.adm-chat-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+/* Flush inline stat strip — same grammar as the Backlog/Routine metric row
+   (eyebrow · value, hairline-separated) rather than a raised card, so the
+   Channels toolbar reads as one system with the rest of the app. */
+.adm-chat-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  flex: 1;
+  min-width: min(100%, 280px);
+}
+
+.adm-chat-metric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sp-1);
+}
+
+.adm-chat-metric:not(:last-child)::after {
+  content: "·";
+  margin: 0 var(--sp-3);
+  color: var(--ink-3);
+}
+
+.adm-chat-metric-label {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.adm-chat-metric-value {
+  font-family: var(--font-sans);
+  font-size: var(--fs-3);
+  font-weight: 500;
+  line-height: var(--leading-none);
+  letter-spacing: var(--track-0);
+  color: var(--ink-1);
+}
+
+/* Master–detail: list leads, inspector follows. */
+.adm-chat-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.85fr) minmax(0, 1.55fr);
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+.adm-chat-panel {
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-3);
+  background: var(--surface-3);
+  padding: var(--sp-4);
+  min-width: 0;
+}
+
+.adm-chat-panel--detail {
+  min-height: 420px;
+}
+
+.adm-chat-panel-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--line-2);
+}
+
+.adm-chat-panel-head > svg {
+  color: var(--ink-3);
+  margin-top: var(--sp-0-5);
+}
+
+.adm-chat-panel-head--detail {
+  align-items: center;
+}
+
+/* The status pill anchors the right edge of the detail header. Spelled on
+   the Badge slot (TonePill) — never revive the retired pill class. */
+.adm-chat-panel-head--detail > [data-slot="badge"] {
+  margin-left: auto;
+  align-self: flex-start;
+}
+
+/* Provider glyph avatar — ink-on-neutral; silhouette carries identity. */
+.adm-chat-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--avatar-md);
+  height: var(--avatar-md);
+  border-radius: var(--r-2);
+  color: var(--ink-1);
+  background: color-mix(in srgb, var(--ink-3) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink-3) 22%, transparent);
+  font: var(--type-label-strong);
+}
+
+.adm-chat-avatar svg {
+  width: 16px;
+  height: 16px;
+}
+
+.adm-chat-avatar--lg {
+  width: var(--avatar-lg);
+  height: var(--avatar-lg);
+  border-radius: var(--r-2);
+}
+
+.adm-chat-avatar--lg svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Hero size of the same ink-on-neutral provider glyph — ownership is not an
+   action, so no cobalt wash here either. */
+.adm-chat-avatar--hero {
+  width: var(--avatar-2xl);
+  height: var(--avatar-2xl);
+  border-radius: var(--r-3);
+  background: color-mix(in srgb, var(--ink-3) 12%, transparent);
+  border-color: color-mix(in srgb, var(--ink-3) 22%, transparent);
+  color: var(--ink-1);
+}
+
+.adm-chat-panel-head h2,
+.adm-chat-section-head h3 {
+  margin: 0;
+  color: var(--ink-1);
+  font: var(--type-heading);
+  letter-spacing: var(--type-heading-track);
+}
+
+.adm-chat-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding-top: var(--sp-4);
+}
+
+.adm-chat-section + .adm-chat-section {
+  border-top: 1px solid var(--line-2);
+}
+
+.adm-chat-section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.adm-chat-section-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-1);
+  border: 1px solid var(--line-1);
+  color: var(--ink-3);
+  font: var(--type-label-strong);
+}
+
+.adm-chat-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+.adm-chat-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding-top: var(--sp-4);
+}
+
+.adm-chat-form.compact {
+  padding-top: 0;
+}
+
+/* Fields inside chat forms are Field/Input/Select primitives now — their
+   label, control, hint, and error styling comes from the shared components,
+   not from descendant rules here. */
+
+.adm-chat-integration-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding-top: var(--sp-4);
+}
+
+.adm-chat-integration {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: var(--sp-3);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+
+.adm-chat-integration:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-1);
+}
+
+.adm-chat-integration.active,
+.adm-chat-integration[data-active="true"] {
+  /* Selected edge: nearest action-edge token (40% ≈ 30% on a 1px hairline). */
+  border-color: var(--line-drag);
+  background: var(--action-soft);
+}
+
+.adm-chat-integration-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--sp-0-5);
+}
+
+.adm-chat-integration-main strong {
+  color: var(--ink-1);
+  font-size: var(--fs-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-chat-integration-main span {
+  color: var(--ink-3);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+}
+
+.adm-chat-readiness {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: var(--sp-2);
+  padding: var(--sp-4) 0;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.adm-chat-ready {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  min-height: 34px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  color: var(--ink-3);
+  font: var(--type-label-strong);
+  text-align: center;
+  transition: border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+
+.adm-chat-ready.ready {
+  --tone: var(--ok);
+  border-color: var(--tone-line);
+  color: var(--ok);
+}
+
+.adm-chat-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+.adm-chat-callback {
+  display: grid;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+}
+
+.adm-chat-callback code {
+  overflow-wrap: anywhere;
+  /* The action cobalt is a FILL colour, not an ink for a code string; the
+     mono face already separates the string, so it takes plain ink. */
+  color: var(--ink-1);
+  font-size: var(--fs-2);
+}
+
+.adm-chat-callback small,
+.adm-chat-form > small {
+  color: var(--ink-3);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+  line-height: var(--leading-snug);
+}
+
+.adm-chat-connection-form {
+  padding: var(--sp-3);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+}
+
+.adm-chat-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line-2);
+  margin-top: var(--sp-4);
+}
+
+.adm-chat-split > .adm-chat-section {
+  padding-top: 0;
+}
+
+.adm-chat-split > .adm-chat-section + .adm-chat-section {
+  border-top: none;
+}
+
+.adm-chat-rows {
+  list-style: none;
+  margin: var(--sp-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.adm-chat-rows li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-height: var(--control-h);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+}
+
+.adm-chat-rows li > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.adm-chat-rows strong {
+  color: var(--ink-1);
+  font-size: var(--fs-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-chat-rows small {
+  color: var(--ink-3);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-chat-rows button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: var(--control-h-xs);
+  border: none;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+
+.adm-chat-rows button:hover {
+  color: var(--err);
+  background: var(--row-hover);
+}
+
+.adm-chat-rows button:focus-visible {
+  color: var(--err);
+  outline: var(--focus-outline-danger);
+  outline-offset: var(--focus-offset);
+}
+
+@media (max-width: 1040px) {
+  .adm-chat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .adm-chat-panel--list {
+    order: 1;
+  }
+
+  .adm-chat-panel--detail {
+    order: 2;
+  }
+
+  .adm-chat-toolbar {
+    order: 0;
+  }
+}
+
+@media (max-width: 719px) {
+  .adm-chat-split {
+    grid-template-columns: 1fr;
+  }
+
+  .adm-chat-stage {
+    padding: var(--sp-4);
+  }
+}

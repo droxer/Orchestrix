@@ -2,7 +2,12 @@
 
 import type { TFunction } from "i18next";
 import { Button } from "@/components/ui/button";
-import { ActionEdit, AdminDelete, AdminEmployees } from "../icons";
+import {
+  ActionEdit,
+  AdminDelete,
+  AdminEmployees,
+  ICON,
+} from "../icons";
 import {
   employeeSummaryStatus,
   isOverLocalComputerLimit,
@@ -38,7 +43,7 @@ export function EmployeeCard({
     >
       <header className="adm-node-card-head">
         <span className="adm-node-avatar adm-emp-avatar" aria-hidden="true" translate="no">
-          <AdminEmployees size={18} aria-hidden="true" />
+          <AdminEmployees size={ICON.lg} aria-hidden="true" />
         </span>
         <div className="adm-node-card-identity">
           <span className="adm-node-card-name" translate="no">{member.displayName}</span>
@@ -49,7 +54,7 @@ export function EmployeeCard({
               already carries it; only running / idle / no-nodes get named. */}
           {key !== "ready" ? (
             <TonePill
-              tone={tone === "muted" ? "neutral" : tone}
+              tone={tone}
               label={t(`admin.v2.emp_state_${key}`, { defaultValue: key })}
               live={tone === "info"}
             />
@@ -62,7 +67,7 @@ export function EmployeeCard({
 
       <div className="adm-node-card-body">
         {member.email ? (
-          <p className="adm-emp-card-email code tone-muted" translate="no">{member.email}</p>
+          <p className="adm-emp-card-email code ink-dim" translate="no">{member.email}</p>
         ) : null}
         <div className="adm-agents adm-emp-nodes">
           <EmployeeComputers
@@ -83,17 +88,17 @@ export function EmployeeCard({
         >
           <span className="adm-emp-card-metric">
             <span className="adm-emp-metric-label">{t("admin.v2.col_running")}</span>
-            <span className={`tnum ${member.runningCount > 0 ? "tone-neutral" : "tone-muted"}`}>
+            <span className={`tnum ${member.runningCount > 0 ? "ink-strong" : "ink-dim"}`}>
               {member.runningCount}
             </span>
           </span>
           <span className="adm-emp-card-metric">
             <span className="adm-emp-metric-label">{t("admin.v2.col_ready")}</span>
-            <span className="tnum tone-muted">{member.readyCount}/{member.nodeCount}</span>
+            <span className="tnum ink-dim">{member.readyCount}/{member.nodeCount}</span>
           </span>
           <span className="adm-emp-card-metric">
             <span className="adm-emp-metric-label">{t("admin.v2.col_local_limit")}</span>
-            <span className={`tnum ${isOverLocalComputerLimit(member) ? "" : "tone-muted"}`}>
+            <span className={`tnum ${isOverLocalComputerLimit(member) ? "" : "ink-dim"}`}>
               {localComputerUsageLabel(member)}
             </span>
             {/* Hue alone can't say "over" — a red count and a red pill read
@@ -121,7 +126,7 @@ export function EmployeeCard({
                 aria-label={t("admin.v2.edit_employee_action")}
                 title={t("admin.v2.edit_employee_action")}
               >
-                <ActionEdit size={14} aria-hidden="true" />
+                <ActionEdit size={ICON.sm} aria-hidden="true" />
               </Button>
             ) : null}
             {onDelete ? (
@@ -136,7 +141,7 @@ export function EmployeeCard({
               aria-label={t("admin.v2.delete_employee_action")}
               title={t("admin.v2.delete_employee_action")}
             >
-              <AdminDelete size={14} aria-hidden="true" />
+              <AdminDelete size={ICON.sm} aria-hidden="true" />
             </Button>
             ) : null}
           </div>

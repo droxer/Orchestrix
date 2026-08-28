@@ -1,4 +1,10 @@
-import { StatusError, StatusInfo, StatusOk, StatusWarn } from "./icons";
+import {
+  ICON,
+  StatusError,
+  StatusInfo,
+  StatusOk,
+  StatusWarn,
+} from "./icons";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CodexCollaborationEvent } from "relay-core";
@@ -145,7 +151,7 @@ function SegmentView({
   }
   if (segment.kind === "command") {
     return (
-      <div className="agent-command">
+      <div className="agent-command code">
         <span className="agent-tool-marker" aria-hidden="true">⏺</span>
         <code>{segment.command}</code>
       </div>
@@ -153,7 +159,7 @@ function SegmentView({
   }
   if (segment.kind === "narration") {
     return (
-      <div className={`agent-status agent-status-${segment.params?.tone ?? "info"}`}>
+      <div className={`agent-status tone-${segment.params?.tone ?? "info"}`}>
         <StatusIcon tone={(segment.params?.tone as "good" | "bad" | "warn" | "info") ?? "info"} />
         <span>{t(segment.key, segment.params)}</span>
       </div>
@@ -161,13 +167,13 @@ function SegmentView({
   }
   if (segment.kind === "status") {
     return (
-      <div className={`agent-status agent-status-${segment.tone}`}>
+      <div className={`agent-status tone-${segment.tone}`}>
         <StatusIcon tone={segment.tone} />
         <span>{segment.text}</span>
       </div>
     );
   }
-  return <pre className="agent-raw">{segment.text}</pre>;
+  return <pre className="agent-raw code">{segment.text}</pre>;
 }
 
 // Reasoning is a `○` marker plus dim italic body (design-system.md agent-turn).
@@ -188,7 +194,7 @@ function ThinkingSegment({ text, live }: { text: string; live: boolean }) {
 
   return (
     <div className={`agent-thinking ${shown.length === 0 ? "is-collapsed" : ""}`}>
-      <span className="agent-thinking-marker" aria-hidden="true">○</span>
+      <span className="agent-thinking-marker code" aria-hidden="true">○</span>
       <div className="agent-thinking-body">
         {shown.map((line, index) => (
           <p key={`thinking-${index}`}>{line}</p>
@@ -230,8 +236,8 @@ function TextSegment({ text, live }: { text: string; live: boolean }) {
 }
 
 function StatusIcon({ tone }: { tone: "good" | "bad" | "warn" | "info" }) {
-  if (tone === "good") return <StatusOk size={13} aria-hidden="true" />;
-  if (tone === "bad") return <StatusError size={13} aria-hidden="true" />;
-  if (tone === "warn") return <StatusWarn size={13} aria-hidden="true" />;
-  return <StatusInfo size={13} aria-hidden="true" />;
+  if (tone === "good") return <StatusOk size={ICON.sm} aria-hidden="true" />;
+  if (tone === "bad") return <StatusError size={ICON.sm} aria-hidden="true" />;
+  if (tone === "warn") return <StatusWarn size={ICON.sm} aria-hidden="true" />;
+  return <StatusInfo size={ICON.sm} aria-hidden="true" />;
 }

@@ -35,13 +35,19 @@
    line box: 4px of vertical padding at a 24px line height makes every line
    carrying a code span taller than its neighbours and the rhythm goes
    ragged. 2px keeps the chip readable without bending the leading. */
+/* Inlines the .code utility's body on purpose: react-markdown emits this
+   <code> element itself, so there is no markup to hang the class on. These
+   two element selectors are the ONLY sanctioned copies — every component that
+   controls its own markup wears `.code` instead (14 rules used to reproduce
+   this block, which is why a one-line change to the utility had to be made in
+   24 places). */
 .md-body code {
   padding: var(--sp-0-5) var(--sp-1-5);
   border-radius: var(--r-1);
   background: var(--surface-2);
   color: var(--ink-1);
   font-family: var(--font-mono);
-  font-feature-settings: "tnum" 1;
+  font-feature-settings: var(--font-features), "tnum" 1;
   font-variant-numeric: tabular-nums;
   letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
@@ -177,7 +183,7 @@
      preview surface in light theme — invisible, so a quoted block read as an
      unstyled paragraph. --ink-4 is muted but keeps the bar above 3:1 in both
      themes. */
-  border-left: 3px solid var(--ink-4);
+  border-left: var(--accent-bar-block-w) solid var(--ink-4);
   color: var(--ink-2);
   font-style: italic;
 }
@@ -259,11 +265,6 @@ html:lang(zh-TW) .md-body blockquote {
   border-radius: var(--r-2);
   background: var(--surface-2);
   color: var(--ink-1);
-  font-family: var(--font-mono);
-  font-feature-settings: "tnum" 1;
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  letter-spacing: var(--type-code-track);
   font-size: var(--fs-3);
   line-height: var(--leading-loose);
   white-space: pre;
@@ -337,10 +338,6 @@ html:lang(zh-TW) .md-body blockquote {
     radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--ink-1) 22%, transparent), transparent);
 }
 
-.md-table:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
 
 /* Headers are labels — wrapping one turns a two-word column into two rows of
    chrome. Cells hold real content, so they wrap, capped at a readable measure
@@ -398,10 +395,6 @@ html:lang(zh-TW) .md-body blockquote {
   color: var(--ink-1);
 }
 
-.md-fence-copy:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
 
 /* Touch has no hover to resolve the control, so it stays visible there. */
 @media (hover: none) {

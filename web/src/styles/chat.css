@@ -85,8 +85,8 @@
 }
 
 .chat-participant-mark {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-md);
+  height: var(--icon-md);
   flex: none;
   border-radius: var(--r-full);
 }
@@ -135,8 +135,8 @@
 .chat-active-agent-mark,
 .chat-agent-option-mark {
   flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
+  width: var(--icon-md);
+  height: var(--icon-md);
   border-radius: var(--r-1);
 }
 
@@ -170,8 +170,8 @@
 }
 
 .chat-agent-state-pip {
-  width: 7px;
-  height: 7px;
+  width: var(--dot);
+  height: var(--dot);
   flex: 0 0 auto;
   border-radius: var(--r-full);
   background: var(--ink-4);
@@ -215,8 +215,8 @@
 
 .header-agent-busy-pip {
   flex: 0 0 auto;
-  width: 6px;
-  height: 6px;
+  width: var(--dot-sm);
+  height: var(--dot-sm);
   border-radius: var(--r-full);
   background: var(--live);
   --pulse-color: var(--live);
@@ -314,8 +314,8 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: var(--avatar-xs);
+  height: var(--avatar-xs);
   grid-column: 1;
   grid-row: 1;
   align-self: start;
@@ -376,22 +376,20 @@
 .msg-agent .rail-node.rail-node-agent > svg { color: var(--ink-1); }
 
 .rail-node-system {
-  width: 10px;
-  height: 10px;
+  width: var(--dot-lg);
+  height: var(--dot-lg);
   border: none;
   border-radius: var(--r-full);
-  background: var(--ink-4);
+  background: var(--tone, var(--ink-4));
   justify-self: center;
 }
 
-.rail-node-system.tone-good { background: var(--ok); }
 /* Bad takes the shared hollow-ring shape (.dot-ring, base.css) the agent
    state pip above uses: shape carries the alarm, not a solid --err fill. */
 .rail-node-system.tone-bad {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--err);
+  box-shadow: inset 0 0 0 1.5px var(--tone);
 }
-.rail-node-system.tone-info { background: var(--info); }
 
 /* A continuation from the same agent drops its header and empties the rail
    node: the hidden header already carries the grouping cue, so repeating the
@@ -552,11 +550,10 @@
   background: none;
   color: var(--ink-4);
   font: var(--type-label);
-  font-feature-settings: "tnum" 1;
+  font-feature-settings: var(--font-features), "tnum" 1;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   cursor: default;
-  opacity: 0.75;
 }
 
 .msg-turn-actions {
@@ -605,10 +602,6 @@
   border-color: var(--tone-line);
 }
 
-.msg-turn-action:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
 
 .msg-turn-action-label {
   font: var(--type-label);

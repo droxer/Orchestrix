@@ -14,7 +14,11 @@ import { describeAgentPlacements } from "../lib/agentPlacements";
 import { teamAvailability } from "../lib/taskAssignment";
 import { teamMutationInput } from "../lib/teamForm";
 import type { AgentTeam } from "../types";
-import { ActionEdit, AdminDelete } from "./icons";
+import {
+  ActionEdit,
+  AdminDelete,
+  ICON,
+} from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { OWNERSHIP_ICON } from "./AgentPlacementBadge";
 import { PageHeader } from "./PageHeader";
@@ -243,7 +247,7 @@ function TeamProfile({
                       title={t("teams.edit_members")}
                       onClick={startEditing}
                     >
-                      <ActionEdit size={14} aria-hidden="true" />
+                      <ActionEdit size={ICON.sm} aria-hidden="true" />
                     </Button>
                   ) : null}
                 </span>
@@ -310,11 +314,11 @@ function TeamProfile({
                               <span className="team-profile-member-lead">{t("teams.lead_badge")}</span>
                             ) : null}
                           </span>
-                          <span className="team-profile-member-meta">
+                          <span className="team-profile-member-meta code">
                             <span>{agentLabel(member.executorKind)}</span>
                             {computer && ComputerIcon ? (
                               <span className="team-profile-member-computer" translate="no" title={computerTitle}>
-                                <ComputerIcon size={12} aria-hidden="true" />
+                                <ComputerIcon size={ICON.xs} aria-hidden="true" />
                                 {computer.nodeName}
                               </span>
                             ) : (
@@ -445,7 +449,7 @@ function TeamProfile({
                   title={t("teams.rename")}
                   onClick={startRename}
                 >
-                  <ActionEdit size={14} aria-hidden="true" />
+                  <ActionEdit size={ICON.sm} aria-hidden="true" />
                 </Button>
               </div>
             )}
@@ -466,7 +470,7 @@ function TeamProfile({
                 {t("admin.v2.danger_zone")}
               </p>
               <Button type="button" variant="destructive" onClick={() => void remove()} loading={deleteTeamMutation.isPending} loadingLabel={t("teams.deleting")} disabled={updateTeamMutation.isPending || imageSaving}>
-                <AdminDelete size={14} aria-hidden="true" />
+                <AdminDelete size={ICON.sm} aria-hidden="true" />
                 {t("teams.delete")}
               </Button>
             </section>
@@ -603,7 +607,7 @@ export function TeamWorkspacePage({
           brief={briefQuery.data}
           panelId="team-page-panel-activities"
           labelledBy="team-page-tab-activities"
-          emptyMark={<IdentityMark kind="team" variant="bare" size={18} />}
+          emptyMark={<IdentityMark kind="team" variant="bare" size={ICON.lg} />}
           onOpenThread={onOpenThread}
         />
       )}

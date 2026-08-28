@@ -11,6 +11,7 @@ import {
   ArtifactReview,
   ArtifactSummary,
   ArtifactTest,
+  ICON,
 } from "../icons";
 import { filterArtifacts } from "../../lib/artifactFilters";
 import { Button } from "@/components/ui/button";
@@ -87,7 +88,7 @@ export function ArtifactIndexStrip({
           title={t("artifact.search_label")}
           onClick={() => onExpandedChange(!expanded)}
         >
-          <ActionSearch size={16} />
+          <ActionSearch size={ICON.md} />
         </Button>
         {artifacts.map((a) => (
           <Button variant="ghost"
@@ -100,7 +101,7 @@ export function ArtifactIndexStrip({
             aria-current={a.id === selectedId || undefined}
             onClick={() => onSelect(a.id)}
           >
-            <ArtifactKindIcon kind={a.kind} size={16} />
+            <ArtifactKindIcon kind={a.kind} size={ICON.md} />
           </Button>
         ))}
       </div>
@@ -109,7 +110,7 @@ export function ArtifactIndexStrip({
       <div className="artifact-index-panel">
         <SearchInput
           className="artifact-index-search"
-          iconSize={14}
+          iconSize={ICON.sm}
           label={t("artifact.search_label")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -152,7 +153,7 @@ export function ArtifactIndexStrip({
                 onClick={() => onSelect(a.id)}
               >
                 <span className="artifact-index-row-icon" aria-hidden="true">
-                  <ArtifactKindIcon kind={a.kind} size={14} />
+                  <ArtifactKindIcon kind={a.kind} size={ICON.sm} />
                 </span>
                 <span className="artifact-index-row-copy">
                   <span className="artifact-index-row-title">{a.title}</span>

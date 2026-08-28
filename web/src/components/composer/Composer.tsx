@@ -2,7 +2,12 @@ import { forwardRef, memo, useEffect, useImperativeHandle, useMemo, useRef, useS
 import { useTranslation } from "react-i18next";
 import type { AgentTeam, DaemonNodeMonitorRecord, EmployeeAgent } from "../../types";
 import { sendShortcutLabel } from "../../lib/sendShortcut";
-import { ActionSend, ComposerStop, WorkspaceFolder } from "../icons";
+import {
+  ActionSend,
+  ComposerStop,
+  ICON,
+  WorkspaceFolder,
+} from "../icons";
 import { AgentSelect } from "./AgentSelect";
 import { useComposer } from "../../hooks/useComposer";
 import { useMentionAutocomplete } from "../../hooks/useMentionAutocomplete";
@@ -219,7 +224,7 @@ const ComposerView = forwardRef<ComposerHandle, {
                   compact readout beside the agent controls. */}
               {projectName ? (
                 <span className="composer-project-room" title={t("project.shared_workspace")}>
-                  <WorkspaceFolder size={14} aria-hidden="true" />
+                  <WorkspaceFolder size={ICON.sm} aria-hidden="true" />
                   {projectName}
                 </span>
               ) : initializingThread ? (
@@ -276,7 +281,7 @@ const ComposerView = forwardRef<ComposerHandle, {
                     : sendShortcutTitle}
               >
                 <span className="send-button-icon" key={running ? "stop" : "send"}>
-                  {running ? <ComposerStop size={13} /> : <ActionSend size={16} />}
+                  {running ? <ComposerStop size={ICON.sm} /> : <ActionSend size={ICON.md} />}
                 </span>
               </Button>
             </div>

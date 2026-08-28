@@ -133,12 +133,55 @@ describe("type-face utilities", () => {
     }
   });
 
+  it("keeps the code recipe in the utility instead of inlining it per component", () => {
+    /* `.code` is documented as the single source for the code face, and 17
+       component rules reproduced its five declarations verbatim anyway —
+       .agent-placement-badge, .adm-computer-chip-name, .adm-node-profile-*,
+       .agent-command, and a dozen more. Nothing was visibly wrong, which is
+       the point: the cost only appears when the utility changes. Adding
+       var(--font-features) to the face (so tabular figures stop switching off
+       the root's stylistic sets) had to be applied in 24 places instead of 2.
+
+       Components that own their markup now wear the class. The two exceptions
+       are element selectors on markup this app does not emit — react-markdown
+       writes its own <code> — and they are named here so a third one cannot
+       be added quietly. */
+    const SANCTIONED = new Set([".md-body code", ".agent-thinking code"]);
+    const RECIPE = [
+      "var(--font-mono)",
+      '"tnum" 1',
+      "tabular-nums",
+      "var(--type-code-track)",
+    ];
+
+    const offenders: string[] = [];
+    for (const file of walk(path.join(webSrc, "styles"), [".css"])) {
+      const name = path.relative(path.join(webSrc, "styles"), file);
+      if (name.startsWith("tokens")) continue;
+      const source = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+      for (const m of source.matchAll(/([^{}]*?)\{([^{}]*)\}/g)) {
+        const selector = m[1].trim().split("\n").pop()?.trim() ?? "";
+        if (!selector || SANCTIONED.has(selector)) continue;
+        // A compound `.thing.code` rule is the documented re-assertion after a
+        // `font` shorthand, not a copy of the utility.
+        if (/\.code(?![\w-])/.test(selector)) continue;
+        const hits = RECIPE.filter((decl) => m[2].includes(decl)).length;
+        if (hits >= 3) offenders.push(`${name}: ${selector}`);
+      }
+    }
+    assert.deepEqual(
+      offenders,
+      [],
+      `these rules inline the .code utility — put the class on the markup instead:\n  ${offenders.join("\n  ")}`,
+    );
+  });
+
   it("re-asserts the code face wherever a later `font` shorthand resets it", () => {
     // The `font` shorthand sets font-family, and these rules are imported
     // after tokens/base.css at equal specificity — so `.code` alone loses.
     const pairs: readonly (readonly [string, string])[] = [
-      ["styles/admin-v2-views.css", "adm-node-card-name"],
-      ["styles/admin-v2-views.css", "adm-node-history-identity span"],
+      ["styles/admin-v2-nodes.css", "adm-node-card-name"],
+      ["styles/admin-v2-employees.css", "adm-node-history-identity span"],
       ["styles/admin-v2-drawers.css", "adm-assign-node-id"],
     ];
 

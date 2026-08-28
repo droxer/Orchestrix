@@ -2,7 +2,12 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionAdd, ActionApprove, AdminInbox } from "../icons";
+import {
+  ActionAdd,
+  ActionApprove,
+  AdminInbox,
+  ICON,
+} from "../icons";
 import { assignControlPanelDaemonNode, createControlPanelDaemonNode, createManagedNode } from "../../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
@@ -336,7 +341,7 @@ export function AssignNodeDrawer({
                           className="adm-assign-node-check"
                           aria-hidden="true"
                         >
-                          {isSelected ? <ActionApprove size={14} /> : null}
+                          {isSelected ? <ActionApprove size={ICON.sm} /> : null}
                         </span>
                       </span>
                     </label>
@@ -359,17 +364,17 @@ export function AssignNodeDrawer({
                     }}
                   />
                   <span className={`adm-assign-node ${createNew ? "selected" : ""}`}>
-                    <span className="adm-assign-node-dot tone-muted" aria-hidden="true" />
+                    <span className="adm-assign-node-dot tone-neutral" aria-hidden="true" />
                     <span className="adm-assign-node-body">
                       <span className="adm-assign-node-id">
-                        <ActionAdd size={12} aria-hidden="true" /> {t("admin.v2.assign_new_node_option")}
+                        <ActionAdd size={ICON.xs} aria-hidden="true" /> {t("admin.v2.assign_new_node_option")}
                       </span>
                       <span className="adm-assign-node-path muted">
                         {t("admin.v2.assign_new_node_hint")}
                       </span>
                     </span>
                     <span className="adm-assign-node-check" aria-hidden="true">
-                      {createNew ? <ActionApprove size={14} /> : null}
+                      {createNew ? <ActionApprove size={ICON.sm} /> : null}
                     </span>
                   </span>
                 </label>
@@ -377,7 +382,7 @@ export function AssignNodeDrawer({
             </ul>
           ) : (
             <div className="adm-assign-empty" role="status">
-              <AdminInbox size={20} aria-hidden="true" />
+              <AdminInbox size={ICON.lg} aria-hidden="true" />
               <div>
                 <p className="adm-assign-empty-title">
                   {t("admin.no_unassigned_nodes")}

@@ -25,8 +25,11 @@ export function KpiTile({ eyebrow, value, hero, slot, delta, hint }: KpiTileProp
       <div className="adm-dash-tile-value tnum">{value}</div>
       {hasFoot ? (
         <div className="adm-dash-tile-foot">
+          {/* A trend direction is not a status tone: "went up" carries no hue
+              of its own, and spelling it `tone-up` put it in a vocabulary whose
+              every other member promises one. Keyed on a data attribute. */}
           {delta ? (
-            <span className={`adm-dash-delta tone-${delta.direction}`}>
+            <span className="adm-dash-delta" data-direction={delta.direction}>
               <span className="adm-dash-delta-glyph" aria-hidden="true">
                 {delta.direction === "up" ? "▲" : delta.direction === "down" ? "▼" : "—"}
               </span>

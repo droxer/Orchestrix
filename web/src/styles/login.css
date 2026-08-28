@@ -161,8 +161,6 @@
 
 .login-input:focus-visible {
   border-color: var(--lg-accent);
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
 }
 
 .login-input:-webkit-autofill {

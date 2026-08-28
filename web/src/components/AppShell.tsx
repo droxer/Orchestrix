@@ -3,7 +3,11 @@
 import type { CSSProperties, Dispatch, ReactNode, SetStateAction } from "react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { NavPreferences, NavThreads } from "./icons";
+import {
+  ICON,
+  NavPreferences,
+  NavThreads,
+} from "./icons";
 import { PreferencesDialog } from "./PreferencesDialog";
 import type { Theme, Language } from "./PreferencesPanel";
 import { SideNav } from "./SideNav";
@@ -82,7 +86,7 @@ function PreferencesButton({ prefsOpen, setPrefsOpen }: { prefsOpen: boolean; se
       aria-expanded={prefsOpen}
       onClick={() => setPrefsOpen((v) => !v)}
     >
-      <NavPreferences size={16} />
+      <NavPreferences size={ICON.md} />
     </Button>
   );
 }
@@ -231,7 +235,7 @@ export function AppShell({
                 aria-label={directoryLabel}
                 onClick={() => onMobileViewChange("threads")}
               >
-                <NavThreads size={16} />
+                <NavThreads size={ICON.md} />
               </Button>
               <div className="mobile-topbar-chat-title" title={activeThreadLabel}>
                 <span className="mobile-topbar-title">{activeThreadLabel}</span>
@@ -257,7 +261,7 @@ export function AppShell({
                 aria-pressed={mobileView === "threads"}
                 onClick={() => onMobileViewChange("threads")}
               >
-                <NavThreads size={16} /><span>{directoryLabel}</span>
+                <NavThreads size={ICON.md} /><span>{directoryLabel}</span>
               </Button>
               <Button variant="ghost"
                 type="button"

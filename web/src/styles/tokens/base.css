@@ -166,23 +166,35 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
-select:focus-visible {
+select:focus-visible,
+summary:focus-visible,
+/* Anything made focusable by hand — a resize separator, a scrollable table,
+   a modal shell. Without this the contract covered only native tags, so every
+   div or span given a tabindex had to hand-write the ring, and 29 component
+   rules did: `.md-table`, `.sidenav-resize`, `.thread-panel-resize`,
+   `.pref-modal` … each an exact two-line copy of this block. Most of those 29
+   were on native buttons and inputs that were ALREADY covered here, so they
+   overrode this rule with its own value — the ring looked component-owned
+   while being identical everywhere, and a change here would have been
+   reverted 29 times over. Matching the attribute makes the contract cover
+   what it always claimed to. */
+[tabindex]:focus-visible {
   outline: var(--focus-outline);
   outline-offset: var(--focus-offset);
 }
 
-.chat-panel:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
-
+/* Same selector list as the contract above — it must not drift from it, or
+   forced-colors mode loses the ring on whatever the two lists disagree about
+   (which is what `.chat-panel` was doing here: named in this block, and in
+   the contract above, but nowhere else). */
 @media (forced-colors: active) {
   button:focus-visible,
   a:focus-visible,
   input:focus-visible,
   textarea:focus-visible,
   select:focus-visible,
-  .chat-panel:focus-visible {
+  summary:focus-visible,
+  [tabindex]:focus-visible {
     outline: var(--focus-w) solid CanvasText;
     outline-offset: var(--focus-offset);
   }
@@ -192,11 +204,22 @@ select:focus-visible {
    a monospace face but only ever set tabular figures in the sans, so every
    identifier wearing it silently rendered in the reading face.
 
+   BOTH RESTATE --font-features. `font-feature-settings` REPLACES the inherited
+   declaration rather than adding to it, so asking for "tnum" alone silently
+   switched OFF the ss01/ss02 pair :root turns on — and the note at the top of
+   this file calls those two "a paired alternates package" precisely so they
+   are never separated. On the two faces this app ships the loss is invisible
+   (neither IBM Plex Sans nor JetBrains Mono has ss01/ss02, or tnum for that
+   matter — Plex's figures are already uniform-width at every weight). It bites
+   the reader the root declaration exists for: someone with Optimistic VF
+   installed, who would see every tabular figure and every identifier drop out
+   of the alternate forms its neighbours keep.
+
    `.tnum` — figures that must align in a column: counts, timestamps, ratios,
    byte sizes. Stays in the sans on purpose. */
 .tnum {
   font-family: var(--font-sans);
-  font-feature-settings: "tnum" 1;
+  font-feature-settings: var(--font-features), "tnum" 1;
   font-variant-numeric: tabular-nums;
   font-weight: 500;
   /* Tabular figures exist to line up in a column; inheriting the body's
@@ -213,7 +236,7 @@ select:focus-visible {
    needs an explicit `.<class>.code` override. */
 .code {
   font-family: var(--font-mono);
-  font-feature-settings: "tnum" 1;
+  font-feature-settings: var(--font-features), "tnum" 1;
   font-variant-numeric: tabular-nums;
   font-weight: 500;
   /* A monospace face is chosen for its fixed advance — tightening it is
@@ -251,12 +274,87 @@ select:focus-visible {
 }
 
 /* Status tone driver — tone classes only set the variable; consumers
-   opt in by reading var(--tone). */
+   opt in by reading var(--tone).
+
+   THESE SIX ARE THE WHOLE VOCABULARY. The list used to be five, and the
+   product spoke ten: `live` and `muted` were emitted from TS but had no
+   entry here, so `--tone` went unset on them and every consumer reading
+   `var(--tone, …)` silently took its fallback — a `.tone-live` badge halo
+   ringed in the cobalt action, a `.tone-live` hollow dot ringed in the
+   critical red. The dashboard covered the hole by painting `--live` and
+   `--ink-4` directly on its own selectors, which is why the gap stayed
+   invisible outside it.
+
+   `muted` was a second spelling of `neutral` — the two were even reconciled
+   by hand at the call sites (`tone === "muted" ? "neutral" : tone` in
+   EmployeeCard/EmployeesView) — and it disagreed with itself across sheets:
+   --ink-3 in admin-v2-views.css, --ink-4 in admin-v2-dashboard.css. It is
+   now spelled `neutral` everywhere and nowhere else.
+
+   `up`/`down`/`flat` were never tones at all. They are a TREND direction,
+   and the two sheets that styled them disagreed about whether the direction
+   even carries a hue: artifact.css read up/down as good/bad (--ok/--err)
+   while admin-v2-dashboard.css read them as pure ink tiers. They have left
+   this prefix — the artifact stats emit real `good`/`bad` tones, and the
+   dashboard delta is keyed on `[data-direction]`. Do not re-add them here:
+   a name in this block promises a STATUS HUE, and "went up" is not one.
+
+   Nothing else may define a `.tone-*` class. A component opts in by reading
+   var(--tone); it never re-derives the tone → hue mapping for itself. */
 .tone-good    { --tone: var(--ok); }
 .tone-info    { --tone: var(--info); }
 .tone-bad     { --tone: var(--err); }
 .tone-warn    { --tone: var(--warn); }
+.tone-live    { --tone: var(--live); }
 .tone-neutral { --tone: var(--ink-4); }
+
+/* Selected row in a navigation rail — threads, projects, agents, teams.
+   ONE definition, because the three rails are one grammar and were drifting
+   apart while each of them carried a comment asserting they were identical:
+   thread.css, agents.css and teams.css each hand-copied the same eleven
+   lines, and each copy re-stated the wash, the 2px width, the 10px inset and
+   the half-radius as literals. Nothing but a reviewer's memory kept them
+   equal, and the same three rails had already drifted on dot size.
+
+   Distinct from the --accent-bar role, which is a full-height inset shadow
+   for drawer sections and table rows. A rail row insets the bar from its top
+   and bottom edges so it reads as a marker beside the row rather than a
+   border on it, and an inset shadow cannot express that — hence a
+   pseudo-element, and hence a shared class rather than a shared token.
+
+   The host row supplies `position: relative`. Selection is calm and the
+   action is loud: a soft wash plus the bar, never a fill. */
+.rail-row[data-selected="true"] {
+  background: var(--action-soft);
+}
+
+.rail-row[data-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: var(--accent-bar-inset);
+  bottom: var(--accent-bar-inset);
+  width: var(--accent-bar-w);
+  border-radius: calc(var(--r-1) / 2);
+  background: var(--action);
+}
+
+/* Ink utilities — "how loud is this text", with no status meaning at all.
+   They exist because the admin console was using `.tone-muted` and
+   `.tone-neutral` as colour utilities on bare counts and email addresses:
+   a status vocabulary pressed into service for emphasis, which is what
+   forced the `:where(.admin-console) .tone-*` painter that
+   admin-v2-views.css no longer has. A dimmed count is not a status, so it
+   does not borrow a status name.
+
+   Two rungs, matching the two questions the call sites actually asked:
+   .ink-dim     recede below body ink (idle counts, secondary ratios, emails)
+   .ink-strong  the emphasis tier (a count that is currently non-zero)
+
+   Reach for these only on markup with no component class of its own. A named
+   component sets its own colour. */
+.ink-dim    { color: var(--ink-3); }
+.ink-strong { color: var(--ink-1); }
 
 /* Hollow-ring "bad/dead" dot — shape carries the alarm, not brightness.
    One ring width (1.5px) for every surface. */

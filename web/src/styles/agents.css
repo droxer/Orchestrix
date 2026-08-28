@@ -72,6 +72,11 @@
    row — which is why nobody read it as status. Deleting it frees the left
    rail for selection, the app-wide meaning. */
 .agents-roster-row {
+  /* Render-skip for a long roster. The estimate is the ROW's own height,
+     owned here rather than in a11y.css: that sheet loads last, so its
+     generic value silently overrode every component-specific one. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 96px;
   position: relative;
   display: flex;
   width: 100%;
@@ -105,24 +110,8 @@
   background: var(--row-hover);
 }
 
-/* Selection is the action-soft wash plus a 2px left accent bar — the same
-   contract as .conversation-row.active, so selection looks identical on the
-   thread rail and the agent roster. Status never touches this rail. */
-.agents-roster-row[data-selected="true"] {
-  background: var(--action-soft);
-}
-
-.agents-roster-row[data-selected="true"]::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  /* Inset holds the bar at ~55% of the row height, matching the thread rail. */
-  top: 10px;
-  bottom: 10px;
-  width: 2px;
-  border-radius: calc(var(--r-1) / 2);
-  background: var(--action);
-}
+/* Selection comes from `.rail-row` (tokens/base.css). Status never touches
+   this rail. */
 
 .agents-roster-row:focus-within {
   outline: var(--focus-outline);
@@ -269,11 +258,6 @@
   border-radius: var(--r-full);
   background: var(--surface-1);
   color: var(--ink-3);
-  font-family: var(--font-mono);
-  font-feature-settings: "tnum" 1;
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  letter-spacing: var(--type-code-track);
   font-size: var(--fs-2);
   line-height: var(--leading-snug);
 }
@@ -294,8 +278,8 @@
    the placement list — the node name stays identity-colored. A soft tone ring
    (as on .adm-placement-dot) makes ready/busy/offline legible at a glance. */
 .agent-placement-badge-dot {
-  width: 7px;
-  height: 7px;
+  width: var(--dot);
+  height: var(--dot);
   flex: none;
   margin-right: var(--sp-1);
   border-radius: var(--r-full);

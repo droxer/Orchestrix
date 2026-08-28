@@ -24,7 +24,7 @@ interface NodeStatusCardProps {
 // the one thing in Relay that is working right now, which is exactly what the
 // live yellow is reserved for. There is no "info" tone left; running used to
 // carry it and nothing else did.
-type Tone = "live" | "good" | "bad" | "warn" | "muted";
+type Tone = "live" | "good" | "bad" | "warn" | "neutral";
 type Slot = { key: string; tone: Tone; count: number; share: number };
 
 // One tone per state. `stale` used to share `bad` with `failed`, which rendered
@@ -36,7 +36,7 @@ const ORDER: Array<{ key: string; tone: Tone }> = [
   { key: "ready", tone: "good" },
   { key: "failed", tone: "bad" },
   { key: "stale", tone: "warn" },
-  { key: "unknown", tone: "muted" },
+  { key: "unknown", tone: "neutral" },
 ];
 
 export function NodeStatusCard({ nodes, className }: NodeStatusCardProps) {
@@ -90,7 +90,7 @@ export function NodeStatusCard({ nodes, className }: NodeStatusCardProps) {
           // zero running count must not glow.
           <div
             key={slot.key}
-            className={`adm-dash-stat tone-${slot.tone === "live" && slot.count === 0 ? "muted" : slot.tone}`}
+            className={`adm-dash-stat tone-${slot.tone === "live" && slot.count === 0 ? "neutral" : slot.tone}`}
           >
             <dt className="adm-dash-stat-label">
               <span className="adm-dash-stat-dot" aria-hidden="true" />

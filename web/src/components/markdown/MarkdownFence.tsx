@@ -5,7 +5,11 @@ import { useTranslation } from "react-i18next";
 
 import { shouldRenderDiagram } from "../../lib/markdown";
 import { highlightToHtml } from "../../lib/syntax";
-import { ActionCopy, CheckIcon } from "../icons";
+import {
+  ActionCopy,
+  CheckIcon,
+  ICON,
+} from "../icons";
 import { useMarkdownMode } from "./context";
 import { MermaidDiagram } from "./MermaidDiagram";
 
@@ -42,7 +46,7 @@ function CopyFenceButton({ text }: { text: string }) {
 
   return (
     <button type="button" className="md-fence-copy" onClick={handleCopy} aria-label={label}>
-      {copied ? <CheckIcon size={13} aria-hidden="true" /> : <ActionCopy size={13} aria-hidden="true" />}
+      {copied ? <CheckIcon size={ICON.sm} aria-hidden="true" /> : <ActionCopy size={ICON.sm} aria-hidden="true" />}
       <span className="md-fence-copy-label">{label}</span>
     </button>
   );
@@ -60,7 +64,7 @@ export function MarkdownFence({ code, language }: { code: string; language: stri
   const { live } = useMarkdownMode();
 
   const fence = (
-    <pre className="agent-code">
+    <pre className="agent-code code">
       {language ? <span className="agent-code-lang">{language}</span> : null}
       <code className="hljs" dangerouslySetInnerHTML={{ __html: highlightToHtml(code, language) }} />
     </pre>

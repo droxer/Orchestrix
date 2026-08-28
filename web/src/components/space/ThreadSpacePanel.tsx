@@ -17,7 +17,10 @@ import { ArtifactBody } from "../artifact/ArtifactBody";
 import { ArtifactPreviewHeader } from "../artifact/ArtifactPreviewHeader";
 import { ArtifactViewToggle, type ArtifactView } from "../artifact/ArtifactViewToggle";
 import { ThreadSpaceList } from "./ThreadSpaceList";
-import { NavBack } from "../icons";
+import {
+  ICON,
+  NavBack,
+} from "../icons";
 import { Button } from "@/components/ui/button";
 import { OverlayCloseButton } from "@/components/ui/OverlayCloseButton";
 import { useModalDrawer } from "@/hooks/useModalDrawer";
@@ -165,7 +168,7 @@ export function ThreadSpacePanel({
               className="thread-space-back"
               onClick={() => onSelectArtifact(null)}
             >
-              <NavBack size={14} />
+              <NavBack size={ICON.sm} />
               <span>{t("space.title")}</span>
             </Button>
           ) : (

@@ -17,7 +17,12 @@ import { NodePresence } from "./NodePresence";
 import { NodeRuntimeMarks } from "./NodeRuntimeMarks";
 import { TonePill } from "../StatusPill";
 import { Button } from "@/components/ui/button";
-import { ActionApprove, ActionCopy, AdminEmployees } from "../icons";
+import {
+  ActionApprove,
+  ActionCopy,
+  AdminEmployees,
+  ICON,
+} from "../icons";
 import { isNodeOnline, nodeOwnershipProfile } from "../../lib/adminHelpers";
 
 interface NodeCardProps {
@@ -76,7 +81,7 @@ export function NodeCard({
           data-ownership={ownership}
           translate="no"
         >
-          <OwnershipMark size={18} aria-hidden="true" />
+          <OwnershipMark size={ICON.lg} aria-hidden="true" />
         </span>
         <div className="adm-node-card-identity">
           <span className="adm-node-card-nameline">
@@ -113,7 +118,7 @@ export function NodeCard({
 
       {employeeName ? (
         <div className="adm-node-card-employee-badge" title={employeeName} translate="no">
-          <AdminEmployees size={12} className="adm-node-card-employee-icon" aria-hidden="true" />
+          <AdminEmployees size={ICON.xs} className="adm-node-card-employee-icon" aria-hidden="true" />
           <span className="adm-node-card-employee-badge-text">{employeeName}</span>
         </div>
       ) : null}
@@ -138,7 +143,7 @@ export function NodeCard({
             aria-label={copied ? t("admin.copied") : t("admin.copy_node_id")}
             title={node.id}
           >
-            {copied ? <ActionApprove size={14} aria-hidden="true" /> : <ActionCopy size={14} aria-hidden="true" />}
+            {copied ? <ActionApprove size={ICON.sm} aria-hidden="true" /> : <ActionCopy size={ICON.sm} aria-hidden="true" />}
           </Button>
           <NodeActions
             node={node}

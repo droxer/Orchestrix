@@ -177,7 +177,7 @@
   align-items: center;
   gap: var(--sp-3);
   width: 100%;
-  min-height: 38px;
+  min-height: var(--control-h-sm);
   padding: 0 var(--sp-3);
   border: 1px solid transparent;
   border-radius: var(--r-full);
@@ -193,10 +193,6 @@
   border-color: var(--line-2);
 }
 
-.sidenav-settings-menu button:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
 
 .sidenav-settings-menu button.danger {
   color: var(--err);
@@ -240,6 +236,9 @@
   cursor: pointer;
 }
 
+/* Hover and active share the neutral wash; active then overrides it with the
+   action wash below. A group rule plus a narrower override — not a duplicate
+   selector, and not a dead declaration. */
 .sidenav-more-item:hover,
 .sidenav-more-item.active {
   background: var(--surface-2);
@@ -251,10 +250,6 @@
   border-color: var(--line-strong);
 }
 
-.sidenav-more-item:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
 
 .sidenav-more-item svg {
   flex-shrink: 0;
@@ -292,10 +287,6 @@
   flex-shrink: 0;
 }
 
-.sidenav-btn:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
 
 .sidenav-btn[data-nav="logout"]:hover {
   color: var(--err);
@@ -447,25 +438,6 @@
   margin-left: auto;
 }
 
-.sidenav-badge-dot {
-  position: absolute;
-  /* 7px lands the 6px dot on the icon's top-right corner inside the 40px
-     collapsed button — close enough to read as "on this destination", far
-     enough not to cover the glyph. */
-  top: 7px;
-  right: 7px;
-  width: 6px;
-  height: 6px;
-  border-radius: var(--r-full);
-  background: var(--warn);
-  /* Cutout ring against the rail so the dot reads over any icon stroke. */
-  box-shadow: 0 0 0 2px var(--surface-2);
-}
-
-.sidenav-panel[data-expanded="true"] .sidenav-badge-dot {
-  display: none;
-}
-
 /* Mobile-only More overflow trigger (Channels / Admin) — hidden on desktop
    where those destinations stay as primary rail items. Last in this file at
    3-class specificity so it outranks every `.sidenav-btn` display rule above
@@ -507,9 +479,4 @@
 .sidenav-resize:hover::after,
 .sidenav-resize:active::after {
   background: var(--line-strong);
-}
-
-.sidenav-resize:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
 }

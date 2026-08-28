@@ -4,7 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
-import { ActionApprove, ActionEdit, ActionRemove, ActionToggle, AdminDelete } from "./icons";
+import {
+  ActionApprove,
+  ActionEdit,
+  ActionRemove,
+  ActionToggle,
+  AdminDelete,
+  ICON,
+} from "./icons";
 import {
   deleteAgentPlacement,
   deleteAgentProfileImage,
@@ -415,7 +422,7 @@ export function AgentProfilePanel({
                     onClick={() => void handleToggleEnabled()}
                     disabled={saving}
                   >
-                    <ActionToggle size={14} aria-hidden="true" />
+                    <ActionToggle size={ICON.sm} aria-hidden="true" />
                     {agent.enabled ? t("admin.v2.agent_disable_action") : t("admin.v2.agent_enable_action")}
                   </Button>
                 </div>
@@ -446,7 +453,7 @@ export function AgentProfilePanel({
                 onClick={() => void handleDeleteAgent()}
                 disabled={saving}
               >
-                <AdminDelete size={14} aria-hidden="true" />
+                <AdminDelete size={ICON.sm} aria-hidden="true" />
                 {t("admin.v2.delete_agent")}
               </Button>
             </div>
@@ -489,7 +496,7 @@ export function AgentProfilePanel({
               aria-label={t("admin.v2.save")}
               title={t("admin.v2.save")}
             >
-              <ActionApprove size={14} aria-hidden="true" />
+              <ActionApprove size={ICON.sm} aria-hidden="true" />
             </Button>
             <Button variant="ghost"
               type="button"
@@ -498,7 +505,7 @@ export function AgentProfilePanel({
               aria-label={t("admin.v2.cancel")}
               title={t("admin.v2.cancel")}
             >
-              <ActionRemove size={14} aria-hidden="true" />
+              <ActionRemove size={ICON.sm} aria-hidden="true" />
             </Button>
           </div>
         ) : (
@@ -512,7 +519,7 @@ export function AgentProfilePanel({
                 aria-label={t("admin.v2.edit_agent")}
                 title={t("admin.v2.edit_agent")}
               >
-                <ActionEdit size={14} aria-hidden="true" />
+                <ActionEdit size={ICON.sm} aria-hidden="true" />
               </Button>
             ) : null}
           </div>
@@ -566,7 +573,7 @@ export function AgentProfilePanel({
             onClick={() => void handleToggleEnabled()}
             disabled={saving}
           >
-            <ActionToggle size={14} aria-hidden="true" />
+            <ActionToggle size={ICON.sm} aria-hidden="true" />
             {agent.enabled ? t("admin.v2.agent_disable_action") : t("admin.v2.agent_enable_action")}
           </Button>
         </div>
@@ -601,7 +608,7 @@ export function AgentProfilePanel({
             onClick={() => void handleDeleteAgent()}
             disabled={saving}
           >
-            <AdminDelete size={14} aria-hidden="true" />
+            <AdminDelete size={ICON.sm} aria-hidden="true" />
             {t("admin.v2.delete_agent")}
           </Button>
           {error ? (

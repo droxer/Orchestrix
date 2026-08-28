@@ -1,4 +1,9 @@
-import { ActionEdit, ActionRemove, NodeOffline } from "./icons";
+import {
+  ActionEdit,
+  ActionRemove,
+  ICON,
+  NodeOffline,
+} from "./icons";
 import { useTranslation } from "react-i18next";
 import type { RelaySession } from "../types";
 import { canDeleteThread, sessionAgents, threadLabel, threadRowMeta, type ThreadItem } from "../lib/threads";
@@ -97,7 +102,7 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose, tone, l
   const agentCluster = agents.length > 0 ? (
     <span className="conversation-agents" title={agentsTitle} aria-hidden="true">
       {agents.map((agent) => (
-        <AgentMark key={agent} agent={agent} size={12} />
+        <AgentMark key={agent} agent={agent} size={ICON.xs} />
       ))}
     </span>
   ) : null;
@@ -113,13 +118,13 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose, tone, l
       aria-label={offlineLabel}
       title={offlineLabel}
     >
-      <NodeOffline size={12} />
+      <NodeOffline size={ICON.xs} />
     </span>
   ) : null;
 
   return (
     <li
-      className={`conversation-row list-virtual${layout === "nested" ? " nested" : ""}`}
+      className={`conversation-row rail-row list-virtual${layout === "nested" ? " nested" : ""}`}
       data-selected={selected ? "true" : "false"}
       data-tone={tone}
     >
@@ -174,7 +179,7 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose, tone, l
             title={t("thread.rename")}
             onClick={() => onRename(session)}
           >
-            <ActionEdit size={11} />
+            <ActionEdit size={ICON.xs} />
           </Button>
         ) : null}
         {onClose ? (
@@ -186,7 +191,7 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose, tone, l
             disabled={!deleteEnabled}
             onClick={handleClose}
           >
-            <ActionRemove size={11} />
+            <ActionRemove size={ICON.xs} />
           </Button>
         ) : null}
       </span>

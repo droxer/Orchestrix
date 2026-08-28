@@ -9,7 +9,15 @@ import { NodePresence } from "../admin/NodePresence";
 import { TonePill } from "../StatusPill";
 import { nodeOwnershipIcon } from "../admin/NodeProfileBadges";
 import { Button } from "@/components/ui/button";
-import { ActionApprove, ActionCopy, ActionEdit, ActionKey, ActionRemove, AdminManageExecutors } from "../icons";
+import {
+  ActionApprove,
+  ActionCopy,
+  ActionEdit,
+  ActionKey,
+  ActionRemove,
+  AdminManageExecutors,
+  ICON,
+} from "../icons";
 import { abbreviateNodeId, formatRunElapsed } from "../../lib/computerNodes";
 import { labelForExecutor } from "../../lib/agentDisplayNames";
 import {
@@ -85,7 +93,7 @@ export function ComputerCard({
     <article className="computer-card" data-online={isNodeOnline(node) ? "true" : "false"}>
       <header className="computer-card-hero">
         <span className="computer-card-avatar" data-ownership={ownership} translate="no">
-          <OwnershipMark size={20} aria-hidden="true" />
+          <OwnershipMark size={ICON.lg} aria-hidden="true" />
         </span>
         <div className="computer-card-identity">
           <div className="computer-card-nameline">
@@ -111,22 +119,22 @@ export function ComputerCard({
             of these renames it" should not need a hover. */}
         <div className="computer-card-actions">
           <Button type="button" variant="outline" size="sm" onClick={() => onRename(node)}>
-            <ActionEdit size={14} aria-hidden="true" />
+            <ActionEdit size={ICON.sm} aria-hidden="true" />
             {t("thread.rename")}
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => onManageExecutors(node)}>
-            <AdminManageExecutors size={14} aria-hidden="true" />
+            <AdminManageExecutors size={ICON.sm} aria-hidden="true" />
             {t("admin.v2.manage_executors")}
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => onShowToken(node)}>
-            <ActionKey size={14} aria-hidden="true" />
+            <ActionKey size={ICON.sm} aria-hidden="true" />
             {t("computer.token_button")}
           </Button>
           {/* Removal is the counterpart to self-service enrollment, but it is
               not the action the reader came for — ghost keeps it reachable
               without competing with rename. */}
           <Button type="button" variant="ghost" size="sm" onClick={() => onDisconnect(node)}>
-            <ActionRemove size={14} aria-hidden="true" />
+            <ActionRemove size={ICON.sm} aria-hidden="true" />
             {t("computer.disconnect")}
           </Button>
         </div>
@@ -150,7 +158,7 @@ export function ComputerCard({
               const row = (
                 <>
                   <StateMark shape="live" className="computer-run-mark" />
-                  <AgentMark agent={run.agent} size={14} className="computer-run-agent-mark" />
+                  <AgentMark agent={run.agent} size={ICON.sm} className="computer-run-agent-mark" />
                   <span className="computer-run-agent">{label}</span>
                   <span className="computer-run-goal">{run.taskGoal || t("computer.untitled_run")}</span>
                   <span className="computer-run-elapsed tnum">{formatRunElapsed(run.startedAt)}</span>
@@ -222,7 +230,7 @@ export function ComputerCard({
                   onClick={() => void handleCopyId()}
                   aria-label={copied ? t("admin.copied") : t("admin.copy_node_id")}
                 >
-                  {copied ? <ActionApprove size={13} aria-hidden="true" /> : <ActionCopy size={13} aria-hidden="true" />}
+                  {copied ? <ActionApprove size={ICON.sm} aria-hidden="true" /> : <ActionCopy size={ICON.sm} aria-hidden="true" />}
                 </Button>
               </span>
             </Fact>
@@ -280,7 +288,7 @@ function RuntimeRow({
       data-presence={presence}
     >
       <i className="adm-agent-dot" aria-hidden="true" />
-      <AgentMark agent={agent} size={14} className="computer-runtime-mark" />
+      <AgentMark agent={agent} size={ICON.sm} className="computer-runtime-mark" />
       <span className="computer-runtime-name" translate="no">{labelForExecutor(agent)}</span>
       <span className="computer-runtime-state">{stateLabel}</span>
       <span className="computer-runtime-version code" translate="no">

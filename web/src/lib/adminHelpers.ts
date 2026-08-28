@@ -220,7 +220,7 @@ export function localComputerUsageLabel(
 
 export type EmployeeQuickFilter = "all" | "running" | "ready" | "idle" | "failed" | "unassigned";
 export type EmployeeSummaryStatusKey = "running" | "ready" | "failed" | "idle" | "no_nodes";
-type EmployeeSummaryTone = Tone | "muted";
+type EmployeeSummaryTone = Tone;
 
 export function matchesEmployeeQuickFilter(
   member: EmployeeNodeSummary,
@@ -245,8 +245,8 @@ export function employeeSummaryStatus(
   if (member.runningCount > 0) return { tone: "info", key: "running" };
   if (member.readyCount > 0) return { tone: "good", key: "ready" };
   if (member.failedCount > 0) return { tone: "bad", key: "failed" };
-  if (member.nodeCount > 0) return { tone: "muted", key: "idle" };
-  return { tone: "muted", key: "no_nodes" };
+  if (member.nodeCount > 0) return { tone: "neutral", key: "idle" };
+  return { tone: "neutral", key: "no_nodes" };
 }
 
 export function employeeEmptyStateTranslationKey(

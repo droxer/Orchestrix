@@ -36,7 +36,10 @@ import { TaskDrawerArtifacts } from "./TaskDrawerArtifacts";
 import { AgentMark } from "../AgentMark";
 import { AgentStateBadge } from "../AgentStateBadge";
 import { IdentityMark } from "../IdentityMark";
-import { NavAgents } from "../icons";
+import {
+  ICON,
+  NavAgents,
+} from "../icons";
 import { ProfileImage } from "../ProfileImagePicker";
 import { cn } from "@/lib/utils";
 import { navigateToAppPath } from "../../lib/appRoute";
@@ -132,7 +135,7 @@ function AssignmentSummary({
     return (
       <span id={id} className="task-assignment-summary is-empty" aria-live="polite">
         <span className="task-assignment-summary-mark" aria-hidden="true">
-          <NavAgents size={16} />
+          <NavAgents size={ICON.md} />
         </span>
         <span className="task-assignment-summary-copy">
           <span className="task-assignment-summary-title">{t("backlog.assign_later")}</span>
@@ -182,7 +185,7 @@ function AssignmentSummary({
           <span className="task-assignment-roster" aria-label={t("backlog.team_roster")}>
             {team.members.slice(0, 5).map((member) => (
               <span key={member.id} className="task-assignment-member" title={member.displayName}>
-                <AgentMark agent={member.executorKind} size={11} />
+                <AgentMark agent={member.executorKind} size={ICON.xs} />
               </span>
             ))}
             {team.members.length > 5 ? <span className="task-assignment-member-more">+{team.members.length - 5}</span> : null}
@@ -509,7 +512,7 @@ export function TaskDrawer({
               <SelectContent>
                 <SelectItem value={NO_AGENT} label={t("backlog.assign_later")}>
                   <span className="task-assignment-option is-empty">
-                    <span className="task-assignment-option-mark" aria-hidden="true"><NavAgents size={14} /></span>
+                    <span className="task-assignment-option-mark" aria-hidden="true"><NavAgents size={ICON.sm} /></span>
                     <span className="task-assignment-option-copy">
                       <span>{t("backlog.assign_later")}</span>
                       <span>{t("backlog.no_executor")}</span>
@@ -534,7 +537,7 @@ export function TaskDrawer({
                   ) : null}
                   <SelectItem value={NAV_AGENTS} label={t("backlog.manage_agents")}>
                     <span className="task-assignment-option is-action">
-                      <span className="task-assignment-option-mark" aria-hidden="true"><NavAgents size={14} /></span>
+                      <span className="task-assignment-option-mark" aria-hidden="true"><NavAgents size={ICON.sm} /></span>
                       <span className="task-assignment-option-copy">
                         <span>{t("backlog.manage_agents")}</span>
                       </span>
@@ -559,7 +562,7 @@ export function TaskDrawer({
                   ) : null}
                   <SelectItem value={NAV_TEAMS} label={t("backlog.create_team")}>
                     <span className="task-assignment-option is-action">
-                      <span className="task-assignment-option-mark" aria-hidden="true"><NavAgents size={14} /></span>
+                      <span className="task-assignment-option-mark" aria-hidden="true"><NavAgents size={ICON.sm} /></span>
                       <span className="task-assignment-option-copy">
                         <span>{t("backlog.create_team")}</span>
                       </span>

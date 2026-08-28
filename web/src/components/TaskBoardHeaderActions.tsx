@@ -2,7 +2,11 @@
 
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { ActionAdd, NavRefresh } from "./icons";
+import {
+  ActionAdd,
+  ICON,
+  NavRefresh,
+} from "./icons";
 
 /** Refresh + primary create actions shared by Backlog and Routine headers. */
 export function TaskBoardHeaderActions({
@@ -34,7 +38,7 @@ export function TaskBoardHeaderActions({
         disabled={isRefreshing}
         onClick={onRefresh}
       >
-        <NavRefresh size={16} />
+        <NavRefresh size={ICON.md} />
       </Button>
       <Button
         type="button"
@@ -47,7 +51,7 @@ export function TaskBoardHeaderActions({
         title={createLabel}
         onClick={onCreate}
       >
-        <ActionAdd size={16} />
+        <ActionAdd size={ICON.md} />
       </Button>
     </>
   );

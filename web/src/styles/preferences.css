@@ -141,10 +141,6 @@
   transform: translateY(-50%);
 }
 
-.pref-nav-item:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
-}
 
 .pref-content {
   min-width: 0;
@@ -219,15 +215,11 @@
 }
 
 .pref-option-row:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
   z-index: 1;
 }
 
 .pref-option-row.selected:focus-visible {
   box-shadow: var(--accent-bar);
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-offset);
 }
 
 .pref-option-copy {

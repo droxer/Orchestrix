@@ -6,7 +6,12 @@ import { describe, it } from "node:test";
 describe("routine start button", () => {
   it("uses the shared compact icon treatment in both routine views", async () => {
     const source = await readFile(resolve("web/src/components/RoutinesPage.tsx"), "utf8");
-    const styles = await readFile(resolve("web/src/styles/backlog.css"), "utf8");
+    // The board and the list own their own action clusters, and the split of
+    // backlog.css put them in different sheets — both still have to agree.
+    const [boardStyles, listStyles] = await Promise.all([
+      readFile(resolve("web/src/styles/task-status.css"), "utf8"),
+      readFile(resolve("web/src/styles/backlog-list.css"), "utf8"),
+    ]);
     const usages = source.match(/<RoutineStartButton\b/g) ?? [];
 
     assert.equal(usages.length, 2);
@@ -15,7 +20,7 @@ describe("routine start button", () => {
     assert.match(source, /tinted/);
     assert.match(source, /className="backlog-action-icon"/);
     assert.doesNotMatch(source, /className="backlog-action-primary backlog-action-icon"/);
-    assert.match(styles, /\.backlog-task-actions button:not\(\[data-variant="icon"\]\)/);
-    assert.match(styles, /\.backlog-row-actions button:not\(\[data-variant="icon"\]\)/);
+    assert.match(boardStyles, /\.backlog-task-actions button:not\(\[data-variant="icon"\]\)/);
+    assert.match(listStyles, /\.backlog-row-actions button:not\(\[data-variant="icon"\]\)/);
   });
 });

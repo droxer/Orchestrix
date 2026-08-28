@@ -6,7 +6,11 @@ import type { TFunction } from "i18next";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
 import { Button } from "@/components/ui/button";
 import type { ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../types";
-import { AdminNode, ICON_STROKE_LARGE } from "../icons";
+import {
+  AdminNode,
+  ICON,
+  ICON_STROKE_LARGE,
+} from "../icons";
 import { SearchInput } from "@/components/ui/search-input";
 import { canUseLocalControlPanel } from "../../lib/controlPanel";
 import {
@@ -135,7 +139,7 @@ export function NodesView({ nodes, employees, storedTokens, layout, onLayoutChan
           className="adm-fleet-empty"
           fill
           title={nodes.length === 0 ? t("admin.no_nodes") : t("admin.v2.no_nodes_for_filter")}
-          illustration={<AdminNode size={40} strokeWidth={ICON_STROKE_LARGE} aria-hidden="true" />}
+          illustration={<AdminNode size={ICON.hero} strokeWidth={ICON_STROKE_LARGE} aria-hidden="true" />}
           actions={nodes.length === 0 && onAddNode ? (
             <Button type="button" onClick={onAddNode}>
               {t("admin.v2.add_node_cta")}

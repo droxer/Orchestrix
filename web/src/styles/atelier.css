@@ -56,14 +56,12 @@ body {
   background: var(--surface-0);
 }
 
-.messenger-shell {
-  grid-template-columns: var(--sidenav-w) var(--thread-w) minmax(0, 1fr) 0;
-  background: var(--surface-0);
-}
-
-.messenger-shell[data-sidenav="open"] {
-  grid-template-columns: var(--sidenav-w-open) var(--thread-w) minmax(0, 1fr) 0;
-}
+/* The shell's grid geometry lives in shell.css and is NOT restated here. Two
+   blocks used to re-declare `grid-template-columns` and `background` with
+   byte-identical values, which declares nothing and quietly makes this sheet
+   the winner: because atelier.css loads after shell.css, any change to the
+   track list there would have been reverted here without a diff to show it.
+   A grammar layer overrides; it does not copy. */
 
 /* A themed rail, not a permanently-dark island: the active route is a
    solid action plate — no ambient glow. Background reads the shell zone role
@@ -75,15 +73,12 @@ body {
    list panel), so the seam draws the same --line-1 hairline the list|canvas
    edge (thread.css) has. */
 .sidenav-panel {
-  align-items: center;
   padding: var(--sp-4) var(--sp-2) var(--sp-3);
   background: var(--surface-rail);
   border-right: 1px solid var(--line-1);
   color: var(--ink-2);
 }
 
-.sidenav-brand-row { margin-bottom: var(--sp-4); }
-.sidenav-brand { color: var(--ink-1); }
 .sidenav-btn { width: var(--touch-target); height: var(--touch-target); border-radius: var(--r-3); color: var(--ink-3); }
 .sidenav-btn:hover { background: var(--surface-3); border-color: transparent; color: var(--ink-1); }
 /* Active route reads as selected the same way a conversation row does: a
@@ -109,13 +104,12 @@ body {
   background: var(--action);
 }
 .sidenav-toggle { color: var(--ink-3); }
-.sidenav-panel[data-expanded="true"] .sidenav-btn { justify-content: flex-start; width: 100%; padding-inline: var(--sp-3); gap: var(--sp-3); }
+.sidenav-panel[data-expanded="true"] .sidenav-btn { padding-inline: var(--sp-3); }
 .sidenav-panel[data-expanded="true"] .sidenav-brand { padding-left: var(--sp-2); }
 
 .chat-panel { background: transparent; }
 
 .transcript { background: transparent; }
-.transcript-inner { width: min(100%, var(--thread-measure)); padding: var(--sp-7) var(--page-gutter) var(--sp-8); gap: var(--sp-7); }
 .transcript-inner:not(:has(.transcript-empty)) { background: none; }
 .transcript-inner:has(.transcript-empty) {
   margin: 0 auto;
@@ -149,8 +143,11 @@ body {
 .msg-time { color: var(--ink-4); }
 
 /* Empty states keep the base type roles — no oversized display override. */
-.relay-empty { max-width: 440px; padding: var(--sp-8) var(--sp-7); }
-.relay-empty-hint { color: var(--ink-3); font-weight: 500; }
+/* .relay-empty's box (max-width, padding) is empty-state.css's and is not
+   restated — the copy here was byte-identical, so it declared nothing while
+   making this the sheet that silently wins. Only the hint's weight is a real
+   override. */
+.relay-empty-hint { font-weight: 500; }
 
 /* Dark theme — token-level dark values live in tokens/palette.css;
    this block only adds structural rules for this file's components. */
@@ -183,9 +180,7 @@ html[data-theme="dark"] .transcript-inner:has(.transcript-empty) {
 
 .backlog-stats {
   border: 0;
-  border-bottom: 1px solid var(--line-1);
   border-radius: 0;
-  background: var(--surface-0);
   box-shadow: none;
 }
 
