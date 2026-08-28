@@ -52,7 +52,7 @@
    and inset from the panel edge. This is what replaced the per-row hairline —
    the wash then reads as a discrete object instead of a full-bleed stripe. */
 .agents-roster-list {
-  /* The rails carry data-density="compact" for TYPE (13px names, 13px meta),
+  /* The rails carry data-density="compact" for TYPE (13px names, 12px meta),
      but a two-line selectable object is not a dense table row, so the dense
      --sp-row (8px) left name and meta touching their own row edges. Restate
      the standard row rhythm for the rail's descendants; density keeps the
@@ -148,8 +148,8 @@
 .agents-roster-row-name {
   overflow: hidden;
   color: var(--ink-1);
-  /* Same 13px/600 list-rail identity as the thread rail — 15px semibold
-     names read too loud in a 318px roster, CJK more so. */
+  /* Same 13px/700 list-rail identity as the thread rail — 16px bold names
+     read too loud in a 318px roster, CJK more so. */
   font: var(--type-label-strong);
   letter-spacing: var(--type-label-strong-track);
   text-overflow: ellipsis;
@@ -261,7 +261,7 @@
   overflow: hidden;
   padding: var(--sp-0-5) var(--sp-2);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: var(--surface-1);
   color: var(--ink-3);
   font-size: var(--fs-2);

@@ -198,7 +198,7 @@
 .computer-card-count {
   padding: 0 var(--sp-1-5);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   color: var(--ink-3);
   font: var(--type-micro);
   letter-spacing: var(--type-micro-track);

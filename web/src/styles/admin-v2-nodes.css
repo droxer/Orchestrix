@@ -128,7 +128,7 @@
   height: 20px;
   padding: 0 var(--sp-2);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: var(--surface-2);
   width: fit-content;
 }
@@ -228,7 +228,7 @@
   height: 20px;
   padding: 0 var(--sp-2);
   border: 1px solid transparent;
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   font: var(--type-micro);
   letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
@@ -478,7 +478,8 @@
   height: 20px;
   padding: 0 var(--sp-2);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-full);
+  /* Labeled, so it takes the CONTROL corner; only the dot inside it is round. */
+  border-radius: var(--r-2);
   text-transform: uppercase;
   color: var(--ink-1);
 }

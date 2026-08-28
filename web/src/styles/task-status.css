@@ -18,7 +18,7 @@
   flex: none;
   width: var(--avatar-sm);
   height: var(--avatar-sm);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: var(--surface-2);
   color: var(--ink-1);
   box-shadow: inset 0 0 0 1px var(--line-2);
@@ -83,7 +83,7 @@
   gap: var(--sp-1);
   padding: var(--sp-0-5) var(--sp-2) var(--sp-0-5) var(--sp-1-5);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: var(--surface-0);
   color: var(--ink-2);
   font: var(--type-label);
@@ -203,7 +203,7 @@
   gap: var(--sp-2);
   padding: var(--sp-0-5) var(--sp-2);
   border: 1px solid var(--tone-line);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   color: var(--ink-2);
   font: var(--type-label);
 }
@@ -338,7 +338,7 @@
 .backlog-task-actions button:not([data-variant="icon"]) {
   min-height: var(--control-h-xs);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: var(--surface-0);
   padding: 0 var(--sp-2);
   color: var(--ink-1);

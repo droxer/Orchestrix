@@ -59,7 +59,7 @@
    full-bleed stripes it brought read as a different kind of object than the
    thread and agent rows beside it. */
 .teams-list {
-  /* The rails carry data-density="compact" for TYPE (13px names, 13px meta),
+  /* The rails carry data-density="compact" for TYPE (13px names, 12px meta),
      but a two-line selectable object is not a dense table row, so the dense
      --sp-row (8px) left name and meta touching their own row edges. Restate
      the standard row rhythm for the rail's descendants; density keeps the
@@ -160,7 +160,7 @@
   border: 0;
   background: transparent;
   color: var(--ink-1);
-  /* Same 13px/600 list-rail identity as the agent roster and thread rail. */
+  /* Same 13px/700 list-rail identity as the agent roster and thread rail. */
   font: var(--type-label-strong);
   letter-spacing: var(--type-label-strong-track);
   text-align: left;

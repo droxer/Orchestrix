@@ -119,7 +119,7 @@
   letter-spacing: var(--type-label-strong-track);
   text-transform: none;
   border: 1px solid var(--line-2);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: var(--surface-1);
   color: var(--ink-3);
   flex: none;
@@ -203,7 +203,7 @@
   padding: var(--sp-4);
   /* Same list-row edge as .adm-assign-node / .adm-placement-item. */
   border: 1px solid var(--line-1);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: var(--surface-0);
   transition:
     border-color var(--t-fast) var(--ease),
@@ -260,7 +260,7 @@
 .adm-agent-inventory-pill {
   font-size: var(--fs-2);
   padding: var(--sp-0-5) var(--sp-1-5);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   border: 1px solid var(--line-1);
   color: var(--ink-1);
   background: var(--surface-0);

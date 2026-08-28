@@ -59,7 +59,7 @@
   gap: 0;
   padding: var(--sp-0-5);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: var(--surface-1);
   flex-shrink: 0;
 }

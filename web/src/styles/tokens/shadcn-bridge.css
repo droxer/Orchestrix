@@ -49,22 +49,27 @@
   /* ---- Scale guards ----
      Everything below OVERRIDES a stock Tailwind scale. Deleting an unused step
      does not remove the utility, it hands it back to Tailwind's default — so
-     `rounded-xl` would silently become 0.75rem (12px), off the 4/8/16/24/32
-     ramp,
+     `rounded-xl` would silently become 0.75rem (12px), off the 4/6/8 ramp,
      and `text-2xl` would become 1.5rem, off the type scale. These blocks are
      therefore kept COMPLETE on purpose; an unused row here is a guard, not
      dead weight, and the usage argument that removed the two colour aliases
      above does not apply to any of them. */
 
-  /* Radii → rounded-* utilities. */
+  /* Radii → rounded-* utilities.
+
+     The ramp has three rungs (--r-1/2/3), so the tiers above `xl` all clamp
+     to the container radius rather than reaching for a 24/32px step that no
+     longer exists. That is the guard doing its job: a stray `rounded-3xl`
+     lands on the app's largest real corner instead of silently inheriting
+     Tailwind's 1.5rem. */
   --radius-xs: var(--r-1);
   --radius-sm: var(--r-1);
   --radius-md: var(--r-2);
   --radius-lg: var(--r-3);
   --radius-xl: var(--r-3);
-  --radius-2xl: var(--r-4);
-  --radius-3xl: var(--r-5);
-  --radius-4xl: var(--r-5);
+  --radius-2xl: var(--r-3);
+  --radius-3xl: var(--r-3);
+  --radius-4xl: var(--r-3);
   --radius-full: var(--r-full);
 
   /* Numeric step → p-4, gap-2, size-4, h-11, …

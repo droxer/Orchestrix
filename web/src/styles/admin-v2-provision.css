@@ -253,7 +253,7 @@
   grid-template-columns: 1fr 1fr;
   gap: var(--sp-0-5);
   padding: var(--sp-0-5);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: var(--surface-1);
   border: 1px solid var(--line-2);
 }
@@ -458,7 +458,7 @@
   height: var(--control-h-xs);
   padding: 0 var(--sp-3);
   border: 1px solid transparent;
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: var(--action);
   color: var(--on-action);
   font: var(--type-label-strong);

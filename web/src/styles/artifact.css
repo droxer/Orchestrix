@@ -9,7 +9,7 @@
 .artifact-chip {
   min-width: 0;
   border: 1px solid var(--line-1);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: var(--surface-1);
   overflow: hidden;
   transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
@@ -246,7 +246,7 @@
   width: var(--control-h);
   height: var(--control-h);
   border: 0;
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: transparent;
   color: var(--info);
   cursor: pointer;
@@ -335,7 +335,7 @@
 .artifact-index-filter-btn {
   padding: var(--sp-0-5) var(--sp-3);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: transparent;
   color: var(--ink-3);
   font: var(--type-label-strong);
@@ -471,7 +471,7 @@
   height: var(--control-h-xs);
   padding: 0 var(--sp-3);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-full);
+  border-radius: var(--r-2);
   background: transparent;
   color: var(--ink-2);
   font: var(--type-label-strong);
