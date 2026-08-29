@@ -18,7 +18,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install agent CLIs
-RUN npm install -g @anthropic-ai/claude-code @openai/codex @earendil-works/pi-coding-agent @moonshot-ai/kimi-code
+RUN npm install -g \
+    @anthropic-ai/claude-code@2.1.251 \
+    @openai/codex@0.150.1 \
+    @earendil-works/pi-coding-agent@0.84.4 \
+    @moonshot-ai/kimi-code@0.39.1
 
 # UID/GID are aligned to the host workspace owner at runtime (orchestrator boot).
 RUN useradd -m -s /bin/bash agent
