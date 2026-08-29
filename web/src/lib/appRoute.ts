@@ -116,6 +116,69 @@ const TEAM_TABS = new Set(["profile", "activities"]);
 const PROJECT_TABS = new Set(["profile", "workspace", "activities"]);
 const AGENT_AVAILABILITY = new Set(["ready", "busy", "pending", "offline"]);
 
+/**
+ * Sort keys each list path owns, by the query param the table writes.
+ *
+ * Registered here for the same reason `?space=1` is: a param the path does
+ * not own is canonicalized straight back out, so a column header would toggle
+ * its caret and reorder nothing. The values are validated too — an unknown
+ * key would render a header with no active column while sorting nothing (see
+ * `parseSortParam`), so a stale link is dropped rather than half-honoured.
+ * Keep in sync with each surface's `SortColumn` set.
+ */
+const LIST_SORT_PARAMS: Record<string, Record<string, ReadonlySet<string>>> = {
+  backlog: { sort: new Set(["title", "status", "priority", "assignee", "due"]) },
+  routines: { sort: new Set(["title", "state", "priority", "assignee", "nextRun"]) },
+  // Two tables on one path, so each owns its own key.
+  admin: {
+    employeeSort: new Set(["employee", "computers", "localLimit", "running", "ready"]),
+    nodeSort: new Set(["node", "employee", "runtimes"]),
+  },
+};
+
+/**
+ * Page params each list path owns. Registered for the same reason as the sort
+ * keys above: without an entry the pager would advance its own highlight and
+ * then render page 1, because the param never survives the write.
+ */
+const LIST_PAGE_PARAMS: Record<string, readonly string[]> = {
+  // `lanes` is the board's per-lane cursor set, not a page number — it is
+  // copied verbatim and validated by `parseLanePages` on read, because the
+  // valid lane names are the task statuses and belong to lib/backlog.
+  backlog: ["page"],
+  routines: ["page"],
+  computer: ["page"],
+  // Two paged collections on one path, so each owns its own key.
+  admin: ["employeePage", "nodePage"],
+};
+
+/** Copies `?page=n` only for a path that pages, and only for a real page. */
+function copyPageParams(head: string, source: URLSearchParams, target: URLSearchParams): void {
+  // The board's per-lane cursors ride along on /backlog. Kept opaque here:
+  // `parseLanePages` drops unknown lanes and non-pages on read, so this only
+  // has to decide whether the path owns the key at all.
+  if (head === "backlog") copyParam(source, target, "lanes");
+  for (const param of LIST_PAGE_PARAMS[head] ?? []) {
+    const value = source.get(param);
+    // Page 1 is the default and carries no param, so the URL never advertises
+    // a page the reader is not on. Anything else `parsePageParam` would floor
+    // to 1 is dropped rather than echoed back.
+    if (value && /^\d+$/.test(value) && Number(value) > 1) target.set(param, value);
+  }
+}
+
+/** Copies `?sort=key` / `?sort=-key` only when the path declares that key. */
+function copySortParams(head: string, source: URLSearchParams, target: URLSearchParams): void {
+  const owned = LIST_SORT_PARAMS[head];
+  if (!owned) return;
+  for (const [param, keys] of Object.entries(owned)) {
+    const value = source.get(param);
+    if (!value) continue;
+    const key = value.startsWith("-") ? value.slice(1) : value;
+    if (keys.has(key)) target.set(param, value);
+  }
+}
+
 function copyParam(source: URLSearchParams, target: URLSearchParams, key: string): void {
   const value = source.get(key);
   if (value) target.set(key, value);
@@ -169,6 +232,9 @@ export function canonicalSearchForPath(pathname: string, search = ""): string {
     const requestedTab = source.get("tab");
     const tab = requestedTab && TEAM_TABS.has(requestedTab) ? requestedTab : "profile";
     if (tab !== "profile") target.set("tab", tab);
+  } else if (!entityId) {
+    copySortParams(head, source, target);
+    copyPageParams(head, source, target);
   }
 
   const encoded = target.toString();

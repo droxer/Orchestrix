@@ -19,7 +19,14 @@ import {
   ViewBoard,
   ViewList,
 } from "./icons";
-import { agentReadyForTask, canDiscussTask, discussionAgentsForTask, filterTasks, isTaskStatus, TASK_STATUSES, tasksByStatus } from "../lib/backlog";
+import { agentReadyForTask, backlogSortColumns, canDiscussTask, discussionAgentsForTask, filterTasks, isTaskStatus, TASK_STATUSES, tasksByStatus } from "../lib/backlog";
+import { applySort } from "../lib/listSort";
+import { LANE_PAGE_SIZE, paginate } from "../lib/pagination";
+import { useLanePagination, usePagination } from "../hooks/usePagination";
+import { Pagination } from "@/components/ui/Pagination";
+import { useListSort } from "../hooks/useListSort";
+import { SortableColumnHeader } from "@/components/ui/SortableColumnHeader";
+import { SortMenu } from "@/components/ui/SortMenu";
 import { readDraggedTaskId, TASK_DRAG_MEDIA_TYPE, taskDropRejection } from "../lib/taskDrag";
 import { emptyBacklogForm, taskAssignmentMutationFields, taskBoardFormsEqual, taskStartMutationInput, type BacklogTaskFormState } from "../lib/taskBoardForm";
 import { TaskDrawer } from "./task-board/TaskDrawer";
@@ -134,11 +141,49 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   const formDirty = Boolean(form && formBaseline && !taskBoardFormsEqual(form, formBaseline));
   const confirmDiscardChanges = useUnsavedChangesGuard(formDirty && !saving && !deleting);
   const backlogTasks = useMemo(() => tasks.filter((task) => !task.isRoutine), [tasks]);
-  const filteredTasks = useMemo(() => filterTasks(backlogTasks, filters), [backlogTasks, filters]);
+  /* Sort is applied AFTER filtering, over the one list both views read — the
+     board keeps its lanes and reorders WITHIN them, which is the only degree
+     of freedom a grouped view has. With no column chosen `applySort` is the
+     identity, so the considered default order `filterTasks` produces
+     (priority, then due date, then recency) survives untouched until the
+     reader asks for something else. */
+  const sortColumns = useMemo(
+    () => backlogSortColumns((task) => taskAssigneeDisplayName(task, currentUser, employeeNames) ?? ""),
+    [currentUser, employeeNames],
+  );
+  const { sort, toggleSort, setSort } = useListSort(sortColumns);
+  const { page, setPage } = usePagination();
+  const { lanePages, setLanePage } = useLanePagination(TASK_STATUSES);
+  const filteredTasks = useMemo(
+    () => applySort(filterTasks(backlogTasks, filters), sortColumns, sort),
+    [backlogTasks, filters, sort, sortColumns],
+  );
   const grouped = useMemo(() => tasksByStatus(filteredTasks), [filteredTasks]);
   const hasFilterResults = filteredTasks.length > 0;
   const showEmptyBoard = backlogTasks.length === 0 || !hasFilterResults;
-  const visibleIds = useMemo(() => filteredTasks.map((task) => task.id), [filteredTasks]);
+  /* The LIST is paged; the board is not. A board page would draw its
+     screenful across all seven lanes at once, so a lane could go empty
+     because of a cursor rather than because nothing is in that state — and
+     dropping a card into a lane whose contents are a page of an unseen whole
+     has no defined meaning. Per-lane paging is the shape that would work
+     there, and it is a different control. */
+  const pagedTasks = useMemo(() => paginate(filteredTasks, page), [filteredTasks, page]);
+  /* Each lane pages on its own cursor, at a tighter size than the list — a
+     lane is one narrow column, not the whole viewport. Built here rather than
+     inside the lane loop so the drag handlers below can ask what a lane is
+     actually showing. */
+  const pagedLanes = useMemo(
+    () => Object.fromEntries(TASK_STATUSES.map((status) => [
+      status,
+      paginate(grouped[status], lanePages[status] ?? 1, LANE_PAGE_SIZE),
+    ])) as Record<TaskStatus, ReturnType<typeof paginate<RelayTaskListItem>>>,
+    [grouped, lanePages],
+  );
+  /* Selection follows what is on screen. In list view that is the current
+     page, so "select all" then Delete cannot reach a row the reader never
+     saw; on the board it stays the whole filtered set. */
+  const visibleTasks = view === "list" ? pagedTasks.items : filteredTasks;
+  const visibleIds = useMemo(() => visibleTasks.map((task) => task.id), [visibleTasks]);
   // Derived, not stored: a task hidden by a filter (or deleted elsewhere) drops
   // out of the selection immediately, so a batch action can never reach a
   // record the board is no longer showing.
@@ -450,7 +495,25 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
       {backlogTasks.length > 0 ? (
         <>
           <BacklogStats tasks={backlogTasks} />
-          <BacklogFiltersBar filters={filters} agents={logicalAgents} onChange={setFilters} />
+          <BacklogFiltersBar
+            filters={filters}
+            agents={logicalAgents}
+            onChange={setFilters}
+            sortMenu={
+              <SortMenu
+                options={[
+                  { key: "title", label: t("backlog.col_task") },
+                  { key: "status", label: t("backlog.status") },
+                  { key: "priority", label: t("backlog.priority") },
+                  { key: "assignee", label: t("backlog.assignee") },
+                  { key: "due", label: t("backlog.due") },
+                ]}
+                sort={sort}
+                onSortChange={setSort}
+                label={t("backlog.sort_label")}
+              />
+            }
+          />
         </>
       ) : null}
 
@@ -469,7 +532,10 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
           );
         })()
       ) : view === "list" ? (
-        <div className="backlog-rows" role="table" data-density="compact" aria-label={t("backlog.title")}>
+        <>
+          {/* The pager is a sibling of the scroller, not a row inside it, so
+              it stays put while the rows move under it. */}
+          <div className="backlog-rows" role="table" data-density="compact" aria-label={t("backlog.title")}>
           <div className="backlog-rows-head" role="row">
             <span className="backlog-rows-head-cell backlog-rows-head-select" role="columnheader">
               <TaskSelectAllCheckbox
@@ -479,11 +545,42 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
               />
             </span>
             <span className="backlog-rows-head-cell backlog-rows-head-dot" role="columnheader" />
-            <span className="backlog-rows-head-cell backlog-rows-head-lead" role="columnheader">{t("backlog.col_task")}</span>
-            <span className="backlog-rows-head-cell backlog-rows-head-status" role="columnheader">{t("backlog.status")}</span>
-            <span className="backlog-rows-head-cell backlog-rows-head-tags" role="columnheader">{t("backlog.priority")}</span>
-            <span className="backlog-rows-head-cell backlog-rows-head-assignee" role="columnheader">{t("backlog.assignee")}</span>
-            <span className="backlog-rows-head-cell backlog-rows-head-due" role="columnheader">{t("backlog.due")}</span>
+            <SortableColumnHeader
+              className="backlog-rows-head-cell backlog-rows-head-lead"
+              label={t("backlog.col_task")}
+              sortKey="title"
+              sort={sort}
+              onSort={toggleSort}
+            />
+            <SortableColumnHeader
+              className="backlog-rows-head-cell backlog-rows-head-status"
+              label={t("backlog.status")}
+              sortKey="status"
+              sort={sort}
+              onSort={toggleSort}
+            />
+            <SortableColumnHeader
+              className="backlog-rows-head-cell backlog-rows-head-tags"
+              label={t("backlog.priority")}
+              sortKey="priority"
+              sort={sort}
+              onSort={toggleSort}
+            />
+            <SortableColumnHeader
+              className="backlog-rows-head-cell backlog-rows-head-assignee"
+              label={t("backlog.assignee")}
+              sortKey="assignee"
+              sort={sort}
+              onSort={toggleSort}
+            />
+            <SortableColumnHeader
+              className="backlog-rows-head-cell backlog-rows-head-due"
+              label={t("backlog.due")}
+              sortKey="due"
+              sort={sort}
+              onSort={toggleSort}
+            />
+            {/* Actions is not a column of data — there is nothing to order by. */}
             <span className="backlog-rows-head-cell backlog-rows-head-actions" role="columnheader">{t("backlog.actions")}</span>
           </div>
           {inlineCreateStatus ? (
@@ -494,7 +591,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
               />
             </div>
           ) : null}
-          {filteredTasks.map((task) => {
+          {pagedTasks.items.map((task) => {
             const discussionAgents = discussionAgentsForTask(task, nodes, logicalAgents);
             const assignment = taskAssignmentDisplay(task);
             return (
@@ -512,7 +609,9 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
               />
             );
           })}
-        </div>
+          </div>
+          <Pagination page={pagedTasks} onPageChange={setPage} label={t("backlog.title")} />
+        </>
       ) : (
         <div
           ref={boardRef}
@@ -539,7 +638,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
               <div className="backlog-task-list">
                 {grouped[status].length === 0 && inlineCreateStatus !== status ? (
                   <p className="backlog-empty">{t("backlog.empty_lane")}</p>
-                ) : grouped[status].map((task) => {
+                ) : pagedLanes[status].items.map((task) => {
                   const session = linkedSession(task);
                   const discussionAgents = discussionAgentsForTask(task, nodes, logicalAgents);
                   const assignment = taskAssignmentDisplay(task);
@@ -580,6 +679,15 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
                   </Button>
                 )}
               </div>
+              {/* Inside the lane, under its cards — the cursor belongs to this
+                  lane and nothing about it is true of the board. */}
+              <Pagination
+                compact
+                className="backlog-lane-pager"
+                page={pagedLanes[status]}
+                onPageChange={(next) => setLanePage(status, next)}
+                label={t(`backlog.statuses.${status}`)}
+              />
             </section>
           ))}
         </div>

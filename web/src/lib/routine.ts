@@ -1,3 +1,5 @@
+import { TASK_PRIORITIES } from "./backlog.ts";
+import { byDate, byRank, byText, type SortColumn } from "./listSort.ts";
 import type { RelaySession, RelayTaskListItem, TaskRoutineCadence, TaskRoutineType } from "../types.js";
 
 export const TASK_ROUTINE_TYPES: TaskRoutineType[] = ["task", "job"];
@@ -65,6 +67,57 @@ export function routineState(
   if (routine.routineNextRunDate < today) return "overdue";
   if (routine.routineNextRunDate === today) return "due";
   return "scheduled";
+}
+
+/**
+ * Schedule urgency, most urgent first — the order the state column sorts by.
+ * It is not the order `RoutineState` happens to be declared in: that union
+ * lists the states, this ranks them. A live run outranks an overdue schedule
+ * because it is the thing you can still act on.
+ */
+export const ROUTINE_STATE_ORDER: readonly RoutineState[] = [
+  "running",
+  "overdue",
+  "due",
+  "scheduled",
+  "unscheduled",
+  "paused",
+];
+
+/** The keys the routine list's sortable column headers speak. */
+export type RoutineSortKey = "title" | "state" | "priority" | "assignee" | "nextRun";
+
+/**
+ * Sortable columns for the routine list, in header order.
+ *
+ * State is derived, not stored (see `routineState` above), so its comparator
+ * closes over the same `running` set the rows render from — sorting off the
+ * dormant `status` field would order the list by the noise that function
+ * exists to ignore.
+ */
+export function routineSortColumns(
+  running: ReadonlySet<string>,
+  assigneeName: (task: RelayTaskListItem) => string,
+  today = isoToday(),
+): readonly SortColumn<RelayTaskListItem, RoutineSortKey>[] {
+  return [
+    { key: "title", compare: byText((task) => task.title) },
+    {
+      key: "state",
+      compare: byRank((task) => routineState(task, running, today), ROUTINE_STATE_ORDER),
+    },
+    { key: "priority", compare: byRank((task) => task.priority, TASK_PRIORITIES) },
+    {
+      key: "assignee",
+      compare: byText(assigneeName),
+      isMissing: (task) => !assigneeName(task).trim(),
+    },
+    {
+      key: "nextRun",
+      compare: byDate((task) => task.routineNextRunDate),
+      isMissing: (task) => !task.routineNextRunDate,
+    },
+  ];
 }
 
 export function routineDueTone(task: RelayTaskListItem, today = isoToday()): "neutral" | "warn" | "bad" {

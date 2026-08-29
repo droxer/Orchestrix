@@ -18,6 +18,9 @@ import { ComputerTokenDrawer } from "./computer/ComputerTokenDrawer";
 import { ManageExecutorsDrawer } from "./admin/ManageExecutorsDrawer";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "./PageHeader";
+import { paginate } from "../lib/pagination";
+import { usePagination } from "../hooks/usePagination";
+import { Pagination } from "@/components/ui/Pagination";
 import { RelayEmptyState } from "./RelayEmptyState";
 import {
   ActionAdd,
@@ -44,6 +47,7 @@ export function ComputerPage({
   const [manageExecutorsNodeId, setManageExecutorsNodeId] = useState<string | null>(null);
   const [tokenNodeId, setTokenNodeId] = useState<string | null>(null);
   const [connectDrawerOpen, setConnectDrawerOpen] = useState(false);
+  const { page, setPage } = usePagination();
   // Removed ids are held locally so the row disappears on confirm instead of
   // lingering until the next 3s poll catches up with the delete.
   const [removedIds, setRemovedIds] = useState<string[]>([]);
@@ -76,6 +80,8 @@ export function ComputerPage({
     const removed = new Set(removedIds);
     return [...newlyConnected, ...merged].filter((node) => !removed.has(node.id));
   }, [nodes, currentUser.employeeId, overrides, removedIds]);
+
+  const pagedNodes = useMemo(() => paginate(myNodes, page), [myNodes, page]);
   const manageExecutorsNode = myNodes.find((node) => node.id === manageExecutorsNodeId) ?? null;
   const tokenNode = myNodes.find((node) => node.id === tokenNodeId) ?? null;
 
@@ -194,7 +200,7 @@ export function ComputerPage({
           />
         ) : (
           <ul className="computer-list">
-            {myNodes.map((node) => (
+            {pagedNodes.items.map((node) => (
               <li key={node.id}>
                 <ComputerCard
                   node={node}
@@ -209,6 +215,10 @@ export function ComputerPage({
             ))}
           </ul>
         )}
+        {/* Each card is a full record rather than a tile, so a handful of
+            machines already fills the viewport — the pager stays absent below
+            the threshold and only appears for a fleet that needs it. */}
+        <Pagination page={pagedNodes} onPageChange={setPage} label={t("computer.title")} />
       </div>
       <ManageExecutorsDrawer
         open={manageExecutorsNodeId !== null}

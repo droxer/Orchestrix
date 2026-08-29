@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { useRelayMutations } from "../hooks/useRelayMutations";
@@ -24,7 +24,14 @@ import { TaskAssignee, TaskExecutionBadge } from "./TaskAssignee";
 import { isTaskAssigneeCurrentUser, taskAssigneeDisplayName, teamReady } from "../lib/taskAssignment";
 import { useEmployeeNames } from "../hooks/useEmployeeNames";
 import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
-import { filterRoutineTasks, latestRoutineSession, routineDueTone, routineState, runningRoutineCount, runningRoutineIds, TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, type RoutineFilters, type RoutineState } from "../lib/routine";
+import { filterRoutineTasks, latestRoutineSession, routineDueTone, routineSortColumns, routineState, runningRoutineCount, runningRoutineIds, TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, type RoutineFilters, type RoutineState } from "../lib/routine";
+import { applySort } from "../lib/listSort";
+import { paginate } from "../lib/pagination";
+import { usePagination } from "../hooks/usePagination";
+import { Pagination } from "@/components/ui/Pagination";
+import { useListSort } from "../hooks/useListSort";
+import { SortableColumnHeader } from "@/components/ui/SortableColumnHeader";
+import { SortMenu } from "@/components/ui/SortMenu";
 import { ROUTINE_STATE_SHAPE, RoutineStateBadge } from "./RoutineStateBadge";
 import { StateMark } from "./StateMark";
 import { emptyRoutineForm, taskAssignmentMutationFields, taskBoardFormsEqual, taskStartMutationInput, type RoutineTaskFormState } from "../lib/taskBoardForm";
@@ -131,7 +138,7 @@ function formatNextRunDate(value: string): string {
   }).format(date);
 }
 
-function RoutineFiltersBar({ filters, agents, onChange }: { filters: RoutineFilters; agents: EmployeeAgent[]; onChange: (next: RoutineFilters) => void }) {
+function RoutineFiltersBar({ filters, agents, onChange, sortMenu }: { filters: RoutineFilters; agents: EmployeeAgent[]; onChange: (next: RoutineFilters) => void; sortMenu?: ReactNode }) {
   const { t } = useTranslation();
 
   return (
@@ -143,6 +150,7 @@ function RoutineFiltersBar({ filters, agents, onChange }: { filters: RoutineFilt
       onQueryChange={(query) => onChange({ ...filters, query })}
       activeCount={activeFilterCount(filters)}
       onClear={() => onChange(initialFilters)}
+      trailing={sortMenu}
     >
       <FilterSelect
         name="routine-type-filter"
@@ -481,11 +489,29 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
   const formDirty = Boolean(form && formBaseline && !taskBoardFormsEqual(form, formBaseline));
   const confirmDiscardChanges = useUnsavedChangesGuard(formDirty && !saving && !deleting);
   const routineTasks = useMemo(() => tasks.filter((task) => task.isRoutine), [tasks]);
-  const filteredTasks = useMemo(() => filterRoutineTasks(tasks, filters), [tasks, filters]);
   // Derived once for the whole board: `routineState` then costs a Set lookup
   // per card instead of a full task scan.
   const runningIds = useMemo(() => runningRoutineIds(tasks), [tasks]);
-  const visibleIds = useMemo(() => filteredTasks.map((task) => task.id), [filteredTasks]);
+  /* The state column sorts by DERIVED schedule health, so its comparator has
+     to close over the same `runningIds` the rows render from — see
+     `routineSortColumns`. Unsorted, `applySort` is the identity and
+     `filterRoutineTasks`' own order (enabled first, then next run) stands. */
+  const sortColumns = useMemo(
+    () => routineSortColumns(runningIds, (task) => taskAssigneeDisplayName(task, currentUser, employeeNames) ?? ""),
+    [currentUser, employeeNames, runningIds],
+  );
+  const { sort, toggleSort, setSort } = useListSort(sortColumns);
+  const { page, setPage } = usePagination();
+  const filteredTasks = useMemo(
+    () => applySort(filterRoutineTasks(tasks, filters), sortColumns, sort),
+    [filters, sort, sortColumns, tasks],
+  );
+  // Both views are flat collections of the same routines, so both page — and
+  // off one cursor, so switching card/list keeps the reader where they were.
+  const pagedTasks = useMemo(() => paginate(filteredTasks, page), [filteredTasks, page]);
+  // Selection follows what is on screen, so "select all" then Delete cannot
+  // reach a routine on a page the reader never saw.
+  const visibleIds = useMemo(() => pagedTasks.items.map((task) => task.id), [pagedTasks]);
   // Derived, not stored: a routine hidden by a filter (or deleted elsewhere)
   // drops out of the selection immediately, so a batch action can never reach
   // a record the board is no longer showing.
@@ -672,7 +698,25 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
       />
 
       <RoutineStats routines={routineTasks} tasks={tasks} />
-      <RoutineFiltersBar filters={filters} agents={logicalAgents} onChange={setFilters} />
+      <RoutineFiltersBar
+        filters={filters}
+        agents={logicalAgents}
+        onChange={setFilters}
+        sortMenu={
+          <SortMenu
+            options={[
+              { key: "title", label: t("backlog.col_task") },
+              { key: "state", label: t("routine.state") },
+              { key: "priority", label: t("backlog.priority") },
+              { key: "assignee", label: t("backlog.assignee") },
+              { key: "nextRun", label: t("routine.next_run") },
+            ]}
+            sort={sort}
+            onSortChange={setSort}
+            label={t("routine.sort_label")}
+          />
+        }
+      />
 
       {filteredTasks.length === 0 ? (
         <BoardEmpty
@@ -682,7 +726,10 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
           onCreate={routineTasks.length === 0 ? () => openRoutineForm(emptyRoutineForm(currentUser)) : undefined}
         />
       ) : view === "list" ? (
-        <div className="backlog-rows" role="table" aria-label={t("routine.title")}>
+        <>
+          {/* The pager is a sibling of the scroller, not a row inside it, so
+              it stays put while the rows move under it. */}
+          <div className="backlog-rows" role="table" aria-label={t("routine.title")}>
           <div className="backlog-rows-head" role="row">
             <span className="backlog-rows-head-cell backlog-rows-head-select" role="columnheader">
               <TaskSelectAllCheckbox
@@ -692,14 +739,45 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
               />
             </span>
             <span className="backlog-rows-head-cell backlog-rows-head-dot" role="columnheader" />
-            <span className="backlog-rows-head-cell backlog-rows-head-lead" role="columnheader">{t("backlog.col_task")}</span>
-            <span className="backlog-rows-head-cell backlog-rows-head-status" role="columnheader">{t("routine.state")}</span>
-            <span className="backlog-rows-head-cell backlog-rows-head-tags" role="columnheader">{t("backlog.priority")}</span>
-            <span className="backlog-rows-head-cell backlog-rows-head-assignee" role="columnheader">{t("backlog.assignee")}</span>
-            <span className="backlog-rows-head-cell backlog-rows-head-due" role="columnheader">{t("routine.next_run")}</span>
+            <SortableColumnHeader
+              className="backlog-rows-head-cell backlog-rows-head-lead"
+              label={t("backlog.col_task")}
+              sortKey="title"
+              sort={sort}
+              onSort={toggleSort}
+            />
+            <SortableColumnHeader
+              className="backlog-rows-head-cell backlog-rows-head-status"
+              label={t("routine.state")}
+              sortKey="state"
+              sort={sort}
+              onSort={toggleSort}
+            />
+            <SortableColumnHeader
+              className="backlog-rows-head-cell backlog-rows-head-tags"
+              label={t("backlog.priority")}
+              sortKey="priority"
+              sort={sort}
+              onSort={toggleSort}
+            />
+            <SortableColumnHeader
+              className="backlog-rows-head-cell backlog-rows-head-assignee"
+              label={t("backlog.assignee")}
+              sortKey="assignee"
+              sort={sort}
+              onSort={toggleSort}
+            />
+            <SortableColumnHeader
+              className="backlog-rows-head-cell backlog-rows-head-due"
+              label={t("routine.next_run")}
+              sortKey="nextRun"
+              sort={sort}
+              onSort={toggleSort}
+            />
+            {/* Actions is not a column of data — there is nothing to order by. */}
             <span className="backlog-rows-head-cell backlog-rows-head-actions" role="columnheader">{t("backlog.actions")}</span>
           </div>
-          {filteredTasks.map((task) => {
+          {pagedTasks.items.map((task) => {
             const session = linkedSession(task);
             const assignment = taskAssignmentDisplay(task);
             return (
@@ -718,10 +796,13 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
               />
             );
           })}
-        </div>
+          </div>
+          <Pagination page={pagedTasks} onPageChange={setPage} label={t("routine.title")} />
+        </>
       ) : (
-        <div className="routine-list">
-          {filteredTasks.map((task) => {
+        <>
+          <div className="routine-list">
+          {pagedTasks.items.map((task) => {
             const session = linkedSession(task);
             const assignment = taskAssignmentDisplay(task);
             return (
@@ -740,7 +821,9 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
               />
             );
           })}
-        </div>
+          </div>
+          <Pagination page={pagedTasks} onPageChange={setPage} label={t("routine.title")} />
+        </>
       )}
 
       <TaskSelectionBar

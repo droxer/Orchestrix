@@ -375,7 +375,8 @@
     "bulk_delete_body_one": "所選的 {{count}} 個任務將從待辦中移除，關聯的話題、產物與執行歷史仍會保留。",
     "bulk_delete_body_other": "所選的 {{count}} 個任務將從待辦中移除，關聯的話題、產物與執行歷史仍會保留。",
     "toast_bulk_deleted_one": "已刪除 {{count}} 個任務。",
-    "toast_bulk_deleted_other": "已刪除 {{count}} 個任務。"
+    "toast_bulk_deleted_other": "已刪除 {{count}} 個任務。",
+    "sort_label": "任務排序"
   },
   "workspace": {
     "title": "工作區",
@@ -609,7 +610,8 @@
     "bulk_delete_body_one": "將刪除所選的 {{count}} 個例行任務及其排程，且不會再次執行。既有執行紀錄與話題仍會保留。",
     "bulk_delete_body_other": "將刪除所選的 {{count}} 個例行任務及其排程，且不會再次執行。既有執行紀錄與話題仍會保留。",
     "toast_bulk_deleted_one": "已刪除 {{count}} 個例行任務。",
-    "toast_bulk_deleted_other": "已刪除 {{count}} 個例行任務。"
+    "toast_bulk_deleted_other": "已刪除 {{count}} 個例行任務。",
+    "sort_label": "例程排序"
   },
   "admin": {
     "title": "管理",
@@ -1434,5 +1436,19 @@
     "new_task": "新增任務",
     "new_thread": "新對話",
     "send_message": "傳送訊息"
+  },
+  "list": {
+    "sort_by_ascending": "依{{column}}升冪排序",
+    "sort_by_descending": "依{{column}}降冪排序",
+    "sort_clear": "清除依{{column}}的排序",
+    "pagination_label": "{{collection}}分頁",
+    "pagination_range": "第 {{from}}–{{to}} 項，共 {{total}} 項",
+    "pagination_previous": "上一頁",
+    "pagination_next": "下一頁",
+    "pagination_page": "第 {{page}} 頁",
+    "sort_none": "預設排序",
+    "sort_option_ascending": "{{column}} ↑",
+    "sort_option_descending": "{{column}} ↓",
+    "pagination_range_compact": "第 {{page}}/{{pageCount}} 頁 · 共 {{total}} 項"
   }
 }

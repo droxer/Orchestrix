@@ -1,0 +1,167 @@
+/* ============================ list sort ============================
+   The column-header sort affordance, shared by every full-page list table
+   (backlog, routines, the admin employee and node tables).
+
+   It deliberately owns no geometry. The head cell keeps its own class from
+   its own stylesheet — `.backlog-rows-head-due` is where the 116px track is
+   declared, and the row cell beside it reads the same rule — so this sheet
+   styles only what sits INSIDE that cell. Adding a width here would
+   reintroduce exactly the head/row drift backlog-list.css warns about. */
+
+.list-sort-button {
+  /* The head cell already carries the micro-caps role; the button inherits
+     it rather than restating the type, so a header reads identically whether
+     or not its column happens to be sortable. */
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: inherit;
+  transition: color var(--t-fast) var(--ease);
+}
+
+.list-sort-button[data-align="end"] { justify-content: flex-end; }
+
+.list-sort-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A sorted column is the loudest label in the header row — it is the one fact
+   the reader needs to recover after coming back to a linked view. */
+.list-sort-button:hover,
+.list-sort-button[data-active="true"] { color: var(--ink-1); }
+
+.list-sort-caret {
+  flex: none;
+  /* The box is reserved on every sortable column even when the caret is
+     invisible: revealing it on hover would otherwise shove the neighbouring
+     column labels sideways under the pointer. */
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--ease);
+}
+
+.list-sort-button:hover .list-sort-caret,
+.list-sort-button:focus-visible .list-sort-caret,
+.list-sort-button[data-active="true"] .list-sort-caret { opacity: 1; }
+
+/* Touch has no hover, so the neutral double-caret is the only thing that says
+   these headers are pressable at all. */
+@media (hover: none) {
+  .list-sort-caret { opacity: 1; }
+}
+
+/* The narrow-width sort control.
+   ------------------------------
+   Sorting belongs on the column headers while there ARE columns, but every one
+   of these tables restacks into cards on a narrow screen and hides its header
+   row — which would leave sorting reachable on a laptop and unreachable on a
+   phone. The menu is the same state behind a different control, so it must
+   appear exactly where the header vanishes and never alongside it.
+
+   The two tiers below are not a choice, they are the two widths the tables
+   already restack at: the backlog and routine lists at the app-wide 820 tier
+   (backlog-list.css hides `.backlog-rows-head`), and the admin tables at 719
+   (admin-v2-employees.css hides `.adm-emp-cols`, admin-v2-nodes.css hides
+   `.adm-node-cols`). Both rules are here rather than in those three
+   stylesheets so the pair can be read — and kept in step — at once. Move a
+   table's restack breakpoint and you have to move its line here too. */
+.list-sort-menu { display: none; }
+
+@media (max-width: 820px) {
+  .backlog-page .list-sort-menu { display: flex; }
+}
+
+@media (max-width: 719px) {
+  .adm-view .list-sort-menu { display: flex; }
+}
+
+/* ============================ list pager ============================
+   The pager under a list or card grid. Shared by every paginated surface, so
+   moving between the backlog list, the routine cards, and the admin tables
+   never changes what the control looks like or where it sits.
+
+   It is a peer of the list, not part of it: the lists scroll their rows in
+   their own container, so the pager sits OUTSIDE that scroller and stays put
+   while the rows move under it. A pager that scrolled away with the last row
+   is one the reader has to reach the bottom to use. */
+
+.list-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2) var(--sp-4);
+  padding: var(--sp-3) var(--page-gutter);
+  border-top: 0.5px solid var(--line-1);
+}
+
+/* The count is the part that earns its place on every page — it is the only
+   thing on screen saying how much is NOT shown. */
+.list-pager-range {
+  margin: 0;
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.list-pager-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.list-pager-page,
+.list-pager-step {
+  min-width: var(--control-h-xs);
+  height: var(--control-h-xs);
+  padding-inline: var(--sp-2);
+  border-radius: var(--r-full);
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
+  color: var(--ink-2);
+}
+
+/* The current page is the only filled control in the row, so it reads as
+   "you are here" rather than as one more button to press. */
+.list-pager-page[data-active="true"] {
+  background: var(--action);
+  color: var(--on-action);
+}
+
+.list-pager-step:disabled {
+  color: var(--ink-4);
+  cursor: default;
+}
+
+/* Not a button: it names what was elided, so it must not look pressable. */
+.list-pager-gap {
+  padding-inline: var(--sp-1);
+  color: var(--ink-4);
+  user-select: none;
+}
+
+@media (max-width: 820px) {
+  .list-pager { padding-inline: var(--sp-4); }
+}
+
+/* Inside a board lane the pager is a footer for one column, not a bar under
+   the page: no top rule (the lane already has its own edge), no page gutter,
+   and the compact variant drops the numbered buttons — see Pagination. */
+.backlog-lane-pager {
+  padding: var(--sp-2) 0 0;
+  border-top: 0;
+}

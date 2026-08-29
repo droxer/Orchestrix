@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import { backendPublicOrigin } from "./apiOrigin.ts";
+import { byNumber, byText, type SortColumn } from "./listSort.ts";
 import type { AgentName, ControlPanelDaemonNodeRecord, EmployeeAgent, EmployeeRecord, LogicalAgentAvailability, Tone } from "../types.js";
 
 export const ADMIN_AGENTS_KEY = ["admin", "agents"] as const;
@@ -304,6 +305,69 @@ export function buildEmployeeSummaries(
       localComputerCount,
     };
   });
+}
+
+/**
+ * Sort keys for the admin node table. There is deliberately no `status` key:
+ * health is rendered as pills INSIDE the node cell rather than in a column of
+ * its own, and a sort the header cannot offer is a sort no reader can reach.
+ * Give status its own column first if this table ever needs to order by it.
+ */
+export type NodeSortKey = "node" | "employee" | "runtimes";
+
+/**
+ * Sortable columns for the admin node table, in header order.
+ *
+ * The employee column takes the map rather than an id because the row prints
+ * the owner's display NAME; sorting by `employeeId` would order the table by
+ * a string that is nowhere on screen.
+ */
+export function nodeSortColumns(
+  employeeById: ReadonlyMap<string, EmployeeRecord>,
+): readonly SortColumn<ControlPanelDaemonNodeRecord, NodeSortKey>[] {
+  const ownerName = (node: ControlPanelDaemonNodeRecord) =>
+    (node.employeeId && employeeById.get(node.employeeId)?.displayName) || node.employeeId || "";
+  return [
+    // Same label rule as `stableNodeOrder`: an unnamed machine sorts under its id.
+    { key: "node", compare: byText((node) => node.displayName?.trim() || node.id) },
+    {
+      key: "employee",
+      compare: byText(ownerName),
+      // "Nobody owns this" is a gap, not a name — it belongs at the bottom
+      // whichever way the column is pointed.
+      isMissing: (node) => !node.employeeId,
+    },
+    {
+      key: "runtimes",
+      compare: byNumber((node) => visibleNodeAgentNames(node).length),
+      defaultDirection: "desc",
+    },
+  ];
+}
+
+export type EmployeeSortKey = "employee" | "computers" | "localLimit" | "running" | "ready";
+
+/**
+ * Sortable columns for the admin employee table, in header order.
+ *
+ * Every count column opens descending: a reader sorting by "Running" is
+ * asking who has the most work in flight, and an ascending first click would
+ * answer with a screenful of zeroes.
+ */
+export function employeeSortColumns(): readonly SortColumn<EmployeeNodeSummary, EmployeeSortKey>[] {
+  return [
+    { key: "employee", compare: byText((member) => member.displayName) },
+    { key: "computers", compare: byNumber((member) => member.nodeCount), defaultDirection: "desc" },
+    {
+      key: "localLimit",
+      // The ratio's numerator is what varies per person; the cap beside it is
+      // usually the org default, so ordering by usage is the useful sort.
+      compare: byNumber((member) => member.localComputerCount),
+      defaultDirection: "desc",
+    },
+    { key: "running", compare: byNumber((member) => member.runningCount), defaultDirection: "desc" },
+    { key: "ready", compare: byNumber((member) => member.readyCount), defaultDirection: "desc" },
+  ];
 }
 
 // Agents are placed on computers, not owned by employees. An agent belongs to a

@@ -1,3 +1,4 @@
+import { byDate, byRank, byText, type SortColumn } from "./listSort.ts";
 import type { AgentName, DaemonNodeMonitorRecord, EmployeeAgent, RelayTaskListItem, TaskPriority, TaskStatus } from "../types.js";
 
 export const TASK_STATUSES: TaskStatus[] = ["backlog", "assigned", "running", "waiting_for_human", "review", "blocked", "done"];
@@ -30,6 +31,39 @@ export function filterTasks(tasks: RelayTaskListItem[], filters: BacklogFilters,
     if (filters.due === "unscheduled" && task.dueDate) return false;
     return true;
   }).sort(compareTasks);
+}
+
+/** The keys the backlog list's sortable column headers speak. */
+export type BacklogSortKey = "title" | "status" | "priority" | "assignee" | "due";
+
+/**
+ * Sortable columns for the backlog list, in header order.
+ *
+ * `assigneeName` is injected rather than read off the task because the row
+ * prints a RESOLVED display name — sorting by `assigneeEmployeeId` would
+ * order the list by a string the reader cannot see, which reads as no sort
+ * at all. Same reason the enumerated columns rank by their domain order:
+ * "high, low, normal" is alphabetical, not a priority ordering.
+ */
+export function backlogSortColumns(
+  assigneeName: (task: RelayTaskListItem) => string,
+): readonly SortColumn<RelayTaskListItem, BacklogSortKey>[] {
+  return [
+    { key: "title", compare: byText((task) => task.title) },
+    { key: "status", compare: byRank((task) => task.status, TASK_STATUSES) },
+    { key: "priority", compare: byRank((task) => task.priority, TASK_PRIORITIES) },
+    {
+      key: "assignee",
+      compare: byText(assigneeName),
+      isMissing: (task) => !assigneeName(task).trim(),
+    },
+    {
+      key: "due",
+      compare: byDate((task) => task.dueDate),
+      // Undated is not "earliest". It sinks either way round.
+      isMissing: (task) => !task.dueDate,
+    },
+  ];
 }
 
 export function isTaskStatus(value: string | null | undefined): value is TaskStatus {

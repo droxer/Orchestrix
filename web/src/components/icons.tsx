@@ -70,6 +70,9 @@ import {
   X,
   Check as LucideCheck,
   ChevronDown as LucideChevronDown,
+  ChevronLeft as LucideChevronLeft,
+  ChevronRight as LucideChevronRight,
+  ChevronsUpDown,
   ChevronUp as LucideChevronUp,
   X as LucideX,
   type LucideIcon,
@@ -320,6 +323,18 @@ export const CheckIcon = withStandardStroke(LucideCheck, "CheckIcon");
 export const ChevronDownIcon = withStandardStroke(LucideChevronDown, "ChevronDownIcon");
 export const ChevronUpIcon = withStandardStroke(LucideChevronUp, "ChevronUpIcon");
 export const XIcon = withStandardStroke(LucideX, "XIcon");
+
+// Column-header sort affordance. Three states, one glyph slot: the active
+// column shows the direction it is sorted in, every other sortable column
+// shows the neutral double caret so the header advertises that it CAN sort
+// without four competing arrows fighting the column labels for attention.
+export const SortAscending = withStandardStroke(LucideChevronUp, "SortAscending");
+export const SortDescending = withStandardStroke(LucideChevronDown, "SortDescending");
+export const SortInactive = withStandardStroke(ChevronsUpDown, "SortInactive");
+
+// Pager steps. Same chevron family as the sort carets, one axis over.
+export const PagePrevious = withStandardStroke(LucideChevronLeft, "PagePrevious");
+export const PageNext = withStandardStroke(LucideChevronRight, "PageNext");
 
 // Generic actions not covered above.
 export const ActionAdd = withStandardStroke(Plus, "ActionAdd");

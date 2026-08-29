@@ -15,6 +15,14 @@ import { useDialogs } from "@/components/ui/DialogProvider";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
 import { SearchInput } from "@/components/ui/search-input";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
+import { applySort } from "../../lib/listSort";
+import { paginate } from "../../lib/pagination";
+import { usePagination } from "../../hooks/usePagination";
+import { Pagination } from "@/components/ui/Pagination";
+import { useListSort } from "../../hooks/useListSort";
+import { SortableColumnHeader } from "@/components/ui/SortableColumnHeader";
+import { SortMenu } from "@/components/ui/SortMenu";
+import { employeeSortColumns } from "../../lib/adminHelpers";
 import {
   buildEmployeeSummaries,
   employeeEmptyStateTranslationKey,
@@ -112,9 +120,15 @@ export function EmployeesView({
     return result;
   }, [summaries]);
 
+  const sortColumns = useMemo(() => employeeSortColumns(), []);
+  // A distinct param: the admin page keeps Employees and Nodes on one route,
+  // so a bare `sort` would have the two tables fighting over one key.
+  const { sort, toggleSort, setSort } = useListSort(sortColumns, "employeeSort");
+  const { page, setPage } = usePagination("employeePage");
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return summaries.filter((item) => {
+    const matching = summaries.filter((item) => {
       if (!matchesEmployeeQuickFilter(item, filter)) return false;
       if (!q) return true;
       // Computers are what the row shows, so they are what search matches —
@@ -130,7 +144,13 @@ export function EmployeesView({
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [summaries, query, filter]);
+    // Unsorted, `buildEmployeeSummaries`' id order stands — applySort is identity.
+    return applySort(matching, sortColumns, sort);
+  }, [summaries, query, filter, sort, sortColumns]);
+
+  // One cursor for both layouts: switching card/list keeps the reader on the
+  // same people rather than resetting them to the top of the roster.
+  const paged = paginate(filtered, page);
 
   if (summaries.length === 0) {
     return (
@@ -170,6 +190,20 @@ export function EmployeesView({
             );
           })}
         </div>
+        {/* Sits with the layout toggle, not inside the filter chips: at the
+            widths it appears, it is the only way to sort at all. */}
+        <SortMenu
+          options={[
+                  { key: "employee", label: t("admin.col_employee") },
+                  { key: "computers", label: t("admin.v2.col_computers"), defaultDirection: "desc" as const },
+                  { key: "localLimit", label: t("admin.v2.col_local_limit"), defaultDirection: "desc" as const },
+                  { key: "running", label: t("admin.v2.col_running"), defaultDirection: "desc" as const },
+                  { key: "ready", label: t("admin.v2.col_ready"), defaultDirection: "desc" as const },
+        ]}
+          sort={sort}
+          onSortChange={setSort}
+          label={t("admin.v2.nav_employees", { defaultValue: "Employees" })}
+        />
         <AdminLayoutToggle layout={layout} onChange={onLayoutChange} />
       </div>
 
@@ -195,7 +229,7 @@ export function EmployeesView({
         />
       ) : layout === "card" ? (
         <div className="adm-fleet-grid">
-          {filtered.map((member) => (
+          {paged.items.map((member) => (
             <EmployeeCard
               key={member.id}
               member={member}
@@ -213,15 +247,56 @@ export function EmployeesView({
       ) : (
         <div role="table" data-density="compact" aria-label={t("admin.v2.nav_employees", { defaultValue: "Employees" })}>
           <div className="adm-emp-cols" role="row">
-            <span className="adm-col-label" role="columnheader">{t("admin.col_employee")}</span>
-            <span className="adm-col-label" role="columnheader">{t("admin.v2.col_computers")}</span>
-            <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_local_limit")}</span>
-            <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_running")}</span>
-            <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_ready")}</span>
+            <SortableColumnHeader
+              className="adm-col-label"
+              label={t("admin.col_employee")}
+              sortKey="employee"
+              sort={sort}
+              onSort={toggleSort}
+            />
+            <SortableColumnHeader
+              className="adm-col-label"
+              label={t("admin.v2.col_computers")}
+              sortKey="computers"
+              sort={sort}
+              onSort={toggleSort}
+              defaultDirection="desc"
+            />
+            {/* The metric columns are flush right, so their carets are too —
+                a left-aligned control under a right-aligned number reads as a
+                different column. */}
+            <SortableColumnHeader
+              className="adm-col-label adm-col-label--metrics"
+              label={t("admin.v2.col_local_limit")}
+              sortKey="localLimit"
+              sort={sort}
+              onSort={toggleSort}
+              align="end"
+              defaultDirection="desc"
+            />
+            <SortableColumnHeader
+              className="adm-col-label adm-col-label--metrics"
+              label={t("admin.v2.col_running")}
+              sortKey="running"
+              sort={sort}
+              onSort={toggleSort}
+              align="end"
+              defaultDirection="desc"
+            />
+            <SortableColumnHeader
+              className="adm-col-label adm-col-label--metrics"
+              label={t("admin.v2.col_ready")}
+              sortKey="ready"
+              sort={sort}
+              onSort={toggleSort}
+              align="end"
+              defaultDirection="desc"
+            />
+            {/* Actions is not a column of data — there is nothing to order by. */}
             <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_actions")}</span>
           </div>
           <ul className="adm-emp-list" role="rowgroup">
-            {filtered.map((member) => {
+            {paged.items.map((member) => {
               const highlight = highlightedEmployeeId === member.id;
               const { tone, key } = employeeSummaryStatus(member);
               return (
@@ -326,6 +401,10 @@ export function EmployeesView({
           </ul>
         </div>
       )}
+
+      {/* One pager under both layouts — it is the collection that is paged,
+          not the way the collection happens to be drawn. */}
+      <Pagination page={paged} onPageChange={setPage} label={t("admin.v2.nav_employees", { defaultValue: "Employees" })} />
     </div>
   );
 }

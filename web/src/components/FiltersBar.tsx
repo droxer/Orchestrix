@@ -23,6 +23,13 @@ interface FiltersBarProps {
   onClear: () => void;
   /** Page-specific filter controls, revealed when the bar is expanded. */
   children?: ReactNode;
+  /**
+   * Always-visible control alongside the Filters button. The narrow-width sort
+   * menu goes here rather than in `children`: on the widths where it is the
+   * only way to sort, burying it behind "Show filters" would hide the control
+   * that replaced the column headers.
+   */
+  trailing?: ReactNode;
 }
 
 export function FiltersBar({
@@ -34,6 +41,7 @@ export function FiltersBar({
   activeCount,
   onClear,
   children,
+  trailing,
 }: FiltersBarProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
@@ -52,6 +60,7 @@ export function FiltersBar({
           onChange={(event) => onQueryChange(event.target.value)}
         />
         <div className="backlog-filter-actions">
+          {trailing}
           <Button variant="ghost"
             type="button"
             className="backlog-filter-chip"

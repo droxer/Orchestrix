@@ -376,7 +376,8 @@
     "bulk_delete_body_one": "1 selected task will be removed from Backlog. Linked threads, artifacts, and run history will stay available.",
     "bulk_delete_body_other": "{{count}} selected tasks will be removed from Backlog. Linked threads, artifacts, and run history will stay available.",
     "toast_bulk_deleted_one": "1 task deleted.",
-    "toast_bulk_deleted_other": "{{count}} tasks deleted."
+    "toast_bulk_deleted_other": "{{count}} tasks deleted.",
+    "sort_label": "Sort tasks"
   },
   "workspace": {
     "title": "Workspace",
@@ -610,7 +611,8 @@
     "bulk_delete_body_one": "1 selected routine and its schedule will be deleted. It will not run again. Existing occurrences and threads will stay available.",
     "bulk_delete_body_other": "{{count}} selected routines and their schedules will be deleted. They will not run again. Existing occurrences and threads will stay available.",
     "toast_bulk_deleted_one": "1 routine deleted.",
-    "toast_bulk_deleted_other": "{{count}} routines deleted."
+    "toast_bulk_deleted_other": "{{count}} routines deleted.",
+    "sort_label": "Sort routines"
   },
   "admin": {
     "title": "Admin",
@@ -1438,5 +1440,19 @@
     "new_task": "New task",
     "new_thread": "New thread",
     "send_message": "Send message"
+  },
+  "list": {
+    "sort_by_ascending": "Sort by {{column}}, ascending",
+    "sort_by_descending": "Sort by {{column}}, descending",
+    "sort_clear": "Clear sorting by {{column}}",
+    "pagination_label": "{{collection}} pages",
+    "pagination_range": "{{from}}–{{to}} of {{total}}",
+    "pagination_previous": "Previous page",
+    "pagination_next": "Next page",
+    "pagination_page": "Page {{page}}",
+    "sort_none": "Default order",
+    "sort_option_ascending": "{{column}} ↑",
+    "sort_option_descending": "{{column}} ↓",
+    "pagination_range_compact": "Page {{page}} of {{pageCount}} · {{total}}"
   }
 }
