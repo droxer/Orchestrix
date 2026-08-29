@@ -97,7 +97,6 @@
   transform: translateY(-1px);
 }
 
-
 .create-agent-runtime-option.is-selected {
   border-color: var(--action);
   /* Selection is a sanctioned action job, but the wash ratio is the token's
@@ -296,7 +295,6 @@
   color: var(--ink-1);
 }
 
-
 .adm-profile-segment-input:disabled + .adm-profile-segment-btn {
   cursor: default;
   opacity: var(--opacity-disabled);
@@ -350,14 +348,6 @@
    the trailing grid column instead of leaving a wide empty gap. */
 .adm-placement-item--compact {
   grid-template-columns: auto 1fr;
-}
-
-.adm-placement-dot {
-  width: var(--dot);
-  height: var(--dot);
-  border-radius: var(--r-full);
-  background: var(--tone, var(--ink-4));
-  flex-shrink: 0;
 }
 
 .adm-placement-body {

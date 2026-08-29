@@ -283,13 +283,10 @@
 /* Status hue lives only on the dot (tone-* sets --tone in base.css), matching
    the placement list — the node name stays identity-colored. Flat: the fill
    alone tells ready/busy/offline, no halo. */
-.agent-placement-badge-dot {
-  width: var(--dot);
-  height: var(--dot);
-  flex: none;
+/* The badge's status pip is a .state-mark (it carries its own tone); only the
+   extra breathing room before the ownership glyph is local. */
+.agent-placement-badge > .state-mark {
   margin-right: var(--sp-1);
-  border-radius: var(--r-full);
-  background: var(--tone, var(--ink-4));
 }
 
 .agent-placement-badge-name {

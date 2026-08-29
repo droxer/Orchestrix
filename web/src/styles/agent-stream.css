@@ -50,13 +50,6 @@
 
 .collaboration-node[open] > summary .collaboration-branch { transform: rotate(45deg); }
 
-.collaboration-status-dot {
-  width: var(--dot);
-  height: var(--dot);
-  border-radius: var(--r-full);
-  background: var(--tone);
-}
-
 .collaboration-label {
   overflow: hidden;
   color: var(--ink-1);

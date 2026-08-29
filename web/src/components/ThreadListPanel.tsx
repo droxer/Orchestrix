@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { StateMark } from "./StateMark";
 import {
   ActionAdd,
   ChevronDownIcon,
@@ -336,7 +337,10 @@ export function ThreadListPanel({
                 <span className="project-folder-icon">
                   <WorkspaceFolder size={ICON.sm} aria-hidden="true" />
                   {projectState ? (
-                    <span className="project-folder-state-dot" data-tone={projectState} aria-hidden="true" />
+                    <StateMark
+                      tone={projectState === "run" ? "live" : "warn"}
+                      className="project-folder-pip"
+                    />
                   ) : null}
                 </span>
                 <span className="project-folder-name">{project.name}</span>

@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { StateMark } from "./StateMark";
 import {
   listProjectWorkspaceFiles,
   readProjectWorkspaceFile,
@@ -176,7 +177,7 @@ function WorkspaceFileBrowser({
             <div className="workspace-files-bar-end">
               {homeStatus.kind === "live" ? (
                 <span className="workspace-home-status" title={homeStatus.nodeId || undefined}>
-                  <span className="workspace-status-pip tone-good" aria-hidden="true" />
+                  <StateMark tone="good" />
                   {t("workspace.source_live")}
                   {homeStatus.nodeId ? <span className="workspace-home-node code">{homeStatus.nodeId}</span> : null}
                 </span>

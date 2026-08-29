@@ -148,6 +148,15 @@
   background: var(--mark-accent);
 }
 
+/* A standalone pip carries its own tone: the component emits the canonical
+   .tone-* class on this same element, so the mark reads the driver's --tone
+   (tokens/base.css) instead of naming a hue for the seventh time. A mark
+   inside a row leaves this off and keeps inheriting --mark-accent from the
+   host, which is what makes a row's rail and its status label agree. */
+.state-mark[data-tone] {
+  --mark-accent: var(--tone);
+}
+
 /* Hollow, not filled: shape carries the alarm, not brightness — a solid
    bright dot at this size reads as just another accent, so the bad tier is
    told by the ring. Same ring shape the node status dots and StatusPill use. */

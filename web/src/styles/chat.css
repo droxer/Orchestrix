@@ -169,26 +169,6 @@
   color: var(--err);
 }
 
-.chat-agent-state-pip {
-  width: var(--dot);
-  height: var(--dot);
-  flex: 0 0 auto;
-  border-radius: var(--r-full);
-  background: var(--ink-4);
-}
-
-.chat-agent-state-pip[data-availability="pending"] {
-  background: var(--warn);
-}
-
-/* A hollow red ring is visually distinct even without color perception and
-   mirrors the offline shape used by task and fleet status indicators. */
-.chat-agent-state-pip[data-availability="offline"],
-.chat-agent-state-pip[data-availability="inactive"] {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--err);
-}
-
 .chat-artifacts-button {
   position: relative;
 }

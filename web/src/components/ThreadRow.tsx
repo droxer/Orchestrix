@@ -5,6 +5,7 @@ import {
   NodeOffline,
 } from "./icons";
 import { useTranslation } from "react-i18next";
+import { StateMark, type StateShape, type StateTone } from "./StateMark";
 import type { RelaySession } from "../types";
 import { canDeleteThread, sessionAgents, threadLabel, threadRowMeta, type ThreadItem } from "../lib/threads";
 import { agentLabel } from "../lib/plan";
@@ -50,6 +51,20 @@ type ThreadRowProps = {
       agent meta line. "nested" — a project folder's single-line sub-row:
       pip + title + stamp, subordinate to the folder name. */
   layout?: "full" | "nested";
+};
+
+/**
+ * The rail's tone words in the app-wide vocabulary, so the pip obeys the one
+ * shape grammar. `err` used to paint a solid --err here while every other
+ * surface spent the hollow ring on failure and this one spent it on
+ * `idle` — the ring meant "failed" one panel over and "settled" in the rail.
+ * Failure takes the ring; a settled thread is out of play, which is `muted`.
+ */
+const PIP: Record<ThreadTone | "err", { tone: StateTone; shape?: StateShape }> = {
+  attn: { tone: "warn" },
+  run: { tone: "live" },
+  err: { tone: "bad" },
+  idle: { tone: "neutral", shape: "muted" },
 };
 
 export function ThreadRow({ item, selected, onSelect, onRename, onClose, tone, layout = "full" }: ThreadRowProps) {
@@ -140,7 +155,7 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose, tone, l
             {/* Nested rows have no group header above them, so each carries
                 its own state pip; full rows speak state in the meta line. */}
             {layout === "nested" ? (
-              <span className="conversation-state-dot" data-tone={tone} aria-hidden="true" />
+              <StateMark {...PIP[tone]} />
             ) : null}
             <span className="conversation-name">
               <strong>{label}</strong>
@@ -162,7 +177,7 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose, tone, l
           {subline && status ? (
             <span className="conversation-subline">
               <span className="conversation-status" data-tone={status.tone}>
-                <span className="conversation-state-dot" data-tone={status.tone} aria-hidden="true" />
+                <StateMark {...PIP[status.tone]} />
                 <span>{status.text}</span>
               </span>
               {agentCluster}

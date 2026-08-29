@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import type { Tone } from "../types";
 
 /**
  * The shape half of Relay's state vocabulary.
@@ -19,6 +20,53 @@ import { cn } from "@/lib/utils";
  */
 export type StateShape = "solid" | "live" | "ring" | "dashed" | "muted";
 
-export function StateMark({ shape = "solid", className }: { shape?: StateShape; className?: string }) {
-  return <span aria-hidden="true" className={cn("state-mark", className)} data-shape={shape} />;
+/**
+ * The tone vocabulary a standalone pip speaks, plus `live` for work in
+ * flight. Both halves come from the `.tone-*` driver in tokens/base.css,
+ * which is the only place the tone → hue mapping is written down.
+ */
+export type StateTone = Tone | "live";
+
+/**
+ * Tone → shape, and the reason this component exists in this form.
+ *
+ * Eight surfaces used to draw their own 8px status circle — five different
+ * tone-plumbing conventions between them — and five of the eight filled
+ * `bad` solid, which the grammar forbids: at this size a solid `--err` reads
+ * as emphasis, not as a problem, so the ring is what says "bad". One of them
+ * inverted the vocabulary outright and spent the ring on *settled*, so the
+ * same shape meant opposite things on two adjacent surfaces.
+ *
+ * Deriving the shape here is the fix. A caller that knows its tone cannot
+ * forget the shape, and there is one place to change the rule.
+ */
+const SHAPE_FOR_TONE: Record<StateTone, StateShape> = {
+  live: "live",
+  bad: "ring",
+  good: "solid",
+  warn: "solid",
+  info: "solid",
+  neutral: "solid",
+};
+
+export function StateMark({
+  shape,
+  tone,
+  className,
+}: {
+  /** Override the shape the tone implies — e.g. a settled row is `muted`. */
+  shape?: StateShape;
+  /** Emits the canonical `.tone-*` class; the CSS reads `--tone` from it. */
+  tone?: StateTone;
+  className?: string;
+}) {
+  const resolved = shape ?? (tone ? SHAPE_FOR_TONE[tone] : "solid");
+  return (
+    <span
+      aria-hidden="true"
+      className={cn("state-mark", tone && `tone-${tone}`, className)}
+      data-shape={resolved}
+      data-tone={tone}
+    />
+  );
 }

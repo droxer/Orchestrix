@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { DashboardView } from "./admin/dashboard/DashboardView";
 import { useNodeMetrics } from "../hooks/useNodeMetrics";
 import { useTranslation } from "react-i18next";
+import { StateMark } from "./StateMark";
 import { useMutationError } from "../hooks/useMutationError";
 import { Button } from "@/components/ui/button";
 import {
@@ -449,7 +450,7 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
                 aria-live="polite"
                 aria-atomic="true"
               >
-                <span className="adm-live-dot offline" aria-hidden="true" />
+                <StateMark tone="bad" />
                 <span className="adm-command-status-text text-danger">
                   {t("admin.fetch_error", { message: headerError })}
                 </span>

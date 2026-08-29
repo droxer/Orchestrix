@@ -601,16 +601,3 @@
   font: var(--type-body-sm);
   letter-spacing: var(--type-body-sm-track);
 }
-
-/* Readiness pip: a standalone toned dot that carries availability at a glance.
-    The status text moves to the element's title/aria-label so the hero stays
-    uncluttered. On the --dot row tier, like every other standalone status
-    pip — it used to say "same 7px as the placement badge", which was true of
-    the badge and of nothing else. */
-.workspace-status-pip {
-  flex: none;
-  width: var(--dot);
-  height: var(--dot);
-  border-radius: var(--r-full);
-  background: var(--tone, var(--ink-4));
-}

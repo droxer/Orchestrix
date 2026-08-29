@@ -565,24 +565,28 @@ function surfaceSheetNames(): string[] {
 describe("workspace status colors", () => {
   const workspace = readStyle("workspace.css");
 
-  // These two used to enumerate a per-tone rule per status — `.tone-good`,
+  // This used to enumerate a per-tone rule per status — `.tone-good`,
   // `.tone-info`, … each naming its own hue on the pip. That shape is what the
   // tone driver exists to prevent: it is a second copy of the tone -> hue
   // mapping, and copies drift (the same enumeration in admin-v2-dashboard.css
-  // resolved `neutral` to a different ink than the one here). The pip now reads
-  // --tone, so "info is --info, never --action" is enforced once, in base.css,
-  // for every consumer at the same time — and toneDriver.test.ts checks that no
-  // sheet re-derives it.
+  // resolved `neutral` to a different ink than the one here). The pip is now a
+  // <StateMark>, which reads --tone through `.state-mark[data-tone]`, so the
+  // hue is decided once in base.css for every status dot in the app at the
+  // same time — see stateMark.test.ts and toneDriver.test.ts.
   it("reads the tone driver instead of re-deriving a hue per status", () => {
+    const files = readFileSync(
+      path.resolve("web", "src", "components", "ProjectWorkspaceFiles.tsx"),
+      "utf8",
+    );
     assert.match(
-      workspace,
-      /\.workspace-status-pip\s*\{[^}]*background:\s*var\(--tone,\s*var\(--ink-4\)\);/,
-      "the workspace status pip must take its colour from --tone",
+      files,
+      /<StateMark tone="good" \/>/,
+      "the workspace status pip must be a StateMark, not a local dot",
     );
     assert.doesNotMatch(
       workspace,
-      /\.workspace-status-pip\.tone-/,
-      "no per-tone override on the pip — that is the driver's job",
+      /\.workspace-status-pip/,
+      "the hand-rolled pip is retired; StateMark owns the row-tier status dot",
     );
   });
 
