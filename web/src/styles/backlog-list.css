@@ -301,25 +301,20 @@
   padding-right: calc(2 * 28px + 4 * var(--sp-1) + var(--sp-2) + var(--sp-hairline));
 }
 
+/* GEOMETRY ONLY — see the matching note in task-status.css. Paint declared
+   here outranks the call site's Button variant by LAYER ORDER (`@layer relay`
+   is declared after Tailwind's `utilities`), so it silently defeats it rather
+   than losing a specificity contest. The neutral actions carry their chip look
+   on variant="outline". */
 .backlog-row-actions button:not([data-variant="icon"]) {
   min-height: var(--control-h-xs);
   /* Square the icon buttons (width is pinned to 28px) instead of stretching to
      the 40px control height — a lone action (routine) looked tall/narrow. */
   height: var(--control-h-xs);
-  border: 1px solid var(--line-1);
   border-radius: var(--r-2);
-  background: var(--surface-0);
   padding: 0 var(--sp-2);
-  color: var(--ink-1);
-  font: var(--type-label);
   cursor: pointer;
   touch-action: manipulation;
-  transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
-}
-
-.backlog-row-actions button:not([data-variant="icon"]):hover:not(:disabled) {
-  background: var(--control-fill-hover);
-  border-color: var(--line-strong);
 }
 
 /* Disabled comes from the button base — see .backlog-task-actions above. */
@@ -412,13 +407,13 @@
     height: var(--control-h-sm);
   }
 
-  /* Give every secondary action a visible chip surface. On the dark canvas the
-     ghost buttons (with a faint hairline) all but vanished — worse when
-     disabled — so they read as neither present nor tappable. The cobalt primary
-     (Start) keeps its own fill. */
-  .backlog-row-actions button:not(.backlog-action-primary, [data-variant="icon"]) {
-    background: var(--surface-1);
-  }
+  /* The secondary actions used to need a --surface-1 chip here: they were
+     ghost buttons wearing a --line-1 hairline, which measures 1.36:1 light /
+     1.60:1 dark and "all but vanished" on the canvas. They now carry
+     variant="outline", whose --control-border boundary clears WCAG 1.4.11 on
+     every plane (5.57:1 / 8.25:1) over a translucent --control-fill, so the
+     chip is no longer a mobile-only patch — and the primary no longer has to
+     be excluded from one. */
 
   /* The inter-group vertical hairlines read as arbitrary noise once the row
      wraps onto its own line; even spacing separates the actions cleanly. */

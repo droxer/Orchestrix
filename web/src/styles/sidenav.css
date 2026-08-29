@@ -188,8 +188,14 @@
   cursor: pointer;
 }
 
+/* --control-fill-hover, not --surface-2. This menu is portaled and floats on
+   its own --surface-0 + --shadow-2 plane; a fixed surface step only lifts on
+   the one plane it was sized against, and in the light register --surface-2 is
+   DARKER than this menu, so the hover read as recessed instead of raised.
+   --control-fill-hover is translucent ink and therefore plane-independent —
+   the same reason roles.css introduced it for the ghost/secondary/icon tiers. */
 .sidenav-settings-menu button:hover {
-  background: var(--surface-2);
+  background: var(--control-fill-hover);
   border-color: var(--line-2);
 }
 
