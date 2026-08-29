@@ -20,7 +20,7 @@
   flex-wrap: wrap;
   gap: var(--sp-2) var(--sp-3);
   min-height: 42px;
-  border-bottom: 1px solid var(--line-1);
+  border-bottom: 0.5px solid var(--line-1);
   padding: var(--sp-2) var(--sp-4);
 }
 
@@ -162,7 +162,7 @@
   /* Geometry beats the Button base utilities (h-(--control-h)). */
   height: auto;
   border: 0;
-  border-bottom: 1px solid var(--line-2);
+  border-bottom: 0.5px solid var(--line-2);
   background: transparent;
   padding: var(--sp-3) var(--sp-4);
   color: var(--ink-1);
@@ -208,7 +208,7 @@
   width: 100%;
   min-height: var(--control-h-xs);
   border: 0;
-  border-bottom: 1px solid var(--line-2);
+  border-bottom: 0.5px solid var(--line-2);
   background: color-mix(in srgb, var(--surface-1) 55%, transparent);
   padding: 0 var(--sp-4);
   color: var(--ink-3);
@@ -311,7 +311,7 @@
 
 .code-view-toolbar {
   display: inline-flex;
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
   overflow: hidden;
 }
@@ -327,7 +327,7 @@
 }
 
 .code-view-toggle + .code-view-toggle {
-  border-left: 1px solid var(--line-1);
+  border-left: 0.5px solid var(--line-1);
 }
 
 .code-view-toggle:hover {
@@ -353,7 +353,7 @@
   flex-direction: column;
   min-height: 0;
   margin: 0;
-  border: 1px solid var(--line-2);
+  border: 0.5px solid var(--line-2);
   /* border-radius owned by atelier.css (--r-2, shared with
      .workspace-code-view / .code-view-scroll). */
   background: var(--surface-2);
@@ -399,7 +399,7 @@
   color: var(--ink-4);
   text-align: right;
   user-select: none;
-  border-right: 1px solid var(--line-2);
+  border-right: 0.5px solid var(--line-2);
   white-space: pre;
 }
 
@@ -421,7 +421,7 @@
 .html-preview {
   width: 100%;
   min-height: 60vh;
-  border: 1px solid var(--line-2);
+  border: 0.5px solid var(--line-2);
   border-radius: var(--r-3);
   background: var(--dark-ink);
 }

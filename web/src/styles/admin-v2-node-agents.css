@@ -55,7 +55,7 @@
 
 .adm-runtime-mark.tone-bad .adm-agent-dot {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--tone);
+  box-shadow: inset 0 0 0 1px var(--tone);
 }
 
 .adm-runtime-mark.is-disabled {
@@ -73,7 +73,7 @@
 .adm-runtime-mark[data-presence="offline"] .adm-agent-dot,
 .adm-runtime-mark[data-presence="disabled"] .adm-agent-dot {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--ink-4);
+  box-shadow: inset 0 0 0 1px var(--ink-4);
 }
 
 /* One rule, two tones: the ring reads the driver's variable rather than
@@ -81,7 +81,7 @@
 .adm-runtime-mark[data-presence="offline"].tone-warn .adm-agent-dot,
 .adm-runtime-mark[data-presence="offline"].tone-bad .adm-agent-dot {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--tone);
+  box-shadow: inset 0 0 0 1px var(--tone);
 }
 
 /* On a dark machine the whole runtime row recedes with the avatar — its
@@ -118,7 +118,7 @@
   font: var(--type-label-strong);
   letter-spacing: var(--type-label-strong-track);
   text-transform: none;
-  border: 1px solid var(--line-2);
+  border: 0.5px solid var(--line-2);
   border-radius: var(--r-2);
   background: var(--surface-1);
   color: var(--ink-3);
@@ -149,14 +149,14 @@
    "problem" language stays consistent with the fleet cards. */
 .adm-agent-chip.tone-bad .adm-agent-dot {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--tone);
+  box-shadow: inset 0 0 0 1px var(--tone);
 }
 
 /* ...and an agent whose computer is dark reads hollow for the same reason,
    even though its last report said ready. */
 .adm-agent-chip[data-presence="offline"].tone-good .adm-agent-dot {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--ink-4);
+  box-shadow: inset 0 0 0 1px var(--ink-4);
 }
 
 /* Official vendor glyph — identity, alongside the name label. Same
@@ -202,7 +202,7 @@
   gap: var(--sp-3);
   padding: var(--sp-4);
   /* Same list-row edge as .adm-assign-node / .adm-placement-item. */
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-0);
   transition:
@@ -229,7 +229,7 @@
   flex-direction: column;
   gap: var(--sp-1);
   padding-top: var(--sp-1);
-  border-top: 1px solid var(--line-2);
+  border-top: 0.5px solid var(--line-2);
 }
 
 .adm-agent-inventory-empty {
@@ -261,7 +261,7 @@
   font-size: var(--fs-2);
   padding: var(--sp-0-5) var(--sp-1-5);
   border-radius: var(--r-2);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   color: var(--ink-1);
   background: var(--surface-0);
 }

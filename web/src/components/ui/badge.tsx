@@ -40,7 +40,7 @@ const badgeVariants = cva(
         warning:
           "border-warning/30 bg-background text-warning before:content-[''] before:size-1.5 before:rounded-full before:bg-warning",
         danger:
-          "border-danger/35 bg-background text-danger before:content-[''] before:size-1.5 before:rounded-full before:bg-transparent before:shadow-[inset_0_0_0_1.5px_var(--err)]",
+          "border-danger/35 bg-background text-danger before:content-[''] before:size-1.5 before:rounded-full before:bg-transparent before:shadow-[inset_0_0_0_1px_var(--err)]",
       },
     },
     defaultVariants: {

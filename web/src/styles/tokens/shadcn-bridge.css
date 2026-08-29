@@ -3,6 +3,12 @@
    stable so component markup never tracks token renames. */
 
 @theme inline {
+  /* Hairline default: the bare `border` / `border-t` / `border-b` utilities
+     draw a 0.5px line, matching the 0.5px structural hairlines the surface
+     sheets write by hand. On a 1x display the engines round this back up to
+     one device pixel, so the floor is the old rendering, never invisible. */
+  --default-border-width: 0.5px;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -151,7 +157,7 @@
   --card-foreground: var(--ink-1);
   /* Popover = floating chrome (menus, select popups) and sits on the elevated
      plane so it reads as above the canvas without a drop shadow. Flat
-     elevation: separation comes from --shadow-2's 1px ring, never a blur. */
+     elevation: separation comes from --shadow-2's hairline ring, never a blur. */
   --popover: var(--surface-3);
   --popover-foreground: var(--ink-1);
   --primary: var(--action);

@@ -47,7 +47,7 @@
   justify-content: center;
   width: 28px;
   height: var(--control-h-xs);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
   background: color-mix(in srgb, var(--surface-2) 76%, transparent);
   color: var(--ink-2);
@@ -100,7 +100,7 @@
   min-height: 76px;
   overflow: hidden;
   padding: var(--sp-3);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-3);
   background: var(--surface-1);
   transition: border-color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
@@ -132,7 +132,7 @@
   justify-content: center;
   width: var(--avatar-lg);
   height: var(--avatar-lg);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-2);
   color: var(--ink-1);
@@ -162,7 +162,7 @@
 .task-assignment-summary[data-tone="warn"] .task-assignment-summary-mark::after { background: var(--warn); }
 .task-assignment-summary[data-tone="bad"] .task-assignment-summary-mark::after {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--err);
+  box-shadow: inset 0 0 0 1px var(--err);
 }
 
 .task-assignment-summary.is-empty .task-assignment-summary-mark {
@@ -271,7 +271,7 @@
   flex-direction: column;
   gap: var(--sp-2);
   padding: var(--sp-3);
-  border: 1px solid var(--line-2);
+  border: 0.5px solid var(--line-2);
   border-radius: var(--r-3);
   background: var(--surface-1);
 }
@@ -302,7 +302,7 @@
 .task-drawer-artifacts {
   margin-top: var(--sp-4);
   padding-top: var(--sp-4);
-  border-top: 1px solid var(--line-2);
+  border-top: 0.5px solid var(--line-2);
 }
 
 .task-drawer-artifacts-title {
@@ -351,7 +351,7 @@
   gap: var(--sp-2);
   min-width: 0;
   padding: var(--sp-1) var(--sp-2);
-  border: 1px solid transparent;
+  border: 0.5px solid transparent;
   border-radius: var(--r-3);
   background: none;
   color: var(--ink-1);

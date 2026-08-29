@@ -10,7 +10,7 @@
   align-items: center;
   gap: 0;
   padding: var(--sp-0-5);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-1);
 }
@@ -37,7 +37,7 @@
 .backlog-view-btn[data-active="true"] {
   background: var(--surface-0);
   color: var(--ink-1);
-  box-shadow: inset 0 0 0 1px var(--line-1);
+  box-shadow: inset 0 0 0 0.5px var(--line-1);
 }
 
 /* ── List view — Vercel-style rows ──────────────────────────────────── */
@@ -59,7 +59,7 @@
   align-items: center;
   gap: var(--sp-4);
   padding: var(--sp-2) var(--sp-3);
-  border-bottom: 1px solid var(--line-1);
+  border-bottom: 0.5px solid var(--line-1);
   background: var(--surface-0);
 }
 
@@ -107,7 +107,7 @@
   gap: var(--sp-4);
   min-height: 68px;
   padding: var(--sp-2) var(--sp-3);
-  border-bottom: 1px solid var(--line-2);
+  border-bottom: 0.5px solid var(--line-2);
   transition: background var(--t-fast) var(--ease);
 }
 
@@ -248,7 +248,7 @@
   line-height: var(--leading-none);
   color: var(--ink-1);
   background: var(--surface-2);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
 }
 
 .task-assignee[data-unassigned="true"] .task-assignee-avatar {
@@ -311,6 +311,7 @@
   /* Square the icon buttons (width is pinned to 28px) instead of stretching to
      the 40px control height — a lone action (routine) looked tall/narrow. */
   height: var(--control-h-xs);
+
   border-radius: var(--r-2);
   padding: 0 var(--sp-2);
   cursor: pointer;
@@ -517,7 +518,7 @@
   gap: var(--sp-3);
   min-height: var(--control-h);
   padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-1);
   color: var(--ink-1);
@@ -552,7 +553,7 @@
   height: auto;
   min-height: var(--control-h-xs);
   padding: var(--sp-1-5) var(--sp-2);
-  border: 1px solid transparent;
+  border: 0.5px solid transparent;
   border-radius: var(--r-2);
   color: var(--ink-4);
   font: var(--type-label);
@@ -568,7 +569,7 @@
   width: 100%;
   min-height: 36px;
   padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--line-strong);
+  border: 0.5px solid var(--line-strong);
   border-radius: var(--r-2);
   background: var(--surface-1);
   color: var(--ink-1);
@@ -586,5 +587,5 @@
   display: flex;
   align-items: center;
   padding: var(--sp-1) var(--sp-3);
-  border-bottom: 1px solid var(--line-2);
+  border-bottom: 0.5px solid var(--line-2);
 }

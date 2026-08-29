@@ -357,10 +357,11 @@ summary:focus-visible,
 .ink-strong { color: var(--ink-1); }
 
 /* Hollow-ring "bad/dead" dot — shape carries the alarm, not brightness.
-   One ring width (1.5px) for every surface. */
+   One ring width (1px) for every surface — a step above the 0.5px structural
+   hairline so the alarm shape stays legible at dot size. */
 .dot-ring {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--tone, var(--err));
+  box-shadow: inset 0 0 0 0.5px var(--tone, var(--err));
 }
 
 /* Shared cross-surface utilities. */

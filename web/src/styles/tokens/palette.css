@@ -299,11 +299,11 @@
      --sp-8 at a scroll region's tail. Re-add them only together with a call
      site in the same change.
 
-     --sp-hairline (1px) is NOT a gap — it is the width of a 1px visual
-     construct expressed as spacing: padding that lets a 1px border/hairline
-     show past a fill, or the 1px channel between segments that reads as a
-     drawn divider. Never use it to separate content. */
-  --sp-hairline: 1px;
+     --sp-hairline (0.5px) is NOT a gap — it is the width of the hairline
+     visual construct expressed as spacing: padding that lets a hairline
+     border show past a fill, or the hairline channel between segments that
+     reads as a drawn divider. Never use it to separate content. */
+  --sp-hairline: 0.5px;
   --sp-0-5: 2px;
   --sp-1-5: 6px;
   --sp-1: 4px;
@@ -465,14 +465,10 @@
      step on the spacing scale. */
   --page-gutter: var(--sp-6);
 
-  /* Elevation — the source system runs three levels and only two of them are real
-     shadows. Level 0 (cards, tiles) is flat: rounding plus a hairline. Level
-     1 is the pill-tab activation indicator. Level 2 is commerce chrome that
-     floats — the sticky purchase summary, and here the drawers, dialogs, and
-     menus that play the same role. Raw values live here; roles.css names
-     them --shadow-1/--shadow-2. */
-  --shadow-tab: rgba(0, 0, 0, 0.2) 1px 1px 0 0;
-  --shadow-panel: rgba(20, 22, 26, 0.3) 0 1px 4px 0;
+  /* Elevation — flat. There are no shadow raw values: planes separate by a
+     surface step plus a hairline, and floating chrome adds only the hairline
+     ring. roles.css names the two roles --shadow-1 (none) and --shadow-2
+     (the ring). */
 
   /* Z layers — surface < drawer < float < dialog.
      Only three tiers are real, and every one of them has consumers.
@@ -609,11 +605,6 @@
      to sit in peripheral vision without pulling focus. */
   --t-pulse: 1.6s;
   --t-pulse-calm: 2.6s;
-
-  /* --t-ambient: decorative drift (the atelier landing mark) — not liveness,
-     so it stays out of the two-cadence pulse vocabulary. One occupant only;
-     a second ambient loop is a bug. */
-  --t-ambient: 16s;
 
   /* --t-tick: the mechanical loop — a spinner rotating, a caret blinking. Not
      a pulse (those breathe to say "an agent is working"); this is a metronome

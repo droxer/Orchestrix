@@ -21,7 +21,7 @@
   border-radius: var(--r-2);
   background: var(--surface-2);
   color: var(--ink-1);
-  box-shadow: inset 0 0 0 1px var(--line-2);
+  box-shadow: inset 0 0 0 0.5px var(--line-2);
 }
 
 .agent-state > svg {
@@ -49,7 +49,7 @@
    computers. */
 .agent-state.tone-bad::after {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--tone);
+  box-shadow: inset 0 0 0 1px var(--tone);
 }
 
 /* Unassigned slot — dashed placeholder, no readiness pip. */
@@ -82,7 +82,7 @@
   align-items: center;
   gap: var(--sp-1);
   padding: var(--sp-0-5) var(--sp-2) var(--sp-0-5) var(--sp-1-5);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-0);
   color: var(--ink-2);
@@ -139,9 +139,6 @@
    rows already reserve" is where that rung in the scale came from. */
 .state-mark {
   --mark-accent: var(--ink-4);
-  /* The halo token reads --tone; a mark's accent is owned by the host rule
-     via --mark-accent, so alias it rather than re-tinting the halo. */
-  --tone: var(--mark-accent);
   position: relative;
   flex: none;
   display: inline-block;
@@ -149,7 +146,6 @@
   height: var(--dot);
   border-radius: var(--r-full);
   background: var(--mark-accent);
-  box-shadow: var(--ring-halo);
 }
 
 /* Hollow, not filled: shape carries the alarm, not brightness — a solid
@@ -157,7 +153,7 @@
    told by the ring. Same ring shape the node status dots and StatusPill use. */
 .state-mark[data-shape="ring"] {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--mark-accent);
+  box-shadow: inset 0 0 0 1px var(--mark-accent);
 }
 
 .state-mark[data-shape="dashed"] {
@@ -202,7 +198,7 @@
   align-items: center;
   gap: var(--sp-2);
   padding: var(--sp-0-5) var(--sp-2);
-  border: 1px solid var(--tone-line);
+  border: 0.5px solid var(--tone-line);
   border-radius: var(--r-2);
   color: var(--ink-2);
   font: var(--type-label);
@@ -305,7 +301,7 @@
   align-items: center;
   gap: var(--sp-1);
   padding: var(--sp-3) var(--sp-4);
-  border-top: 1px solid var(--line-2);
+  border-top: 0.5px solid var(--line-2);
   background: var(--surface-1);
   border-radius: 0 0 calc(var(--r-3) - 1px) calc(var(--r-3) - 1px);
   opacity: 0;
@@ -331,7 +327,7 @@
 .backlog-action-group + .backlog-action-group {
   margin-left: var(--sp-1);
   padding-left: calc(var(--sp-2) + var(--sp-1));
-  border-left: 1px solid var(--line-1);
+  border-left: 0.5px solid var(--line-1);
 }
 
 /* GEOMETRY ONLY — paint belongs to the Button variant the call site picks.
@@ -344,6 +340,7 @@
 .backlog-task-actions select,
 .backlog-task-actions button:not([data-variant="icon"]) {
   min-height: var(--control-h-xs);
+
   border-radius: var(--r-2);
   padding: 0 var(--sp-2);
   cursor: pointer;

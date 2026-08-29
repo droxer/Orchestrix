@@ -50,7 +50,7 @@
   justify-content: space-between;
   gap: var(--sp-4);
   padding: var(--sp-7);
-  border-bottom: 1px solid var(--line-1);
+  border-bottom: 0.5px solid var(--line-1);
 }
 
 .adm-drawer-head-text {
@@ -126,7 +126,7 @@
   flex-direction: column;
   gap: var(--sp-5);
   padding-bottom: var(--sp-6);
-  border-bottom: 1px solid var(--line-2);
+  border-bottom: 0.5px solid var(--line-2);
 }
 
 .adm-form-section:last-of-type {
@@ -164,7 +164,7 @@
   padding: var(--sp-3) var(--sp-4);
   border-radius: var(--r-2);
   background: var(--surface-1);
-  border: 1px solid var(--line-2);
+  border: 0.5px solid var(--line-2);
   font: var(--type-body-sm);
   letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
@@ -176,7 +176,7 @@
   padding: var(--sp-3) var(--sp-4);
   border-radius: var(--r-2);
   --tone: var(--err);
-  border: 1px solid var(--tone-line);
+  border: 0.5px solid var(--tone-line);
   color: var(--err);
   font-size: var(--fs-3);
   line-height: var(--leading-normal);
@@ -201,7 +201,7 @@
   margin-left: calc(-1 * var(--sp-7));
   padding: var(--sp-4) var(--sp-7);
   background: var(--surface-3);
-  border-top: 1px solid var(--line-1);
+  border-top: 0.5px solid var(--line-1);
 }
 
 /* Left-aligned slot inside the pinned footer (e.g. Delete opposite the
@@ -237,7 +237,7 @@
   gap: var(--sp-3);
   padding-top: var(--sp-4);
   margin-top: var(--sp-2);
-  border-top: 1px solid var(--line-2);
+  border-top: 0.5px solid var(--line-2);
 }
 
 .adm-drawer-section-title {
@@ -276,7 +276,7 @@
   align-items: center;
   gap: var(--sp-4);
   padding: var(--sp-4) var(--sp-6);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-left: var(--accent-bar-w) solid var(--action);
   border-radius: var(--r-3);
   background: var(--surface-0);
@@ -293,7 +293,7 @@
   height: var(--control-h);
   border-radius: var(--r-full);
   background: var(--surface-2);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   color: var(--ink-1);
   font: var(--type-label-strong);
   letter-spacing: var(--type-label-strong-track);
@@ -375,7 +375,7 @@
   width: 100%;
   padding: var(--sp-3) var(--sp-4);
   background: var(--surface-0);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   /* List-row container, not a chip: the 6px container rung, matching
      .team-member-options / .task-assignment-summary / .pref-option-list. */
   border-radius: var(--r-2);

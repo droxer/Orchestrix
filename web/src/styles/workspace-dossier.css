@@ -26,7 +26,7 @@
   gap: var(--sp-5);
   padding: var(--sp-6);
   overflow: hidden;
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-3);
   background: transparent;
   transition:
@@ -103,14 +103,14 @@
   position: relative;
   z-index: 1;
   padding: var(--sp-5) 0 0;
-  border-top: 1px solid var(--line-2);
+  border-top: 0.5px solid var(--line-2);
 }
 
 .agent-personality-empty {
   position: relative;
   z-index: 1;
   padding-top: var(--sp-5);
-  border-top: 1px solid var(--line-2);
+  border-top: 0.5px solid var(--line-2);
 }
 
 .agent-personality-empty > p,
@@ -140,7 +140,7 @@
   grid-template-columns: 1fr 1fr;
   margin: var(--sp-4) 0 0;
   padding: 0;
-  border-top: 1px solid var(--line-2);
+  border-top: 0.5px solid var(--line-2);
   list-style: none;
 }
 
@@ -150,12 +150,12 @@
   align-items: start;
   gap: var(--sp-2);
   padding: var(--sp-3) var(--sp-3) var(--sp-3) 0;
-  border-bottom: 1px solid var(--line-2);
+  border-bottom: 0.5px solid var(--line-2);
 }
 
 .agent-personality-editor-guide li:nth-child(odd) {
   margin-right: var(--sp-3);
-  border-right: 1px solid var(--line-2);
+  border-right: 0.5px solid var(--line-2);
 }
 
 /* Ordinal markers — technical text (mono, quiet ink), not the action
@@ -180,7 +180,7 @@
   flex-direction: column;
   gap: var(--sp-3);
   padding-top: var(--sp-5);
-  border-top: 1px solid var(--line-2);
+  border-top: 0.5px solid var(--line-2);
 }
 
 .agent-profile-name-field {
@@ -191,7 +191,7 @@
 
 .agent-personality-editor-guide {
   padding: var(--sp-4);
-  border: 1px solid var(--line-2);
+  border: 0.5px solid var(--line-2);
   border-radius: var(--r-2);
   background: var(--surface-1);
 }
@@ -325,7 +325,7 @@
   min-width: 28px;
   height: var(--control-h-xs);
   padding: 0 var(--sp-2);
-  border: 1px solid var(--line-2);
+  border: 0.5px solid var(--line-2);
   border-radius: var(--r-2);
   background: transparent;
   color: var(--ink-3);
@@ -455,7 +455,7 @@
 
   .workspace-pane {
     border-right: 0;
-    border-bottom: 1px solid var(--line-1);
+    border-bottom: 0.5px solid var(--line-1);
     min-height: 240px;
   }
 

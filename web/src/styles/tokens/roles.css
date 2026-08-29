@@ -14,15 +14,13 @@
   --link: var(--link-blue);
   --link-hover: var(--link-blue-strong);
 
-  /* Elevation — the source system's three levels. Level 0 (cards, tiles) is flat:
-     rounding plus a hairline, and heavy shadows on a card are called out as
-     a mistake in the source system ("elevation is a commerce-flow signal,
-     not a marketing flourish"). Level 2 is the one published blur, carried
-     by chrome that genuinely floats — drawers, dialogs, menus, sticky
-     summaries — paired with a hairline ring so the edge stays crisp on
-     either register. */
+  /* Elevation — flat. Every plane separates by a surface step plus a hairline;
+     floating chrome (drawers, dialogs, menus, sticky summaries) adds only the
+     hairline ring so its edge stays crisp over the content below it. No drop
+     shadows anywhere: in a flat system a blur is faux depth, and it was the
+     only one in the app. */
   --shadow-1: none;
-  --shadow-2: 0 0 0 1px var(--line-1), var(--shadow-panel);
+  --shadow-2: 0 0 0 0.5px var(--line-1);
 
   /* Row wash under the pointer. Translucent INK, not a surface step — the
      same fix --control-fill below documents. Mixed from --surface-1 (60%),
@@ -48,7 +46,7 @@
   /* Status-tinted edge — the one strength for a border that carries a status
      tone (set --tone first via the .tone-* classes, or it falls back to the
      neutral ink). Was hand-mixed at nine different percentages (18–45%)
-     across the surface sheets; 35% reads against both registers on a 1px
+     across the surface sheets; 35% reads against both registers on a 0.5px
      hairline. */
   --tone-line: color-mix(in srgb, var(--tone, var(--ink-1)) 35%, transparent);
 
@@ -69,10 +67,6 @@
      ~55% of a one-line row, which is what makes it read as a marker beside
      the row rather than a border on it. */
   --accent-bar-inset: 10px;
-
-  /* Badge halo — the 3px soft ring that lifts a status badge off a busy
-     row. Reads --tone like --tone-line. */
-  --ring-halo: 0 0 0 3px color-mix(in srgb, var(--tone, var(--action)) 16%, transparent);
 
   /* Interactive control boundary / unchecked track. Unlike structural
      hairlines, this role must remain at least 3:1 against every surface so an

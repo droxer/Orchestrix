@@ -21,7 +21,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--line-1);
+  border-right: 0.5px solid var(--line-1);
   /* Shell zone role (see --surface-list in palette.css): every list rail —
      threads, agents, teams — sits on the same elevation step between the nav
      rail and the detail canvas. This one sat flat on --surface-0, so the
@@ -260,7 +260,7 @@
   max-width: 100%;
   overflow: hidden;
   padding: var(--sp-0-5) var(--sp-2);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-1);
   color: var(--ink-3);
@@ -281,8 +281,8 @@
 }
 
 /* Status hue lives only on the dot (tone-* sets --tone in base.css), matching
-   the placement list — the node name stays identity-colored. A soft tone ring
-   (as on .adm-placement-dot) makes ready/busy/offline legible at a glance. */
+   the placement list — the node name stays identity-colored. Flat: the fill
+   alone tells ready/busy/offline, no halo. */
 .agent-placement-badge-dot {
   width: var(--dot);
   height: var(--dot);
@@ -290,10 +290,6 @@
   margin-right: var(--sp-1);
   border-radius: var(--r-full);
   background: var(--tone, var(--ink-4));
-}
-
-.agent-placement-badge-dot:not(.tone-neutral) {
-  box-shadow: var(--ring-halo);
 }
 
 .agent-placement-badge-name {
@@ -356,7 +352,7 @@
 
   .agents-roster {
     border-right: 0;
-    border-bottom: 1px solid var(--line-1);
+    border-bottom: 0.5px solid var(--line-1);
     max-height: 46vh;
   }
 

@@ -131,7 +131,7 @@ html[data-theme="dark"] .relay-bleed-mark {
   height: var(--avatar-xl);
   border-radius: var(--r-2);
   background: var(--surface-2);
-  box-shadow: inset 0 0 0 1px var(--line-2);
+  box-shadow: inset 0 0 0 0.5px var(--line-2);
   color: var(--ink-1);
 }
 
@@ -225,14 +225,9 @@ html[data-theme="dark"] .relay-bleed-mark {
   width: var(--avatar-3xl);
   height: var(--avatar-3xl);
   border-radius: var(--r-3);
-  /* Flat system, one decorative exception: a wide action-tinted halo stands
-     in for a drop shadow so the hero tile reads as the room's focal point.
-     The hairline at the halo's edge keeps the pool from dissolving into the
-     ambient wash behind it. */
-  box-shadow:
-    inset 0 0 0 1px var(--line-2),
-    0 0 0 10px color-mix(in srgb, var(--action) 6%, transparent),
-    0 0 0 11px color-mix(in srgb, var(--action) 12%, transparent);
+  /* Flat, no exception: the hero tile carries the same hairline as every
+     other plane — no halo standing in for a drop shadow. */
+  box-shadow: inset 0 0 0 0.5px var(--line-2);
 }
 
 /* The hero tile already wears its tinted halo; the plain orbit ring would
@@ -267,7 +262,7 @@ html[data-theme="dark"] .relay-bleed-mark {
   align-items: center;
   gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-4);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-1);
   color: var(--ink-2);

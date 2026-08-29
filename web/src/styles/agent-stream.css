@@ -10,7 +10,7 @@
 
 .collaboration-tree {
   padding: var(--sp-3) var(--sp-4);
-  border: 1px solid var(--line-2);
+  border: 0.5px solid var(--line-2);
   border-radius: var(--r-2);
 }
 
@@ -42,8 +42,8 @@
 .collaboration-branch {
   width: 6px;
   height: 6px;
-  border-right: 1px solid var(--ink-3);
-  border-bottom: 1px solid var(--ink-3);
+  border-right: 0.5px solid var(--ink-3);
+  border-bottom: 0.5px solid var(--ink-3);
   transform: rotate(-45deg);
   transition: transform var(--t-fast) var(--ease);
 }
@@ -77,7 +77,7 @@
      the status dot center, not the grid edge. */
   margin-left: 11px;
   padding-left: var(--sp-4);
-  border-left: 1px solid var(--line-2);
+  border-left: 0.5px solid var(--line-2);
 }
 
 .collaboration-node-body > p {
@@ -264,7 +264,7 @@
 .agent-raw {
   margin: 0;
   padding: var(--sp-3) var(--sp-4);
-  border: 1px solid var(--line-2);
+  border: 0.5px solid var(--line-2);
   border-radius: var(--r-2);
   background: var(--surface-1);
   color: var(--ink-2);

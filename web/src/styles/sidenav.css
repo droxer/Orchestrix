@@ -53,7 +53,7 @@
   width: calc(var(--control-h) - var(--sp-1));
   height: calc(var(--control-h) - var(--sp-1));
   flex: 0 0 calc(var(--control-h) - var(--sp-1));
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-3);
   background: var(--surface-0);
   box-shadow: var(--shadow-1);
@@ -147,7 +147,7 @@
   width: 100%;
   padding: var(--sp-3) 0 0;
   /* The footer stays part of the rail instead of reading as a card. */
-  border-width: 1px 0 0;
+  border-width: 0.5px 0 0;
   border-style: solid;
   border-color: var(--line-1);
   border-radius: 0;
@@ -162,7 +162,7 @@
   position: fixed;
   min-width: 188px;
   padding: var(--sp-2);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-3);
   background: var(--surface-0);
   box-shadow: var(--shadow-2);
@@ -190,6 +190,7 @@
   width: 100%;
   min-height: var(--control-h-sm);
   padding: 0 var(--sp-3);
+
   border-radius: var(--r-2);
   font: var(--type-label);
   text-align: left;
@@ -208,7 +209,7 @@
   position: fixed;
   min-width: 188px;
   padding: var(--sp-2);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-3);
   background: var(--surface-0);
   box-shadow: var(--shadow-2);
@@ -224,7 +225,7 @@
   width: 100%;
   min-height: var(--touch-target);
   padding: 0 var(--sp-3);
-  border: 1px solid transparent;
+  border: 0.5px solid transparent;
   border-radius: var(--r-1);
   background: transparent;
   color: var(--ink-1);
@@ -273,7 +274,7 @@
   align-items: center;
   justify-content: center;
   background: transparent;
-  border: 1px solid transparent;
+  border: 0.5px solid transparent;
   font: inherit;
   text-decoration: none;
   -webkit-appearance: none;
@@ -303,7 +304,7 @@
   padding: var(--sp-2) var(--sp-3);
   border-radius: var(--r-2);
   background: var(--surface-0);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   color: var(--ink-1);
   font: var(--type-label-strong);
   box-shadow: var(--shadow-2);
@@ -416,7 +417,7 @@
   align-items: center;
   gap: var(--sp-1);
   padding: var(--sp-0-5) var(--sp-2);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-1);
   color: var(--ink-3);

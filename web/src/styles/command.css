@@ -36,7 +36,7 @@
   gap: var(--sp-2);
   padding: 0 var(--sp-3);
   min-height: var(--sp-8);
-  border-bottom: 1px solid var(--line-1);
+  border-bottom: 0.5px solid var(--line-1);
   color: var(--ink-3);
 }
 
@@ -114,7 +114,7 @@
   align-items: center;
   min-height: var(--sp-5);
   padding: 0 var(--sp-1-5);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-1);
   background: var(--surface-2);
   color: var(--ink-3);
@@ -135,7 +135,7 @@
   align-items: center;
   gap: var(--sp-4);
   padding: var(--sp-2) var(--sp-3);
-  border-top: 1px solid var(--line-1);
+  border-top: 0.5px solid var(--line-1);
   color: var(--ink-4);
   font: var(--type-label);
 }

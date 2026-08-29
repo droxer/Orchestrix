@@ -8,7 +8,7 @@
    and the mono tag text, never by a wash of accent colour. */
 .artifact-chip {
   min-width: 0;
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-1);
   overflow: hidden;
@@ -112,7 +112,7 @@
   overflow-x: auto;
   color: var(--ink-1);
   background: var(--surface-1);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
 }
 .artifact-diff-line {
@@ -162,7 +162,7 @@
   padding: var(--sp-4);
   color: var(--ink-1);
   background: var(--surface-1);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
   font-family: var(--font-mono);
   letter-spacing: var(--type-code-track);
@@ -226,7 +226,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--line-1);
+  border-right: 0.5px solid var(--line-1);
   background: var(--surface-1);
 }
 
@@ -275,7 +275,7 @@
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  border-right: 1px solid var(--line-1);
+  border-right: 0.5px solid var(--line-1);
   background: var(--surface-1);
   box-shadow: var(--shadow-2);
   transform: translateX(-105%);
@@ -304,7 +304,7 @@
   align-items: center;
   gap: var(--sp-2);
   padding: var(--sp-3) var(--sp-4);
-  border-bottom: 1px solid var(--line-1);
+  border-bottom: 0.5px solid var(--line-1);
   flex: 0 0 auto;
 }
 
@@ -328,13 +328,13 @@
   flex-wrap: wrap;
   gap: var(--sp-1);
   padding: var(--sp-2) var(--sp-4);
-  border-bottom: 1px solid var(--line-1);
+  border-bottom: 0.5px solid var(--line-1);
   flex: 0 0 auto;
 }
 
 .artifact-index-filter-btn {
   padding: var(--sp-0-5) var(--sp-3);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
   background: transparent;
   color: var(--ink-3);
@@ -439,7 +439,7 @@
   gap: var(--sp-3);
   padding: 0 var(--sp-4);
   height: var(--control-h);
-  border-bottom: 1px solid var(--line-1);
+  border-bottom: 0.5px solid var(--line-1);
   background: var(--surface-1);
   flex: 0 0 auto;
   min-width: 0;
@@ -470,7 +470,7 @@
   gap: var(--sp-1);
   height: var(--control-h-xs);
   padding: 0 var(--sp-3);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
   background: transparent;
   color: var(--ink-2);
@@ -542,7 +542,7 @@
     width: 100%;
     max-height: min(38vh, 280px);
     border-right: 0;
-    border-bottom: 1px solid var(--line-1);
+    border-bottom: 0.5px solid var(--line-1);
   }
 
   .artifact-index-strip-icons {

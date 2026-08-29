@@ -177,7 +177,7 @@
   width: 36px;
   height: var(--control-h-sm);
   padding: 0;
-  border: 1px solid transparent;
+  border: 0.5px solid transparent;
   border-radius: var(--r-2);
   color: var(--ink-3);
   background: transparent;

@@ -177,7 +177,9 @@ describe("UI primitive contracts", () => {
   it("keeps floating chrome on the flat elevation role instead of a drop shadow", async () => {
     const roles = await readFile(resolve("web/src/styles/tokens/roles.css"), "utf8");
     assert.match(roles, /--shadow-1:\s*none/);
-    assert.match(roles, /--shadow-2:\s*0 0 0 1px var\(--line-1\)/);
+    // Anchored on the closing `;` so a drop shadow cannot be appended back:
+    // floating chrome gets the 0.5px hairline ring and nothing else.
+    assert.match(roles, /--shadow-2:\s*0 0 0 0\.5px var\(--line-1\);/);
 
     for (const file of ["select.tsx", "card.tsx", "table.tsx"]) {
       const source = await readFile(resolve(`web/src/components/ui/${file}`), "utf8");

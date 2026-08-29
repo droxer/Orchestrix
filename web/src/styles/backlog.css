@@ -25,7 +25,7 @@
   align-items: baseline;
   margin: 0;
   padding: var(--sp-4) var(--page-gutter);
-  border-bottom: 1px solid var(--line-1);
+  border-bottom: 0.5px solid var(--line-1);
   background: var(--surface-0);
 }
 
@@ -72,7 +72,7 @@
 .backlog-filter-bar {
   display: flex;
   flex-direction: column;
-  border-bottom: 1px solid var(--line-2);
+  border-bottom: 0.5px solid var(--line-2);
   background: var(--surface-0);
 }
 
@@ -91,7 +91,7 @@
   gap: var(--sp-2);
   min-height: var(--control-h-sm);
   padding: 0 var(--sp-3);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-2);
   color: var(--ink-3);
@@ -130,7 +130,7 @@
   gap: var(--sp-2);
   min-height: var(--control-h-sm);
   padding: var(--sp-2) var(--sp-3);
-  border: 1px solid transparent;
+  border: 0.5px solid transparent;
   border-radius: var(--r-2);
   background: var(--surface-2);
   color: var(--ink-1);
@@ -158,7 +158,7 @@
   min-width: 18px;
   justify-content: center;
   padding: var(--sp-0-5) var(--sp-2);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
   background: transparent;
   color: var(--ink-3);
@@ -246,7 +246,7 @@
    carried by a single hairline between lanes (see .backlog-lane-label's
    comment) and the lane-head's bottom rule. */
 .backlog-lane + .backlog-lane {
-  border-left: 1px solid var(--line-1);
+  border-left: 0.5px solid var(--line-1);
 }
 
 /* Chip that trails the finger during a touch drag, standing in for the drag
@@ -259,7 +259,7 @@
   z-index: var(--z-float);
   max-width: 200px;
   overflow: hidden;
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-3);
   background: var(--surface-0);
   box-shadow: var(--shadow-2);
@@ -288,7 +288,7 @@
 }
 
 .backlog-lane[data-drop="active"] {
-  box-shadow: inset 0 0 0 1px var(--ink-2);
+  box-shadow: inset 0 0 0 0.5px var(--ink-2);
 }
 
 /* Drawn as an overlay ring, NOT as `outline`. The refusal state is a dashed
@@ -321,7 +321,7 @@
   justify-content: space-between;
   gap: var(--sp-2);
   padding: var(--sp-4);
-  border-bottom: 1px solid var(--line-2);
+  border-bottom: 0.5px solid var(--line-2);
   background: var(--surface-0);
 }
 
@@ -360,7 +360,7 @@
   position: relative;
   content-visibility: auto;
   contain-intrinsic-size: auto 180px;
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-3);
   background: var(--surface-1);
   padding: var(--sp-4);

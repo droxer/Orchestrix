@@ -203,7 +203,7 @@ html:lang(zh-TW) .md-body blockquote {
 .md-body hr {
   margin: var(--sp-5) 0;
   border: 0;
-  border-top: 1px solid var(--line-2);
+  border-top: 0.5px solid var(--line-2);
 }
 
 .md-body a {
@@ -241,7 +241,7 @@ html:lang(zh-TW) .md-body blockquote {
 .md-body th,
 .md-body td {
   padding: var(--sp-2);
-  border-bottom: 1px solid var(--line-2);
+  border-bottom: 0.5px solid var(--line-2);
   text-align: left;
   vertical-align: top;
 }
@@ -261,7 +261,7 @@ html:lang(zh-TW) .md-body blockquote {
   position: relative;
   margin: var(--sp-4) 0;
   padding: var(--sp-3) var(--sp-4);
-  border: 1px solid var(--line-2);
+  border: 0.5px solid var(--line-2);
   border-radius: var(--r-2);
   background: var(--surface-2);
   color: var(--ink-1);
@@ -300,7 +300,9 @@ html:lang(zh-TW) .md-body blockquote {
    The one block that cannot be reflowed to fit a narrow column. It scrolls
    inside its own box so the transcript column never scrolls sideways.
    `tabindex` is set by the browser's scrollable-region heuristics; the border
-   makes the clipped edge legible rather than looking like a truncated table. */
+   makes the clipped edge legible rather than looking like a truncated table.
+   Deliberately 1px where every other line is the 0.5px hairline — a scrolling
+   table's clipped edge needs the legible frame, not the soft hairline. */
 .md-table {
   max-width: 100%;
   margin: 0 0 var(--sp-4);
@@ -373,7 +375,7 @@ html:lang(zh-TW) .md-body blockquote {
   align-items: center;
   gap: var(--sp-1);
   padding: var(--sp-1) var(--sp-2);
-  border: 1px solid var(--line-2);
+  border: 0.5px solid var(--line-2);
   border-radius: var(--r-1);
   background: var(--surface-1);
   color: var(--ink-3);
@@ -415,7 +417,7 @@ html:lang(zh-TW) .md-body blockquote {
 .md-diagram {
   margin: var(--sp-4) 0;
   padding: var(--sp-3);
-  border: 1px solid var(--line-2);
+  border: 0.5px solid var(--line-2);
   border-radius: var(--r-2);
   background: var(--surface-1);
   overflow-x: auto;
@@ -442,7 +444,7 @@ html:lang(zh-TW) .md-body blockquote {
 .md-body section[data-footnotes] {
   margin-top: var(--sp-4);
   padding-top: var(--sp-3);
-  border-top: 1px solid var(--line-2);
+  border-top: 0.5px solid var(--line-2);
   color: var(--ink-3);
   font: var(--type-body-sm);
   letter-spacing: var(--type-body-sm-track);
@@ -515,7 +517,7 @@ html:lang(zh-TW) .md-body blockquote {
    chat turn cannot afford, since there it would compete with the thread name. */
 .doc-prose h1 {
   padding-bottom: var(--sp-2);
-  border-bottom: 1px solid var(--line-2);
+  border-bottom: 0.5px solid var(--line-2);
 }
 
 .doc-prose li {

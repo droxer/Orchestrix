@@ -41,7 +41,7 @@
   display: grid;
   gap: var(--sp-3);
   padding: var(--sp-4);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-3);
   background: var(--surface-0);
 }
@@ -54,7 +54,7 @@
   align-items: center;
   gap: var(--sp-2);
   padding-bottom: var(--sp-2);
-  border-bottom: 1px solid var(--line-2);
+  border-bottom: 0.5px solid var(--line-2);
 }
 
 .handoff-panel-mark {
@@ -92,7 +92,7 @@
 .handoff-panel > input {
   min-width: 0;
   height: var(--control-h);
-  border: 1px solid var(--control-border);
+  border: 0.5px solid var(--control-border);
   border-radius: var(--r-2);
   outline: 0;
   background: var(--surface-0);

@@ -27,7 +27,7 @@
   padding: 12%;
   border-radius: inherit;
   background: var(--surface-2);
-  box-shadow: inset 0 0 0 1px var(--line-1);
+  box-shadow: inset 0 0 0 0.5px var(--line-1);
   color: var(--ink-2);
 }
 
@@ -75,7 +75,7 @@
   width: var(--avatar-2xl);
   height: var(--avatar-2xl);
   border-radius: var(--r-3);
-  box-shadow: inset 0 0 0 1px var(--line-1);
+  box-shadow: inset 0 0 0 0.5px var(--line-1);
 }
 
 .profile-image-picker-visual > svg {
@@ -117,7 +117,7 @@
   width: 24px;
   height: var(--control-h-2xs);
   padding: 0;
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-full);
   background: var(--surface-0);
   color: var(--ink-2);
@@ -141,7 +141,7 @@
   max-width: min(260px, 70vw);
   --tone: var(--err);
   padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--tone-line);
+  border: 0.5px solid var(--tone-line);
   border-radius: var(--r-2);
   background: var(--surface-0);
   color: var(--err);
@@ -203,7 +203,7 @@
     width: 24px;
     height: var(--control-h-2xs);
     transform: translate(-50%, -50%);
-    border: 1px solid var(--line-1);
+    border: 0.5px solid var(--line-1);
     border-radius: var(--r-full);
     background: var(--surface-0);
     box-shadow: var(--shadow-1);

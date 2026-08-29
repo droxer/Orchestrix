@@ -30,7 +30,7 @@
 .adm-dash-kpis {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 1fr;
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-3);
   background: var(--surface-1);
   overflow: hidden;
@@ -52,7 +52,7 @@
   flex-direction: column;
   gap: var(--sp-2);
   padding: var(--sp-5);
-  border-right: 1px solid var(--line-1);
+  border-right: 0.5px solid var(--line-1);
   min-width: 0;
 }
 
@@ -242,7 +242,7 @@
   text-transform: uppercase;
   color: var(--ink-3);
   padding: var(--sp-0-5) var(--sp-2);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-1);
 }
@@ -287,7 +287,7 @@
 .adm-dash-bar-seg {
   display: block;
   height: 100%;
-  border-right: 1px solid var(--surface-1);
+  border-right: 0.5px solid var(--surface-1);
 }
 
 .adm-dash-bar-seg:last-child { border-right: none; }
@@ -380,7 +380,7 @@
    — the same shape StatusPill and the node presence dots use. */
 .adm-dash-stat.tone-bad .adm-dash-stat-dot {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--tone);
+  box-shadow: inset 0 0 0 1px var(--tone);
 }
 
 .adm-dash-stat-value {
@@ -487,9 +487,9 @@
 
   .adm-dash-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .adm-dash-tile { grid-column: span 1; }
-  .adm-dash-tile--hero { grid-column: 1 / -1; border-right: none; border-bottom: 1px solid var(--line-1); }
-  .adm-dash-tile--nodes { border-right: 1px solid var(--line-1); border-bottom: 1px solid var(--line-1); }
-  .adm-dash-tile--employees { border-right: none; border-bottom: 1px solid var(--line-1); }
+  .adm-dash-tile--hero { grid-column: 1 / -1; border-right: none; border-bottom: 0.5px solid var(--line-1); }
+  .adm-dash-tile--nodes { border-right: 0.5px solid var(--line-1); border-bottom: 0.5px solid var(--line-1); }
+  .adm-dash-tile--employees { border-right: none; border-bottom: 0.5px solid var(--line-1); }
   .adm-dash-tile--tokens { grid-column: 1 / -1; border-right: none; }
 }
 

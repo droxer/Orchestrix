@@ -21,7 +21,9 @@ function Switch({ className, ...props }: SwitchPrimitive.Root.Props) {
     >
       <SwitchPrimitive.Thumb
         data-slot="switch-thumb"
-        className="pointer-events-none block size-4 rounded-full bg-background shadow-sm transition-transform data-checked:translate-x-4 data-unchecked:translate-x-0"
+        /* No shadow-sm — the thumb separates from the track by its fill step,
+           like every other plane in the flat system. */
+        className="pointer-events-none block size-4 rounded-full bg-background transition-transform data-checked:translate-x-4 data-unchecked:translate-x-0"
       />
     </SwitchPrimitive.Root>
   )

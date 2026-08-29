@@ -84,7 +84,7 @@ function SelectContent({
           data-slot="select-content"
           data-align-trigger={alignItemWithTrigger}
           /* Flat elevation: --shadow-2 is the role for borderless floating
-             chrome (a single 1px ring). The former `shadow-md` was a Tailwind
+             chrome (a single hairline ring). The former `shadow-md` was a Tailwind
              drop shadow — the only faux depth in the app — and
              `ring-foreground/10` hardcoded what that token already owns. */
           className={cn("relative isolate z-(--z-float) max-h-(--available-height) w-(--anchor-width) min-w-36 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-md bg-popover text-popover-foreground shadow-(--shadow-2) transition-[opacity,transform] duration-(--t-fast) ease-(--ease) data-[open]:opacity-100 data-[closed]:opacity-0 data-[closed]:scale-95", className )}

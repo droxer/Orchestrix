@@ -9,7 +9,7 @@
   grid-template-columns: auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
-  border-left: 1px solid var(--line-1);
+  border-left: 0.5px solid var(--line-1);
   background: var(--surface-0);
   overflow: hidden;
 }
@@ -51,7 +51,7 @@
   gap: var(--sp-2);
   min-height: var(--header-h);
   padding-inline: var(--sp-4);
-  border-bottom: 1px solid var(--line-1);
+  border-bottom: 0.5px solid var(--line-1);
 }
 
 .thread-space-title {

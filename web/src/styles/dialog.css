@@ -78,7 +78,7 @@
   width: 100%;
   height: var(--control-h);
   padding: 0 var(--sp-3);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--field-on-overlay);
   color: var(--ink-1);
@@ -107,7 +107,7 @@
   align-items: flex-start;
   gap: var(--sp-3);
   padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   border-left: var(--accent-bar-block-w) solid var(--info);
   border-radius: var(--r-3);
   background: var(--surface-3);

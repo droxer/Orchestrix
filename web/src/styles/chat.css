@@ -14,7 +14,7 @@
   align-items: center;
   gap: var(--sp-3);
   padding: 0 var(--page-gutter);
-  border-bottom: 1px solid var(--line-1);
+  border-bottom: 0.5px solid var(--line-1);
   background: var(--surface-0);
 }
 
@@ -186,7 +186,7 @@
 .chat-agent-state-pip[data-availability="offline"],
 .chat-agent-state-pip[data-availability="inactive"] {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--err);
+  box-shadow: inset 0 0 0 1px var(--err);
 }
 
 .chat-artifacts-button {
@@ -204,7 +204,7 @@
   display: grid;
   place-items: center;
   padding: 0 var(--sp-1);
-  border: 1px solid var(--surface-0);
+  border: 0.5px solid var(--surface-0);
   border-radius: var(--r-2);
   background: var(--ink-1);
   color: var(--surface-0);
@@ -321,7 +321,7 @@
   align-self: start;
   color: var(--ink-1);
   background: var(--surface-0);
-  border: 1px solid var(--line-1);
+  border: 0.5px solid var(--line-1);
   /* Agents are squares; the human is a circle. Yellow is reserved for action
      and live work, so the human-vs-machine tell is the silhouette, not a
      fill. Agent identity is the profile image inside. */
@@ -388,7 +388,7 @@
    state pip above uses: shape carries the alarm, not a solid --err fill. */
 .rail-node-system.tone-bad {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--tone);
+  box-shadow: inset 0 0 0 1px var(--tone);
 }
 
 /* A continuation from the same agent drops its header and empties the rail
@@ -481,7 +481,7 @@
   gap: var(--sp-1);
   padding: var(--sp-3) var(--sp-4);
   background: var(--surface-1);
-  border: 1px solid var(--line-2);
+  border: 0.5px solid var(--line-2);
   border-radius: var(--r-3);
   border-top-left-radius: var(--r-1);
 }
@@ -572,7 +572,7 @@
   gap: var(--sp-1-5);
   height: var(--sp-6);
   padding: 0 var(--sp-2);
-  border: 1px solid transparent;
+  border: 0.5px solid transparent;
   border-radius: var(--r-2);
   background: transparent;
   color: var(--ink-3);
