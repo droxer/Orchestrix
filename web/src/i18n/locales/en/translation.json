@@ -377,7 +377,25 @@
     "bulk_delete_body_other": "{{count}} selected tasks will be removed from Backlog. Linked threads, artifacts, and run history will stay available.",
     "toast_bulk_deleted_one": "1 task deleted.",
     "toast_bulk_deleted_other": "{{count}} tasks deleted.",
-    "sort_label": "Sort tasks"
+    "sort_label": "Sort tasks",
+    "history_title": "Run history",
+    "history_loading": "Loading history…",
+    "history_empty": "Nothing has run yet.",
+    "history_error": "Could not load run history.",
+    "history_occurrence_origin": "(occurrence)",
+    "history": {
+      "created": "Created",
+      "assigned": "Assigned",
+      "unassigned": "Unassigned",
+      "status": "Status → {{status}}",
+      "session_linked": "Thread started",
+      "session_unlinked": "Thread unlinked",
+      "occurrence": "Occurrence scheduled",
+      "dispatch_started": "Dispatched",
+      "dispatch_queued": "Queued for a node",
+      "dispatch_rejected": "Dispatch rejected",
+      "activity": "Activity"
+    }
   },
   "workspace": {
     "title": "Workspace",

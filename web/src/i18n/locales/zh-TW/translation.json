@@ -376,7 +376,25 @@
     "bulk_delete_body_other": "所選的 {{count}} 個任務將從待辦中移除，關聯的話題、產物與執行歷史仍會保留。",
     "toast_bulk_deleted_one": "已刪除 {{count}} 個任務。",
     "toast_bulk_deleted_other": "已刪除 {{count}} 個任務。",
-    "sort_label": "任務排序"
+    "sort_label": "任務排序",
+    "history_title": "執行紀錄",
+    "history_loading": "正在載入執行紀錄…",
+    "history_empty": "尚未執行。",
+    "history_error": "無法載入執行紀錄。",
+    "history_occurrence_origin": "（實例）",
+    "history": {
+      "created": "已建立",
+      "assigned": "已指派",
+      "unassigned": "已取消指派",
+      "status": "狀態 → {{status}}",
+      "session_linked": "已開啟討論串",
+      "session_unlinked": "已解除討論串關聯",
+      "occurrence": "已排定實例",
+      "dispatch_started": "已派送",
+      "dispatch_queued": "排隊等待節點",
+      "dispatch_rejected": "派送遭拒",
+      "activity": "活動"
+    }
   },
   "workspace": {
     "title": "工作區",

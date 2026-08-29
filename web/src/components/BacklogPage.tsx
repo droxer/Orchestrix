@@ -725,6 +725,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
           onChange={(next) => {
             if (next.variant === "backlog") setForm(next);
           }}
+          onOpenThread={onOpenThread}
           onSubmit={(event) => void submitTask(event)}
           onDelete={form.id ? () => { void deleteBacklog(); } : undefined}
         />
