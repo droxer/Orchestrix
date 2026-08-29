@@ -233,6 +233,29 @@ def provisioned_sandbox_record(sandbox: dict[str, Any]) -> dict[str, Any]:
     return public
 
 
+def _confined_workspace_path(root: str, subpath: str) -> str | None:
+    """Join ``subpath`` under ``root``, or ``None`` if it would escape.
+
+    Project subpaths are server-generated today, but this value ends up as the
+    root that generated-file confinement is measured against, so an absolute or
+    ``..``-bearing subpath would silently widen what a daemon can index.
+    """
+    candidate = Path(root) / subpath
+    try:
+        resolved = candidate.resolve()
+        root_resolved = Path(root).resolve()
+    except OSError:
+        return None
+    if resolved != root_resolved and root_resolved not in resolved.parents:
+        logger.warning(
+            "rejecting workspace subpath outside the node workspace",
+            root=root,
+            subpath=subpath,
+        )
+        return None
+    return str(candidate)
+
+
 def _string_metadata(value: Any, limit: int = 500) -> str | None:
     if not isinstance(value, str):
         return None
@@ -3202,6 +3225,17 @@ class DaemonNodeRegistry:
             in (sandbox.get("capabilities") or [])
         ):
             artifact_workspace_path = str(Path(workspace_path) / session_id)
+        elif (
+            workspace_path
+            and session.get("workspaceLayout") == "project"
+            and isinstance(session.get("workspaceSubpath"), str)
+            and session["workspaceSubpath"]
+            and DAEMON_CAPABILITY_PROJECT_WORKSPACES
+            in (sandbox.get("capabilities") or [])
+        ):
+            artifact_workspace_path = _confined_workspace_path(
+                workspace_path, session["workspaceSubpath"]
+            ) or workspace_path
         if isinstance(event.get("generatedFiles"), list):
             items = daemon_reported_generated_files(
                 artifact_workspace_path, event["generatedFiles"]

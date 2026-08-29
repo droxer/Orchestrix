@@ -751,6 +751,9 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
         # Passed through raw; the registry sanitizes each entry (path
         # confinement, extension allowlist, content caps) before indexing.
         generated_files = value.get("generatedFiles")
+        # Passed through raw; collaboration policy validates the aggregate
+        # verdict before it can affect task state.
+        round_result = value.get("roundResult")
         return {
             "type": event_type,
             "commandId": command_id,
@@ -764,6 +767,11 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
             **(
                 {"generatedFiles": generated_files}
                 if isinstance(generated_files, list)
+                else {}
+            ),
+            **(
+                {"roundResult": round_result}
+                if isinstance(round_result, dict)
                 else {}
             ),
         }
