@@ -276,7 +276,6 @@ export function ThreadsView({
         >
           <RelayEmptyState
             fill
-            mark
             title={t("project.loading")}
             body={t("project.loading_body")}
           />
@@ -291,7 +290,6 @@ export function ThreadsView({
         >
           <RelayEmptyState
             fill
-            mark
             title={t("project.load_failed")}
             body={projectsError || t("project.load_failed_body")}
             actions={(
@@ -310,7 +308,6 @@ export function ThreadsView({
         >
           <RelayEmptyState
             fill
-            mark
             title={t("project.not_found")}
             body={t("project.not_found_body")}
             actions={(
@@ -324,7 +321,6 @@ export function ThreadsView({
         <section id="chat-panel" className="chat-panel project-directory-empty" aria-label={t("project.projects")} tabIndex={-1}>
           <RelayEmptyState
             fill
-            mark
             title={t("project.select_title")}
             body={t("project.select_body")}
           />

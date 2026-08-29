@@ -119,8 +119,6 @@ export function TeamsPage({
             <div className="route-loading" role="status" aria-live="polite">{t("admin.loading")}</div>
           ) : visibleTeams.length === 0 ? (
             <RelayEmptyState
-              /* Rail-tight plate: the corner doodle would land on the copy. */
-              marginalia={null}
               title={teams.length === 0 ? t("teams.empty_title") : t("teams.empty_filtered_title")}
               body={teams.length === 0 ? t("teams.empty_body") : t("teams.empty_filtered_body")}
             />
@@ -211,7 +209,7 @@ export function TeamsPage({
             />
           </>
         ) : (
-          <RelayEmptyState fill mark title={t("teams.select_title")} body={t("teams.select_body")} />
+          <RelayEmptyState fill title={t("teams.select_title")} body={t("teams.select_body")} />
         )}
       </div>
 

@@ -364,7 +364,6 @@ export function ThreadListPanel({
           ) : directoryState === "error" ? (
             <RelayEmptyState
               className="conversation-empty"
-              marginalia={null}
               title={t("project.load_failed")}
               body={projectsError || t("project.load_failed_body")}
               actions={(
@@ -376,13 +375,11 @@ export function ThreadListPanel({
           ) : directoryState === "filtered-empty" ? (
             <RelayEmptyState
               className="conversation-empty"
-              marginalia={null}
               title={t("thread.no_matches")}
             />
           ) : directoryState === "empty" ? (
             <RelayEmptyState
               className="conversation-empty"
-              marginalia={null}
               title={t("project.no_projects")}
               actions={(
                 <Button type="button" onClick={() => onCreateProject()}>
@@ -394,7 +391,6 @@ export function ThreadListPanel({
         ) : threads.length === 0 ? (
           <RelayEmptyState
             className="conversation-empty"
-            marginalia={null}
             title={query.trim() ? t("thread.no_matches") : t("thread.no_threads")}
             actions={query.trim() ? undefined : (
               <Button type="button" onClick={() => onNewThread(null)}>
