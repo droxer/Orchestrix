@@ -6,8 +6,8 @@ import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import type { AgentName, CurrentUser, EmployeeAgent, LogicalAgentAvailability } from "../types";
+import { AgentMetaLine } from "./AgentMetaLine";
 import { AgentStateBadge } from "./AgentStateBadge";
-import { AgentMark } from "./AgentMark";
 import {
   ActionAdd,
   ICON,
@@ -21,9 +21,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FilterSelect } from "./FiltersBar";
 import { SearchInput } from "@/components/ui/search-input";
-import { describeAgentPlacements } from "../lib/agentPlacements";
-import { agentLabel } from "../lib/plan";
-import { OWNERSHIP_ICON } from "./AgentPlacementBadge";
 import { CreateAgentDialog } from "./agents/CreateAgentDialog";
 
 interface AgentsPageProps {
@@ -49,10 +46,6 @@ function parseAvailabilityFilter(value: string | null): AvailabilityFilter {
   return AVAILABILITY_FILTERS.includes(value as AvailabilityFilter)
     ? value as AvailabilityFilter
     : "all";
-}
-
-function activePlacements(agent: EmployeeAgent) {
-  return agent.placements.filter((placement) => placement.desiredState !== "removed");
 }
 
 function agentDescriptors(t: ReturnType<typeof useTranslation>["t"]):
@@ -125,11 +118,7 @@ function RosterRow({
   onSelect: (agent: EmployeeAgent) => void;
 }) {
   const { t } = useTranslation();
-  const placements = activePlacements(agent);
-  const placementDescriptions = describeAgentPlacements(placements);
   const ready = agent.enabled && agent.availability === "ready";
-  const runtime = agentLabel(agent.executorKind);
-  const computerNames = placementDescriptions.map(({ nodeName }) => nodeName).join(", ");
 
   return (
     <li className="list-virtual">
@@ -158,45 +147,11 @@ function RosterRow({
             <span className="agents-roster-row-title">
               <span className="agents-roster-row-name">{agent.displayName}</span>
             </span>
-            {/* Runtime + Computers are execution metadata, not an Agent-owned
-                workspace. Keep every active Computer visible in route order. */}
-            <span
+            <AgentMetaLine
+              executorKind={agent.executorKind}
+              placements={agent.placements}
               className="agents-roster-row-meta"
-              title={placementDescriptions.length
-                ? `${t("agents_page.runtime")}: ${runtime} · ${t("agents_page.computers")}: ${computerNames}`
-                : `${t("agents_page.runtime")}: ${runtime} · ${t("agents_page.no_placements")}`}
-            >
-              <span className="agents-roster-row-runtime">
-                <span className="sr-only">{t("agents_page.runtime")}: </span>
-                <span className="agents-roster-row-runtime-mark" aria-hidden="true">
-                  <AgentMark agent={agent.executorKind} size={ICON.xs} />
-                </span>
-                <span className="agents-roster-row-runtime-label" translate="no">{runtime}</span>
-              </span>
-              <span className="agents-roster-row-meta-separator" aria-hidden="true">·</span>
-              {placementDescriptions.length ? (
-                <span className="agents-roster-row-computers">
-                  <span className="sr-only">{t("agents_page.computers")}: </span>
-                  {placementDescriptions.map((description, index) => {
-                    const ComputerIcon = OWNERSHIP_ICON[description.ownership];
-                    return (
-                      <span
-                        key={description.placement.id}
-                        className="agents-roster-row-computer"
-                      >
-                        {index > 0 ? (
-                          <span className="agents-roster-row-computer-separator" aria-hidden="true">,</span>
-                        ) : null}
-                        <ComputerIcon size={ICON.xs} aria-hidden="true" />
-                        <span translate="no">{description.nodeName}</span>
-                      </span>
-                    );
-                  })}
-                </span>
-              ) : (
-                <span>{t("agents_page.no_placements")}</span>
-              )}
-            </span>
+            />
           </span>
           {/* One row, ONE place for status. Disabled used to render as a Badge
               inline after the name while Busy / Pending / Offline rendered in

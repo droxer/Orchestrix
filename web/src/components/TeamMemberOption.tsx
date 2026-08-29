@@ -1,18 +1,15 @@
 "use client";
 
-import { useTranslation } from "react-i18next";
-import { describeAgentPlacements } from "../lib/agentPlacements";
-import { agentLabel } from "../lib/plan";
 import type { AgentName, AgentPlacement } from "../types";
-import { OWNERSHIP_ICON } from "./AgentPlacementBadge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ICON } from "./icons";
+import { AgentMetaLine } from "./AgentMetaLine";
 
 /* One team-member pick row. TeamDrawer and TeamWorkspacePage both used to
    render this label+checkbox+name+kind anatomy by hand; the checkbox is the
    shared primitive so the check affordance stops being OS chrome. The meta
-   line matches the agent roster: kind first, then the agent's home computer
-   — an agent with nowhere to run says so. */
+   line is <AgentMetaLine>, the same component the roster and the team profile
+   render — this file used to claim it matched the roster while drawing its own
+   glyph-less, one-rung-larger version. */
 export function TeamMemberOption({
   agentId,
   displayName,
@@ -30,14 +27,6 @@ export function TeamMemberOption({
   disabled?: boolean;
   onToggle: (agentId: string) => void;
 }) {
-  const { t } = useTranslation();
-  // One agent lives on exactly one computer.
-  const computer = describeAgentPlacements(placements)[0] ?? null;
-  const ComputerIcon = computer ? OWNERSHIP_ICON[computer.ownership] : null;
-  const computerTitle = computer
-    ? `${t(`admin.v2.node_ownership_${computer.ownership}`)} · ${computer.nodeName}`
-    : undefined;
-
   return (
     <label
       className="team-member-option"
@@ -50,17 +39,11 @@ export function TeamMemberOption({
       />
       <span className="team-member-option-main">
         <span className="team-member-option-name">{displayName}</span>
-        <span className="team-member-option-meta code">
-          <span>{agentLabel(executorKind)}</span>
-          {computer && ComputerIcon ? (
-            <span className="team-member-option-computer" translate="no" title={computerTitle}>
-              <ComputerIcon size={ICON.xs} aria-hidden="true" />
-              {computer.nodeName}
-            </span>
-          ) : (
-            <span>{t("agents_page.no_placements")}</span>
-          )}
-        </span>
+        <AgentMetaLine
+          executorKind={executorKind}
+          placements={placements}
+          className="team-member-option-meta"
+        />
       </span>
     </label>
   );

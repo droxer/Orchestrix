@@ -3,9 +3,11 @@
 import type { TFunction } from "i18next";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { isNodeOnline, nodeOwnershipProfile, visualStatus } from "../../lib/adminHelpers";
-import { nodeOwnershipIcon } from "./NodeProfileBadges";
 import { NodePresence } from "./NodePresence";
-import { ICON } from "../icons";
+import {
+  ICON,
+  nodeOwnershipIcon,
+} from "../icons";
 
 /**
  * The computers assigned to one employee.

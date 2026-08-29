@@ -9,8 +9,6 @@ import { useRelayMutations } from "../hooks/useRelayMutations";
 import { TEAMS_QUERY_KEY } from "../hooks/useTeams";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
-import { agentLabel } from "../lib/plan";
-import { describeAgentPlacements } from "../lib/agentPlacements";
 import { teamAvailability } from "../lib/taskAssignment";
 import { teamMutationInput } from "../lib/teamForm";
 import type { AgentTeam } from "../types";
@@ -19,8 +17,8 @@ import {
   AdminDelete,
   ICON,
 } from "./icons";
+import { AgentMetaLine } from "./AgentMetaLine";
 import { AgentStateBadge } from "./AgentStateBadge";
-import { OWNERSHIP_ICON } from "./AgentPlacementBadge";
 import { PageHeader } from "./PageHeader";
 import { IdentityMark } from "./IdentityMark";
 import { TeamMemberOption } from "./TeamMemberOption";
@@ -291,14 +289,8 @@ function TeamProfile({
                   {team.members.map((member) => {
                     const ready = member.enabled && member.availability === "ready";
                     // TeamMemberSummary carries no placements; the roster's
-                    // full agent record knows the member's home computer.
-                    const computer = describeAgentPlacements(
-                      agents.find((agent) => agent.id === member.id)?.placements ?? [],
-                    )[0] ?? null;
-                    const ComputerIcon = computer ? OWNERSHIP_ICON[computer.ownership] : null;
-                    const computerTitle = computer
-                      ? `${t(`admin.v2.node_ownership_${computer.ownership}`)} · ${computer.nodeName}`
-                      : undefined;
+                    // full agent record knows the member's computers.
+                    const placements = agents.find((agent) => agent.id === member.id)?.placements ?? [];
                     return (
                       <li key={member.id} className="team-profile-member">
                         <AgentStateBadge
@@ -315,17 +307,11 @@ function TeamProfile({
                               <span className="team-profile-member-lead">{t("teams.lead_badge")}</span>
                             ) : null}
                           </span>
-                          <span className="team-profile-member-meta code">
-                            <span>{agentLabel(member.executorKind)}</span>
-                            {computer && ComputerIcon ? (
-                              <span className="team-profile-member-computer" translate="no" title={computerTitle}>
-                                <ComputerIcon size={ICON.xs} aria-hidden="true" />
-                                {computer.nodeName}
-                              </span>
-                            ) : (
-                              <span>{t("agents_page.no_placements")}</span>
-                            )}
-                          </span>
+                          <AgentMetaLine
+                            executorKind={member.executorKind}
+                            placements={placements}
+                            className="team-profile-member-meta"
+                          />
                         </span>
                         {/* Per-member readiness, not the team's — the band
                             carries the team's own availability. */}

@@ -2,8 +2,7 @@
 
 import type { TFunction } from "i18next";
 import type { AgentName, ControlPanelDaemonNodeRecord } from "../../types";
-import { AgentMark } from "../AgentMark";
-import { ICON } from "../icons";
+import { RuntimeMark } from "../RuntimeMark";
 import {
   agentStatusTone,
   nodeAgentPresence,
@@ -62,19 +61,18 @@ export function NodeRuntimeMarks({
         const disabled = isAgentDisabled(node, name);
         const presence = nodeAgentPresence(node, name);
         return (
-          <span
+          <RuntimeMark
             key={name}
-            className={`adm-runtime-mark tone-${agentStatusTone(agentStatus)}${disabled ? " is-disabled" : ""}`}
-            data-agent={name}
-            data-presence={presence}
+            agent={name}
+            presence={presence}
+            tone={agentStatusTone(agentStatus, { disabled })}
+            disabled={disabled}
+            glyphClassName="adm-agent-chip-mark"
             role="img"
             aria-label={`${name} · ${nodeAgentPresenceLabel(presence, t)}`}
             title={agentTitle(node, name, t)}
             translate="no"
-          >
-            <i className="adm-agent-dot" aria-hidden="true" />
-            <AgentMark agent={name} size={ICON.sm} className="adm-agent-chip-mark" />
-          </span>
+          />
         );
       })}
     </span>

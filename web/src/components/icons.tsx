@@ -14,6 +14,7 @@ import {
   CircleStop,
   Coins,
   Copy,
+  Cpu,
   CalendarClock,
   CalendarDays,
   Cloud,
@@ -42,7 +43,6 @@ import {
   LogOut,
   MessagesSquare,
   MoreHorizontal,
-  Network,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRight,
@@ -54,7 +54,6 @@ import {
   RotateCcw,
   ScanEye,
   Search,
-  Server,
   Settings,
   Square,
   Settings2,
@@ -77,6 +76,8 @@ import {
   type LucideProps,
 } from "lucide-react";
 import { forwardRef } from "react";
+
+import { IdentityMark } from "./IdentityMark";
 
 // Standard refined stroke for every icon in the product. Lucide defaults to
 // 2 which feels chunky next to the rest of the type; 1.75 reads as
@@ -154,6 +155,25 @@ function withStandardStroke(Icon: LucideIcon, displayName: string) {
   return Wrapped;
 }
 
+/**
+ * A nav/section glyph that draws the very mark the class already owns.
+ *
+ * `NavAgents` was a lucide robot head and `NavTeams` a lucide network node,
+ * while every profile slot in the app drew the agent diamond and the team fan
+ * from `IdentityMark`. That is two pictures for one class: the rail said one
+ * thing about an agent and the row beside it said another. The section glyph
+ * is now the same silhouette as the thing the section contains, so a reader
+ * learns each shape once. These marks are filled, not stroked, so they take
+ * no `strokeWidth` — size and colour are the whole contract.
+ */
+function identityGlyph(kind: "agent" | "team", displayName: string) {
+  function Glyph({ size = ICON.sm, className }: Pick<LucideProps, "size" | "className">) {
+    return <IdentityMark kind={kind} variant="bare" size={Number(size)} className={className} />;
+  }
+  Glyph.displayName = displayName;
+  return Glyph;
+}
+
 // Semantic exports. Anywhere we want to swap the underlying glyph, do it
 // here — no caller in the app has to know which lucide picture we chose.
 // This module is the only place allowed to import lucide-react: a glyph
@@ -165,18 +185,24 @@ export const NavAdmin = withStandardStroke(UserCog, "NavAdmin");
 export const NavBacklog = withStandardStroke(ListTodo, "NavBacklog");
 export const NavChannels = withStandardStroke(Hash, "NavChannels");
 export const NavRoutine = withStandardStroke(CalendarClock, "NavRoutine");
-export const NavAgents = withStandardStroke(Bot, "NavAgents");
-// A team is a dispatch lead fanning out to members — the same idea the
-// bespoke team IdentityMark draws. `Users` stays with employees (actual people), so
-// the roster chip and the teams nav are no longer the same silhouette.
-export const NavTeams = withStandardStroke(Network, "NavTeams");
+export const NavAgents = identityGlyph("agent", "NavAgents");
+// A team is a dispatch lead fanning out to members — no longer *the same idea
+// as* the bespoke team IdentityMark, but that mark itself. `Users` stays with
+// employees (actual people), so the roster chip and the teams nav are not the
+// same silhouette.
+export const NavTeams = identityGlyph("team", "NavTeams");
 export const NavPreferences = withStandardStroke(Settings, "NavPreferences");
 export const NavLogout = withStandardStroke(LogOut, "NavLogout");
 export const NavRefresh = withStandardStroke(RefreshCw, "NavRefresh");
 export const NavSidebarCollapse = withStandardStroke(PanelLeftClose, "NavSidebarCollapse");
 export const NavSidebarExpand = withStandardStroke(PanelLeftOpen, "NavSidebarExpand");
 export const NavMore = withStandardStroke(MoreHorizontal, "NavMore");
-export const NavComputer = withStandardStroke(Server, "NavComputer");
+// The computers section is a machine, not a data-centre rack. Every computer
+// *inside* it is drawn by its ownership glyph (a cloud or a laptop, below);
+// the rack was the picture that set deliberately abandoned, so the section and
+// its members disagreed. `Cpu` is claimed by no ownership variant, so section
+// and member never collapse into the same silhouette.
+export const NavComputer = withStandardStroke(Cpu, "NavComputer");
 // Compose a new thread (pencil-in-square), the messaging-app convention.
 export const ActionCompose = withStandardStroke(SquarePen, "ActionCompose");
 
@@ -225,7 +251,24 @@ export const ActionImage = withStandardStroke(ImagePlus, "ActionImage");
 export const NodeManaged = withStandardStroke(Cloud, "NodeManaged");
 export const NodeLocal = withStandardStroke(Laptop, "NodeLocal");
 export const NodePending = withStandardStroke(CircleDashed, "NodePending");
-export const NodeOffline = withStandardStroke(WifiOff, "NodeOffline");
+
+/** The one map from ownership to glyph. Two call sites — the placement badge
+ *  and the node profile badges — each kept a private copy of this record, so
+ *  a fourth ownership kind (or a different picture for an existing one) would
+ *  have had to be remembered twice. */
+export type NodeOwnership = "managed" | "local" | "pending";
+
+const NODE_OWNERSHIP_ICON: Record<NodeOwnership, typeof NodeManaged> = {
+  managed: NodeManaged,
+  local: NodeLocal,
+  pending: NodePending,
+};
+
+/** The card/row avatar is a computer's logo, so it carries the ownership
+ *  glyph rather than one generic machine for every computer. */
+export function nodeOwnershipIcon(ownership: NodeOwnership): typeof NodeManaged {
+  return NODE_OWNERSHIP_ICON[ownership];
+}
 
 // Preferences category glyphs.
 export const PrefAppearance = withStandardStroke(Palette, "PrefAppearance");
@@ -239,6 +282,10 @@ export const StatusOk = withStandardStroke(CircleCheck, "StatusOk");
 export const StatusInfo = withStandardStroke(Info, "StatusInfo");
 export const StatusWarn = withStandardStroke(TriangleAlert, "StatusWarn");
 export const StatusError = withStandardStroke(CircleAlert, "StatusError");
+// Presence, not ownership. This lived in the ownership block above and
+// answered a different question there: a computer is a cloud or a laptop
+// whether or not it is reachable right now.
+export const NodeOffline = withStandardStroke(WifiOff, "NodeOffline");
 export const StreamAttachment = withStandardStroke(Paperclip, "StreamAttachment");
 
 // The thread space toggle shows and hides the right-hand panel; it is a
@@ -280,7 +327,9 @@ export const ActionEdit = withStandardStroke(Pencil, "ActionEdit");
 export const ActionToggle = withStandardStroke(Power, "ActionToggle");
 
 // Admin page glyphs — node/employee management and channel setup.
-export const AdminNode = withStandardStroke(Server, "AdminNode");
+// Same machine as NavComputer — the admin fleet section and the computers
+// nav are one object seen from two surfaces.
+export const AdminNode = withStandardStroke(Cpu, "AdminNode");
 export const AdminManageExecutors = withStandardStroke(Settings2, "AdminManageExecutors");
 export const AdminDelete = withStandardStroke(Trash2, "AdminDelete");
 export const AdminRestore = withStandardStroke(RotateCcw, "AdminRestore");

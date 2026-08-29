@@ -317,7 +317,7 @@ button.computer-run-open:hover {
    left the reader guessing which mark was which and what it meant. */
 .computer-runtime-row {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--sp-2);
   min-width: 0;
@@ -325,32 +325,10 @@ button.computer-run-open:hover {
   font: var(--type-body-sm);
 }
 
-.computer-runtime-row .adm-agent-dot { background: var(--tone, var(--ink-4)); }
-.computer-runtime-row.tone-bad .adm-agent-dot {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--tone);
-}
-
+/* A switched-off runtime dims whole: the mark's own is-disabled would leave
+   the name, state and version at full strength beside a faded pip. */
 .computer-runtime-row.is-disabled {
   opacity: var(--opacity-disabled);
-}
-
-/* Presence, same shape rule as the fleet marks: filled = this runtime can
-   take work now, hollow = it cannot. On a computer that has gone dark every
-   row goes hollow and dims, so "my machine is off" reads as one fact rather
-   than four rows still claiming to be ready. */
-.computer-runtime-row[data-presence="offline"] .adm-agent-dot,
-.computer-runtime-row[data-presence="disabled"] .adm-agent-dot {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--ink-4);
-}
-
-/* An unhappy runtime keeps its loud ring even on a dark machine: "not
-   available" and "broken" are different problems and the reader fixes them
-   differently. */
-.computer-runtime-row[data-presence="offline"].tone-warn .adm-agent-dot,
-.computer-runtime-row[data-presence="offline"].tone-bad .adm-agent-dot {
-  box-shadow: inset 0 0 0 1px var(--tone);
 }
 
 .computer-card[data-online="false"] .computer-runtime-row {

@@ -2,31 +2,13 @@
 
 import type { TFunction } from "i18next";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
-import {
-  ICON,
-  NodeLocal,
-  NodeManaged,
-  NodePending,
-} from "../icons";
+import { ICON, nodeOwnershipIcon } from "../icons";
 import {
   nodeOwnershipProfile,
   nodeLocalityKinds,
   nodeSandboxProfile,
-  type NodeOwnershipProfile,
   type StoredNodeTokenMap,
 } from "./helpers";
-
-const OWNERSHIP_ICON: Record<NodeOwnershipProfile, typeof NodeManaged> = {
-  managed: NodeManaged,
-  local: NodeLocal,
-  pending: NodePending,
-};
-
-/** The card/row avatar is a computer's logo, so it carries the ownership
- *  glyph rather than one generic server rack for every machine. */
-export function nodeOwnershipIcon(ownership: NodeOwnershipProfile): typeof NodeManaged {
-  return OWNERSHIP_ICON[ownership];
-}
 
 interface NodeProfileBadgesProps {
   node: ControlPanelDaemonNodeRecord;
@@ -62,7 +44,7 @@ export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = 
   const localityHint = localities
     .map((locality) => t(`admin.v2.node_locality_${locality}_hint`))
     .join(" · ");
-  const OwnershipIcon = OWNERSHIP_ICON[ownership];
+  const OwnershipIcon = nodeOwnershipIcon(ownership);
   const showSandbox = !card && !hideSandbox;
 
   return (

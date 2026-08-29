@@ -2,8 +2,10 @@ import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import type { DaemonNodeMonitorRecord } from "../../types";
 import { nodeOwnershipProfile } from "../../lib/adminHelpers";
-import { nodeOwnershipIcon } from "../admin/NodeProfileBadges";
-import { ICON } from "../icons";
+import {
+  ICON,
+  nodeOwnershipIcon,
+} from "../icons";
 import {
   Select,
   SelectContent,

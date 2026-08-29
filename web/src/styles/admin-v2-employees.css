@@ -94,32 +94,10 @@
   white-space: nowrap;
 }
 
-/* Meta line = kind · home computer, one quiet mono row. The middot separator
-   is generated, never typed, so both surfaces stay in lockstep. */
-.team-member-option-meta {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--sp-1);
-  color: var(--ink-3);
-  font-size: var(--fs-2);
-  white-space: nowrap;
-}
-
-.team-member-option-meta > * + *::before {
-  content: "·";
-  margin-right: var(--sp-1);
-  color: var(--ink-4);
-}
-
-.team-member-option-computer {
-  display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--sp-1);
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+/* Meta line = runtime · computers, one quiet mono row — <AgentMetaLine>
+   (.agent-meta in agents.css). This surface used to draw its own copy with
+   no vendor glyph and a generated middot, which is why a picked agent looked
+   unlike the same agent on the roster. */
 
 .adm-employees-empty.relay-empty--fill {
   min-height: min(420px, 50vh);

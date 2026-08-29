@@ -162,7 +162,16 @@
   flex: none;
 }
 
-.agents-roster-row-meta {
+/* ── The agent meta line ─────────────────────────────────────────────────
+   `[vendor glyph] runtime · [ownership glyph] computer, computer` — the one
+   annotation under an agent's name, shared by the roster row, the team
+   profile's member list, and the team member picker (<AgentMetaLine>).
+
+   It used to be three hand-written copies. The team pair dropped the vendor
+   glyph entirely, sat a type rung larger at --fs-2, showed only the first
+   computer, and kept `removed` placements the roster had already filtered —
+   so the same agent read four different ways depending on the screen. */
+.agent-meta {
   display: flex;
   align-items: center;
   min-width: 0;
@@ -175,17 +184,16 @@
   white-space: nowrap;
 }
 
-.agents-roster-row-runtime,
-.agents-roster-row-meta-separator {
+.agent-meta-runtime,
+.agent-meta-separator {
   flex: none;
 }
 
-/* Runtime reads as plain meta, not a boxed chip: the team-member roster
-   (.team-member-option-meta) renders kind as icon + text, and the boxed
-   treatment here was heavier than the agent name it annotates while its
-   19px inset divider cramped the label. Icon + mono text matches the
-   computer segments beside it. */
-.agents-roster-row-runtime {
+/* Runtime reads as plain meta, not a boxed chip: the boxed treatment was
+   heavier than the agent name it annotates, and its 19px inset divider
+   cramped the label. Icon + mono text matches the computer segments beside
+   it. */
+.agent-meta-runtime {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
@@ -200,33 +208,33 @@
   letter-spacing: var(--type-code-track);
 }
 
-.agents-roster-row-runtime-mark {
+.agent-meta-runtime-mark {
   display: inline-flex;
   align-items: center;
 }
 
-.agents-roster-row-runtime-mark > svg {
+.agent-meta-runtime-mark > svg {
   display: block;
 }
 
-.agents-roster-row-runtime-label {
+.agent-meta-runtime-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.agents-roster-row-meta-separator {
+.agent-meta-separator {
   color: var(--ink-4);
 }
 
-.agents-roster-row-computers {
+.agent-meta-computers {
   display: flex;
   align-items: center;
   min-width: 0;
   overflow: hidden;
 }
 
-.agents-roster-row-computer {
+.agent-meta-computer {
   display: inline-flex;
   align-items: center;
   min-width: 0;
@@ -235,19 +243,19 @@
 
 /* Ownership glyph — the local/cloud badge. Kind is carried by the icon,
    never a hue, same rule as the placement badge. */
-.agents-roster-row-computer > svg {
+.agent-meta-computer > svg {
   flex: none;
   color: var(--ink-3);
 }
 
-.agents-roster-row-computer > span:last-child {
+.agent-meta-computer > span:last-child {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.agents-roster-row-computer-separator {
+.agent-meta-computer-separator {
   margin-left: var(--sp-1-5);
   color: var(--ink-4);
 }
