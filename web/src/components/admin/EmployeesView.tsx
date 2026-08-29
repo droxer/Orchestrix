@@ -309,7 +309,8 @@ export function EmployeesView({
                         size="icon-r-sm"
                         tinted
                         type="button"
-                        className="adm-node-card-icon-btn danger"
+                        danger
+                        className="adm-node-card-icon-btn"
                         onClick={() => void handleDeleteEmployee(member.id)}
                         disabled={pendingDelete !== null}
                         aria-label={t("admin.v2.delete_employee_action")}

@@ -113,7 +113,7 @@ export function BacklogTaskCard({
       </div>
       <div className="backlog-task-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
-          <Button variant="ghost"
+          <Button variant="outline"
             type="button"
             className="backlog-action-icon"
             onClick={onAssign}
@@ -135,14 +135,14 @@ export function BacklogTaskCard({
           </Button>
         </div>
         <div className="backlog-action-group" aria-label={t("backlog.actions_state")}>
-          <Button variant="ghost"
+          <Button variant="outline"
             type="button"
             className={task.status === "blocked" ? undefined : "backlog-action-block"}
             onClick={onToggleBlock}
           >
             {task.status === "blocked" ? t("backlog.reopen") : t("backlog.block")}
           </Button>
-          <Button variant="ghost" type="button" className="backlog-action-done" onClick={onDone} disabled={task.status === "done"}>{t("backlog.done")}</Button>
+          <Button variant="outline" type="button" className="backlog-action-done" onClick={onDone} disabled={task.status === "done"}>{t("backlog.done")}</Button>
         </div>
       </div>
     </article>
@@ -201,7 +201,7 @@ export function BacklogTaskRow({
       </span>
       <div className="backlog-row-actions" role="cell" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
-          <Button variant="ghost"
+          <Button variant="outline"
             type="button"
             className="backlog-action-icon"
             onClick={onAssign}
@@ -223,7 +223,7 @@ export function BacklogTaskRow({
           </Button>
         </div>
         <div className="backlog-action-group" aria-label={t("backlog.actions_state")}>
-          <Button variant="ghost"
+          <Button variant="outline"
             type="button"
             className={cn("backlog-action-icon", task.status !== "blocked" && "backlog-action-block")}
             onClick={onToggleBlock}
@@ -232,7 +232,7 @@ export function BacklogTaskRow({
           >
             {task.status === "blocked" ? <NavRefresh size={ICON.sm} /> : <ActionStop size={ICON.sm} />}
           </Button>
-          <Button variant="ghost"
+          <Button variant="outline"
             type="button"
             className="backlog-action-icon backlog-action-done"
             onClick={onDone}

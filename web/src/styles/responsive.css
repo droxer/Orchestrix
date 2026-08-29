@@ -235,10 +235,13 @@
     white-space: nowrap;
   }
 
-  .mobile-topbar button.active {
-    background: var(--surface-2);
-    color: var(--ink-1);
-  }
+  /* The active topbar button is styled once, in atelier.css, on --action-soft
+     — the token palette.css designates for "active nav". An identical
+     `.mobile-topbar button.active` rule lived here too: same selector, same
+     specificity, same media query, so it won on source order alone (this file
+     imports after atelier) and silently replaced the cobalt tint with
+     --surface-2, while atelier's border-color/box-shadow still applied. One
+     owner per state — the duplicate is gone. */
 
   .sidenav-panel {
     grid-row: 3;

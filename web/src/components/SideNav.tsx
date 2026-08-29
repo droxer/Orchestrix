@@ -535,7 +535,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
             <NavPreferences size={ICON.md} />
             <span>{t("nav.preferences")}</span>
           </Button>
-          <Button type="button" variant="ghost" role="menuitem" className="danger" onClick={handleLogout}>
+          <Button type="button" variant="destructive" role="menuitem" onClick={handleLogout}>
             <NavLogout size={ICON.md} />
             <span>{t("nav.logout")}</span>
           </Button>

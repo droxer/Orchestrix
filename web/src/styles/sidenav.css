@@ -171,6 +171,17 @@
   animation: settings-menu-in var(--t-fast) var(--ease) both;
 }
 
+/* GEOMETRY + the menu's own type tier. Paint is the variant's: the neutral
+   item is `ghost` (whose hover wash is --control-fill-hover — translucent ink,
+   so it lifts on this portaled --surface-0 plane instead of the --surface-2
+   step that used to read as RECESSED in the light register), and Sign out is
+   `destructive`, which brings its red ink and ring with it.
+
+   The border/background/color that used to be declared here defeated both, by
+   layer order rather than specificity — and a local `.danger { color: --err }`
+   restated the destructive grammar hue-only, so the signal vanished under
+   forced-colors. `font` stays: the menu label is deliberately the 500 tier,
+   not the 700 button label. */
 .sidenav-settings-menu button {
   display: flex;
   justify-content: flex-start;
@@ -179,23 +190,10 @@
   width: 100%;
   min-height: var(--control-h-sm);
   padding: 0 var(--sp-3);
-  border: 1px solid transparent;
   border-radius: var(--r-2);
-  background: transparent;
-  color: var(--ink-1);
   font: var(--type-label);
   text-align: left;
   cursor: pointer;
-}
-
-.sidenav-settings-menu button:hover {
-  background: var(--surface-2);
-  border-color: var(--line-2);
-}
-
-
-.sidenav-settings-menu button.danger {
-  color: var(--err);
 }
 
 .sidenav-settings-menu svg {

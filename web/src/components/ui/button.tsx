@@ -45,8 +45,9 @@ const buttonVariants = cva(
            ink-3 idle; a control wash + line-2 + ink-1 on hover. Always paired
            with the round `icon-r` (--control-h) / `icon-r-sm` (--control-h-xs)
            sizes.
-           `tinted` swaps the hover to an --action wash; a `danger` className
-           re-tints it to --err. */
+           `tinted` swaps the hover to an --action wash; the `danger` modifier
+           re-tints it to --err and adds the hairline that keeps the
+           destructive signal alive under forced-colors. */
         icon: "text-(--ink-3) hover:border-(--line-2) hover:bg-(--control-fill-hover) hover:text-(--ink-1)",
       },
       size: {
@@ -98,7 +99,27 @@ const buttonVariants = cva(
          action instead of the neutral ink hover. Declared after `variant` so
          these classes win the tailwind-merge conflict. */
       tinted: {
-        true: "hover:border-transparent hover:bg-[color-mix(in_srgb,var(--action)_10%,transparent)] hover:text-(--action) [&.danger]:hover:bg-[color-mix(in_srgb,var(--err)_10%,transparent)] [&.danger]:hover:text-(--err)",
+        true: "hover:border-transparent hover:bg-[color-mix(in_srgb,var(--action)_10%,transparent)] hover:text-(--action)",
+        false: "",
+      },
+      /* Destructive intent on a QUIET tier — the icon-only row actions (delete
+         a node, an employee, a chat link, a thread) and menu items where the
+         `destructive` variant's resting ring, repeated down every row, would
+         turn the surface into a wall of red. Neutral at rest, --err on
+         hover/focus.
+
+         The BORDER is the load-bearing part, not the hue. Forced-colors mode
+         discards author colors, so a red-only hover leaves such a button
+         indistinguishable from its neutral siblings — the destructive signal
+         disappears exactly where it matters most. Pairing the hue with a
+         hairline keeps a SHAPE signal that survives the color being dropped,
+         which is the same reason the `destructive` variant carries a ring.
+
+         Declared after `tinted` so it wins the tailwind-merge conflict when
+         both are set (a tinted icon button that is destructive reads --err,
+         not --action). */
+      danger: {
+        true: "hover:border-(--err) hover:bg-[color-mix(in_srgb,var(--err)_10%,transparent)] hover:text-(--err) focus-visible:border-(--err) focus-visible:text-(--err) focus-visible:[outline:var(--focus-outline-danger)] focus-visible:[outline-offset:var(--focus-offset)]",
         false: "",
       },
     },
@@ -122,6 +143,7 @@ function Button({
   variant = "default",
   size = "default",
   tinted = false,
+  danger = false,
   loading = false,
   loadingLabel,
   disabled,
@@ -132,7 +154,8 @@ function Button({
     <ButtonPrimitive
       data-slot="button"
       data-variant={variant}
-      className={cn(buttonVariants({ variant, size, tinted, className }))}
+      data-danger={danger || undefined}
+      className={cn(buttonVariants({ variant, size, tinted, danger, className }))}
       aria-busy={loading || undefined}
       disabled={disabled || loading}
       {...props}

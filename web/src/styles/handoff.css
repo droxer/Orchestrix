@@ -26,22 +26,14 @@
   transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
 }
 
-/* Ghost secondaries match the global ghost grammar: transparent at rest, a
-   hairline + ink on hover. No accent-coloured hover — the filled primary
-   (Approve/Send) is the only coloured control in the bar. */
-.decision-bar button[data-variant="ghost"],
-.handoff-actions button[data-variant="ghost"] {
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--ink-2);
-}
-
-.decision-bar button[data-variant="ghost"]:hover:not(:disabled),
-.handoff-actions button[data-variant="ghost"]:hover:not(:disabled) {
-  border-color: var(--line-strong);
-  background: transparent;
-  color: var(--ink-1);
-}
+/* Ghost secondaries are left to the ghost variant. This block used to claim it
+   "matched the global ghost grammar" while doing the opposite of it: global
+   ghost washes --control-fill-hover behind the label and draws no border,
+   whereas this forced `background: transparent` on hover and drew a
+   --line-strong border instead — a second, bar-only ghost grammar that
+   outranked the variant by layer order. The filled primary (Approve/Send) is
+   still the only coloured control in the bar; that comes from its own variant,
+   not from suppressing everyone else's hover. */
 
 .handoff-panel {
   width: min(100%, 560px);

@@ -72,7 +72,8 @@ export function NodeActions({ node, onReveal, onRename, onManageExecutors, onDel
           size="icon-r-sm"
           tinted
           type="button"
-          className="adm-node-card-icon-btn adm-node-action--delete danger"
+          danger
+          className="adm-node-card-icon-btn adm-node-action--delete"
           onClick={onDeleteRequest}
           disabled={deletePending}
           aria-label={t("admin.v2.delete_node_for", { id: node.id })}

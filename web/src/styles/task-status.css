@@ -334,25 +334,37 @@
   border-left: 1px solid var(--line-1);
 }
 
+/* GEOMETRY ONLY — paint belongs to the Button variant the call site picks.
+   `@layer relay` is declared after Tailwind's `utilities`, so a background /
+   border / color / font declared here outranks the variant by LAYER ORDER, not
+   specificity: there is no specificity war to notice in review, the variant
+   simply never applies. That is how the primary Start action lost its cobalt
+   fill (it rendered --surface-0 at weight 500). The neutral actions get their
+   chip look from variant="outline"; the native <select> paints below. */
 .backlog-task-actions select,
 .backlog-task-actions button:not([data-variant="icon"]) {
   min-height: var(--control-h-xs);
-  border: 1px solid var(--line-1);
   border-radius: var(--r-2);
-  background: var(--surface-0);
   padding: 0 var(--sp-2);
-  color: var(--ink-1);
-  font: var(--type-label);
   cursor: pointer;
   touch-action: manipulation;
+}
+
+/* The select is a native control with no variant to inherit from, so it
+   restates the outline tier explicitly. --control-border, NOT --line-1: this
+   boundary is the control's whole affordance and must clear WCAG 1.4.11 (3:1).
+   --line-1 is the STRUCTURAL hairline and measures 1.36:1 light / 1.60:1 dark
+   against --surface-0 — invisible. See the same note in ui/button.tsx. */
+.backlog-task-actions select {
+  max-width: 96px;
+  border: 1px solid var(--control-border);
+  background: var(--control-fill);
+  color: var(--ink-1);
+  font: var(--type-label);
   transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
 }
 
-.backlog-task-actions select {
-  max-width: 96px;
-}
-
-.backlog-task-actions button:not([data-variant="icon"]):hover:not(:disabled) {
+.backlog-task-actions select:hover {
   background: var(--control-fill-hover);
   border-color: var(--line-strong);
 }
@@ -365,9 +377,14 @@
 /* Filled only while actionable; a disabled start recedes to a ghost icon so
    Done/running rows don't scatter faded action blocks. The fill itself comes
    from the `default` button variant the call site already selects — see
-   BacklogPage's variant={startDisabled ? "ghost" : "default"}. It used to be
-   restated here too, which meant this block silently outranked the variant and
-   any future change to primary would not have reached the backlog. */
+   BacklogPage's variant={startDisabled ? "ghost" : "default"}.
+
+   A restatement of the fill was removed from this block once before, for the
+   right reason. But the blanket `button:not([data-variant="icon"])` rule above
+   still forced background/color/font onto EVERY non-icon button in the group,
+   the primary included — so the variant was still outranked, and the cobalt
+   read as --surface-0 instead. Both halves have to stay paint-free for the
+   call site's variant to survive. */
 
 /* Icon-only action — square button, glyph centered, label in the tooltip. */
 .backlog-task-actions .backlog-action-icon,

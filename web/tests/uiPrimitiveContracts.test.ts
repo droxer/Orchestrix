@@ -88,8 +88,48 @@ describe("UI primitive contracts", () => {
     const source = await readFile(resolve("web/src/components/ui/button.tsx"), "utf8");
     const signature = source.match(/function Button\(\{([\s\S]*?)\}: ButtonProps\)/)?.[1] ?? "";
 
+    // Every cva modifier has to be destructured out of props, or it spreads onto
+    // the DOM node and React warns about an unknown attribute.
     assert.match(signature, /\btinted\b/);
-    assert.match(source, /buttonVariants\(\{ variant, size, tinted, className \}\)/);
+    assert.match(signature, /\bdanger\b/);
+    assert.match(source, /buttonVariants\(\{ variant, size, tinted, danger, className \}\)/);
+  });
+
+  it("gives the quiet danger tier a border, not hue alone", async () => {
+    const source = await readFile(resolve("web/src/components/ui/button.tsx"), "utf8");
+    const danger = source.match(/danger: \{\s*true:\s*"([^"]*)"/)?.[1] ?? "";
+
+    // Forced-colors mode discards author colours. A destructive affordance that
+    // signals only with --err ink is indistinguishable from its neutral
+    // siblings there, so the tier must also change SHAPE on hover and focus.
+    assert.match(danger, /hover:border-\(--err\)/);
+    assert.match(danger, /focus-visible:border-\(--err\)/);
+    assert.match(danger, /focus-visible:\[outline:var\(--focus-outline-danger\)\]/);
+
+    // The quiet tier stays neutral at rest — the resting ring belongs to the
+    // full `destructive` variant, and repeating it down every row would turn
+    // a list into a wall of red.
+    assert.doesNotMatch(danger, /(^|\s)text-\(--err\)/);
+    assert.doesNotMatch(danger, /(^|\s)border-\(--err\)/);
+  });
+
+  it("routes every quiet destructive action through the shared danger modifier", async () => {
+    // These surfaces each used to re-implement destructive paint as a
+    // descendant CSS rule, which both forked the grammar and (because
+    // @layer relay is declared after Tailwind's utilities) outranked whatever
+    // variant the call site asked for.
+    for (const file of [
+      "web/src/styles/thread.css",
+      "web/src/styles/sidenav.css",
+      "web/src/styles/admin-v2-channels.css",
+    ]) {
+      const css = await readFile(resolve(file), "utf8");
+      const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
+      for (const [selector, body] of withoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        if (!/(^|[\s,>+~])button(?![-\w])|\.danger/.test(selector)) continue;
+        assert.doesNotMatch(body, /--err|--focus-outline-danger/, `${file}: ${selector.trim()}`);
+      }
+    }
   });
 
   it("wraps long select options instead of silently clipping them", async () => {
