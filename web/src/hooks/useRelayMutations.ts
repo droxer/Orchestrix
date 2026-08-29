@@ -32,6 +32,7 @@ import { TEAMS_QUERY_KEY } from "./useTeams";
 import { mergeSessionSnapshotIntoSessions } from "../lib/sessionPollMerge";
 import { applySessionEventUnchecked } from "../lib/sessionEvents";
 import { mergeTaskSummaryIntoTasks, taskSummaryFromTask } from "../lib/taskSummary";
+import { batchOutcome, type BatchOutcome } from "../lib/taskSelection";
 
 type TokenArg = { token?: string };
 
@@ -206,6 +207,34 @@ export function useRelayMutations() {
     },
   });
 
+  // Batch delete from the board's selection bar. There is no bulk endpoint, so
+  // the requests fan out and settle independently: one task that refuses to
+  // delete (active work) must not strand the rest. The mutation resolves with
+  // a per-record outcome and the caller reports the partial result — a batch
+  // that half-failed is never announced as a clean success.
+  const deleteTasksMutation = useMutation({
+    mutationFn: async ({ taskIds }: { taskIds: readonly string[] }): Promise<BatchOutcome> => {
+      const results = await Promise.allSettled(taskIds.map((taskId) => deleteTask(taskId)));
+      return batchOutcome(taskIds, results);
+    },
+    onSuccess: ({ succeeded, failed }) => {
+      if (succeeded.length > 0) {
+        const removed = new Set(succeeded);
+        queryClient.setQueryData<RelayTaskSummary[]>(TASKS_QUERY_KEY, (current) =>
+          (current ?? []).filter((task) => !removed.has(task.id)));
+      }
+      // One toast for the batch, not one per record: a selection of twenty
+      // blocked tasks would otherwise bury the board in identical messages.
+      if (failed.length > 0) {
+        const active = failed.find(({ error }) => error instanceof RelayApiError && error.code === "task_execution_active");
+        const messageKey = active ? "errors.task_execution_active" : "errors.delete_task";
+        reportMutationError("Failed to delete tasks", failed[0].error, t(messageKey));
+      }
+    },
+    onError: onRelayError("Failed to delete tasks", "errors.delete_task"),
+    onSettled: () => void invalidateTasks(),
+  });
+
   const assignTaskMutation = useMutation({
     mutationFn: ({ taskId, agentId }: { taskId: string; agentId: string }) => assignTask(taskId, agentId),
     onSuccess: cacheTask,
@@ -303,6 +332,7 @@ export function useRelayMutations() {
     createTaskMutation,
     updateTaskMutation,
     deleteTaskMutation,
+    deleteTasksMutation,
     assignTaskMutation,
     startTaskMutation,
     createTeamMutation,

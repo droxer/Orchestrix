@@ -22,6 +22,7 @@ import { TaskAssignee, TaskExecutionBadge } from "../TaskAssignee";
 import { Button } from "@/components/ui/button";
 import { StateMark } from "../StateMark";
 
+import { TaskSelectCheckbox } from "./TaskSelection";
 import { TASK_STATUS_SHAPE } from "./backlogVocabulary";
 import { formatDueDate } from "./BacklogChrome";
 
@@ -43,6 +44,8 @@ export function BacklogTaskCard({
   assigneeIsSelf,
   agentDisplayName,
   canDiscuss,
+  selected,
+  onToggleSelect,
   dragging,
   onDragStart,
   onDragEnd,
@@ -60,6 +63,8 @@ export function BacklogTaskCard({
   assigneeIsSelf?: boolean;
   agentDisplayName?: string;
   canDiscuss: boolean;
+  selected: boolean;
+  onToggleSelect: () => void;
   dragging: boolean;
   onDragStart: (event: DragEvent<HTMLElement>) => void;
   onDragEnd: () => void;
@@ -81,6 +86,7 @@ export function BacklogTaskCard({
     <article
       className="backlog-task group list-virtual"
       data-priority={task.priority}
+      data-selected={selected ? "true" : undefined}
       data-dragging={dragging ? "true" : undefined}
       draggable
       onDragStart={onDragStart}
@@ -88,6 +94,12 @@ export function BacklogTaskCard({
       onTouchStart={onTouchStart}
     >
       <div className="backlog-task-badges">
+        <TaskSelectCheckbox
+          className="backlog-select-box"
+          checked={selected}
+          label={t("backlog.select_task", { title: task.title })}
+          onCheckedChange={onToggleSelect}
+        />
         <PriorityBadge priority={task.priority} />
         <TaskExecutionBadge task={task} ready={ready} displayName={agentDisplayName} />
       </div>
@@ -155,6 +167,8 @@ export function BacklogTaskRow({
   assigneeIsSelf,
   agentDisplayName,
   canDiscuss,
+  selected,
+  onToggleSelect,
   onEdit,
   onAssign,
   onStart,
@@ -167,6 +181,8 @@ export function BacklogTaskRow({
   assigneeIsSelf?: boolean;
   agentDisplayName?: string;
   canDiscuss: boolean;
+  selected: boolean;
+  onToggleSelect: () => void;
   onEdit: () => void;
   onAssign: () => void;
   onStart: () => void;
@@ -181,7 +197,15 @@ export function BacklogTaskRow({
     task.status === "done";
 
   return (
-    <article className="backlog-row group list-virtual" role="row" data-status={task.status} data-priority={task.priority}>
+    <article className="backlog-row group list-virtual" role="row" data-status={task.status} data-priority={task.priority} data-selected={selected ? "true" : undefined}>
+      <span className="backlog-row-select-cell" role="cell">
+        <TaskSelectCheckbox
+          className="backlog-select-box"
+          checked={selected}
+          label={t("backlog.select_task", { title: task.title })}
+          onCheckedChange={onToggleSelect}
+        />
+      </span>
       <span className="backlog-row-dot-cell" aria-hidden="true">
         <StateMark shape={TASK_STATUS_SHAPE[task.status]} />
       </span>

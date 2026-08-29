@@ -29,6 +29,16 @@ import { ROUTINE_STATE_SHAPE, RoutineStateBadge } from "./RoutineStateBadge";
 import { StateMark } from "./StateMark";
 import { emptyRoutineForm, taskAssignmentMutationFields, taskBoardFormsEqual, taskStartMutationInput, type RoutineTaskFormState } from "../lib/taskBoardForm";
 import { TaskDrawer } from "./task-board/TaskDrawer";
+import { TaskSelectAllCheckbox, TaskSelectCheckbox, TaskSelectionBar } from "./task-board/TaskSelection";
+import {
+  EMPTY_TASK_SELECTION,
+  pruneSelection,
+  selectedTasks,
+  selectionCheckState,
+  toggleAllSelected,
+  toggleSelected,
+  type TaskSelection,
+} from "../lib/taskSelection";
 import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
 import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
@@ -236,6 +246,8 @@ function RoutineCard({
   assigneeDisplayName,
   assigneeIsSelf,
   agentDisplayName,
+  selected,
+  onToggleSelect,
   onEdit,
   onAssign,
   onStart,
@@ -247,6 +259,8 @@ function RoutineCard({
   assigneeDisplayName?: string;
   assigneeIsSelf?: boolean;
   agentDisplayName?: string;
+  selected: boolean;
+  onToggleSelect: () => void;
   onEdit: () => void;
   onAssign: () => void;
   onStart: () => void;
@@ -259,8 +273,14 @@ function RoutineCard({
   // through the board, so its `status` field is a constant and styling on it
   // paints every card the same.
   return (
-    <article className="routine-card backlog-task list-virtual" data-priority={task.priority} data-routine-state={state}>
+    <article className="routine-card backlog-task list-virtual" data-priority={task.priority} data-routine-state={state} data-selected={selected ? "true" : undefined}>
       <div className="backlog-task-badges">
+        <TaskSelectCheckbox
+          className="backlog-select-box"
+          checked={selected}
+          label={t("routine.select_routine", { title: task.title })}
+          onCheckedChange={onToggleSelect}
+        />
         <RoutineStateBadge state={state} />
         <PriorityBadge priority={task.priority} />
         <TaskExecutionBadge task={task} ready={ready} displayName={agentDisplayName} />
@@ -335,6 +355,8 @@ function RoutineRow({
   assigneeDisplayName,
   assigneeIsSelf,
   agentDisplayName,
+  selected,
+  onToggleSelect,
   onEdit,
   onAssign,
   onStart,
@@ -346,6 +368,8 @@ function RoutineRow({
   assigneeDisplayName?: string;
   assigneeIsSelf?: boolean;
   agentDisplayName?: string;
+  selected: boolean;
+  onToggleSelect: () => void;
   onEdit: () => void;
   onAssign: () => void;
   onStart: () => void;
@@ -355,7 +379,15 @@ function RoutineRow({
   const startDisabled = (!task.assignedAgentId && !task.assignedTeamId) || !task.routineEnabled;
 
   return (
-    <article className="backlog-row group list-virtual" role="row" data-routine-state={state} data-priority={task.priority}>
+    <article className="backlog-row group list-virtual" role="row" data-routine-state={state} data-priority={task.priority} data-selected={selected ? "true" : undefined}>
+      <span className="backlog-row-select-cell" role="cell">
+        <TaskSelectCheckbox
+          className="backlog-select-box"
+          checked={selected}
+          label={t("routine.select_routine", { title: task.title })}
+          onCheckedChange={onToggleSelect}
+        />
+      </span>
       <span className="backlog-row-dot-cell" aria-hidden="true">
         <StateMark shape={ROUTINE_STATE_SHAPE[state]} />
       </span>
@@ -434,6 +466,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
     updateTaskMutation,
     createTaskMutation,
     deleteTaskMutation,
+    deleteTasksMutation,
   } = useRelayMutations();
   const [filters, setFilters] = useState(initialFilters);
   const [view, setView] = useState<RoutineView>(() => parseRoutineView(null));
@@ -443,6 +476,8 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
   const [assignmentFocus, setAssignmentFocus] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [selection, setSelection] = useState<TaskSelection>(EMPTY_TASK_SELECTION);
+  const [deletingSelection, setDeletingSelection] = useState(false);
   const formDirty = Boolean(form && formBaseline && !taskBoardFormsEqual(form, formBaseline));
   const confirmDiscardChanges = useUnsavedChangesGuard(formDirty && !saving && !deleting);
   const routineTasks = useMemo(() => tasks.filter((task) => task.isRoutine), [tasks]);
@@ -450,6 +485,11 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
   // Derived once for the whole board: `routineState` then costs a Set lookup
   // per card instead of a full task scan.
   const runningIds = useMemo(() => runningRoutineIds(tasks), [tasks]);
+  const visibleIds = useMemo(() => filteredTasks.map((task) => task.id), [filteredTasks]);
+  // Derived, not stored: a routine hidden by a filter (or deleted elsewhere)
+  // drops out of the selection immediately, so a batch action can never reach
+  // a record the board is no longer showing.
+  const visibleSelection = useMemo(() => pruneSelection(selection, visibleIds), [selection, visibleIds]);
   function changeView(next: RoutineView) {
     setView(next);
     writeViewPreference(ROUTINE_VIEW_STORAGE_KEY, next);
@@ -547,6 +587,37 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
     }
   }
 
+  async function deleteSelectedRoutines() {
+    const targets = selectedTasks(filteredTasks, visibleSelection);
+    if (targets.length === 0 || deletingSelection) return;
+    const confirmed = await confirm({
+      title: t("routine.bulk_delete_title", { count: targets.length }),
+      message: t("routine.bulk_delete_body", { count: targets.length }),
+      confirmLabel: t("routine.delete_selected"),
+      cancelLabel: t("dialog.cancel"),
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    setDeletingSelection(true);
+    try {
+      const { succeeded } = await deleteTasksMutation.mutateAsync({ taskIds: targets.map((task) => task.id) });
+      // Only the records that actually went are dropped from the selection —
+      // whatever refused stays checked so a retry needs no re-picking.
+      setSelection((current) => {
+        const next = new Set(current);
+        for (const id of succeeded) next.delete(id);
+        return next;
+      });
+      if (succeeded.length > 0) {
+        announce({ message: t("routine.toast_bulk_deleted", { count: succeeded.length }), tone: "success" });
+      }
+    } catch {
+      // mutation onError surfaces a toast; the selection stays put for a retry.
+    } finally {
+      setDeletingSelection(false);
+    }
+  }
+
   function linkedSession(task: RelayTaskListItem): RelaySession | undefined {
     return latestRoutineSession(task, tasks, sessions);
   }
@@ -613,6 +684,13 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
       ) : view === "list" ? (
         <div className="backlog-rows" role="table" aria-label={t("routine.title")}>
           <div className="backlog-rows-head" role="row">
+            <span className="backlog-rows-head-cell backlog-rows-head-select" role="columnheader">
+              <TaskSelectAllCheckbox
+                state={selectionCheckState(visibleSelection, visibleIds)}
+                label={t("routine.select_all_routines")}
+                onToggle={() => setSelection((current) => toggleAllSelected(current, visibleIds))}
+              />
+            </span>
             <span className="backlog-rows-head-cell backlog-rows-head-dot" role="columnheader" />
             <span className="backlog-rows-head-cell backlog-rows-head-lead" role="columnheader">{t("backlog.col_task")}</span>
             <span className="backlog-rows-head-cell backlog-rows-head-status" role="columnheader">{t("routine.state")}</span>
@@ -628,6 +706,8 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
               <RoutineRow
                 key={task.id}
                 task={task}
+                selected={visibleSelection.has(task.id)}
+                onToggleSelect={() => setSelection((current) => toggleSelected(current, task.id))}
                 state={routineState(task, runningIds)}
                 session={session}
                 assigneeDisplayName={taskAssigneeDisplayName(task, currentUser, employeeNames)}
@@ -648,6 +728,8 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
               <RoutineCard
                 key={task.id}
                 task={task}
+                selected={visibleSelection.has(task.id)}
+                onToggleSelect={() => setSelection((current) => toggleSelected(current, task.id))}
                 state={routineState(task, runningIds)}
                 session={session}
                 assigneeDisplayName={taskAssigneeDisplayName(task, currentUser, employeeNames)}
@@ -660,6 +742,14 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
           })}
         </div>
       )}
+
+      <TaskSelectionBar
+        count={visibleSelection.size}
+        deleting={deletingSelection}
+        deleteLabel={t("routine.delete_selected")}
+        onDelete={() => { void deleteSelectedRoutines(); }}
+        onClear={() => setSelection(EMPTY_TASK_SELECTION)}
+      />
 
       {form ? (
         <TaskDrawer

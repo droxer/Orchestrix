@@ -362,7 +362,20 @@
     "delete_title": "刪除任務？",
     "delete_body": "「{{title}}」將從待辦中移除，關聯的話題、產物與執行歷史仍會保留。",
     "toast_deleted": "任務已刪除。",
-    "inline_title_placeholder": "任務標題…"
+    "inline_title_placeholder": "任務標題…",
+    "selection": "已選任務",
+    "select_task": "選擇{{title}}",
+    "select_all_tasks": "全選任務",
+    "selected_one": "已選 {{count}} 個任務",
+    "selected_other": "已選 {{count}} 個任務",
+    "clear_selection": "清除選擇",
+    "delete_selected": "刪除所選",
+    "bulk_delete_title_one": "刪除 {{count}} 個任務？",
+    "bulk_delete_title_other": "刪除 {{count}} 個任務？",
+    "bulk_delete_body_one": "所選的 {{count}} 個任務將從待辦中移除，關聯的話題、產物與執行歷史仍會保留。",
+    "bulk_delete_body_other": "所選的 {{count}} 個任務將從待辦中移除，關聯的話題、產物與執行歷史仍會保留。",
+    "toast_bulk_deleted_one": "已刪除 {{count}} 個任務。",
+    "toast_bulk_deleted_other": "已刪除 {{count}} 個任務。"
   },
   "workspace": {
     "title": "工作區",
@@ -587,7 +600,16 @@
     "deleting": "刪除中…",
     "delete_title": "刪除例行任務？",
     "delete_body": "將刪除「{{title}}」及其排程，且不會再次執行。既有執行紀錄與話題仍會保留。",
-    "toast_deleted": "例行任務已刪除。"
+    "toast_deleted": "例行任務已刪除。",
+    "select_routine": "選擇{{title}}",
+    "select_all_routines": "全選例行任務",
+    "delete_selected": "刪除所選",
+    "bulk_delete_title_one": "刪除 {{count}} 個例行任務？",
+    "bulk_delete_title_other": "刪除 {{count}} 個例行任務？",
+    "bulk_delete_body_one": "將刪除所選的 {{count}} 個例行任務及其排程，且不會再次執行。既有執行紀錄與話題仍會保留。",
+    "bulk_delete_body_other": "將刪除所選的 {{count}} 個例行任務及其排程，且不會再次執行。既有執行紀錄與話題仍會保留。",
+    "toast_bulk_deleted_one": "已刪除 {{count}} 個例行任務。",
+    "toast_bulk_deleted_other": "已刪除 {{count}} 個例行任務。"
   },
   "admin": {
     "title": "管理",
