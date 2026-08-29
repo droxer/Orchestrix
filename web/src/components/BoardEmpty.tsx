@@ -25,7 +25,7 @@ export function BoardEmpty({
   onClear?: () => void;
 }) {
   return (
-    <div className="backlog-board-empty relay-marginalia-host">
+    <div className="backlog-board-empty relay-marginalia-host relay-plate">
       <span className="relay-empty-marginalia" aria-hidden="true">
         <RelayDoodleOrbit />
       </span>

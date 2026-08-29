@@ -43,6 +43,24 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
 
   return (
     <main className="login-screen" data-mode="login">
+      {/* The double-chevron mark bled huge off the canvas edge — the login
+          signature. Pinned to the dark register via --lg-ink: unlike
+          RelayMark it must stay dark-register ink whatever theme the
+          operator has saved. */}
+      <span className="login-bleed" aria-hidden="true">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 64 64"
+          fill="none"
+          focusable="false"
+          shapeRendering="geometricPrecision"
+        >
+          <g strokeWidth="7" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 14 L32 32 L12 50" stroke="currentColor" />
+            <path d="M32 14 L52 32 L32 50" stroke="currentColor" opacity="0.45" />
+          </g>
+        </svg>
+      </span>
       <section className="login-card" aria-labelledby="login-headline">
         <div className="login-identity">
           <header className="login-brand">

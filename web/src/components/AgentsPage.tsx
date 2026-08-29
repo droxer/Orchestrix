@@ -343,6 +343,8 @@ export function AgentsPage({
           </div>
         ) : visibleAgents.length === 0 ? (
           <RelayEmptyState
+            /* Rail-tight plate: the corner doodle would land on the copy. */
+            marginalia={null}
             title={activeAgents.length === 0 ? t("agents_page.empty_title") : t("agents_page.empty_filtered_title")}
             body={activeAgents.length === 0 ? t("agents_page.empty_body") : t("agents_page.empty_filtered_body")}
           />
