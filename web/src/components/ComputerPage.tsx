@@ -23,6 +23,7 @@ import {
   ActionAdd,
   AdminNode,
   ICON,
+  ICON_STROKE_LARGE,
 } from "./icons";
 
 export function ComputerPage({
@@ -188,7 +189,7 @@ export function ComputerPage({
           <RelayEmptyState
             title={t("computer.empty_title")}
             body={t("computer.empty_body")}
-            illustration={<AdminNode size={ICON.hero} aria-hidden="true" />}
+            illustration={<AdminNode size={ICON.hero} strokeWidth={ICON_STROKE_LARGE} aria-hidden="true" />}
             actions={connectCta("default")}
           />
         ) : (

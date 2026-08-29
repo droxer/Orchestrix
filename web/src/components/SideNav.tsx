@@ -285,7 +285,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
           both states. */}
       <div className="sidenav-brand-row">
         <div className="sidenav-brand" aria-hidden="true">
-          <span className="sidenav-brand-mark"><RelayMark width={24} height={24} /></span>
+          <span className="sidenav-brand-mark"><RelayMark size={ICON.xl} /></span>
           <span className="sidenav-brand-copy">
             <span className="sidenav-brand-word sr-only">Relay</span>
           </span>

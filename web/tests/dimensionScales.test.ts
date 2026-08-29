@@ -203,7 +203,7 @@ describe("glyph and avatar scales", () => {
     const offenders: string[] = [];
     for (const src of sources) {
       if (src.rel.endsWith(path.join("components", "icons.tsx"))) continue;
-      for (const m of stripTsComments(src.text).matchAll(/\b(size|iconSize)=\{(\d+)\}/g)) {
+      for (const m of stripTsComments(src.text).matchAll(/\b(size|iconSize|width|height)=\{(\d+)\}/g)) {
         offenders.push(`${src.rel}: ${m[0]}`);
       }
     }

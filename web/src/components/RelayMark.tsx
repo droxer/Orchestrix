@@ -1,19 +1,20 @@
+import { ICON } from "./icons";
+
 type RelayMarkProps = {
   className?: string;
-  width?: number;
-  height?: number;
+  size?: number;
 };
 
-export function RelayMark({ className, width = 32, height = 32 }: RelayMarkProps) {
+export function RelayMark({ className, size = ICON.xl }: RelayMarkProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 64 64"
-      width={width}
-      height={height}
+      width={size}
+      height={size}
       className={className}
-      role="img"
-      aria-label="Relay"
+      aria-hidden="true"
+      focusable="false"
       shapeRendering="geometricPrecision"
     >
       <g

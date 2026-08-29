@@ -359,7 +359,7 @@ export function ThreadsView({
                           <span className="transcript-phase-node" aria-hidden="true" />
                           <span className="transcript-phase-label">
                             {!isHandoff ? (
-                              <RelayMark width={12} height={12} className="transcript-phase-icon transcript-phase-mark" />
+                              <RelayMark size={ICON.xs} className="transcript-phase-icon transcript-phase-mark" />
                             ) : PhaseIcon ? (
                               <PhaseIcon size={ICON.xs} className="transcript-phase-icon" aria-hidden="true" />
                             ) : null}

@@ -1,8 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Relay" shape-rendering="geometricPrecision">
   <title>Relay</title>
-  <!-- Brand app-icon badge (light): cloud field, hairline stroke, and the
-       register-invariant action cobalt (#0064e0, --action) on the lead chevron.
-       Served as the apple-touch-icon from app/layout.tsx. -->
+  <!-- Standalone app-icon badge: cloud field, hairline stroke, and the
+       action cobalt on the lead chevron. Source for apple-touch-icon.png. -->
   <rect x="4" y="4" width="56" height="56" rx="15" fill="#eef1f5"/>
   <rect x="4" y="4" width="56" height="56" rx="15" fill="none" stroke="#ced0d4" stroke-width="1"/>
   <g fill="none" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">

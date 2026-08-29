@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { RelayEmptyState } from "./RelayEmptyState";
 import { RelayMark } from "./RelayMark";
 import { RelayDoodleChevron } from "./marginalia";
-import { ActionPrompt } from "./icons";
+import { ActionPrompt, ICON } from "./icons";
 import { sendShortcutLabel } from "../lib/sendShortcut";
 
 type TranscriptEmptyProps = {
@@ -30,7 +30,7 @@ export function TranscriptEmpty({
       marginalia={<RelayDoodleChevron />}
       kicker={(
         <span className="transcript-empty-kicker">
-          <RelayMark width={11} height={11} />
+          <RelayMark size={ICON.xs} />
           {t("thread.new_thread")}
         </span>
       )}
@@ -38,7 +38,7 @@ export function TranscriptEmpty({
       body={t("transcript.landing_body")}
       illustration={(
         <span className="relay-empty-avatar" aria-hidden="true">
-          <RelayMark width={30} height={30} />
+          <RelayMark size={ICON.xl} />
         </span>
       )}
       actions={ready && onSuggestion ? (
@@ -53,7 +53,7 @@ export function TranscriptEmpty({
                 onClick={() => onSuggestion(text)}
               >
                 <span>{text}</span>
-                <ActionPrompt width={13} height={13} />
+                <ActionPrompt size={ICON.xs} />
               </button>
             );
           })}

@@ -46,12 +46,9 @@ export const metadata: Metadata = {
   title: "Relay",
   description: "Nodes, daemons, and agent runs.",
   icons: {
-    icon: [
-      { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/brand/relay-mark.svg", type: "image/svg+xml" },
-    ],
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml", sizes: "any" }],
     shortcut: "/favicon.svg",
-    apple: "/brand/relay-mark.svg",
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
 };
 

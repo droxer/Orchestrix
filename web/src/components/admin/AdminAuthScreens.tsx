@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RelayMark } from "../RelayMark";
+import { ICON } from "../icons";
 
 interface AdminLoginScreenProps {
   onLogin: () => void;
@@ -24,7 +25,7 @@ function AuthShell({ children }: { children: React.ReactNode }) {
     <section className="adm-auth-shell">
       <div className="adm-auth-card">
         <div className="adm-auth-brand">
-          <RelayMark width={32} height={32} aria-hidden="true" />
+          <RelayMark size={ICON.xl} />
           <span className="sr-only">Relay Admin</span>
         </div>
         {children}

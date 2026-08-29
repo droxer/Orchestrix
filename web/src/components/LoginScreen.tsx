@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { login, RelayApiError } from "../api";
 import type { CurrentUser } from "../types";
 import { RelayMark } from "./RelayMark";
+import { ICON } from "./icons";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -64,7 +65,7 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
       <section className="login-card" aria-labelledby="login-headline">
         <div className="login-identity">
           <header className="login-brand">
-            <RelayMark width={28} height={28} />
+            <RelayMark size={ICON.xl} />
             <span className="login-wordmark">Relay</span>
           </header>
 

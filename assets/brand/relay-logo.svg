@@ -1,27 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 64" role="img" aria-label="Relay" shape-rendering="geometricPrecision">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 64" role="img" aria-label="Relay" shape-rendering="geometricPrecision">
   <title>Relay</title>
-  <!-- Fieldnotes wordmark. Olive ink by rule: the highlighter yellow is
-       reserved for actions and live agent work, and a logo is neither.
-       Lettering is IBM Plex Sans 700, matching the app's display tier. -->
+  <!-- Standalone wordmark. Ink adapts to the viewer's color scheme; the
+       cobalt action color remains reserved for the app-icon badge. -->
   <style>
-    :root {
-      color-scheme: light dark;
-      --relay-ink: #23251d;
-    }
+    :root { color-scheme: light dark; --relay-logo-ink: #0a1317; }
     @media (prefers-color-scheme: dark) {
-      :root {
-        --relay-ink: #f1f1e8;
-      }
+      :root { --relay-logo-ink: #f3f6f7; }
     }
   </style>
   <g fill="none" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M8 14 L28 32 L8 50" stroke="var(--relay-ink, #23251d)"/>
-    <path d="M28 14 L48 32 L28 50" stroke="var(--relay-ink, #23251d)" opacity="0.45"/>
+    <path d="M8 14 L28 32 L8 50" stroke="var(--relay-logo-ink, #0a1317)"/>
+    <path d="M28 14 L48 32 L28 50" stroke="var(--relay-logo-ink, #0a1317)" opacity="0.45"/>
   </g>
   <text x="74" y="44"
-        font-family="'IBM Plex Sans', 'Avenir Next', 'Segoe UI Variable', 'Segoe UI', ui-sans-serif, system-ui, sans-serif"
+        font-family="'Optimistic VF', 'IBM Plex Sans', Montserrat, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif"
         font-size="42"
         font-weight="700"
-        letter-spacing="-1px"
-        fill="var(--relay-ink, #23251d)">Relay</text>
+        letter-spacing="0"
+        fill="var(--relay-logo-ink, #0a1317)">Relay</text>
 </svg>
