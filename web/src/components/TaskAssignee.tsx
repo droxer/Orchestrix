@@ -70,7 +70,9 @@ export function TaskExecutionBadge({
 }) {
   const { t } = useTranslation();
   if (task.assignedTeamId) {
-    const name = displayName ?? task.assignedTeamId;
+    // A team the roster no longer returns (deleted or scoped out) falls back
+    // to the same placeholder the task drawer draws — never the raw team id.
+    const name = displayName ?? t("backlog.assignment_unavailable_team");
     // Mirror AgentStateBadge: the team's default profile image (name monogram
     // on its identity hue) carries identity, the readiness pip carries status
     // (same tri-state mapping — busy = info, pending = warn, never collapsed

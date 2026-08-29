@@ -36,9 +36,20 @@
   letter-spacing: var(--type-label-track);
 }
 
-.task-assignment-field > [data-slot="select-trigger"] {
-  min-height: var(--control-h);
-  padding-block: var(--sp-1);
+/* The closed trigger carries identity only — mark + name on one line — so it
+   keeps the standard control height. The summary card below owns the
+   operational readout. */
+.task-assignment-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.task-assignment-trigger-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .task-assignment-option {
@@ -49,27 +60,16 @@
   min-width: 0;
 }
 
-.task-assignment-option-mark {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: var(--control-h-xs);
-  height: var(--control-h-xs);
-  border: 0.5px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: color-mix(in srgb, var(--surface-2) 76%, transparent);
+/* Menu rows draw the board's `.agent-state` chip as their mark — one box
+   size across entity rows, the unassigned slot, and the nav actions. Action
+   rows put the class glyph inside the empty slot, so the slot's ghost dot
+   steps aside. */
+.task-assignment-option.is-action .agent-state--empty {
   color: var(--ink-2);
 }
 
-.task-assignment-option.is-empty .task-assignment-option-mark {
-  border-style: dashed;
-  color: var(--ink-4);
-}
-
-.task-assignment-option.is-action .task-assignment-option-mark {
-  border-style: dashed;
-  color: var(--ink-2);
+.task-assignment-option.is-action .agent-state--empty::before {
+  content: none;
 }
 
 .task-assignment-option.is-action .task-assignment-option-copy > span:first-child {
@@ -120,13 +120,6 @@
   transition: border-color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
 }
 
-.task-assignment-summary::before {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: var(--accent-bar-w);
-  background: var(--ink-2);
-  content: "";
-}
 
 .task-assignment-summary.is-empty {
   align-items: center;
@@ -135,10 +128,6 @@
   min-height: calc(var(--avatar-lg) + 2 * var(--sp-3));
   border-style: dashed;
   background: color-mix(in srgb, var(--surface-1) 78%, transparent);
-}
-
-.task-assignment-summary.is-empty::before {
-  display: none;
 }
 
 .task-assignment-summary-mark {

@@ -111,16 +111,9 @@ body {
 
 .chat-panel { background: transparent; }
 
+/* Flat landing: the canvas stays plain — the empty state composes itself
+   with type and spacing, not an ambient wash. */
 .transcript { background: transparent; }
-.transcript-inner:not(:has(.transcript-empty)) { background: none; }
-.transcript-inner:has(.transcript-empty) {
-  margin: 0 auto;
-  min-height: 100%;
-  border: 0;
-  border-radius: 0;
-  /* Flat landing: the canvas stays plain — the empty state composes itself
-     with type and spacing, not an ambient wash. */
-}
 .rail-node { border-color: var(--ink-4); border-radius: var(--r-full); background: var(--surface-3); }
 .msg-time { color: var(--ink-4); }
 

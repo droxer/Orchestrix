@@ -229,12 +229,6 @@
   gap: var(--sp-7);
 }
 
-/* Empty transcript — flat soft surface behind the shared empty state. */
-.transcript-inner:has(.transcript-empty) {
-  background: var(--surface-1);
-  border-radius: var(--r-3);
-}
-
 /* Transcript empty — layout shell; visual language from empty-state.css */
 .transcript-empty {
   margin: auto;

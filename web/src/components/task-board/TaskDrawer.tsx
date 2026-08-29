@@ -40,6 +40,7 @@ import { IdentityMark } from "../IdentityMark";
 import {
   ICON,
   NavAgents,
+  NavTeams,
 } from "../icons";
 import { ProfileImage } from "../ProfileImagePicker";
 import { cn } from "@/lib/utils";
@@ -71,6 +72,20 @@ function effectiveAgentAvailability(agent: Pick<EmployeeAgent, "enabled" | "avai
   return agent.enabled ? agent.availability : "offline";
 }
 
+// Team identity chip — the same `.agent-state` box the boards draw, so the
+// menu, the closed trigger, and the task cards all show one mark. The tone
+// pip carries readiness; the glyph stays neutral.
+function TeamMark({ team }: { team: TeamView }) {
+  const { t } = useTranslation();
+  const availability = teamAvailability(team);
+  const stateLabel = `${team.name} · ${t(`status.${availability}`, { defaultValue: availability })}`;
+  return (
+    <span className={cn("agent-state", availabilityTone(availability))} role="img" aria-label={stateLabel} title={stateLabel}>
+      <ProfileImage src={team.profileImageUrl} alt="" fallback={<IdentityMark kind="team" />} />
+    </span>
+  );
+}
+
 function AssignmentOption({
   agent,
   team,
@@ -99,19 +114,46 @@ function AssignmentOption({
   }
 
   if (!team) return null;
-  const availability = teamAvailability(team);
-  const stateLabel = `${team.name} · ${t(`status.${availability}`, { defaultValue: availability })}`;
   return (
     <span className="task-assignment-option">
-      <span className={cn("agent-state", availabilityTone(availability))} role="img" aria-label={stateLabel} title={stateLabel}>
-        <ProfileImage src={team.profileImageUrl} alt="" fallback={<IdentityMark kind="team" />} />
-      </span>
+      <TeamMark team={team} />
       <span className="task-assignment-option-copy">
         <span>{team.name}</span>
         <span>{t("backlog.team_member_count", { count: team.members.length })}</span>
       </span>
     </span>
   );
+}
+
+// The closed trigger carries identity only — mark + name on one line, at the
+// same height and weight as every other select in the drawer. The summary
+// card below owns the operational readout (descriptor, roster, readiness
+// hint), so the two no longer repeat each other.
+function AssignmentTriggerValue({ agent, team }: { agent?: AgentView; team?: TeamView }) {
+  if (team) {
+    return (
+      <span className="task-assignment-trigger">
+        <TeamMark team={team} />
+        <span className="task-assignment-trigger-name">{team.name}</span>
+      </span>
+    );
+  }
+  if (agent) {
+    const availability = effectiveAgentAvailability(agent);
+    return (
+      <span className="task-assignment-trigger">
+        <AgentStateBadge
+          agent={agent.executorKind}
+          ready={availability === "ready"}
+          availability={availability}
+          imageUrl={agent.profileImageUrl}
+          name={agent.displayName}
+        />
+        <span className="task-assignment-trigger-name">{agent.displayName}</span>
+      </span>
+    );
+  }
+  return null;
 }
 
 function AssignmentSummary({
@@ -136,7 +178,7 @@ function AssignmentSummary({
     return (
       <span id={id} className="task-assignment-summary is-empty" aria-live="polite">
         <span className="task-assignment-summary-mark" aria-hidden="true">
-          <NavAgents size={ICON.md} />
+          <NavAgents size={ICON.xl} />
         </span>
         <span className="task-assignment-summary-copy">
           <span className="task-assignment-summary-title">{t("backlog.assign_later")}</span>
@@ -511,8 +553,8 @@ export function TaskDrawer({
                     if (value === NO_AGENT) {
                       return t("backlog.assign_later");
                     }
-                    if (assignedTeamView) return <AssignmentOption team={assignedTeamView} />;
-                    if (assignedAgentView) return <AssignmentOption agent={assignedAgentView} />;
+                    if (assignedTeamView) return <AssignmentTriggerValue team={assignedTeamView} />;
+                    if (assignedAgentView) return <AssignmentTriggerValue agent={assignedAgentView} />;
                     return t("backlog.assign_later");
                   }}
                 </SelectValue>
@@ -520,7 +562,7 @@ export function TaskDrawer({
               <SelectContent>
                 <SelectItem value={NO_AGENT} label={t("backlog.assign_later")}>
                   <span className="task-assignment-option is-empty">
-                    <span className="task-assignment-option-mark" aria-hidden="true"><NavAgents size={ICON.sm} /></span>
+                    <span className="agent-state agent-state--empty" aria-hidden="true" />
                     <span className="task-assignment-option-copy">
                       <span>{t("backlog.assign_later")}</span>
                       <span>{t("backlog.no_executor")}</span>
@@ -537,6 +579,7 @@ export function TaskDrawer({
                   {agentOptions.length === 0 ? (
                     <SelectItem value="__empty_agents__" label={t("backlog.no_agents_available")} disabled>
                       <span className="task-assignment-option is-empty">
+                        <span className="agent-state agent-state--empty" aria-hidden="true" />
                         <span className="task-assignment-option-copy">
                           <span>{t("backlog.no_agents_available")}</span>
                         </span>
@@ -545,7 +588,7 @@ export function TaskDrawer({
                   ) : null}
                   <SelectItem value={NAV_AGENTS} label={t("backlog.manage_agents")}>
                     <span className="task-assignment-option is-action">
-                      <span className="task-assignment-option-mark" aria-hidden="true"><NavAgents size={ICON.sm} /></span>
+                      <span className="agent-state agent-state--empty" aria-hidden="true"><NavAgents size={ICON.sm} /></span>
                       <span className="task-assignment-option-copy">
                         <span>{t("backlog.manage_agents")}</span>
                       </span>
@@ -562,6 +605,7 @@ export function TaskDrawer({
                   {teamOptions.length === 0 ? (
                     <SelectItem value="__empty_teams__" label={t("backlog.no_teams_available")} disabled>
                       <span className="task-assignment-option is-empty">
+                        <span className="agent-state agent-state--empty" aria-hidden="true" />
                         <span className="task-assignment-option-copy">
                           <span>{t("backlog.no_teams_available")}</span>
                         </span>
@@ -570,7 +614,7 @@ export function TaskDrawer({
                   ) : null}
                   <SelectItem value={NAV_TEAMS} label={t("backlog.create_team")}>
                     <span className="task-assignment-option is-action">
-                      <span className="task-assignment-option-mark" aria-hidden="true"><NavAgents size={ICON.sm} /></span>
+                      <span className="agent-state agent-state--empty" aria-hidden="true"><NavTeams size={ICON.sm} /></span>
                       <span className="task-assignment-option-copy">
                         <span>{t("backlog.create_team")}</span>
                       </span>
