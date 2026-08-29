@@ -95,8 +95,9 @@
   /* Action — cobalt, register-invariant AS A FILL. The source system reserves
      #0064e0 for the in-product commerce CTA and gives marketing surfaces a
      black pill instead; Relay is entirely in-product, so cobalt is THE primary
-     action here and the black pill survives as --ink-button below for the
-     pre-auth and landing surfaces that read as marketing.
+     action on every surface, pre-auth chrome included. The black marketing
+     pill has no consumer here and is deliberately not carried as a token —
+     a second primary nobody presses is a second primary to keep in step.
 
      The invariance proof is FILL-ONLY: white on #0064e0 measures 5.4:1 and on
      the pressed #0457cb 6.5:1, so neither register needs its own fill. As an
@@ -112,25 +113,35 @@
   --action-soft: color-mix(in srgb, #0091ff 15%, transparent); /* soft-cobalt callout tint, selection wash, active nav */
   --on-action: #ffffff;
 
-  /* Ink button — the source system's marketing-surface primary: a black pill with
-     white text, paired with an outlined secondary. Register-varying by
-     necessity: a black pill on the ink-deep canvas is invisible, so the dark
-     register inverts it to white-on-ink. */
-  --ink-button: #ffffff;
-  --on-ink-button: #0a1317;
-
   /* Status — the source system's semantic hues. The published values are BADGE FILL
      colors (white text on a saturated pill), and Relay renders status as ink
      far more often than as a fill — counts, inline state labels, dots — so
      each tone is tuned until it clears 4.5:1 as small text against the worst
      plane it can land on (--surface-3 here). The hue family is the source system's;
      the lightness is ours.
-     Worst-plane ratios: ok 5.9 · warn 7.7 · err 4.9. */
+     Two further constraints shape the warning and the critical tone, and both
+     come from the three status hues sharing one screen — a row can carry a
+     green dot, an amber count, and a red label at once:
+
+       Amber, not golden yellow. The published #f7b928 sits at oklch hue 82,
+       lightness 82 — the loudest token in the palette, brighter against most
+       planes than the foreground ink, so a WAITING state out-shouted the
+       error beside it. A warning is a caution, not a highlighter: hue 65 at
+       L 78 stays warm, drops ~1.2 points on the worst plane, and holds 43°
+       of hue clearance from the critical red so the two never blur on a 6px
+       dot or a count badge.
+
+       The critical red keeps its saturation. Pulling a red toward the ink
+       ramp to buy contrast is what makes a destructive control read bland;
+       this one holds chroma 0.19 at hue 22 and spends LIGHTNESS, not chroma,
+       on the AA floor.
+
+     Worst-plane ratios: ok 5.9 · warn 6.5 · err 4.7. */
   --ok: #4ac16a;   /* success — the source system's #31a24c, lifted for the dark canvas */
-  --warn: #f7b928; /* warning — published value, already AA here */
-  --err: #ff6b7f;  /* critical — the source system's #e41e3f, lifted for the dark canvas */
+  --warn: #fc9f30; /* warning — the source system's #f7b928, moved off the highlighter */
+  --err: #ff6367;  /* critical — the source system's #e41e3f, lifted for the dark canvas */
   /* Text on an --err FILL (destructive hover inversion). The lifted red is
-     bright enough here that the on-fill text is the canvas ink. */
+     bright enough here that the on-fill text is the canvas ink (6.5:1). */
   --on-err: #0a1317;
 
   /* Live — work an agent is doing RIGHT NOW. The source system sanctions exactly two
@@ -183,19 +194,23 @@
      registers at once), the diff viewer, and ink-fill chrome. Values are
      the same ones the two registers use above — declared once here so no
      component ever hand-copies a hex. Consumers: login.css (--lg-*),
-     preferences.css (swatches), workspace.css, artifact.css, a11y.css. */
+     preferences.css (swatches), workspace.css, artifact.css, a11y.css.
+
+     This set is CONSUMER-DRIVEN, not a complete mirror of the register above:
+     every member here has a caller. Do not "finish" it by adding the tiers
+     that happen to be missing — a pinned value with no consumer is a copy of
+     a hex that nothing proves still matches the register it mirrors, which is
+     the exact drift these tokens exist to prevent. Add a tier when something
+     paints it. */
   --dark-canvas: #0a1317;
   --dark-surface: #131c21;
   --dark-elevated: #22303a;
   --dark-ink: #ffffff;
-  --dark-ink-strong: #ffffff;
-  --dark-body: #dfe3e8;
   --dark-ink-soft: #b6bec6;
   --dark-line: color-mix(in srgb, #ffffff 14%, transparent);
   --dark-line-soft: color-mix(in srgb, #ffffff 8%, transparent);
 
   --light-canvas: #eef1f5;
-  --light-ink: #0a1317;
 
   /* Document paper — artifact/file previews assume a white page in every
      register, matching how the document would print. It is also the brand's
@@ -637,7 +652,7 @@
 
      surface-0  canvas          #eef1f5   the soft-cloud page
      surface-1  cards, panels   #fbfcfd   raised — near white
-     surface-2  fills, wells    #e2e7ee   RECESSED — deliberately darker
+     surface-2  fills, wells    #e0e6ed   RECESSED — deliberately darker
      surface-3  drawers, modals #ffffff   the top plane, the source system's canvas
 
    surface-2 inverting direction between registers is correct: a search field
@@ -717,17 +732,16 @@ html[data-theme="light"] {
      the soft callout tint changes weight here. */
   --action-soft: color-mix(in srgb, #0064e0 15%, transparent);
 
-  /* Ink button — the source system's marketing black pill, verbatim on this canvas. */
-  --ink-button: #000000;
-  --on-ink-button: #ffffff;
-
   /* Light status — the same three hues, deepened until each clears 4.5:1 as
      small text on the worst plane here (--surface-2). The source system's own values
      measure 3.1 (success), 1.8 (warning), and 4.0 (critical) on white; they
      are badge-fill colours, not text colours.
-     Ratios against --surface-2: ok 4.6 · warn 4.7 · err 4.7. */
+     The warning follows the dark register off the golden-yellow hue onto the
+     amber at 65; the critical red already sits at the saturated hue 22 the
+     dark register moves to, so it is unchanged.
+     Ratios against --surface-2: ok 4.6 · warn 4.8 · err 4.7. */
   --ok: #12752f;   /* success #31a24c, deepened */
-  --warn: #8a5a00; /* warning #f7b928, deepened */
+  --warn: #8f560f; /* warning, deepened on the amber hue */
   --err: #c81232;  /* critical #e41e3f, deepened */
   /* Text on an --err fill — white, as the source system's badge-critical prints it
      (5.9:1 on this red). */

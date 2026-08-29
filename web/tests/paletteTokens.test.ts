@@ -83,19 +83,19 @@ describe("Meta commerce palette tokens", () => {
     assert.match(lightRegister, /--action-soft:\s*color-mix\(in srgb, #[0-9a-f]{6} \d+%, transparent\);/);
   });
 
-  it("keeps the source system's black marketing pill available as its own token", () => {
+  it("carries exactly one primary button, so there is no second fill to keep in step", () => {
     // The source system runs two primary buttons: cobalt inside the commerce
-    // flow, black on marketing surfaces. Relay is in-product, so cobalt is the
-    // action — but the black pill survives as --ink-button for the pre-auth and
-    // landing chrome, and it MUST be register-varying or it disappears into the
-    // dark canvas.
-    const darkFill = tokenIn(darkRegister, "--ink-button");
-    const lightFill = tokenIn(lightRegister, "--ink-button");
-    assert.notEqual(darkFill, lightFill, "a black pill on the dark canvas is invisible — invert it");
-    assert.equal(lightFill, "#000000", "the light register takes the source system's ink-button verbatim");
-    for (const [label, register] of [["dark", darkRegister], ["light", lightRegister]] as const) {
-      const ratio = contrast(tokenIn(register, "--on-ink-button"), tokenIn(register, "--ink-button"));
-      assert.ok(ratio >= 4.5, `${label} --on-ink-button on --ink-button is ${ratio.toFixed(2)}:1`);
+    // flow, black on marketing surfaces. Relay is entirely in-product, so
+    // cobalt is the action on every surface and the black pill has no
+    // consumer. It used to live here as --ink-button/--on-ink-button with
+    // nothing painting it — a register-varying fill that had to be kept in
+    // step with a canvas it never touched. Reintroduce it only with a caller.
+    for (const name of ["--ink-button", "--on-ink-button"]) {
+      assert.doesNotMatch(
+        darkRegister + lightRegister,
+        new RegExp(`${name}:`),
+        `${name} is declared with no consumer — the action is cobalt everywhere`,
+      );
     }
   });
 
@@ -114,8 +114,8 @@ describe("Meta commerce palette tokens", () => {
     // swatches, diff chrome) read these instead of re-declaring literals.
     for (const name of [
       "--dark-canvas", "--dark-surface", "--dark-elevated",
-      "--dark-ink", "--dark-ink-strong", "--dark-body", "--dark-ink-soft",
-      "--light-canvas", "--light-ink",
+      "--dark-ink", "--dark-ink-soft",
+      "--light-canvas",
     ]) {
       assert.match(darkRegister, new RegExp(`${name}:\\s*#[0-9a-f]{6};`), `${name} is not pinned`);
     }
@@ -132,10 +132,8 @@ describe("Meta commerce palette tokens", () => {
     assert.equal(declared(darkRegister, "--dark-surface"), declared(darkRegister, "--surface-1"));
     assert.equal(declared(darkRegister, "--dark-elevated"), declared(darkRegister, "--surface-3"));
     assert.equal(declared(darkRegister, "--dark-ink"), declared(darkRegister, "--ink-1"));
-    assert.equal(declared(darkRegister, "--dark-body"), declared(darkRegister, "--ink-2"));
     assert.equal(declared(darkRegister, "--dark-ink-soft"), declared(darkRegister, "--ink-3"));
     assert.equal(declared(darkRegister, "--light-canvas"), declared(lightRegister, "--surface-0"));
-    assert.equal(declared(darkRegister, "--light-ink"), declared(lightRegister, "--ink-1"));
   });
 
   it("marks live work in the Oculus purple, legible as small text in both registers", () => {
@@ -236,7 +234,6 @@ describe("pre-auth login palette", () => {
     assert.match(login, /--lg-canvas:\s*var\(--dark-canvas\);/);
     assert.match(login, /--lg-elevated:\s*var\(--dark-elevated\);/);
     assert.match(login, /--lg-ink:\s*var\(--dark-ink\);/);
-    assert.match(login, /--lg-body:\s*var\(--dark-body\);/);
     assert.match(login, /--lg-muted:\s*var\(--dark-ink-soft\);/);
     assert.match(login, /--lg-err:\s*var\(--dark-ink\);/);
     assert.match(login, /\.login-error \{[^}]*var\(--lg-err\)/s);
@@ -250,7 +247,6 @@ describe("pre-auth login palette", () => {
     assert.doesNotMatch(loginCode, /--action\s*:/, "login.css must not override --action; the yellow CTA reaches pre-auth");
     assert.match(login, /--lg-steel:\s*var\(--action\);/);
     assert.match(login, /--lg-steel-active:\s*var\(--action-hover\);/);
-    assert.match(login, /--lg-on-steel:\s*var\(--on-action\);/);
   });
 
   it("originates no color of its own", () => {
