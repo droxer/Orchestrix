@@ -86,13 +86,25 @@ function Field({
       {hint ? (
         <p className="m-0 text-xs leading-normal text-muted-foreground">{hint}</p>
       ) : null}
-      {error ? (
-        <span id={errorId} role="alert" className="text-sm text-danger">
-          {error}
-        </span>
-      ) : null}
+      {error ? <FieldError id={errorId}>{error}</FieldError> : null}
     </Wrapper>
   )
 }
 
-export { Field }
+/* The field-level error treatment, on its own so controls <Field> cannot wrap
+   can still use it. A fieldset of checkboxes (TeamDrawer's member picker) or a
+   custom radio list (AssignNodeDrawer's node list) owns its own layout but
+   still needs the one error voice — previously each hand-copied this span, so
+   the treatment lived in three places.
+
+   Distinct from `.adm-form-error`, which is the boxed SUBMIT-level error at the
+   foot of a drawer form. Field errors sit inline under their control. */
+function FieldError({ id, children }: { id?: string; children: ReactNode }) {
+  return (
+    <span id={id} role="alert" className="text-sm text-danger">
+      {children}
+    </span>
+  )
+}
+
+export { Field, FieldError }

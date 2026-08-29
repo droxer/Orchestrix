@@ -1,9 +1,10 @@
 /* ── Drawers ──────────────────────────────────────────────────────── */
 /* Backdrop positioning/scrim/entrance come from .overlay-backdrop (always
-   paired in Drawer.tsx); this class only right-aligns the panel and layers it. */
+   paired in Drawer.tsx); this class only right-aligns the panel. Layering is
+   set inline by Drawer.tsx as `calc(var(--z-drawer) + layer)` so stacked
+   drawers order themselves — a static z-index here would never win. */
 .adm-drawer-backdrop {
   justify-content: flex-end;
-  z-index: var(--z-drawer);
 }
 
 .adm-drawer {
@@ -60,8 +61,10 @@
   min-width: 0;
 }
 
+/* No bottom margin: .adm-drawer-head-text already sets the gap. A margin here
+   made kicker→title 8px against a 4px title→subtitle. */
 .adm-drawer-kicker {
-  margin: 0 0 var(--sp-1);
+  margin: 0;
   font: var(--type-micro);
   letter-spacing: var(--type-micro-track);
   text-transform: uppercase;
@@ -93,18 +96,32 @@
   letter-spacing: var(--type-code-track);
 }
 
+/* The body is the query container for drawer content. Field grids inside a
+   drawer must respond to the PANEL, not the viewport — a 460px `form` panel
+   is narrow on a 1440px desktop, and a viewport media query cannot see that. */
 .adm-drawer-body {
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: var(--sp-7);
+  container: drawer-body / inline-size;
 }
 
 /* Opt-in column layout: the form grows to fill the panel so its footer can be
-   anchored to the bottom edge even when the form is short. */
+   anchored to the bottom edge even when the form is short. The `flex: 1` on
+   the child is what makes that true — without it the form sizes to its
+   content and .adm-form-actions' `margin-top: auto` has nothing to push
+   against, leaving the action bar floating mid-panel above dead space. */
 .adm-drawer-body--column {
   display: flex;
   flex-direction: column;
+}
+
+/* `1 0 auto`, not `1`: grow to fill a short panel, but never shrink below
+   content height — the body is the scroll container, and a shrinkable basis-0
+   child would collapse instead of scrolling. */
+.adm-drawer-body--column > * {
+  flex: 1 0 auto;
 }
 
 /* The close affordance is the shared .overlay-close (overlay.css) — one
@@ -178,7 +195,8 @@
   --tone: var(--err);
   border: 0.5px solid var(--tone-line);
   color: var(--err);
-  font-size: var(--fs-3);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   line-height: var(--leading-normal);
 }
 
@@ -317,9 +335,10 @@
 
 .adm-assign-operator-name {
   /* The 18px tier is the source system's subtitle-lg, which is 700 — at a lighter
-     weight the drawer subject sat BELOW the 16px/700 name role beneath it. */
-  font-size: var(--fs-heading);
-  font-weight: 700;
+     weight the drawer subject sat BELOW the 16px/700 name role beneath it. That
+     pairing is exactly --type-heading; say so instead of rebuilding it. */
+  font: var(--type-heading);
+  letter-spacing: var(--type-heading-track);
   color: var(--ink-1);
 }
 
@@ -335,7 +354,7 @@
   justify-content: space-between;
   gap: var(--sp-4);
   padding-bottom: var(--sp-1);
-  border-bottom: 1px dotted var(--line-1);
+  border-bottom: 0.5px solid var(--line-1);
 }
 
 .adm-assign-nodes-count {
@@ -358,12 +377,24 @@
   position: relative;
 }
 
+/* Not hidden — stretched. The radio is an invisible box covering its whole
+   row, so the ONE focus ring base.css already draws on `input:focus-visible`
+   lands on the row's geometry and nothing here has to restate it. `opacity: 0`
+   is what made that impossible before: it hides the outline along with the
+   box, which is why this row kept reaching for a ring of its own.
+
+   `appearance: none` + transparent strips the radio's own dial; the label
+   still owns the click, so the input stays out of the pointer path. */
 .adm-assign-node-input {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   margin: 0;
-  opacity: 0;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-2);
   pointer-events: none;
 }
 
@@ -393,10 +424,6 @@
 .adm-assign-node:hover {
   border-color: var(--line-strong);
   background: var(--control-fill-hover);
-}
-
-.adm-assign-node-input:focus-visible + .adm-assign-node {
-  border-color: var(--link);
 }
 
 .adm-assign-node.selected {
@@ -458,8 +485,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: var(--avatar-xs);
+  height: var(--avatar-xs);
   border-radius: var(--r-full);
   color: var(--on-action);
   background: transparent;

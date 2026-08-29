@@ -160,67 +160,65 @@ export function ProjectDrawer({
       title={t(project ? "project.edit" : "project.setup_title")}
       subtitle={t(project ? "project.edit_subtitle" : "project.setup_subtitle")}
       width="form"
-      closeLabel={t("admin.v2.close_drawer")}
+      closeLabel={t("drawer.close")}
       bodyClassName="adm-drawer-body--column"
       onClosed={reset}
     >
-      <form className="project-setup-form" onSubmit={(event) => void submit(event)} noValidate>
-        <section className="project-setup-basics">
-          <div className="project-setup-basics-grid">
-            <Field label={t("project.name")} error={nameError ?? undefined} errorId="project-name-error">
-              <Input
-                ref={nameRef}
-                data-modal-initial-focus
-                className="project-name-input"
-                maxLength={120}
-                placeholder={t("project.setup_name_placeholder")}
-                value={name}
-                onChange={(event) => {
-                  setName(event.target.value);
-                  setNameError(null);
-                }}
-                aria-invalid={Boolean(nameError) || undefined}
-                aria-describedby={nameError ? "project-name-error" : undefined}
-              />
-            </Field>
-            <Field
-              label={t("project.computer")}
-              labelId={computerLabelId}
-              wrapper="div"
-              hint={project ? undefined : projectComputers.length === 0 ? t("project.no_computers") : t("project.setup_computer_hint")}
-              error={computerError ?? undefined}
-              errorId="project-computer-error"
-            >
-              {project ? (
-                <p className="project-computer-static" translate="no">{selectedComputerLabel}</p>
-              ) : (
-                <Select value={computerId} onValueChange={(value) => { setComputerId(value ?? ""); setComputerError(null); }}>
-                  <SelectTrigger
-                    className="w-full project-computer-select"
-                    disabled={projectComputers.length === 0}
-                    aria-labelledby={computerLabelId}
-                    aria-invalid={Boolean(computerError) || undefined}
-                    aria-describedby={computerError ? "project-computer-error" : undefined}
-                  >
-                    <SelectValue placeholder={t("project.choose_computer")}>
-                      {(value: string | null) => {
-                        const selected = projectComputers.find((computer) => computer.id === value);
-                        return selected ? selected.displayName || selected.id : t("project.choose_computer");
-                      }}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projectComputers.map((computer) => <SelectItem key={computer.id} value={computer.id}>{computer.displayName || computer.id}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )}
-            </Field>
-          </div>
-        </section>
+      <form className="adm-form project-setup-form" onSubmit={(event) => void submit(event)} noValidate>
+        <div className="project-setup-basics-grid">
+          <Field label={t("project.name")} error={nameError ?? undefined} errorId="project-name-error">
+            <Input
+              ref={nameRef}
+              data-modal-initial-focus
+              className="project-name-input"
+              maxLength={120}
+              placeholder={t("project.setup_name_placeholder")}
+              value={name}
+              onChange={(event) => {
+                setName(event.target.value);
+                setNameError(null);
+              }}
+              aria-invalid={Boolean(nameError) || undefined}
+              aria-describedby={nameError ? "project-name-error" : undefined}
+            />
+          </Field>
+          <Field
+            label={t("project.computer")}
+            labelId={computerLabelId}
+            wrapper="div"
+            hint={project ? undefined : projectComputers.length === 0 ? t("project.no_computers") : t("project.setup_computer_hint")}
+            error={computerError ?? undefined}
+            errorId="project-computer-error"
+          >
+            {project ? (
+              <p className="project-computer-static" translate="no">{selectedComputerLabel}</p>
+            ) : (
+              <Select value={computerId} onValueChange={(value) => { setComputerId(value ?? ""); setComputerError(null); }}>
+                <SelectTrigger
+                  className="w-full project-computer-select"
+                  disabled={projectComputers.length === 0}
+                  aria-labelledby={computerLabelId}
+                  aria-invalid={Boolean(computerError) || undefined}
+                  aria-describedby={computerError ? "project-computer-error" : undefined}
+                >
+                  <SelectValue placeholder={t("project.choose_computer")}>
+                    {(value: string | null) => {
+                      const selected = projectComputers.find((computer) => computer.id === value);
+                      return selected ? selected.displayName || selected.id : t("project.choose_computer");
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {projectComputers.map((computer) => <SelectItem key={computer.id} value={computer.id}>{computer.displayName || computer.id}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+          </Field>
+        </div>
 
         {project ? (
           <div className="adm-drawer-section">
-            <p className="adm-drawer-section-title">{t("admin.v2.danger_zone")}</p>
+            <h3 className="adm-drawer-section-title">{t("admin.v2.danger_zone")}</h3>
             <div className="adm-drawer-section-actions">
               <Button type="button" variant="destructive" onClick={() => void archive()} loading={archiveProjectMutation.isPending} loadingLabel={t("project.archiving")} disabled={updateProjectMutation.isPending}>
                 {t("project.archive")}
@@ -228,7 +226,7 @@ export function ProjectDrawer({
             </div>
           </div>
         ) : null}
-        <div className="project-setup-actions adm-form-actions">
+        <div className="adm-form-actions">
           <Button size="cta" type="button" variant="ghost" onClick={() => void requestClose()} disabled={busy}>{t("dialog.cancel")}</Button>
           <Button size="cta" type="submit" loading={createProjectMutation.isPending || updateProjectMutation.isPending}>{t(project ? "project.save" : "project.create")}</Button>
         </div>

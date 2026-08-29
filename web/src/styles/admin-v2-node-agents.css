@@ -163,8 +163,9 @@
   text-decoration-thickness: 1px;
 }
 
+/* margin-top is 0 in the base rule now; this only adds the trailing space
+   before the toggle list. */
 .adm-agent-drawer-note {
-  margin-top: 0;
   margin-bottom: var(--sp-4);
 }
 

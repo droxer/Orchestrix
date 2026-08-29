@@ -569,10 +569,11 @@
 
 /* Reduced motion: covered by the global reset in a11y.css (loads last, wins). */
 
+/* The strip + preview shell manages its own scrolling, so the body drops the
+   drawer's padding and scroll. Height comes from the body's own `flex: 1`. */
 .artifact-library-drawer-body {
   padding: 0;
   overflow: hidden;
-  height: 100%;
 }
 
 /* Empty library: ArtifactsEmpty replaces the strip + preview pane entirely,

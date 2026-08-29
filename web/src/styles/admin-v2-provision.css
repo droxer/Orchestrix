@@ -427,10 +427,19 @@
 .adm-cred-value {
   flex: 1;
   color: var(--ink-1);
-  font-size: var(--fs-3);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   word-break: break-all;
   background: transparent;
   padding: 0;
+}
+
+/* Most call sites pair this with .code. Re-assert the code face the `font`
+   shorthand above resets — the same compound .adm-assign-node-id.code needs. */
+.adm-cred-value.code {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: var(--type-code-track);
 }
 
 /* Compact filled pill for value-row micro-actions (copy, rename confirm).
@@ -461,8 +470,11 @@
   color: var(--ok);
 }
 
+/* No top margin: every call site sits inside .adm-form, which already gaps at
+   --sp-6. The margin stacked on top of it and gave notes 40px of lead where
+   their siblings get 24px. */
 .adm-cred-note {
-  margin: var(--sp-4) 0 0;
+  margin: 0;
   font: var(--type-body-sm);
   letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
@@ -472,7 +484,8 @@
 .adm-cred-empty {
   margin: 0;
   padding: var(--sp-4);
-  font-size: var(--fs-3);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
   border: 1px dashed var(--line-1);
   border-radius: var(--r-3);
@@ -522,7 +535,8 @@
 
 .adm-auth-sub {
   margin: 0;
-  font-size: var(--fs-3);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
   line-height: var(--leading-loose);
 }

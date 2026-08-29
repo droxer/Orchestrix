@@ -7,7 +7,7 @@ import { useRelayMutations } from "../../hooks/useRelayMutations";
 import { teamMutationInput } from "../../lib/teamForm";
 import type { AgentTeam } from "../../types";
 import { Button } from "@/components/ui/button";
-import { Field } from "@/components/ui/field";
+import { Field, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDialogs } from "@/components/ui/DialogProvider";
@@ -189,9 +189,7 @@ export function TeamDrawer({
           </div>
           {agents.length === 0 ? <span className="adm-form-hint">{t("teams.no_agents")}</span> : null}
           {membersError ? (
-            <span id="team-members-error" className="text-sm text-danger" role="alert">
-              {t("teams.members_required")}
-            </span>
+            <FieldError id="team-members-error">{t("teams.members_required")}</FieldError>
           ) : null}
         </fieldset>
         <Field
