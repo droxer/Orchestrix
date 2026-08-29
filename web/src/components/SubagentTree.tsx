@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { StateMark } from "./StateMark";
 
 import type { CollaborationTreeNode } from "../lib/collaborationTree";
 
@@ -39,7 +40,7 @@ function SubagentNode({ node }: { node: CollaborationTreeNode }) {
     >
       <summary onClick={() => { userToggledRef.current = true; }}>
         <span className="collaboration-branch" aria-hidden="true" />
-        <span className={`collaboration-status-dot tone-${tone}`} aria-hidden="true" />
+        <StateMark tone={tone} />
         <span className="collaboration-label" title={node.prompt ?? undefined}>{node.label}</span>
         <span className="collaboration-status">{t(`agent_stream.subagent_status.${node.status}`)}</span>
       </summary>

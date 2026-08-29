@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
+import { StateMark } from "./StateMark";
 import {
   placementBadgeDetailLabels,
   placementBadgeShowsSandbox,
@@ -48,7 +49,7 @@ export function AgentPlacementBadge({
       data-ownership={description.ownership}
       title={detailTitle}
     >
-      <i className={`agent-placement-badge-dot tone-${placementStatusTone(status)}`} aria-hidden="true" />
+      <StateMark tone={placementStatusTone(status)} />
       <OwnershipIcon size={ICON.sm} aria-hidden="true" />
       <span className="agent-placement-badge-name code" translate="no">
         {description.nodeName}

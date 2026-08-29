@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
+import { StateMark } from "./StateMark";
 import {
   AdminDelete,
   ICON,
@@ -38,7 +39,7 @@ export function PlacementList({
         const tone = placementStatusTone(placement.status);
         return (
           <li key={placement.id} className={`adm-placement-item${canManage ? "" : " adm-placement-item--compact"}`}>
-            <span className={`adm-placement-dot tone-${tone}`} aria-hidden="true" />
+            <StateMark tone={tone} />
             <span className="adm-placement-body">
               <AgentPlacementBadge
                 description={description}

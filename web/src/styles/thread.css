@@ -45,7 +45,6 @@
   background: var(--line-strong);
 }
 
-
 /* The rail's header is the shared <PageHeader> (shell.css) and its filter
    band is .list-filter-bar (inputs.css); the header's create button is the
    shared .page-header-icon-action (shell.css), the same ghost plus every
@@ -190,28 +189,12 @@
    as the opposite of what it means. Expanded, the folder says nothing —
    every row carries its own pip, so a folder dot would restate it.
    Settled projects stay silent; there's nothing to surface. */
-.project-folder-state-dot {
+/* A collapsed folder's pip is a .state-mark parked on the glyph's corner; the
+   mark owns its size, shape and pulse, so only the anchoring is local. */
+.project-folder-pip {
   position: absolute;
   right: -2px;
   bottom: -1px;
-  width: var(--dot);
-  height: var(--dot);
-  border-radius: var(--r-full);
-}
-
-.project-folder-state-dot[data-tone="attn"] {
-  background: var(--warn);
-}
-
-.project-folder-state-dot[data-tone="run"] {
-  background: var(--live);
-  animation: pulse-ring var(--t-pulse) var(--ease) infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .project-folder-state-dot[data-tone="run"] {
-    animation: none;
-  }
 }
 
 .project-folder-select > .project-folder-name {
@@ -264,7 +247,6 @@
   color: var(--ink-1);
   background: var(--surface-2);
 }
-
 
 .project-folder-threads {
   display: grid;
@@ -526,42 +508,11 @@
 }
 
 /* The state pip, in two homes: on a nested row it leads the title (the flat
-   in-project list has no group headers to carry state); on a full row it
-   sits in the meta line's status cluster. Solid warn = needs you, pulsing
-   live = running, solid err = failed/cancelled, hollow ring = settled
-   (shape carries rest, hue carries attention — design-system.md status
-   fill rules). */
-.conversation-state-dot {
-  flex: none;
-  width: var(--dot);
-  height: var(--dot);
-  border-radius: var(--r-full);
-}
-
-.conversation-state-dot[data-tone="attn"] {
-  background: var(--warn);
-}
-
-.conversation-state-dot[data-tone="run"] {
-  --pulse-color: var(--live);
-  background: var(--live);
-  animation: pulse-ring var(--t-pulse) var(--ease) infinite;
-}
-
-.conversation-state-dot[data-tone="err"] {
-  background: var(--err);
-}
-
-.conversation-state-dot[data-tone="idle"] {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--ink-4);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .conversation-state-dot[data-tone="run"] {
-    animation: none;
-  }
-}
+   in-project list has no group headers to carry state); on a full row it sits
+   in the meta line's status cluster. Both are .state-mark now — the shape
+   grammar it enforces is what this rule used to get wrong, spending the
+   hollow ring on `idle` while the ring meant "failed" everywhere else. The
+   tone -> shape table lives in ThreadRow. */
 
 .conversation-row-actions {
   position: absolute;

@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { StateMark, type StateTone } from "../StateMark";
 import type { AgentTeam, EmployeeAgent } from "../../types";
 import { IdentityMark } from "../IdentityMark";
 import { ProfileImage } from "../ProfileImagePicker";
@@ -16,6 +17,19 @@ export function teamSelectValue(teamId: string): string {
 export function parseTeamSelectValue(value: string | null): string | null {
   return value?.startsWith(TEAM_VALUE_PREFIX) ? value.slice(TEAM_VALUE_PREFIX.length) : null;
 }
+
+/**
+ * Availability → pip tone. `ready` and `busy` both stay neutral here: this
+ * pip always sits beside the availability word, so hue only has to separate
+ * the states the label cannot make urgent on its own. `offline`/`inactive`
+ * resolve to `bad`, which StateMark draws as the hollow ring.
+ */
+const PIP_TONE: Record<string, StateTone> = {
+  pending: "warn",
+  offline: "bad",
+  inactive: "bad",
+};
+const pipTone = (availability: string): StateTone => PIP_TONE[availability] ?? "neutral";
 
 // Target picker for the composer footer: selects who the thread talks to —
 // one logical (employee) agent, a whole agent team, or — in a project room —
@@ -126,7 +140,7 @@ export function AgentSelect({ logicalAgents, activeLogicalAgentId, onLogicalAgen
           </>
         ) : (
           <span className="chat-agent-select-unavailable">
-            <span className="chat-agent-state-pip" data-availability="offline" aria-hidden="true" />
+            <StateMark tone="bad" />
             {t("thread.no_available_agent")}
           </span>
         )}
@@ -189,7 +203,7 @@ export function AgentSelect({ logicalAgents, activeLogicalAgentId, onLogicalAgen
                   </span>
                   {availabilityLabel ? (
                     <span className="chat-agent-option-availability" data-availability={availability}>
-                      <span className="chat-agent-state-pip" data-availability={availability} aria-hidden="true" />
+                      <StateMark tone={pipTone(availability)} />
                       {availabilityLabel}
                     </span>
                   ) : null}
@@ -242,7 +256,7 @@ function agentOptions({ logicalAgents, t }: {
         <span translate="no">{logicalAgent.displayName}</span>
         {availabilityLabel ? (
           <span className="chat-agent-option-availability" data-availability={visualAvailability}>
-            <span className="chat-agent-state-pip" data-availability={visualAvailability} aria-hidden="true" />
+            <StateMark tone={pipTone(visualAvailability)} />
             {availabilityLabel}
           </span>
         ) : null}

@@ -141,19 +141,3 @@
   min-height: 0;
   overflow: hidden;
 }
-
-.adm-live-dot {
-  width: var(--dot);
-  height: var(--dot);
-  border-radius: var(--r-full);
-  background: var(--ink-4);
-  transition: background var(--t-fast) var(--ease);
-}
-
-/* Offline takes the shared hollow-ring "bad" shape (.dot-ring, base.css):
-   --err resolves to the loudest ink step, so a solid fill reads as emphasis,
-   not "problem" — the ring is what says offline. */
-.adm-live-dot.offline {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--err);
-}
