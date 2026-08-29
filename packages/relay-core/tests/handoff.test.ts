@@ -1123,6 +1123,29 @@ describe("execution manager boundary", () => {
 
   it("runs agent readiness through the execution manager", async () => {
     resetAgentReadiness();
+    /* Preflight injects the running agent's provider credentials, resolved
+       from `process.env` at call time — so this test's `env:{}` assertions
+       only hold on a machine with no provider keys exported. Developers have
+       them; CI does not, which made this pass locally for whoever had a clean
+       shell and fail for everyone else with a diff full of their real API key.
+       Clear the whole credential set for the duration instead of asserting
+       around whatever happens to be set. */
+    const hostCredentials = new Map<string, string | undefined>();
+    for (const name of allAgentCredentialEnvNames()) {
+      hostCredentials.set(name, process.env[name]);
+      delete process.env[name];
+    }
+    try {
+      await runsAgentReadinessThroughTheExecutionManager();
+    } finally {
+      for (const [name, value] of hostCredentials) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+  });
+
+  async function runsAgentReadinessThroughTheExecutionManager(): Promise<void> {
     const calls: string[] = [];
     const manager: ExecutionManager = {
       ensureImage: () => "/tmp/rootfs",
@@ -1173,7 +1196,7 @@ describe("execution manager boundary", () => {
     assert.match(calls[1] ?? "", /^shell:su agent .*claude auth status/);
     assert.doesNotMatch(calls[1] ?? "", /ANTHROPIC_API_KEY=.*secret/);
     assert.equal(calls.length, 3);
-  });
+  }
 
   it("allows Kimi env-key auth without a host Kimi Code home", async () => {
     const oldEnv = process.env;
