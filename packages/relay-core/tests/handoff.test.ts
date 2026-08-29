@@ -29,6 +29,9 @@ import {
   getAgent,
   KimiStreamRenderer,
   agentCredentialEnv,
+  agentCredentialEnvNames,
+  allAgentCredentialEnvNames,
+  agentTranscriptLimit,
   guestCodexConfigToml,
   guestAgentEnv,
   guestPiAuthJson,
@@ -874,11 +877,38 @@ describe("agent stream rendering", () => {
     assert.equal(output, "");
   });
 
+  it("never renders a non-message Kimi record as assistant speech", () => {
+    // Kimi's stream-json carries records that are not assistant turns. One
+    // carrying a text/content field must not be spoken as if the agent said
+    // it — an unrecognized record renders as nothing.
+    const renderer = new KimiStreamRenderer();
+
+    const output = renderer.feed([
+      JSON.stringify({ type: "session_start", text: "resuming session abc" }),
+      JSON.stringify({ type: "usage", content: "input=12 output=34" }),
+      "",
+    ].join("\n"));
+
+    assert.equal(output, "");
+    assert.doesNotMatch(output, /resuming session/);
+  });
+
   it("builds the Kimi action command in stream-json mode", () => {
     const command = buildKimiCommand(state({ task_goal: "Do the thing" }));
 
     assert.match(command, /--output-format stream-json/);
     assert.match(command, /--prompt/);
+  });
+
+  it("runs every approval-gated agent without an interactive prompt", () => {
+    // These runs are headless: nothing can answer a tool-approval question, so
+    // an agent that asks one stalls until the run is cancelled. Each CLI that
+    // has an approval gate must be launched with it disabled.
+    const taskState = state({ task_goal: "Do the thing" });
+
+    assert.match(buildClaudeCommand(taskState), /--permission-mode bypassPermissions/);
+    assert.match(buildCodexCommand(taskState), /--dangerously-bypass-approvals-and-sandbox/);
+    assert.match(buildKimiCommand(taskState), /(^|\s)--auto(\s|$)/);
   });
 
   it("filters noisy seccomp stderr warnings", () => {
@@ -1108,8 +1138,9 @@ describe("execution manager boundary", () => {
         calls.push("skills");
       },
       execStream: async () => ({ exit_code: 0, stdout: "", stderr: "" }),
-      runShell: async (command) => {
+      runShell: async (command, _signal, env) => {
         calls.push(`shell:${command}`);
+        calls.push(`env:${JSON.stringify(env ?? {})}`);
         return { exit_code: 0, stdout: "ok\n", stderr: "" };
       },
     };
@@ -1121,7 +1152,8 @@ describe("execution manager boundary", () => {
     assert.equal(calls[0], "auth:codex");
     assert.equal(calls[1], "skills");
     assert.match(calls[2] ?? "", /^shell:su agent .*codex login status/);
-    assert.equal(calls.length, 3);
+    assert.equal(calls[3], "env:{}");
+    assert.equal(calls.length, 4);
 
     resetAgentReadiness();
     calls.length = 0;
@@ -1130,7 +1162,7 @@ describe("execution manager boundary", () => {
     assert.equal(calls[0], "auth:kimi");
     assert.equal(calls[1], "skills");
     assert.match(calls[2] ?? "", /^shell:su agent .*KIMI_CODE_HOME=.*kimi --version && kimi doctor/);
-    assert.equal(calls.length, 3);
+    assert.equal(calls.length, 4);
 
     resetAgentReadiness();
     calls.length = 0;
@@ -1138,8 +1170,9 @@ describe("execution manager boundary", () => {
 
     // Claude needs no guest auth but still gets the shared skills before preflight.
     assert.equal(calls[0], "skills");
-    assert.match(calls[1] ?? "", /^shell:su agent .*claude/);
-    assert.equal(calls.length, 2);
+    assert.match(calls[1] ?? "", /^shell:su agent .*claude auth status/);
+    assert.doesNotMatch(calls[1] ?? "", /ANTHROPIC_API_KEY=.*secret/);
+    assert.equal(calls.length, 3);
   });
 
   it("allows Kimi env-key auth without a host Kimi Code home", async () => {
@@ -1473,26 +1506,30 @@ describe("credential scoping", () => {
     });
   });
 
-  it("injects only the running agent's provider credentials", () => {
+  it("keeps provider credentials out of shell command arguments", () => {
     withEnv(allProviderEnv, () => {
       const claudeCommand = buildClaudeCommand(state());
-      assert.ok(claudeCommand.includes("anthropic-secret"));
-      for (const other of ["openai-secret", "pi-secret", "kimi-secret", "moonshot-secret"]) {
-        assert.ok(!claudeCommand.includes(other), `Claude run exposed ${other}`);
-      }
-
       const codexCommand = buildCodexCommand(state());
-      assert.ok(codexCommand.includes("openai-secret"));
-      for (const other of ["anthropic-secret", "pi-secret", "kimi-secret", "moonshot-secret"]) {
-        assert.ok(!codexCommand.includes(other), `Codex run exposed ${other}`);
-      }
-
       const kimiCommand = buildKimiCommand(state());
-      assert.ok(kimiCommand.includes("kimi-secret"));
-      assert.ok(kimiCommand.includes("moonshot-secret"));
-      for (const other of ["anthropic-secret", "openai-secret", "pi-secret"]) {
-        assert.ok(!kimiCommand.includes(other), `Kimi run exposed ${other}`);
+      const piCommand = buildPiCommand(state());
+      for (const command of [claudeCommand, codexCommand, piCommand, kimiCommand]) {
+        for (const secret of Object.values(allProviderEnv)) {
+          assert.ok(!command.includes(secret), `agent command exposed ${secret}`);
+        }
       }
+    });
+  });
+
+  it("passes only the selected agent credentials through the executor environment", async () => {
+    await withEnvAsync(allProviderEnv, async () => {
+      let executionEnv: Record<string, string> | undefined;
+      await runAgentNode("claude", state(), {
+        execStream: async (_cmd, _args, options) => {
+          executionEnv = (options as { env?: Record<string, string> } | undefined)?.env;
+          return { exit_code: 0, stdout: "", stderr: "" };
+        },
+      });
+      assert.deepEqual(executionEnv, { ANTHROPIC_API_KEY: "anthropic-secret" });
     });
   });
 
@@ -1509,6 +1546,41 @@ describe("credential scoping", () => {
       assert.ok(piKeys.includes("PI_API_KEY") && !piKeys.includes("OPENAI_API_KEY"));
       assert.ok(kimiKeys.includes("KIMI_API_KEY") && kimiKeys.includes("MOONSHOT_API_KEY"));
       assert.ok(!kimiKeys.includes("ANTHROPIC_API_KEY"));
+    });
+  });
+
+  it("declares every key a resolver can emit", () => {
+    // The declared list is what a local node strips from its inherited
+    // environment. A resolver emitting an undeclared key would leave that key
+    // inherited by every agent, so the two must not drift apart.
+    withEnv(allProviderEnv, () => {
+      for (const agent of AGENT_NAMES) {
+        const declared = new Set(agentCredentialEnvNames(agent));
+        for (const [key] of agentCredentialEnv(agent)) {
+          assert.ok(declared.has(key), `${agent} emitted undeclared credential key ${key}`);
+        }
+      }
+    });
+  });
+
+  it("collects every provider key across agents for local-node stripping", () => {
+    const all = allAgentCredentialEnvNames();
+    for (const agent of AGENT_NAMES) {
+      for (const key of agentCredentialEnvNames(agent)) {
+        assert.ok(all.includes(key), `${key} missing from the strip list`);
+      }
+    }
+    assert.equal(all.length, new Set(all).size, "strip list must be deduplicated");
+  });
+});
+
+describe("agent transcript budget", () => {
+  it("defaults to 256 KiB and honors the documented override", () => {
+    withEnv({ RELAY_AGENT_RESULT_LOG_LIMIT: "" }, () => {
+      assert.equal(agentTranscriptLimit(), 262_144);
+    });
+    withEnv({ RELAY_AGENT_RESULT_LOG_LIMIT: "1048576" }, () => {
+      assert.equal(agentTranscriptLimit(), 1_048_576);
     });
   });
 });
@@ -1823,11 +1895,12 @@ describe("agent registry", () => {
       },
       () => {
         const command = buildKimiCommand(state({ task_goal: "Wire up Kimi" }));
-        assert.match(command, /kimi --model kimi-test --output-format stream-json --prompt/);
+        assert.match(command, /kimi --auto --model kimi-test --output-format stream-json --prompt/);
         assert.match(command, /Wire up Kimi/);
         assert.ok(command.indexOf("--model kimi-test") < command.indexOf("--prompt"));
+        // --auto (never asks) is the sandbox stance, not -y (still asks
+        // questions), matching Claude's bypassPermissions and Codex's bypass.
         assert.doesNotMatch(command, /--yolo/);
-        assert.doesNotMatch(command, /--auto/);
         assert.doesNotMatch(command, /stdbuf/);
       },
     );

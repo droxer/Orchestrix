@@ -23,7 +23,10 @@ from relay.daemon_registry import (
     workspace_paths_match,
 )
 from relay.daemon_registry.artifacts import _is_generated_artifact_path
-from relay.daemon_registry.registry import task_progress_file
+from relay.daemon_registry.registry import (
+    _confined_workspace_path,
+    task_progress_file,
+)
 from relay.persistence.agent_placement_store import LocalAgentPlacementStore
 from relay.persistence.agent_store import LocalAgentStore
 from relay.persistence.daemon_store import DatabaseDaemonStore, LocalDaemonStore
@@ -612,6 +615,19 @@ def test_first_dispatch_refuses_to_downgrade_thread_layout_for_old_daemon() -> N
     asyncio.run(run_flow())
 
 
+def test_confined_workspace_path_rejects_escaping_subpaths() -> None:
+    # The joined path becomes the root that daemon-reported generated files are
+    # confined against, so a subpath that climbs out would widen what a node can
+    # index. Project subpaths are server-generated today; this keeps that true
+    # if a caller ever threads one through from a payload.
+    assert _confined_workspace_path("/srv/workspace", "projects/prj_one") == (
+        "/srv/workspace/projects/prj_one"
+    )
+    assert _confined_workspace_path("/srv/workspace", "../../etc") is None
+    assert _confined_workspace_path("/srv/workspace", "/etc") is None
+    assert _confined_workspace_path("/srv/workspace", "projects/../../etc") is None
+
+
 def test_project_dispatch_carries_shared_workspace_subpath() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
@@ -627,7 +643,11 @@ def test_project_dispatch_carries_shared_workspace_subpath() -> None:
                     "workspaceId": "machine-a",
                     "protocolVersion": 1,
                     "supportedAgents": ["codex"],
-                    "capabilities": ["thread-workspaces", "project-workspaces"],
+                    "capabilities": [
+                        "thread-workspaces",
+                        "project-workspaces",
+                        "generated-files",
+                    ],
                     "status": "ready",
                 },
                 "ui_token",
@@ -656,6 +676,34 @@ def test_project_dispatch_carries_shared_workspace_subpath() -> None:
             [command] = registry.take_commands("sbx_alice", "node_token")
             assert command["workspaceLayout"] == "project"
             assert command["workspaceSubpath"] == "projects/prj_one"
+            registry.handle_event(
+                "sbx_alice",
+                {
+                    "type": "run.completed",
+                    "commandId": command["id"],
+                    "sessionId": command["sessionId"],
+                    "runId": command["runId"],
+                    "agent": "codex",
+                    "exitCode": 0,
+                    "agentLog": "created report.pdf",
+                    "generatedFiles": [
+                        {
+                            "relativePath": "report.pdf",
+                            "title": "report.pdf",
+                            "bytes": 42,
+                            "contentType": "application/pdf",
+                        }
+                    ],
+                },
+                "node_token",
+            )
+            updated = session_store.get_session(session["id"])
+            [artifact] = [
+                item
+                for item in updated["artifacts"]
+                if item["kind"] == "workspace_file"
+            ]
+            assert artifact["path"] == "/workspace/alice/projects/prj_one/report.pdf"
 
     asyncio.run(run_flow())
 
