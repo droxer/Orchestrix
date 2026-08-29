@@ -860,6 +860,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
           onChange={(next) => {
             if (next.variant === "routine") setForm(next);
           }}
+          onOpenThread={onOpenThread}
           onSubmit={(event) => void submitRoutine(event)}
           onDelete={form.id ? () => { void deleteRoutine(); } : undefined}
         />

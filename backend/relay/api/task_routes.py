@@ -972,12 +972,60 @@ async def pickup_task(
     return result
 
 
+def occurrence_tasks(
+    ctx: Any, task: dict[str, Any], actor: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """The routine's promoted occurrences the actor may read.
+
+    A routine never runs itself — the scheduler promotes an occurrence task and
+    that occurrence carries the run. Rolling its records up to the routine is
+    what makes the routine's own surface show what its runs produced. An
+    occurrence that was deleted, or that this actor cannot read, is skipped
+    rather than failing the whole rollup.
+    """
+    if not task.get("isRoutine"):
+        return []
+    occurrences: list[dict[str, Any]] = []
+    for occurrence_id in task.get("occurrenceIds") or []:
+        try:
+            occurrences.append(get_task_for_actor(ctx.task_store, occurrence_id, actor))
+        except HTTPException:
+            continue
+        except Exception:  # noqa: BLE001 - one unreadable occurrence must not block the rest
+            logger.warning(
+                "Unexpected error reading routine occurrence",
+                task_id=task.get("id"),
+                occurrence_id=occurrence_id,
+                exc_info=True,
+            )
+            continue
+    return occurrences
+
+
 @router.get("/tasks/{task_id}/events")
 async def task_events(
-    task_id: str, request: Request, ctx: AppContextDep
+    task_id: str,
+    request: Request,
+    ctx: AppContextDep,
+    include: str | None = None,
 ) -> dict[str, Any]:
+    """The task's event log — the run history behind its current state.
+
+    `include=occurrences` additionally folds in the event logs of a routine's
+    promoted occurrences, merged by timestamp, so the routine shows the runs it
+    caused. Each event keeps its own `taskId`, so the caller can still tell the
+    routine's own entries from an occurrence's. The default answer stays the
+    task's own log verbatim — an event-sourced replay must never silently
+    receive another task's events.
+    """
     actor = request_actor(request, ctx.auth_store)
-    return {"events": get_task_for_actor(ctx.task_store, task_id, actor)["events"]}
+    task = get_task_for_actor(ctx.task_store, task_id, actor)
+    events = list(task["events"])
+    if include == "occurrences":
+        for occurrence in occurrence_tasks(ctx, task, actor):
+            events.extend(occurrence["events"])
+        events.sort(key=lambda event: event.get("timestamp") or "")
+    return {"events": events}
 
 
 @router.get("/tasks/{task_id}/artifacts")
@@ -988,12 +1036,22 @@ async def task_artifacts(
 
     Aggregates workspace artifacts across the task's linked sessions and dedupes
     to the newest record per workspace file, so a file regenerated in a later
-    session surfaces once at its latest state.
+    session surfaces once at its latest state. For a routine the rollup also
+    covers its promoted occurrences — the routine itself never runs, so its
+    files are always produced by an occurrence's sessions.
     """
     actor = request_actor(request, ctx.auth_store)
     task = get_task_for_actor(ctx.task_store, task_id, actor)
+    sources: list[tuple[str, str]] = [
+        (task_id, session_id) for session_id in task.get("linkedSessionIds", [])
+    ]
+    for occurrence in occurrence_tasks(ctx, task, actor):
+        sources.extend(
+            (occurrence["id"], session_id)
+            for session_id in occurrence.get("linkedSessionIds", [])
+        )
     newest: dict[str, dict[str, Any]] = {}
-    for session_id in task.get("linkedSessionIds", []):
+    for origin_task_id, session_id in sources:
         try:
             session = ctx.session_store.get_session(session_id)
         except (KeyError, FileNotFoundError):
@@ -1013,7 +1071,7 @@ async def task_artifacts(
             ):
                 newest[key] = {
                     **artifact_index_item(session, artifact),
-                    "taskId": task_id,
+                    "taskId": origin_task_id,
                 }
     ordered = sorted(
         newest.values(), key=lambda item: item.get("createdAt") or "", reverse=True

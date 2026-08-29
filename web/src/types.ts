@@ -9,6 +9,7 @@ import type {
   DaemonNodeMonitorRecord,
   RelayArtifact,
   RelayTask,
+  RelayTaskEvent,
   RelayTaskListItem,
   RelayTaskSummary,
   RelaySession,
@@ -33,6 +34,7 @@ export type {
   DaemonNodeMonitorRecord,
   RelayArtifact,
   RelayTask,
+  RelayTaskEvent,
   RelayTaskListItem,
   RelayTaskSummary,
   RelaySession,
@@ -107,6 +109,10 @@ export interface ArtifactsResponse {
 export interface TaskArtifactsResponse {
   taskId: string;
   artifacts: ArtifactIndexItem[];
+}
+
+export interface TaskEventsResponse {
+  events: RelayTaskEvent[];
 }
 
 export interface TaskDeletionResponse {

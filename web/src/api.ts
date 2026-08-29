@@ -53,6 +53,7 @@ import type {
   UserRole,
   TaskArtifactsResponse,
   TaskDeletionResponse,
+  TaskEventsResponse,
   TaskMutationInput,
   TaskRunAssignment,
   ThreadMessageInput,
@@ -704,6 +705,21 @@ export function startTask(
 
 export function listTaskArtifacts(taskId: string, signal?: AbortSignal): Promise<TaskArtifactsResponse> {
   return apiJson<TaskArtifactsResponse>(`/tasks/${encodeURIComponent(taskId)}/artifacts`, { signal });
+}
+
+/**
+ * The task's event log — the run history behind its current state.
+ *
+ * `includeOccurrences` folds in the logs of a routine's promoted occurrences,
+ * which is where a routine's runs actually happen.
+ */
+export function listTaskEvents(
+  taskId: string,
+  options: { includeOccurrences?: boolean } = {},
+  signal?: AbortSignal,
+): Promise<TaskEventsResponse> {
+  const query = options.includeOccurrences ? "?include=occurrences" : "";
+  return apiJson<TaskEventsResponse>(`/tasks/${encodeURIComponent(taskId)}/events${query}`, { signal });
 }
 
 export async function readArtifactText(

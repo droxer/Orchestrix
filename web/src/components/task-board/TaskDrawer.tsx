@@ -33,6 +33,7 @@ import {
 } from "../../lib/taskBoardForm";
 import { Drawer } from "@/components/ui/Drawer";
 import { TaskDrawerArtifacts } from "./TaskDrawerArtifacts";
+import { TaskDrawerHistory } from "./TaskDrawerHistory";
 import { AgentMark } from "../AgentMark";
 import { AgentStateBadge } from "../AgentStateBadge";
 import { IdentityMark } from "../IdentityMark";
@@ -218,6 +219,8 @@ type TaskDrawerProps = {
   onClosed?: () => void;
   /** Read-only context (status, linked thread, recent activity) shown above the form in edit mode. */
   meta?: ReactNode;
+  /** Opens a thread in place from the run history; falls back to plain navigation. */
+  onOpenThread?: (sessionId: string) => void;
 };
 
 function BacklogFields({ form, onChange }: { form: BacklogTaskFormState; onChange: (next: TaskBoardFormState) => void }) {
@@ -339,6 +342,7 @@ export function TaskDrawer({
   onDelete,
   onClosed,
   meta,
+  onOpenThread,
 }: TaskDrawerProps) {
   const { t } = useTranslation();
   const priorityLabelId = useId();
@@ -600,7 +604,18 @@ export function TaskDrawer({
             </div>
           </>
         ) : null}
-        {form.variant === "backlog" && form.id ? <TaskDrawerArtifacts taskId={form.id} /> : null}
+        {form.id ? (
+          <>
+            {/* Both variants roll artifacts up the same way: a routine's files
+                come from its occurrences' sessions, resolved by the backend. */}
+            <TaskDrawerArtifacts taskId={form.id} />
+            <TaskDrawerHistory
+              taskId={form.id}
+              isRoutine={form.variant === "routine"}
+              onOpenThread={onOpenThread}
+            />
+          </>
+        ) : null}
         <div className="adm-form-actions">
           {form.id && onDelete ? (
             <Button
