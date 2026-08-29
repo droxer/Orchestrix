@@ -154,6 +154,15 @@
   max-height: 220px;
 }
 
+.adm-dash-chart-axis {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-3) var(--sp-2) var(--sp-8);
+  color: var(--ink-4);
+  font: var(--type-label);
+}
+
 .adm-dash-chart--empty { opacity: var(--opacity-dormant); }
 
 /* Deliberately the shortest chart on the page. Token volume is supporting

@@ -354,9 +354,12 @@
   .messenger-shell .sidenav-nav .sidenav-group:nth-child(3) .sidenav-btn { animation-delay: calc(var(--t-stagger) * 3); }
   .messenger-shell .sidenav-nav .sidenav-group:nth-child(4) .sidenav-btn { animation-delay: calc(var(--t-stagger) * 4); }
 
-  /* Admin Channels/Admin collapse into a More overflow so the primary tabs
-     (Threads, My Computer, Backlog, Routines, Agents, Teams) fit a 390pt
-     phone without horizontal scroll. */
+  /* Keep five stable primary tabs on phones. Operational and management
+     destinations remain available through More without crushing their labels. */
+  .sidenav-secondary-item {
+    display: none !important;
+  }
+
   .sidenav-overflow-item {
     display: none !important;
   }

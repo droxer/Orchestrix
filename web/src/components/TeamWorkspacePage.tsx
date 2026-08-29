@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { deleteTeamProfileImage, getWorkspaceBrief, updateTeamProfileImage } from "../api";
@@ -56,6 +56,7 @@ function TeamProfile({
   onDeleted: () => void;
 }) {
   const { t } = useTranslation();
+  const leadLabelId = useId();
   const { confirm } = useDialogs();
   const queryClient = useQueryClient();
   const { updateTeamMutation, deleteTeamMutation } = useRelayMutations();
@@ -346,6 +347,7 @@ function TeamProfile({
               <>
                 <Field
                   label={t("teams.lead")}
+                  labelId={leadLabelId}
                   wrapper="div"
                   className="team-profile-lead-field"
                   error={validationError === "lead" ? t("teams.lead_required") : undefined}
@@ -358,6 +360,7 @@ function TeamProfile({
                     <SelectTrigger
                       ref={leadRef}
                       className="w-full"
+                      aria-labelledby={leadLabelId}
                       aria-invalid={validationError === "lead" || undefined}
                       aria-describedby={validationError === "lead" ? "team-profile-lead-error" : undefined}
                     >

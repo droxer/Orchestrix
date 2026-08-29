@@ -172,8 +172,10 @@
   display: block;
   max-width: 100%;
   height: auto;
+  aspect-ratio: auto 16 / 9;
   margin: var(--sp-4) 0;
   border-radius: var(--r-2);
+  background: var(--surface-2);
 }
 
 .md-body blockquote {

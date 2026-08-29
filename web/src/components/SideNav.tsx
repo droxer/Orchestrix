@@ -271,8 +271,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
     onResize(clampSidenavWidth(width + delta, max), true);
   }, [onResize, width]);
 
-  const moreActive = route === "admin";
-  const channelsHint = `${t("nav.channels")} · ${t("nav.coming_soon")}`;
+  const moreActive = ["routine", "teams", "computer", "channels", "admin"].includes(route);
   const commandMenuHint = `${t("command.title")} · ${commandShortcutLabel()}`;
 
   return (
@@ -342,7 +341,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
             <span className="sidenav-label sr-only">{t("nav.backlog")}</span>
           </a>
           <a
-            className={`sidenav-btn ${route === "routine" ? "active" : ""}`}
+            className={`sidenav-btn sidenav-secondary-item ${route === "routine" ? "active" : ""}`}
             data-nav="routine"
             href={hrefForRoute("routine")}
             aria-label={t("nav.routine")}
@@ -375,7 +374,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
             <span className="sidenav-label sr-only">{t("nav.agents")}</span>
           </a>
           <a
-            className={`sidenav-btn ${route === "teams" ? "active" : ""}`}
+            className={`sidenav-btn sidenav-secondary-item ${route === "teams" ? "active" : ""}`}
             data-nav="teams"
             href={hrefForRoute("teams")}
             aria-label={t("nav.teams")}
@@ -393,7 +392,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
         <div className="sidenav-group sidenav-group--separated" role="group" aria-label={t("nav.manage")}>
           <span className="sidenav-group-label sidenav-overflow-item sr-only" aria-hidden="true">{t("nav.manage")}</span>
           <a
-            className={`sidenav-btn ${route === "computer" ? "active" : ""}`}
+            className={`sidenav-btn sidenav-secondary-item ${route === "computer" ? "active" : ""}`}
             data-nav="computer"
             href={hrefForRoute("computer")}
             aria-label={t("nav.computer")}
@@ -407,27 +406,24 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
             <NavComputer size={ICON.lg} aria-hidden="true" />
             <span className="sidenav-label sr-only">{t("nav.computer")}</span>
           </a>
-          {/* Keeps role=button + aria-disabled so assistive tech still
-              announces it as an unavailable destination, but drops
-              tabIndex: it has no activation handler, so a keyboard user
-              tabbing in hit a dead stop with no way to learn why. The
-              focus tooltip goes with it. */}
-          <span
-            className="sidenav-btn sidenav-overflow-item"
+          <a
+            className={`sidenav-btn sidenav-secondary-item sidenav-overflow-item ${route === "channels" ? "active" : ""}`}
             data-nav="channels"
-            role="button"
-            aria-disabled="true"
-            aria-label={channelsHint}
-            onMouseEnter={(e) => showNavTooltip(channelsHint, e.currentTarget)}
+            href={hrefForRoute("channels")}
+            aria-label={t("nav.channels")}
+            aria-current={route === "channels" ? "page" : undefined}
+            onClick={(event) => handleRouteClick(event, "channels")}
+            onMouseEnter={(e) => showNavTooltip(t("nav.channels"), e.currentTarget)}
             onMouseLeave={hideNavTooltip}
+            onFocus={(e) => showNavTooltip(t("nav.channels"), e.currentTarget)}
+            onBlur={hideNavTooltip}
           >
             <NavChannels size={ICON.lg} />
             <span className="sidenav-label sr-only">{t("nav.channels")}</span>
-            <span className="sidenav-badge" aria-hidden="true">{t("nav.coming_soon_short")}</span>
-          </span>
+          </a>
           {isAdmin ? (
             <a
-              className={`sidenav-btn sidenav-overflow-item ${route === "admin" ? "active" : ""}`}
+              className={`sidenav-btn sidenav-secondary-item sidenav-overflow-item ${route === "admin" ? "active" : ""}`}
               data-nav="admin"
               href={hrefForRoute("admin")}
               aria-label={t("nav.admin")}
@@ -550,11 +546,46 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
           aria-label={t("nav.more_label")}
           style={{ top: moreMenu.y, left: moreMenu.x }}
         >
-          <span className="sidenav-more-item" role="menuitem" aria-disabled="true">
+          <a
+            className={`sidenav-more-item ${route === "routine" ? "active" : ""}`}
+            role="menuitem"
+            href={hrefForRoute("routine")}
+            aria-current={route === "routine" ? "page" : undefined}
+            onClick={(event) => handleRouteClick(event, "routine")}
+          >
+            <NavRoutine size={ICON.md} />
+            <span>{t("nav.routine")}</span>
+          </a>
+          <a
+            className={`sidenav-more-item ${route === "teams" ? "active" : ""}`}
+            role="menuitem"
+            href={hrefForRoute("teams")}
+            aria-current={route === "teams" ? "page" : undefined}
+            onClick={(event) => handleRouteClick(event, "teams")}
+          >
+            <NavTeams size={ICON.md} />
+            <span>{t("nav.teams")}</span>
+          </a>
+          <a
+            className={`sidenav-more-item ${route === "computer" ? "active" : ""}`}
+            role="menuitem"
+            href={hrefForRoute("computer")}
+            aria-current={route === "computer" ? "page" : undefined}
+            onClick={(event) => handleRouteClick(event, "computer")}
+          >
+            <NavComputer size={ICON.md} />
+            <span>{t("nav.computer")}</span>
+          </a>
+          <a
+            className={`sidenav-more-item ${route === "channels" ? "active" : ""}`}
+            role="menuitem"
+            href={hrefForRoute("channels")}
+            aria-current={route === "channels" ? "page" : undefined}
+            onClick={(event) => handleRouteClick(event, "channels")}
+          >
             <NavChannels size={ICON.md} />
             <span>{t("nav.channels")}</span>
-            <span className="sidenav-badge" aria-hidden="true">{t("nav.coming_soon_short")}</span>
-          </span>
+          </a>
           {isAdmin ? (
             <a
               className={`sidenav-more-item ${route === "admin" ? "active" : ""}`}

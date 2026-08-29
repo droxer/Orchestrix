@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useEmployeeAgents } from "../../hooks/useEmployeeAgents";
 import { useRelayMutations } from "../../hooks/useRelayMutations";
@@ -27,6 +27,7 @@ export function TeamDrawer({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const leadLabelId = useId();
   const { confirm } = useDialogs();
   const { createTeamMutation, updateTeamMutation, deleteTeamMutation } = useRelayMutations();
   const [name, setName] = useState("");
@@ -195,6 +196,7 @@ export function TeamDrawer({
         </fieldset>
         <Field
           label={t("teams.lead")}
+          labelId={leadLabelId}
           wrapper="div"
           error={validationError === "lead" ? t("teams.lead_required") : undefined}
           errorId="team-lead-error"
@@ -206,6 +208,7 @@ export function TeamDrawer({
             <SelectTrigger
               ref={leadRef}
               className="w-full"
+              aria-labelledby={leadLabelId}
               aria-invalid={validationError === "lead" || undefined}
               aria-describedby={validationError === "lead" ? "team-lead-error" : undefined}
             >

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { createControlPanelEmployee } from "../../api";
 import { initialsOf } from "../../lib/adminHelpers";
@@ -47,6 +47,7 @@ export function AddEmployeeDrawer({
   onSuccess,
 }: AddEmployeeDrawerProps) {
   const { t } = useTranslation();
+  const nodeLabelId = useId();
 
   const [employeeId, setEmployeeId] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -329,12 +330,12 @@ export function AddEmployeeDrawer({
           {unassignedNodes.length === 0 ? (
             <p className="adm-form-hint adm-form-hint--notice">{t("admin.unassigned_hint")}</p>
           ) : (
-            <Field label={t("admin.assign_node")} wrapper="div">
+            <Field label={t("admin.assign_node")} labelId={nodeLabelId} wrapper="div">
               <Select
                 value={selectedNodeId || null}
                 onValueChange={(value) => setSelectedNodeId(value ?? "")}
               >
-                <SelectTrigger className="w-full code">
+                <SelectTrigger className="w-full code" aria-labelledby={nodeLabelId}>
                   <SelectValue placeholder={t("admin.select_node")} />
                 </SelectTrigger>
                 <SelectContent>

@@ -707,6 +707,7 @@
       "dash_coming_soon_tag": "即将上线",
       "dash_sessions_title": "对话趋势 · 近 14 天",
       "dash_sessions_hint": "单日峰值 {{count}}。",
+      "dash_sessions_empty": "近 14 天暂无对话。",
       "dash_tokens_title": "Token 用量",
       "dash_tokens_empty": "尚无 Token 用量上报。",
       "dash_tokens_summary": "输出 {{output}} · 输入 {{input}} · 缓存 {{cache}}",

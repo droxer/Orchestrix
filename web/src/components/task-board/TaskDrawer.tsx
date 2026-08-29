@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -222,9 +222,10 @@ type TaskDrawerProps = {
 
 function BacklogFields({ form, onChange }: { form: BacklogTaskFormState; onChange: (next: TaskBoardFormState) => void }) {
   const { t } = useTranslation();
+  const statusLabelId = useId();
   return (
     <>
-      <Field label={t("backlog.status")}>
+      <Field label={t("backlog.status")} labelId={statusLabelId} wrapper="div">
         <Select
           value={form.status}
           onValueChange={(value) => {
@@ -232,7 +233,7 @@ function BacklogFields({ form, onChange }: { form: BacklogTaskFormState; onChang
             onChange({ ...form, status: value as TaskStatus })
           }}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger className="w-full" aria-labelledby={statusLabelId}>
             <SelectValue>{(value: TaskStatus) => t(`backlog.statuses.${value}`)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -256,9 +257,11 @@ function BacklogFields({ form, onChange }: { form: BacklogTaskFormState; onChang
 
 function RoutineFields({ form, onChange }: { form: RoutineTaskFormState; onChange: (next: TaskBoardFormState) => void }) {
   const { t } = useTranslation();
+  const typeLabelId = useId();
+  const cadenceLabelId = useId();
   return (
     <>
-      <Field label={t("routine.type")}>
+      <Field label={t("routine.type")} labelId={typeLabelId} wrapper="div">
         <Select
           value={form.routineType}
           onValueChange={(value) => {
@@ -266,7 +269,7 @@ function RoutineFields({ form, onChange }: { form: RoutineTaskFormState; onChang
             onChange({ ...form, routineType: value as TaskRoutineType })
           }}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger className="w-full" aria-labelledby={typeLabelId}>
             <SelectValue>{(value: TaskRoutineType) => t(`routine.types.${value}`)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -276,7 +279,7 @@ function RoutineFields({ form, onChange }: { form: RoutineTaskFormState; onChang
           </SelectContent>
         </Select>
       </Field>
-      <Field label={t("routine.cadence")}>
+      <Field label={t("routine.cadence")} labelId={cadenceLabelId} wrapper="div">
         <Select
           value={form.routineCadence}
           onValueChange={(value) => {
@@ -291,7 +294,7 @@ function RoutineFields({ form, onChange }: { form: RoutineTaskFormState; onChang
             })
           }}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger className="w-full" aria-labelledby={cadenceLabelId}>
             <SelectValue>{(value: TaskRoutineCadence) => t(`routine.cadences.${value}`)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -338,6 +341,7 @@ export function TaskDrawer({
   meta,
 }: TaskDrawerProps) {
   const { t } = useTranslation();
+  const priorityLabelId = useId();
   const fieldPrefix = form.variant;
   const assignmentFieldId = `${fieldPrefix}-assignment`;
   const assignmentSummaryId = `${fieldPrefix}-assignment-summary`;
@@ -430,7 +434,7 @@ export function TaskDrawer({
         <div className="task-drawer-form-grid">
           {form.variant === "routine" ? <RoutineFields form={form} onChange={onChange} /> : null}
           {form.variant === "backlog" ? <BacklogFields form={form} onChange={onChange} /> : null}
-          <Field label={t("backlog.priority")} wrapper="div">
+          <Field label={t("backlog.priority")} labelId={priorityLabelId} wrapper="div">
             <Select
               value={form.priority}
               onValueChange={(value) => {
@@ -438,7 +442,7 @@ export function TaskDrawer({
                 updateBase({ priority: value as TaskPriority })
               }}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full" aria-labelledby={priorityLabelId}>
                 <SelectValue>{(value: TaskPriority) => t(`backlog.priorities.${value}`)}</SelectValue>
               </SelectTrigger>
               <SelectContent>

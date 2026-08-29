@@ -11,6 +11,7 @@ import { AgentMark } from "./AgentMark";
 import {
   ActionAdd,
   ICON,
+  NavBack,
 } from "./icons";
 import { StatusPill, TonePill } from "./StatusPill";
 import { AgentDetailPage } from "./AgentDetailPage";
@@ -30,6 +31,7 @@ interface AgentsPageProps {
   /** The agent currently inspected in the detail pane, driven by the pathname. */
   detailAgent: EmployeeAgent | null;
   onOpenAgent: (agent: EmployeeAgent) => void;
+  onBackToAgents: () => void;
   onOpenThread: (sessionId: string) => void;
 }
 
@@ -222,6 +224,7 @@ export function AgentsPage({
   currentUser,
   detailAgent,
   onOpenAgent,
+  onBackToAgents,
   onOpenThread,
 }: AgentsPageProps) {
   const { t } = useTranslation();
@@ -299,6 +302,7 @@ export function AgentsPage({
     <section
       id="agents-panel"
       className="agents-page"
+      data-view={detailAgent ? "detail" : "list"}
       aria-label={t("agents_page.title")}
       tabIndex={-1}
     >
@@ -367,13 +371,24 @@ export function AgentsPage({
 
       <div className="agents-detail">
         {detailAgent ? (
-          <AgentDetailPage
-            key={detailAgent.id}
-            agent={detailAgent}
-            onOpenThread={onOpenThread}
-            canEditMeta
-            onProfileDirtyChange={handleProfileDirtyChange}
-          />
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              className="agents-mobile-back"
+              onClick={onBackToAgents}
+            >
+              <NavBack size={ICON.sm} aria-hidden="true" />
+              {t("agents_page.title")}
+            </Button>
+            <AgentDetailPage
+              key={detailAgent.id}
+              agent={detailAgent}
+              onOpenThread={onOpenThread}
+              canEditMeta
+              onProfileDirtyChange={handleProfileDirtyChange}
+            />
+          </>
         ) : (
           <RelayEmptyState
             fill

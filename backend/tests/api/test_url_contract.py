@@ -144,7 +144,15 @@ def test_spa_fallback_is_allowlisted_and_never_masks_api_typos(
     assert direct_web_route.status_code == 200
     assert direct_web_route.text == "<html>relay-spa</html>"
 
-    for path in ("/agents", "/agents/agent_123", "/teams", "/teams/team_123"):
+    for path in (
+        "/agents",
+        "/agents/agent_123",
+        "/computer",
+        "/projects",
+        "/projects/project_123",
+        "/teams",
+        "/teams/team_123",
+    ):
         browser_route = client.get(path, headers={"accept": "text/html"})
         assert browser_route.status_code == 200
         assert browser_route.text == "<html>relay-spa</html>"

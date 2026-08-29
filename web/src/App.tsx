@@ -1006,6 +1006,7 @@ export function App() {
             currentUser={user}
             detailAgent={detailAgent}
             onOpenAgent={openAgentDetail}
+            onBackToAgents={() => navigateToAgent(null)}
             onOpenThread={openThread}
           />
         ) : route === "computer" ? (

@@ -110,7 +110,7 @@ export function useAppRouter({
     syncAppStateToUrl(state, replace);
   }, []);
 
-  const navigateToAgent = useCallback((agentId: string) => {
+  const navigateToAgent = useCallback((agentId: string | null) => {
     navigateToAppState({ route: "agents", mobileView: "chat", sessionId: null, agentId });
   }, [navigateToAppState]);
 

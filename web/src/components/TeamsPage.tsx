@@ -11,6 +11,7 @@ import type { CurrentUser } from "../types";
 import {
   ActionAdd,
   ICON,
+  NavBack,
 } from "./icons";
 import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
@@ -69,7 +70,13 @@ export function TeamsPage({
   }, [selectedTeam?.id]);
 
   return (
-    <section id="teams-panel" className="teams-page" aria-label={t("teams.title")} tabIndex={-1}>
+    <section
+      id="teams-panel"
+      className="teams-page"
+      data-view={selectedTeam ? "detail" : "list"}
+      aria-label={t("teams.title")}
+      tabIndex={-1}
+    >
       <div className="teams-roster">
         <PageHeader
           kicker={t("nav.workforce")}
@@ -185,13 +192,24 @@ export function TeamsPage({
 
       <div className="teams-detail">
         {selectedTeam ? (
-          <TeamWorkspacePage
-            key={selectedTeam.id}
-            team={selectedTeam}
-            employeeId={currentUser.employeeId}
-            onOpenThread={onOpenThread}
-            onDeleted={() => onSelectTeam(null)}
-          />
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              className="teams-mobile-back"
+              onClick={() => onSelectTeam(null)}
+            >
+              <NavBack size={ICON.sm} aria-hidden="true" />
+              {t("teams.title")}
+            </Button>
+            <TeamWorkspacePage
+              key={selectedTeam.id}
+              team={selectedTeam}
+              employeeId={currentUser.employeeId}
+              onOpenThread={onOpenThread}
+              onDeleted={() => onSelectTeam(null)}
+            />
+          </>
         ) : (
           <RelayEmptyState fill mark title={t("teams.select_title")} body={t("teams.select_body")} />
         )}

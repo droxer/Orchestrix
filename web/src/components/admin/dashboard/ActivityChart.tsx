@@ -10,16 +10,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-
-interface DailyPoint {
-  date: string;
-  count: number;
-  completed: number;
-  failed: number;
-}
+import { activityChartMetrics, type ActivityChartPoint } from "@/lib/activityChart";
 
 interface ActivityChartProps {
-  daily: DailyPoint[];
+  daily: ActivityChartPoint[];
   ready: boolean;
   className?: string;
 }
@@ -33,7 +27,7 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
   const lineRef = useRef<SVGPathElement>(null);
   const [lineLength, setLineLength] = useState(0);
 
-  const { areaPath, linePath, gridLines, xTicks, yTicks, max } = useMemo(() => {
+  const { areaPath, linePath, gridLines, xTicks, dataPeak } = useMemo(() => {
     const points = (daily?.length ?? 0) > 0 ? daily! : Array.from({ length: 14 }, (_, i) => ({
       date: `d${i}`,
       count: 0,
@@ -43,12 +37,12 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
 
     const innerW = WIDTH - PADDING.left - PADDING.right;
     const innerH = HEIGHT - PADDING.top - PADDING.bottom;
-    const max = Math.max(...points.map((p) => p.count), 4);
+    const { dataPeak, scaleMax } = activityChartMetrics(daily);
     const step = innerW / Math.max(points.length - 1, 1);
 
     const coords = points.map((p, i) => {
       const x = PADDING.left + i * step;
-      const y = PADDING.top + innerH - (p.count / max) * innerH;
+      const y = PADDING.top + innerH - (p.count / scaleMax) * innerH;
       return { x, y };
     });
 
@@ -65,10 +59,6 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
       ` L ${last.x.toFixed(1)} ${baselineY.toFixed(1)} Z`;
 
     const gridLines = [0, 0.25, 0.5, 0.75, 1].map((f) => PADDING.top + innerH - f * innerH);
-    const yTicks = [0, 0.5, 1].map((f) => ({
-      y: PADDING.top + innerH - f * innerH,
-      value: Math.round(f * max),
-    }));
     const tickIndices = points.length > 7 ? [0, Math.floor(points.length / 2), points.length - 1] : points.map((_, i) => i);
     const xTicks = tickIndices.map((i) => {
       const c = coords[i];
@@ -76,7 +66,7 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
       return { x: c.x, label };
     });
 
-    return { areaPath, linePath, gridLines, xTicks, yTicks, max };
+    return { areaPath, linePath, gridLines, xTicks, dataPeak };
   }, [daily, i18n.language]);
 
   useEffect(() => {
@@ -125,36 +115,10 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
           className="adm-dash-chart-line"
           style={lineLength > 0 ? { "--chart-path-length": `${lineLength}px` } as CSSProperties : undefined}
         />
-        {yTicks.map((tick) => (
-          <text
-            key={tick.value}
-            x={PADDING.left - 8}
-            y={tick.y + 3}
-            style={{ fontSize: 'var(--fs-1)' }}
-            textAnchor="end"
-            fill="var(--ink-4)"
-            fontFamily="var(--font-sans)"
-          >
-            {tick.value}
-          </text>
-        ))}
-        {xTicks.map((tick, i) => (
-          <text
-            key={i}
-            x={tick.x}
-            y={HEIGHT - 8}
-            style={{ fontSize: 'var(--fs-1)' }}
-            /* The end ticks sit ON the plot edges, so a centred label there
-               overhangs the viewBox and is clipped — the last date rendered as
-               "Aug 2". Anchor the outer two inward; the rest stay centred. */
-            textAnchor={i === 0 ? "start" : i === xTicks.length - 1 ? "end" : "middle"}
-            fill="var(--ink-4)"
-            fontFamily="var(--font-sans)"
-          >
-            {tick.label}
-          </text>
-        ))}
       </svg>
+      <div className="adm-dash-chart-axis" aria-hidden="true">
+        {xTicks.map((tick) => <span key={`${tick.x}-${tick.label}`}>{tick.label}</span>)}
+      </div>
       {(daily?.length ?? 0) > 0 ? (
         <ul className="sr-only">
           {daily.map((point) => (
@@ -166,7 +130,11 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
       ) : null}
       <CardFooter className="border-t">
         <CardDescription render={<span />}>
-          {ready ? t("admin.v2.dash_sessions_hint", { count: max }) : t("admin.v2.dash_loading")}
+          {ready
+            ? dataPeak > 0
+              ? t("admin.v2.dash_sessions_hint", { count: dataPeak })
+              : t("admin.v2.dash_sessions_empty")
+            : t("admin.v2.dash_loading")}
         </CardDescription>
       </CardFooter>
     </Card>

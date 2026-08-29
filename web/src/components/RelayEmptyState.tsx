@@ -1,6 +1,5 @@
 import { useId, type ElementType, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { RelayDoodleNotes } from "./marginalia";
 
 type RelayEmptyStateProps = {
   title: string;
@@ -16,9 +15,7 @@ type RelayEmptyStateProps = {
   headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
   mark?: boolean;
   fill?: boolean;
-  /** Field-notes vignette sketched in a corner of the empty state. Defaults
-   *  to RelayDoodleNotes; pass another doodle from marginalia.tsx to vary it,
-   *  or null for a surface too tight to host one. */
+  /** Optional field-notes vignette sketched in a corner of a roomy surface. */
   marginalia?: ReactNode | null;
 };
 
@@ -52,11 +49,11 @@ export function RelayEmptyState({
       {mark ? (
         <span className="relay-bleed-mark" aria-hidden="true">R</span>
       ) : null}
-      {marginalia === null ? null : (
+      {marginalia ? (
         <span className="relay-empty-marginalia" aria-hidden="true">
-          {marginalia ?? <RelayDoodleNotes />}
+          {marginalia}
         </span>
-      )}
+      ) : null}
       {illustration ? (
         <div className="relay-empty-illustration" aria-hidden="true">
           {illustration}
