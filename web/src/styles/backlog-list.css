@@ -589,3 +589,78 @@
   padding: var(--sp-1) var(--sp-3);
   border-bottom: 0.5px solid var(--line-2);
 }
+
+/* ── Batch selection ───────────────────────────────────────────────── */
+
+/* Declared once for the header cell and the row cell, like every other column
+   above — the box is 16px, the checkbox's own size. */
+.backlog-rows-head-select,
+.backlog-row-select-cell {
+  flex: none;
+  width: 16px;
+  display: flex;
+  align-items: center;
+}
+
+/* The checkbox is a secondary control: it always holds its column so nothing
+   shifts when a selection starts, but it only paints once the pointer is on
+   the record, the box has focus, or the record is already picked. Gated on a
+   hover-capable pointer — a touch device has no hover to reveal it with, so
+   there the box is simply always visible. */
+@media (hover: hover) {
+  .backlog-row .backlog-select-box:not([data-checked]):not(:focus-visible),
+  .backlog-task .backlog-select-box:not([data-checked]):not(:focus-visible) {
+    opacity: 0;
+  }
+
+  .backlog-row:hover .backlog-select-box,
+  .backlog-row:focus-within .backlog-select-box,
+  .backlog-task:hover .backlog-select-box,
+  .backlog-task:focus-within .backlog-select-box {
+    opacity: 1;
+  }
+}
+
+.backlog-row[data-selected="true"] {
+  background: var(--row-hover);
+}
+
+/* The card floats on the lane rather than sitting in a table, so its selected
+   state is carried by the action ring, not by a row wash. */
+.backlog-task[data-selected="true"] {
+  box-shadow: inset 0 0 0 1px var(--action);
+}
+
+/* Floating, not docked into the page header: the header keeps its create and
+   refresh actions reachable while a selection is live, and the record list
+   does not reflow the moment the first checkbox is ticked. */
+.task-selection-bar {
+  position: fixed;
+  left: 50%;
+  bottom: max(env(safe-area-inset-bottom), var(--sp-5));
+  z-index: var(--z-float);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  max-width: calc(100vw - var(--sp-8));
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
+  border: 0.5px solid var(--line-1);
+  border-radius: var(--r-3);
+  background: var(--surface-3);
+  box-shadow: var(--shadow-2);
+}
+
+.task-selection-count {
+  margin: 0;
+  color: var(--ink-1);
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
+  white-space: nowrap;
+}
+
+.task-selection-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}

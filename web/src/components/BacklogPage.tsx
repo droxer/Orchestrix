@@ -59,6 +59,16 @@ import {
 } from "./task-board/backlogVocabulary";
 import { BacklogStats, BacklogFiltersBar, BacklogViewToggle } from "./task-board/BacklogChrome";
 import { BacklogTaskCard, BacklogTaskRow } from "./task-board/BacklogRecords";
+import { TaskSelectAllCheckbox, TaskSelectionBar } from "./task-board/TaskSelection";
+import {
+  EMPTY_TASK_SELECTION,
+  pruneSelection,
+  selectedTasks,
+  selectionCheckState,
+  toggleAllSelected,
+  toggleSelected,
+  type TaskSelection,
+} from "../lib/taskSelection";
 
 
 
@@ -89,6 +99,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     updateTaskMutation,
     createTaskMutation,
     deleteTaskMutation,
+    deleteTasksMutation,
   } = useRelayMutations();
   const [filters, setFilters] = useState(initialFilters);
   const [view, setView] = useState<BacklogView>(() => parseBacklogView(null));
@@ -98,6 +109,8 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   const [assignmentFocus, setAssignmentFocus] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [selection, setSelection] = useState<TaskSelection>(EMPTY_TASK_SELECTION);
+  const [deletingSelection, setDeletingSelection] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dropLane, setDropLane] = useState<TaskStatus | null>(null);
   // The lane whose inline create field is open, if any. Also the target
@@ -125,6 +138,12 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   const grouped = useMemo(() => tasksByStatus(filteredTasks), [filteredTasks]);
   const hasFilterResults = filteredTasks.length > 0;
   const showEmptyBoard = backlogTasks.length === 0 || !hasFilterResults;
+  const visibleIds = useMemo(() => filteredTasks.map((task) => task.id), [filteredTasks]);
+  // Derived, not stored: a task hidden by a filter (or deleted elsewhere) drops
+  // out of the selection immediately, so a batch action can never reach a
+  // record the board is no longer showing.
+  const visibleSelection = useMemo(() => pruneSelection(selection, visibleIds), [selection, visibleIds]);
+  const selectedCount = visibleSelection.size;
   const draggedTask = useMemo(
     () => (draggedTaskId ? backlogTasks.find((task) => task.id === draggedTaskId) ?? null : null),
     [backlogTasks, draggedTaskId],
@@ -244,6 +263,37 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
       // mutation onError surfaces a toast; keep the drawer open for retry.
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function deleteSelectedTasks() {
+    const targets = selectedTasks(filteredTasks, visibleSelection);
+    if (targets.length === 0 || deletingSelection) return;
+    const confirmed = await confirm({
+      title: t("backlog.bulk_delete_title", { count: targets.length }),
+      message: t("backlog.bulk_delete_body", { count: targets.length }),
+      confirmLabel: t("backlog.delete_selected"),
+      cancelLabel: t("dialog.cancel"),
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    setDeletingSelection(true);
+    try {
+      const { succeeded } = await deleteTasksMutation.mutateAsync({ taskIds: targets.map((task) => task.id) });
+      // Only the records that actually went are dropped from the selection —
+      // whatever refused stays checked so a retry needs no re-picking.
+      setSelection((current) => {
+        const next = new Set(current);
+        for (const id of succeeded) next.delete(id);
+        return next;
+      });
+      if (succeeded.length > 0) {
+        announce({ message: t("backlog.toast_bulk_deleted", { count: succeeded.length }), tone: "success" });
+      }
+    } catch {
+      // mutation onError surfaces a toast; the selection stays put for a retry.
+    } finally {
+      setDeletingSelection(false);
     }
   }
 
@@ -421,6 +471,13 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
       ) : view === "list" ? (
         <div className="backlog-rows" role="table" data-density="compact" aria-label={t("backlog.title")}>
           <div className="backlog-rows-head" role="row">
+            <span className="backlog-rows-head-cell backlog-rows-head-select" role="columnheader">
+              <TaskSelectAllCheckbox
+                state={selectionCheckState(visibleSelection, visibleIds)}
+                label={t("backlog.select_all_tasks")}
+                onToggle={() => setSelection((current) => toggleAllSelected(current, visibleIds))}
+              />
+            </span>
             <span className="backlog-rows-head-cell backlog-rows-head-dot" role="columnheader" />
             <span className="backlog-rows-head-cell backlog-rows-head-lead" role="columnheader">{t("backlog.col_task")}</span>
             <span className="backlog-rows-head-cell backlog-rows-head-status" role="columnheader">{t("backlog.status")}</span>
@@ -444,6 +501,8 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
               <BacklogTaskRow
                 key={task.id}
                 task={task}
+                selected={visibleSelection.has(task.id)}
+                onToggleSelect={() => setSelection((current) => toggleSelected(current, task.id))}
                 assigneeDisplayName={taskAssigneeDisplayName(task, currentUser, employeeNames)}
                 assigneeIsSelf={isTaskAssigneeCurrentUser(task, currentUser)}
                 agentDisplayName={assignment.name}
@@ -488,6 +547,8 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
                     <BacklogTaskCard
                       key={task.id}
                       task={task}
+                      selected={visibleSelection.has(task.id)}
+                      onToggleSelect={() => setSelection((current) => toggleSelected(current, task.id))}
                       session={session}
                       assigneeDisplayName={taskAssigneeDisplayName(task, currentUser, employeeNames)}
                       assigneeIsSelf={isTaskAssigneeCurrentUser(task, currentUser)}
@@ -531,6 +592,14 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
           {draggedTask.title}
         </span>
       ) : null}
+
+      <TaskSelectionBar
+        count={selectedCount}
+        deleting={deletingSelection}
+        deleteLabel={t("backlog.delete_selected")}
+        onDelete={() => { void deleteSelectedTasks(); }}
+        onClear={() => setSelection(EMPTY_TASK_SELECTION)}
+      />
 
       {form ? (
         <TaskDrawer

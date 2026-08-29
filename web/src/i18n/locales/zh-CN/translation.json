@@ -363,7 +363,20 @@
     "delete_title": "删除任务？",
     "delete_body": "“{{title}}”将从待办中移除，关联的话题、产物和运行历史仍会保留。",
     "toast_deleted": "任务已删除。",
-    "inline_title_placeholder": "任务标题…"
+    "inline_title_placeholder": "任务标题…",
+    "selection": "已选任务",
+    "select_task": "选择{{title}}",
+    "select_all_tasks": "全选任务",
+    "selected_one": "已选 {{count}} 个任务",
+    "selected_other": "已选 {{count}} 个任务",
+    "clear_selection": "清除选择",
+    "delete_selected": "删除所选",
+    "bulk_delete_title_one": "删除 {{count}} 个任务？",
+    "bulk_delete_title_other": "删除 {{count}} 个任务？",
+    "bulk_delete_body_one": "所选的 {{count}} 个任务将从待办中移除，关联的话题、产物和运行历史仍会保留。",
+    "bulk_delete_body_other": "所选的 {{count}} 个任务将从待办中移除，关联的话题、产物和运行历史仍会保留。",
+    "toast_bulk_deleted_one": "已删除 {{count}} 个任务。",
+    "toast_bulk_deleted_other": "已删除 {{count}} 个任务。"
   },
   "workspace": {
     "title": "工作区",
@@ -588,7 +601,16 @@
     "deleting": "正在删除…",
     "delete_title": "删除例行任务？",
     "delete_body": "将删除“{{title}}”及其计划，并且不会再次运行。已有执行记录和话题仍会保留。",
-    "toast_deleted": "例行任务已删除。"
+    "toast_deleted": "例行任务已删除。",
+    "select_routine": "选择{{title}}",
+    "select_all_routines": "全选例行任务",
+    "delete_selected": "删除所选",
+    "bulk_delete_title_one": "删除 {{count}} 个例行任务？",
+    "bulk_delete_title_other": "删除 {{count}} 个例行任务？",
+    "bulk_delete_body_one": "将删除所选的 {{count}} 个例行任务及其计划，并且不会再次运行。已有执行记录和话题仍会保留。",
+    "bulk_delete_body_other": "将删除所选的 {{count}} 个例行任务及其计划，并且不会再次运行。已有执行记录和话题仍会保留。",
+    "toast_bulk_deleted_one": "已删除 {{count}} 个例行任务。",
+    "toast_bulk_deleted_other": "已删除 {{count}} 个例行任务。"
   },
   "admin": {
     "title": "管理",
