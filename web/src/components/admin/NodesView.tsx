@@ -15,9 +15,17 @@ import { SearchInput } from "@/components/ui/search-input";
 import { canUseLocalControlPanel } from "../../lib/controlPanel";
 import {
   matchesNodeQuickFilter,
+  nodeSortColumns,
   stableNodeOrder,
   type NodeQuickFilter,
 } from "../../lib/adminHelpers";
+import { applySort } from "../../lib/listSort";
+import { paginate } from "../../lib/pagination";
+import { usePagination } from "../../hooks/usePagination";
+import { Pagination } from "@/components/ui/Pagination";
+import { useListSort } from "../../hooks/useListSort";
+import { SortableColumnHeader } from "@/components/ui/SortableColumnHeader";
+import { SortMenu } from "@/components/ui/SortMenu";
 import type { StoredNodeTokenMap } from "./helpers";
 import { NodeCard } from "./NodeCard";
 import { NodeRow } from "./NodeRow";
@@ -86,9 +94,15 @@ export function NodesView({ nodes, employees, storedTokens, layout, onLayoutChan
     return result;
   }, [nodes]);
 
+  const sortColumns = useMemo(() => nodeSortColumns(employeeById), [employeeById]);
+  // A distinct param: the admin page keeps Nodes and Employees on one route,
+  // so a bare `sort` would have the two tables fighting over one key.
+  const { sort, toggleSort, setSort } = useListSort(sortColumns, "nodeSort");
+  const { page, setPage } = usePagination("nodePage");
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return stableNodeOrder(nodes).filter((node) => {
+    const matching = stableNodeOrder(nodes).filter((node) => {
       if (!matchesNodeQuickFilter(node, filter)) return false;
       if (!q) return true;
       const employee = (node.employeeId && employeeById.get(node.employeeId)) ?? null;
@@ -105,7 +119,13 @@ export function NodesView({ nodes, employees, storedTokens, layout, onLayoutChan
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [nodes, filter, query, employeeById]);
+    // Unsorted, `stableNodeOrder` above still decides — applySort is identity.
+    return applySort(matching, sortColumns, sort);
+  }, [nodes, filter, query, employeeById, sort, sortColumns]);
+
+  // One cursor for both layouts: switching card/list keeps the reader on the
+  // same machines rather than resetting them to the top of the fleet.
+  const paged = paginate(filtered, page);
 
   return (
     <div className="adm-view">
@@ -128,6 +148,18 @@ export function NodesView({ nodes, employees, storedTokens, layout, onLayoutChan
             );
           })}
         </div>
+        {/* Sits with the layout toggle, not inside the filter chips: at the
+            widths it appears, it is the only way to sort at all. */}
+        <SortMenu
+          options={[
+                  { key: "node", label: t("admin.v2.col_node") },
+                  { key: "employee", label: t("admin.v2.col_employee") },
+                  { key: "runtimes", label: t("admin.v2.node_runtimes"), defaultDirection: "desc" as const },
+        ]}
+          sort={sort}
+          onSortChange={setSort}
+          label={t("admin.v2.nav_nodes")}
+        />
         <AdminLayoutToggle layout={layout} onChange={onLayoutChange} />
       </div>
 
@@ -155,7 +187,7 @@ export function NodesView({ nodes, employees, storedTokens, layout, onLayoutChan
         />
       ) : layout === "card" ? (
         <div className="adm-fleet-grid">
-          {filtered.map((node) => {
+          {paged.items.map((node) => {
             const employee = node.employeeId ? employeeById.get(node.employeeId) : undefined;
             const employeeName = employee?.displayName;
             return (
@@ -177,13 +209,33 @@ export function NodesView({ nodes, employees, storedTokens, layout, onLayoutChan
       ) : (
         <div role="table" data-density="compact" aria-label={t("admin.v2.nav_nodes")}>
           <div className="adm-node-cols" role="row">
-            <span className="adm-col-label" role="columnheader">{t("admin.v2.col_node")}</span>
-            <span className="adm-col-label" role="columnheader">{t("admin.v2.col_employee")}</span>
-            <span className="adm-col-label" role="columnheader">{t("admin.v2.node_runtimes")}</span>
+            <SortableColumnHeader
+              className="adm-col-label"
+              label={t("admin.v2.col_node")}
+              sortKey="node"
+              sort={sort}
+              onSort={toggleSort}
+            />
+            <SortableColumnHeader
+              className="adm-col-label"
+              label={t("admin.v2.col_employee")}
+              sortKey="employee"
+              sort={sort}
+              onSort={toggleSort}
+            />
+            <SortableColumnHeader
+              className="adm-col-label"
+              label={t("admin.v2.node_runtimes")}
+              sortKey="runtimes"
+              sort={sort}
+              onSort={toggleSort}
+              defaultDirection="desc"
+            />
+            {/* Actions is not a column of data — there is nothing to order by. */}
             <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_actions")}</span>
           </div>
           <ul className="adm-node-list" role="rowgroup">
-            {filtered.map((node) => {
+            {paged.items.map((node) => {
               const employee = node.employeeId ? employeeById.get(node.employeeId) : undefined;
               const employeeName = employee?.displayName;
               return (
@@ -204,6 +256,10 @@ export function NodesView({ nodes, employees, storedTokens, layout, onLayoutChan
           </ul>
         </div>
       )}
+
+      {/* One pager under both layouts — it is the collection that is paged,
+          not the way the collection happens to be drawn. */}
+      <Pagination page={paged} onPageChange={setPage} label={t("admin.v2.nav_nodes")} />
     </div>
   );
 }

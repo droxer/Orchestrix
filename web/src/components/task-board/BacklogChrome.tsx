@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { type EmployeeAgent, type RelayTaskListItem } from "../../types";
 import {
@@ -79,6 +79,7 @@ export function formatDueDate(value: string): string {
   }).format(date);
 }
 export function BacklogFiltersBar({
+  sortMenu,
   filters,
   agents,
   onChange,
@@ -86,6 +87,8 @@ export function BacklogFiltersBar({
   filters: BacklogFilters;
   agents: EmployeeAgent[];
   onChange: (next: BacklogFilters) => void;
+  /** The narrow-width sort control; see SortMenu. */
+  sortMenu?: ReactNode;
 }) {
   const { t } = useTranslation();
 
@@ -98,6 +101,7 @@ export function BacklogFiltersBar({
       onQueryChange={(query) => onChange({ ...filters, query })}
       activeCount={activeFilterCount(filters)}
       onClear={() => onChange(initialFilters)}
+      trailing={sortMenu}
     >
       <FilterSelect
         name="backlog-status-filter"

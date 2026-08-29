@@ -62,6 +62,7 @@
 @import "./styles/backlog.css" layer(relay);
 @import "./styles/task-status.css" layer(relay);
 @import "./styles/task-drawer.css" layer(relay);
+@import "./styles/list-sort.css" layer(relay);
 @import "./styles/backlog-list.css" layer(relay);
 @import "./styles/agents.css" layer(relay);
 @import "./styles/teams.css" layer(relay);

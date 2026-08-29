@@ -137,6 +137,62 @@ describe("app pathname routes", () => {
     assert.equal(pathKeepsThreadSpaceParams("/backlog"), false);
   });
 
+  it("keeps the sort param on every path whose list has sortable column headers", () => {
+    // Same trap as the space panel above: a table that writes ?sort on a path
+    // that does not own it has the param canonicalized straight back out, so
+    // clicking a column header does nothing at all.
+    assert.equal(canonicalBrowserUrl("/backlog", "?sort=-due"), "/backlog?sort=-due");
+    assert.equal(canonicalBrowserUrl("/routines", "?sort=title"), "/routines?sort=title");
+    // The admin page keeps two tables on one path, so each owns its own key.
+    assert.equal(
+      canonicalBrowserUrl("/admin", "?employeeSort=-running&nodeSort=node"),
+      "/admin?employeeSort=-running&nodeSort=node",
+    );
+  });
+
+  it("keeps the page param on every path whose list pages", () => {
+    // Same trap as ?sort and ?space: unowned params are canonicalized straight
+    // back out, so the pager would advance its own highlight and show page 1.
+    assert.equal(canonicalBrowserUrl("/backlog", "?page=3"), "/backlog?page=3");
+    assert.equal(canonicalBrowserUrl("/routines", "?page=2"), "/routines?page=2");
+    assert.equal(canonicalBrowserUrl("/computer", "?page=2"), "/computer?page=2");
+    assert.equal(
+      canonicalBrowserUrl("/admin", "?employeePage=2&nodePage=4"),
+      "/admin?employeePage=2&nodePage=4",
+    );
+  });
+
+  it("keeps sort and page together, since a reader sets both", () => {
+    assert.equal(canonicalBrowserUrl("/backlog", "?sort=-due&page=2"), "/backlog?sort=-due&page=2");
+  });
+
+  it("drops a page param that is not a positive integer", () => {
+    // parsePageParam would floor these to 1 anyway; dropping them keeps the
+    // URL from advertising a page that is not being shown.
+    assert.equal(canonicalBrowserUrl("/backlog", "?page=0"), "/backlog");
+    assert.equal(canonicalBrowserUrl("/backlog", "?page=-2"), "/backlog");
+    assert.equal(canonicalBrowserUrl("/backlog", "?page=nope"), "/backlog");
+    assert.equal(canonicalBrowserUrl("/backlog", "?page=1.5"), "/backlog");
+    // Page 1 is the default and carries no param.
+    assert.equal(canonicalBrowserUrl("/backlog", "?page=1"), "/backlog");
+  });
+
+  it("keeps the board's per-lane pages, which only /backlog has", () => {
+    assert.equal(canonicalBrowserUrl("/backlog", "?lanes=running:2"), "/backlog?lanes=running%3A2");
+    assert.equal(canonicalBrowserUrl("/routines", "?lanes=running:2"), "/routines");
+  });
+
+  it("drops a page param on a path with no paged list", () => {
+    assert.equal(canonicalBrowserUrl("/threads", "?page=2"), "/threads");
+    assert.equal(canonicalBrowserUrl("/backlog", "?nodePage=2"), "/backlog");
+  });
+
+  it("drops a sort param on a path with no sortable table", () => {
+    assert.equal(canonicalBrowserUrl("/threads", "?sort=-due"), "/threads");
+    assert.equal(canonicalBrowserUrl("/backlog", "?nodeSort=node"), "/backlog");
+    assert.equal(canonicalBrowserUrl("/admin", "?sort=-due"), "/admin");
+  });
+
   it("keeps the open space panel when a state change stays on the same thread", () => {
     const onThread = {
       route: "main" as const,
