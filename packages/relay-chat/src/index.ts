@@ -18,6 +18,7 @@ export {
 export {
   RelayChatClient,
   normalizeBaseUrl,
+  idleReconnectDelayMs,
   parseSseRelayEvent,
   type RelayChatClientOptions,
 } from "./relay-client.js";
