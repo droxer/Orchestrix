@@ -13,6 +13,7 @@ import {
   ansi,
   emitOrPrint,
   getAgent,
+  agentCredentialEnv,
   guestAgentEnv,
   hostWorkspaceOwner,
   hostWorkspacePath,
@@ -77,7 +78,11 @@ export async function ensureAgentReady(
   }
   // Skills are shared across every agent under ~/.claude/skills.
   await executionManager.prepareAgentSkills(signal);
-  const result = await executionManager.runShell(def.preflight.command(), signal);
+  const result = await executionManager.runShell(
+    def.preflight.command(),
+    signal,
+    Object.fromEntries(agentCredentialEnv(agent)),
+  );
   if (result.exit_code !== 0) {
     const detail = (result.stderr || result.stdout).trim();
     throw new Error(`${def.preflight.label} preflight failed. ${detail}`);

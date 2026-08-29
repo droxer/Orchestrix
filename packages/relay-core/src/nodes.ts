@@ -1,6 +1,7 @@
 import { getAgent } from "./agents.js";
 import { StderrLineRenderer } from "./renderers.js";
 import {
+  agentCredentialEnv,
   agentWorkspacePath,
 } from "./guest.js";
 import {
@@ -16,7 +17,17 @@ import { CodexCollaborationStream } from "./codex-collaboration.js";
 // output events are incomplete. A small tail cap drops the head of the stream,
 // which renders as the reply's first characters going missing, so keep the
 // budget generous; override with RELAY_AGENT_RESULT_LOG_LIMIT when needed.
-const AGENT_RESULT_LOG_LIMIT = Number(process.env.RELAY_AGENT_RESULT_LOG_LIMIT) || 262_144;
+const DEFAULT_AGENT_TRANSCRIPT_LIMIT = 262_144;
+
+/**
+ * Byte budget for retained agent transcript text, read at call time so tests
+ * and operators can widen it. Every layer that truncates a transcript honors
+ * this same number — the daemon's live stream capture as well as the log built
+ * here — because a lower cap upstream would silently defeat raising it.
+ */
+export function agentTranscriptLimit(): number {
+  return Number(process.env.RELAY_AGENT_RESULT_LOG_LIMIT) || DEFAULT_AGENT_TRANSCRIPT_LIMIT;
+}
 
 /**
  * Run one agent assignment. Command construction, rendering, and failure
@@ -55,6 +66,7 @@ export async function runAgentNode(
     },
     sink: options.sink,
     signal: options.signal,
+    env: Object.fromEntries(agentCredentialEnv(agent)),
   });
   const tokenUsage = extractTokenUsageFromJsonl(result.stdout, agent);
 
@@ -86,7 +98,7 @@ function requiredExecStream(options: AgentRunOptions) {
   return options.execStream;
 }
 
-function agentResultLog(label: string, result: { exit_code: number; stdout: string; stderr: string; error_message?: string }, limit = AGENT_RESULT_LOG_LIMIT): string {
+function agentResultLog(label: string, result: { exit_code: number; stdout: string; stderr: string; error_message?: string }, limit = agentTranscriptLimit()): string {
   const parts = [`[${label} Exit ${result.exit_code}]`];
   if (result.error_message) parts.push(`Error: ${result.error_message}`);
   if (result.stderr.trim()) parts.push(`stderr:\n${result.stderr.slice(-limit)}`);

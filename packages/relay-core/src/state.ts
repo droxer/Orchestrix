@@ -98,6 +98,7 @@ export type AgentExecutor = (
     stderrRenderer?: (chunk: string) => string;
     sink?: AgentOutputSink;
     signal?: AbortSignal;
+    env?: Record<string, string>;
   },
 ) => Promise<StreamExecResult>;
 

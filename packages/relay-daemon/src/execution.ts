@@ -54,9 +54,10 @@ export interface ExecutionManager {
       stderrRenderer?: StreamRenderer;
       sink?: AgentOutputSink;
       signal?: AbortSignal;
+      env?: Record<string, string>;
     },
   ): Promise<StreamExecResult>;
-  runShell(command: string, signal?: AbortSignal): Promise<StreamExecResult>;
+  runShell(command: string, signal?: AbortSignal, env?: Record<string, string>): Promise<StreamExecResult>;
 }
 
 export class BoxLiteExecutionManager implements ExecutionManager {
@@ -111,17 +112,19 @@ export class BoxLiteExecutionManager implements ExecutionManager {
       stderrRenderer?: StreamRenderer;
       sink?: AgentOutputSink;
       signal?: AbortSignal;
+      env?: Record<string, string>;
     } = {},
   ): Promise<StreamExecResult> {
     if (options.signal?.aborted) {
       return { exit_code: -1, stdout: "", stderr: "", error_message: "Execution cancelled before start." };
     }
-    const execution = await activeBox().exec(cmd, args, null, false, null, null, options.cwd ?? null);
+    const env = options.env ? Object.entries(options.env) : null;
+    const execution = await activeBox().exec(cmd, args, env, false, null, null, options.cwd ?? null);
     return collectExecution(execution, true, options.stdoutRenderer, options.stderrRenderer, options.sink, options.signal);
   }
 
-  async runShell(command: string, signal?: AbortSignal): Promise<StreamExecResult> {
-    const execution = await activeBox().exec("bash", ["-c", command]);
+  async runShell(command: string, signal?: AbortSignal, env?: Record<string, string>): Promise<StreamExecResult> {
+    const execution = await activeBox().exec("bash", ["-c", command], env ? Object.entries(env) : null);
     return collectExecution(execution, false, undefined, undefined, undefined, signal);
   }
 }
