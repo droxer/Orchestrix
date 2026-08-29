@@ -52,6 +52,26 @@
   font-family: var(--font-sans);
 }
 
+/* The bled double-chevron — the login signature, echoed from the empty-state
+   bleed mark. Fixed so it can leave the viewport without creating scrollable
+   overflow; the 5% ink wash keeps it a watermark, not a logo. */
+.login-bleed {
+  position: fixed;
+  left: calc(-1 * var(--sp-7));
+  bottom: calc(-1 * var(--sp-7));
+  width: 40vmin;
+  height: 40vmin;
+  color: color-mix(in srgb, var(--lg-ink) 5%, transparent);
+  pointer-events: none;
+  user-select: none;
+}
+
+.login-bleed > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 /* ---------- The card ------------------------------------------------- */
 
 .login-card {
@@ -63,6 +83,9 @@
   background: color-mix(in srgb, var(--lg-elevated) 35%, var(--lg-canvas));
   border: 1px solid var(--lg-hairline-soft);
   border-radius: var(--r-3);
+  /* A 1px inner top highlight — edge refraction on the pinned dark plate,
+     not elevation; the system stays flat (no drop shadow). */
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--lg-ink) 6%, transparent);
   animation: rise var(--t-slow) var(--ease);
 }
 
@@ -161,6 +184,9 @@
 
 .login-input:focus-visible {
   border-color: var(--lg-accent);
+  /* The focused well lifts 2% toward the ink so it reads active at a glance,
+     not just by its cobalt edge. */
+  background: color-mix(in srgb, var(--lg-ink) 2%, var(--lg-elevated));
 }
 
 .login-input:-webkit-autofill {
@@ -288,6 +314,26 @@
 }
 
 /* ---------- Motion --------------------------------------------------- */
+
+/* Staged entrance: the card rises as one object, then its sections follow
+   on the shared --t-stagger ladder — the same choreography rule as the
+   transcript hero. The error eases in on the same small travel instead of
+   popping. */
+@media (prefers-reduced-motion: no-preference) {
+  .login-card > * {
+    --rise-from: var(--rise-sm);
+    animation: rise var(--t-slow) var(--ease) both;
+  }
+
+  .login-card > .login-identity { animation-delay: calc(var(--t-stagger) * 1); }
+  .login-card > .login-form { animation-delay: calc(var(--t-stagger) * 2); }
+  .login-card > .login-foot { animation-delay: calc(var(--t-stagger) * 3); }
+
+  .login-error {
+    --rise-from: var(--rise-sm);
+    animation: rise var(--t-slow) var(--ease);
+  }
+}
 
 /* ---------- Responsive ----------------------------------------------- */
 

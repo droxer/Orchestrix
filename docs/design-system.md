@@ -448,6 +448,19 @@ inline SVG components in `web/src/components/marginalia.tsx`. The rules:
 - One doodle per surface. A second one on the same screen is clutter, not
   charm.
 
+The same construction-line language grows into the surfaces themselves in two
+places. Every empty state sits inside a **draft plate** — a dashed
+`--line-1` frame with solid `--line-strong` crop ticks straddling its corners,
+and the doodle hugging the top-right tick — defined once as `.relay-plate` in
+`empty-state.css` and shared by the centered `RelayEmptyState` and the
+left-aligned `BoardEmpty`. Illustration tiles (`.relay-empty-avatar`) wear a
+dashed orbit ring from the same vocabulary; the transcript hero is the one
+tile that goes without, because it already carries the tinted halo. And the
+pinned-dark login cover bleeds the double-chevron mark itself — huge, at 5%
+ink, fixed off the lower-left corner (`login-bleed`), so the pre-auth cover
+and the empty states read as the same product. Frame, ticks, ring, and bleed
+obey the marginalia rules: neutral ink only, decorative, never animated.
+
 ## Do's and Don'ts
 
 ### Do
