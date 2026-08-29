@@ -20,7 +20,6 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Drawer } from "@/components/ui/Drawer";
-import { OWNERSHIP_ICON } from "../AgentPlacementBadge";
 import {
   Select,
   SelectContent,
@@ -29,7 +28,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
-import { ICON } from "../icons";
+import {
+  ICON,
+  nodeOwnershipIcon,
+} from "../icons";
 
 interface CreateAgentDialogProps {
   open: boolean;
@@ -53,7 +55,7 @@ function ComputerOptionLabel({
   label: string;
   ownership: ComputerOwnership;
 }) {
-  const ComputerIcon = OWNERSHIP_ICON[ownership];
+  const ComputerIcon = nodeOwnershipIcon(ownership);
   return (
     <span className="create-agent-computer-option">
       <ComputerIcon size={ICON.sm} aria-hidden="true" />

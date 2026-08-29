@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import type { TFunction } from "i18next";
 import type { AgentName, ControlPanelDaemonNodeRecord } from "../../types";
 import { AgentMark } from "../AgentMark";
+import { RuntimeMark } from "../RuntimeMark";
 import { StateMark } from "../StateMark";
 import { NodePresence } from "../admin/NodePresence";
 import { TonePill } from "../StatusPill";
-import { nodeOwnershipIcon } from "../admin/NodeProfileBadges";
 import { Button } from "@/components/ui/button";
 import {
   ActionApprove,
@@ -17,6 +17,7 @@ import {
   ActionRemove,
   AdminManageExecutors,
   ICON,
+  nodeOwnershipIcon,
 } from "../icons";
 import { abbreviateNodeId, formatRunElapsed } from "../../lib/computerNodes";
 import { labelForExecutor } from "../../lib/agentDisplayNames";
@@ -282,13 +283,15 @@ function RuntimeRow({
           : t(`status.${agentStatus}`, { defaultValue: agentStatus });
 
   return (
-    <li
-      className={`computer-runtime-row tone-${tone}${disabled ? " is-disabled" : ""}`}
-      data-agent={agent}
-      data-presence={presence}
-    >
-      <i className="adm-agent-dot" aria-hidden="true" />
-      <AgentMark agent={agent} size={ICON.sm} className="computer-runtime-mark" />
+    <li className={`computer-runtime-row${disabled ? " is-disabled" : ""}`}>
+      <RuntimeMark
+        agent={agent}
+        presence={presence}
+        tone={tone}
+        variant="labeled"
+        disabled={disabled}
+        glyphClassName="computer-runtime-mark"
+      />
       <span className="computer-runtime-name" translate="no">{labelForExecutor(agent)}</span>
       <span className="computer-runtime-state">{stateLabel}</span>
       <span className="computer-runtime-version code" translate="no">

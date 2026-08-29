@@ -7,20 +7,8 @@ import {
   placementBadgeShowsSandbox,
   placementStatusTone,
   type AgentPlacementDescription,
-  type PlacementOwnership,
 } from "../lib/agentPlacements";
-import {
-  ICON,
-  NodeLocal,
-  NodeManaged,
-  NodePending,
-} from "./icons";
-
-export const OWNERSHIP_ICON: Record<PlacementOwnership, typeof NodeManaged> = {
-  managed: NodeManaged,
-  local: NodeLocal,
-  pending: NodePending,
-};
+import { ICON, nodeOwnershipIcon } from "./icons";
 
 export function AgentPlacementBadge({
   description,
@@ -30,7 +18,7 @@ export function AgentPlacementBadge({
   showSandbox?: boolean;
 }) {
   const { t } = useTranslation();
-  const OwnershipIcon = OWNERSHIP_ICON[description.ownership];
+  const OwnershipIcon = nodeOwnershipIcon(description.ownership);
   const ownershipLabel = t(`admin.v2.node_ownership_${description.ownership}`);
   const sandboxLabel = t(`admin.v2.node_sandbox_${description.sandbox}`);
   const status = description.placement.status;

@@ -310,29 +310,10 @@
 
 /* Same meta voice as the picker row: kind · home computer on one quiet
    mono line, generated middot separator. */
-.team-profile-member-meta {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--sp-1);
-  color: var(--ink-3);
-  font-size: var(--fs-2);
-  white-space: nowrap;
-}
-
-.team-profile-member-meta > * + *::before {
-  content: "·";
-  margin-right: var(--sp-1);
-  color: var(--ink-4);
-}
-
-.team-profile-member-computer {
-  display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--sp-1);
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* The meta line under a member's name is <AgentMetaLine> (.agent-meta in
+   agents.css) — this surface used to draw its own glyph-less, --fs-2 copy. */
+.team-profile-member .agent-meta {
+  flex-wrap: nowrap;
 }
 
 .team-profile-member-fieldset {

@@ -3,14 +3,55 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, it } from "node:test";
 
-describe("agent roster", () => {
-  it("shows the runtime and every active computer", async () => {
-    const source = await readFile(resolve("web/src/components/AgentsPage.tsx"), "utf8");
+const read = (path: string) => readFile(resolve("web", path), "utf8");
 
-    assert.match(source, /agentLabel\(agent\.executorKind\)/);
-    assert.match(source, /<AgentMark agent=\{agent\.executorKind\}/);
-    assert.match(source, /className="agents-roster-row-runtime-mark"/);
-    assert.match(source, /placementDescriptions\.map\(/);
-    assert.doesNotMatch(source, /const computer = placementDescriptions\[0\]/);
+/**
+ * The agent meta line — `[vendor glyph] runtime · [ownership glyph] computers`.
+ *
+ * The roster row, the team profile's member list, and the team member picker
+ * each drew this by hand and had drifted on every property that makes it
+ * legible: the team pair dropped the vendor glyph entirely, sat a type rung
+ * larger, showed only the first computer, and kept `removed` placements the
+ * roster had already filtered out. These tests fail if a surface grows its own
+ * copy again.
+ */
+describe("agent meta line", () => {
+  it("shows the runtime glyph and every active computer", async () => {
+    const source = await read("src/components/AgentMetaLine.tsx");
+
+    assert.match(source, /agentLabel\(executorKind\)/);
+    assert.match(source, /<AgentMark agent=\{executorKind\}/);
+    assert.match(source, /className="agent-meta-runtime-mark"/);
+    // Every active placement, in route order — never just the first.
+    assert.match(source, /descriptions\.map\(/);
+    assert.doesNotMatch(source, /descriptions\[0\]/);
+    // `removed` placements are filtered before anything is described.
+    assert.match(source, /describeAgentPlacements\(activePlacements\(placements\)\)/);
+  });
+
+  it("is the one component every agent-bearing surface renders", async () => {
+    for (const path of [
+      "src/components/AgentsPage.tsx",
+      "src/components/TeamWorkspacePage.tsx",
+      "src/components/TeamMemberOption.tsx",
+    ]) {
+      const source = await read(path);
+      assert.match(source, /<AgentMetaLine\b/, path);
+      // No surface may re-derive the line's parts for itself.
+      assert.doesNotMatch(source, /agentLabel\(/, path);
+      assert.doesNotMatch(source, /nodeOwnershipIcon\(/, path);
+    }
+  });
+
+  it("keeps the meta line on one type rung across surfaces", async () => {
+    const css = await read("src/styles/agent-meta.css").catch(() => read("src/styles/agents.css"));
+    const rule = css.match(/\.agent-meta \{([^}]*)\}/)?.[1] ?? "";
+    assert.match(rule, /--fs-1/);
+
+    // The team surfaces used to redefine it a rung larger.
+    for (const path of ["src/styles/teams.css", "src/styles/admin-v2-employees.css"]) {
+      const sheet = await read(path);
+      assert.doesNotMatch(sheet, /\.team-(?:profile-member|member-option)-meta \{/, path);
+    }
   });
 });

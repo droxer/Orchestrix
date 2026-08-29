@@ -11,12 +11,13 @@ import {
   type StoredNodeTokenMap,
 } from "./helpers";
 import { NodeActions } from "./NodeActions";
-import { NodeProfileBadges, nodeOwnershipIcon } from "./NodeProfileBadges";
+import { NodeProfileBadges } from "./NodeProfileBadges";
 import { NodePresence } from "./NodePresence";
 import { NodeRuntimeMarks } from "./NodeRuntimeMarks";
 import {
   AdminEmployees,
   ICON,
+  nodeOwnershipIcon,
 } from "../icons";
 import { TonePill } from "../StatusPill";
 

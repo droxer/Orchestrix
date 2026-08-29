@@ -6,6 +6,19 @@ export type PlacementPreference = "preferred" | "alternate";
 
 export type PlacementStatusTone = "good" | "info" | "warn" | "bad" | "neutral";
 
+/**
+ * The placements an agent actually runs on right now.
+ *
+ * A placement torn down keeps its row until the daemon confirms, so every
+ * surface that lists an agent's computers has to drop `removed` first. This
+ * lived privately in AgentsPage while the team surfaces read `agent.placements`
+ * raw — so a removed computer stayed visible in a team long after it had gone
+ * from the roster.
+ */
+export function activePlacements(placements: readonly AgentPlacement[]): AgentPlacement[] {
+  return placements.filter((placement) => placement.desiredState !== "removed");
+}
+
 export function placementStatusTone(status: AgentPlacement["status"]): PlacementStatusTone {
   if (status === "ready") return "good";
   if (status === "busy") return "info";
