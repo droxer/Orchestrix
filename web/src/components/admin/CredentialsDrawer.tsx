@@ -107,7 +107,10 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
       width="detail"
       bodyClassName={hasDangerZone ? "adm-drawer-body--column" : undefined}
     >
-      <div className={hasDangerZone ? "adm-form" : undefined}>
+      {/* .adm-form is unconditional — it owns the stack's vertical rhythm.
+          Only the column layout is conditional, because only the danger-zone
+          branch has a footer to anchor to the panel's bottom edge. */}
+      <div className="adm-form">
         <NodeProfileBadges
           node={node}
           storedTokens={storedToken ? { [node.id]: storedToken } : {}}
@@ -158,7 +161,7 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
         {hasDangerZone ? (
           <>
             <div className="adm-drawer-section">
-              <p className="adm-drawer-section-title">{t("admin.v2.danger_zone")}</p>
+              <h3 className="adm-drawer-section-title">{t("admin.v2.danger_zone")}</h3>
               <div className="adm-drawer-section-actions">
                 {onUnassign && node.employeeId ? (
                   <Button

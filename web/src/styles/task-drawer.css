@@ -4,10 +4,19 @@
 
 /* ── Task board drawer forms (adm-drawer + adm-form) ──────────────── */
 
+/* Two-up only when the PANEL can hold it. The drawer body is the query
+   container (.adm-drawer-body); a viewport media query cannot see how wide
+   this particular drawer is. */
 .task-drawer-form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: var(--sp-4);
+}
+
+@container drawer-body (min-width: 480px) {
+  .task-drawer-form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .task-drawer-next-run {
@@ -45,7 +54,7 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 28px;
+  width: var(--control-h-xs);
   height: var(--control-h-xs);
   border: 0.5px solid var(--line-1);
   border-radius: var(--r-2);
@@ -94,10 +103,15 @@
 .task-assignment-summary {
   position: relative;
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
+  /* The mark column is the mark — it was 42px against a 40px --avatar-lg
+     glyph, which left 2px of slop between the mark and the copy beside it. */
+  grid-template-columns: var(--avatar-lg) minmax(0, 1fr);
   align-items: start;
   gap: var(--sp-3);
-  min-height: 76px;
+  /* Height floor so the card does not jump when the assignment changes and
+     the roster row appears: the mark, its padding, and one more line of copy.
+     Was a bare 76px. */
+  min-height: calc(var(--avatar-lg) + 3 * var(--sp-3));
   overflow: hidden;
   padding: var(--sp-3);
   border: 0.5px solid var(--line-1);
@@ -109,14 +123,16 @@
 .task-assignment-summary::before {
   position: absolute;
   inset: 0 auto 0 0;
-  width: 2px;
+  width: var(--accent-bar-w);
   background: var(--ink-2);
   content: "";
 }
 
 .task-assignment-summary.is-empty {
   align-items: center;
-  min-height: 66px;
+  /* The empty state is centred and single-line, so it reserves the mark and
+     its padding only — no third line. Was a bare 66px. */
+  min-height: calc(var(--avatar-lg) + 2 * var(--sp-3));
   border-style: dashed;
   background: color-mix(in srgb, var(--surface-1) 78%, transparent);
 }
@@ -253,14 +269,6 @@
   letter-spacing: var(--type-label-track);
 }
 
-@media (max-width: 480px) {
-  /* Form-grid ergonomics only: below 480px two-column fields cramp. Drawer
-     chrome breakpoints are owned by the 820px takeover in mobile-overlays.css. */
-  .task-drawer-form-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
 /* Drawer input elevation moved to .adm-drawer in admin-v2-drawers.css so every
    drawer shares the raised-field mapping. */
 
@@ -352,7 +360,9 @@
   min-width: 0;
   padding: var(--sp-1) var(--sp-2);
   border: 0.5px solid transparent;
-  border-radius: var(--r-3);
+  /* List row, not a card: the 6px control rung, same call .adm-assign-node
+     makes for the same shape. */
+  border-radius: var(--r-2);
   background: none;
   color: var(--ink-1);
   font: var(--type-body-sm);

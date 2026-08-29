@@ -19,7 +19,7 @@ import { Drawer } from "@/components/ui/Drawer";
 import { RunModeField, type RunLocation } from "./RunModeField";
 import { initialsOf, statusTone, visualStatus } from "./helpers";
 import { Button } from "@/components/ui/button";
-import { Field } from "@/components/ui/field";
+import { Field, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { NodeProfileBadges } from "./NodeProfileBadges";
 import { NodePresence } from "./NodePresence";
@@ -394,9 +394,7 @@ export function AssignNodeDrawer({
             </div>
           )}
           {fieldErrors.nodeId ? (
-            <span id="assign-node-node-error" className="text-sm text-danger" role="alert">
-              {fieldErrors.nodeId}
-            </span>
+            <FieldError id="assign-node-node-error">{fieldErrors.nodeId}</FieldError>
           ) : null}
         </section>
 

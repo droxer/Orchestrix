@@ -298,20 +298,31 @@
 }
 
 /* Project setup: the same flat dossier grammar as the profile page — hairlines
-   and type roles, no card chrome. */
+   and type roles, no card chrome. The flex column, gap, and panel fill come
+   from the shared .adm-form (admin-v2-drawers.css); this class carries only
+   the ink the drawer form doesn't set. */
 .project-setup-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-6);
-  min-height: 100%;
   color: var(--ink-1);
 }
 
+/* Two-up only when the DRAWER can hold it. The old `minmax(220px, .8fr)` plus
+   a 640px viewport query sized this for a page: inside a 460px `form` panel
+   the computer column took its 220px floor and squeezed the name field to
+   ~160px, and the single-column fallback keyed off the viewport so it never
+   fired on desktop where the squeeze actually happened. A container query
+   asks the panel instead. */
 .project-setup-basics-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(220px, .8fr);
+  grid-template-columns: 1fr;
   gap: var(--sp-4);
 }
+
+@container drawer-body (min-width: 480px) {
+  .project-setup-basics-grid {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  }
+}
+
 .project-name-input { min-height: var(--control-h); }
 .project-computer-select { min-height: var(--control-h); }
 /* Edit mode: the computer is immutable, so it renders as text, not a dead select. */
@@ -324,9 +335,6 @@
   font: var(--type-body);
 }
 
-@media (max-width: 640px) {
-  .project-setup-basics-grid { grid-template-columns: 1fr; }
-}
 
 .project-empty-hint {
   margin: 0;
