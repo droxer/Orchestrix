@@ -71,8 +71,8 @@ describe("Profile images", () => {
   it("separates the agent and team default marks by silhouette, not colour", async () => {
     const markSource = await readFile(resolve("web/src/components/IdentityMark.tsx"), "utf8");
 
-    // One primitive, two compositions: a lone dispatch node is an agent; the
-    // same node routing onward to two members is a team.
+    // One primitive, two compositions: a lone node is an agent; a cluster of
+    // three of the same node is a team.
     assert.match(markSource, /kind: "agent" \| "team"/);
     assert.match(markSource, /AGENT_PATHS/);
     assert.match(markSource, /TEAM_PATHS/);

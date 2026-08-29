@@ -46,7 +46,7 @@ describe("Agent team management", () => {
     assert.match(teamWorkspaceSource, /updateTeamMutation\.mutateAsync/);
     assert.match(teamWorkspaceSource, /deleteTeamMutation\.mutateAsync/);
     assert.match(teamMarkSource, /Relay's default profile image for an agent or an agent team/);
-    assert.match(teamMarkSource, /M12 1\.5 18 7\.5/);
+    assert.match(teamMarkSource, /M10\.83 3\.62Q12 2\.95/);
     assert.match(teamsSource, /className="teams-list-mark"/);
     assert.match(teamWorkspaceSource, /<IdentityMark kind="team" variant="bare"/);
     // The assignment picker identifies a team by its profile image, whose

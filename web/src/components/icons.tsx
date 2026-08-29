@@ -162,7 +162,7 @@ function withStandardStroke(Icon: LucideIcon, displayName: string) {
  * A nav/section glyph that draws the very mark the class already owns.
  *
  * `NavAgents` was a lucide robot head and `NavTeams` a lucide network node,
- * while every profile slot in the app drew the agent diamond and the team fan
+ * while every profile slot in the app drew the agent node and the team cluster
  * from `IdentityMark`. That is two pictures for one class: the rail said one
  * thing about an agent and the row beside it said another. The section glyph
  * is now the same silhouette as the thing the section contains, so a reader
@@ -189,7 +189,7 @@ export const NavBacklog = withStandardStroke(ListTodo, "NavBacklog");
 export const NavChannels = withStandardStroke(Hash, "NavChannels");
 export const NavRoutine = withStandardStroke(CalendarClock, "NavRoutine");
 export const NavAgents = identityGlyph("agent", "NavAgents");
-// A team is a dispatch lead fanning out to members — no longer *the same idea
+// A team is a cluster of agent nodes — no longer *the same idea
 // as* the bespoke team IdentityMark, but that mark itself. `Users` stays with
 // employees (actual people), so the roster chip and the teams nav are not the
 // same silhouette.
