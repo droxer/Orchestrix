@@ -25,6 +25,7 @@ import {
 import { shellQuote } from "relay-core";
 import { hostWorkspaceOwner } from "relay-core";
 import type { AgentName, AgentOutputSink, StreamExecResult } from "relay-core";
+import { BoundedTextCapture } from "./bounded-text.js";
 
 export type BoxLiteModule = typeof import("@boxlite-ai/boxlite");
 type StreamRenderer = (chunk: string) => string;
@@ -245,12 +246,17 @@ function collectKimiCodePath(sourceHome: string, path: string, files: KimiCodeFi
   files.push({ relativePath, content: readFileSync(path) });
 }
 
-// ── Agent skills (Claude Code SKILL.md directories) ─────────────────────────
+// ── Agent skills (per-CLI SKILL.md directories) ─────────────────────────────
 // Skills are not secret, so they go in with world-readable perms. The source
 // directory on the host is configured via RELAY_AGENT_SKILLS_DIR; every file
-// under it is mirrored into the agent's ~/.claude/skills inside the node.
+// under it is mirrored into every supported CLI's inventory directory.
 
-const GUEST_AGENT_SKILLS_DIR = "/home/agent/.claude/skills";
+const GUEST_AGENT_SKILLS_DIRS = [
+  "/home/agent/.claude/skills",
+  "/home/agent/.codex/skills",
+  "/home/agent/.pi/skills",
+  "/home/agent/.kimi/skills",
+] as const;
 
 interface SkillFile {
   relativePath: string;
@@ -307,15 +313,26 @@ export async function prepareGuestAgentSkills(signal?: AbortSignal): Promise<voi
   if (!sourceDir) return;
   const files = collectSkillFiles(sourceDir);
   if (files.length === 0) return;
-  const script = ["set -eu", `mkdir -p ${shellQuote(GUEST_AGENT_SKILLS_DIR)}`];
+  // Write each file's payload exactly once and copy the finished tree to the
+  // remaining CLIs. Embedding every file per directory would multiply this
+  // single `bash -c` argument by the number of agents and run it into ARG_MAX
+  // on a large skills directory.
+  const [primarySkillsDir, ...mirrorSkillsDirs] = GUEST_AGENT_SKILLS_DIRS;
+  const script = ["set -eu", `mkdir -p ${shellQuote(primarySkillsDir)}`];
   for (const file of files) {
-    const target = posix.join(GUEST_AGENT_SKILLS_DIR, ...file.relativePath.split(posix.sep));
+    const target = posix.join(primarySkillsDir, ...file.relativePath.split(posix.sep));
     script.push(
       `mkdir -p ${shellQuote(posix.dirname(target))}`,
       `printf %s ${shellQuote(file.content.toString("base64"))} | base64 -d > ${shellQuote(target)}`,
     );
   }
-  script.push(`chown -R agent:agent ${shellQuote(GUEST_AGENT_SKILLS_DIR)}`);
+  for (const skillsDir of mirrorSkillsDirs) {
+    script.push(
+      `mkdir -p ${shellQuote(skillsDir)}`,
+      `cp -a ${shellQuote(`${primarySkillsDir}/.`)} ${shellQuote(skillsDir)}`,
+    );
+  }
+  script.push(`chown -R agent:agent ${GUEST_AGENT_SKILLS_DIRS.map(shellQuote).join(" ")}`);
   const command = script.join("; ");
   const result = await collectExecution(await activeBox().exec("bash", ["-c", command]), false, undefined, undefined, undefined, signal);
   if (result.exit_code !== 0) {
@@ -374,13 +391,13 @@ export async function prepareGuestAgentAuth(agents: Iterable<AgentName> = ["code
 export async function execStream(
   cmd: string,
   args: string[] = [],
-  options: { cwd?: string; stdoutRenderer?: StreamRenderer; stderrRenderer?: StreamRenderer; sink?: AgentOutputSink; signal?: AbortSignal } = {},
+  options: { cwd?: string; stdoutRenderer?: StreamRenderer; stderrRenderer?: StreamRenderer; sink?: AgentOutputSink; signal?: AbortSignal; env?: Record<string, string> } = {},
 ): Promise<StreamExecResult> {
   if (options.signal?.aborted) {
     return { exit_code: -1, stdout: "", stderr: "", error_message: "Execution cancelled before start." };
   }
   const box = activeBox();
-  const execution = await box.exec(cmd, args, null, false, null, null, options.cwd ?? null);
+  const execution = await box.exec(cmd, args, options.env ? Object.entries(options.env) : null, false, null, null, options.cwd ?? null);
   return collectExecution(execution, true, options.stdoutRenderer, options.stderrRenderer, options.sink, options.signal);
 }
 
@@ -392,8 +409,8 @@ export async function collectExecution(
   sink?: AgentOutputSink,
   signal?: AbortSignal,
 ): Promise<StreamExecResult> {
-  const stdoutParts: string[] = [];
-  const stderrParts: string[] = [];
+  const stdoutCapture = new BoundedTextCapture();
+  const stderrCapture = new BoundedTextCapture();
   let cancelled = false;
   const abortExecution = (): void => {
     cancelled = true;
@@ -402,12 +419,12 @@ export async function collectExecution(
   if (signal?.aborted) abortExecution();
   signal?.addEventListener("abort", abortExecution, { once: true });
 
-  async function readStream(name: "stdout" | "stderr", parts: string[]): Promise<void> {
+  async function readStream(name: "stdout" | "stderr", capture: BoundedTextCapture): Promise<void> {
     const reader = await execution[name]();
     const decoder = new TextDecoder("utf-8");
     const pushText = (text: string): void => {
       if (!text) return;
-      parts.push(text);
+      capture.append(text);
       if (!echo) return;
       const rendered = name === "stderr"
         ? stderrRenderer ? stderrRenderer(text) : text
@@ -433,12 +450,12 @@ export async function collectExecution(
 
   try {
     await closeExecutionStdin(execution);
-    await Promise.all([readStream("stdout", stdoutParts), readStream("stderr", stderrParts)]);
+    await Promise.all([readStream("stdout", stdoutCapture), readStream("stderr", stderrCapture)]);
     const result = await execution.wait();
     return {
       exit_code: result.exitCode ?? -1,
-      stdout: stdoutParts.join(""),
-      stderr: stderrParts.join(""),
+      stdout: stdoutCapture.toString(),
+      stderr: stderrCapture.toString(),
       error_message: cancelled ? "Execution cancelled." : result.errorMessage,
     };
   } finally {
