@@ -48,10 +48,20 @@ describe("reviewed design regressions", () => {
     assert.match(teamStyles, /\.teams-page\[data-view="detail"\]\s+\.teams-roster\s*\{[^}]*display:\s*none/s);
   });
 
-  it("makes decorative empty-state marginalia opt-in", () => {
+  it("keeps empty states free of a decorative layer", () => {
     const emptyState = readWeb("src/components/RelayEmptyState.tsx");
-    assert.match(emptyState, /\{marginalia \? \(/);
-    assert.doesNotMatch(emptyState, /marginalia \?\? <RelayDoodleNotes/);
+    const board = readWeb("src/components/BoardEmpty.tsx");
+    const styles = readWeb("src/styles/empty-state.css");
+
+    // No plate frame, crop ticks, corner doodle, watermark glyph, or orbit
+    // ring: an empty state composes from type, spacing, and one mark tile.
+    for (const source of [emptyState, board]) {
+      assert.doesNotMatch(source, /marginalia|RelayDoodle|relay-plate|relay-bleed-mark/);
+    }
+    assert.doesNotMatch(styles, /relay-bleed-mark|relay-plate|marginalia|--et-tick/);
+    assert.doesNotMatch(styles, /\.relay-empty(-avatar)?::(before|after)/);
+    // The hero renders settled like every other empty state.
+    assert.doesNotMatch(styles, /animation:\s*rise/);
   });
 
   it("associates reviewed select triggers with their visible labels", () => {

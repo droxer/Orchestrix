@@ -517,9 +517,13 @@
    only the dot carries the (grey) presence signal on the calm cadence. It
    rides the shared `blink` keyframe (tokens/base.css) with a 0.45 floor —
    the hand-rolled local keyframe only added a scale channel, which read as
-   a heartbeat rather than presence. */
+   a heartbeat rather than presence. Positioned here rather than inherited:
+   empty-state.css no longer ships an ::after on the avatar tile. */
 .relay-empty-avatar.is-pulse::after {
   content: "";
+  position: absolute;
+  right: calc(-1 * var(--sp-1));
+  bottom: calc(-1 * var(--sp-1));
   width: var(--dot);
   height: var(--dot);
   border-radius: var(--r-full);
