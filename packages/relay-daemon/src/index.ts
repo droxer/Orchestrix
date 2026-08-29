@@ -58,6 +58,8 @@ import {
   ensureMachineId,
   GUEST_WORKSPACE,
   agentHomePath,
+  agentCredentialEnv,
+  allAgentCredentialEnvNames,
   DAEMON_CAPABILITY_GENERATED_FILES,
   DAEMON_CAPABILITY_PROJECT_WORKSPACES,
   DAEMON_CAPABILITY_ROUND_RESULT,
@@ -71,6 +73,7 @@ import { workspaceCommandEvent } from "./workspace-read.js";
 import { ThreadWorkspaceManager } from "./thread-workspace.js";
 import { OutputEventBuffer, type BufferedOutput } from "./output-event-buffer.js";
 import { WorkspaceRunGate } from "./workspace-run-gate.js";
+import { BoundedTextCapture } from "./bounded-text.js";
 
 export type DaemonSandboxMode = DaemonNodeSandboxMode;
 const DEFAULT_DAEMON_SANDBOX_MODE: DaemonSandboxMode = "boxlite";
@@ -443,7 +446,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
         if (stopping) return { commands: [] };
         // Capability re-registration refreshes agent inventory independently
         // of the lightweight liveness heartbeat.
-        if (Date.now() - lastRegisteredAt >= registrationRefreshIntervalMs) {
+        if (activeRuns.size === 0 && Date.now() - lastRegisteredAt >= registrationRefreshIntervalMs) {
           agentHealth = await discoverDaemonAgentHealth(environment, logger, sandboxId, runtimeSignal);
           agentInventory = await discoverAgentInventory(environment.execStream, runtimeSignal, inventoryDiscoveryTimeoutMs);
           updateHeartbeatSettings(await register());
@@ -833,8 +836,10 @@ async function executeCommand(
   logger.info("agent ready", commandLogFields(sandboxId, command));
   let outputSequence = 0;
   let outputPostFailure: Error | undefined;
-  const outputPostQueue: Array<{ post: () => Promise<void>; fields: DaemonLogFields }> = [];
+  const maxOutputBacklogBytes = positiveIntEnv("RELAY_DAEMON_OUTPUT_BACKLOG_BYTES") ?? 16_777_216;
+  const outputPostQueue: Array<{ post: () => Promise<void>; fields: DaemonLogFields; bytes: number }> = [];
   let outputPostHead = 0;
+  let outputPostBacklogBytes = 0;
   let outputPostDrain: Promise<void> | undefined;
   const drainOutputPosts = async (): Promise<void> => {
     while (outputPostHead < outputPostQueue.length && !outputPostFailure) {
@@ -848,6 +853,8 @@ async function executeCommand(
           ...item.fields,
           error: outputPostFailure.message,
         });
+      } finally {
+        outputPostBacklogBytes = Math.max(0, outputPostBacklogBytes - item.bytes);
       }
     }
     outputPostQueue.length = 0;
@@ -863,9 +870,18 @@ async function executeCommand(
   const enqueueOutputPost = (
     post: () => Promise<void>,
     fields: DaemonLogFields,
+    bytes: number,
   ): void => {
     if (outputPostFailure) return;
-    outputPostQueue.push({ post, fields });
+    if (outputPostBacklogBytes + bytes > maxOutputBacklogBytes) {
+      outputPostFailure = new Error(
+        `Output delivery backlog exceeded ${maxOutputBacklogBytes} bytes.`,
+      );
+      outputPostQueue.length = outputPostHead;
+      return;
+    }
+    outputPostBacklogBytes += bytes;
+    outputPostQueue.push({ post, fields, bytes });
     startOutputDrain();
   };
   const waitForOutputPosts = async (): Promise<void> => {
@@ -894,6 +910,7 @@ async function executeCommand(
           entries,
         } satisfies DaemonNodeEvent, token, signal),
       { agent, sequence: entries[0]?.sequence },
+      entries.reduce((total, entry) => total + Buffer.byteLength(entry.text), 0),
     );
   };
   const outputBuffer = new OutputEventBuffer(
@@ -920,6 +937,7 @@ async function executeCommand(
             sequence,
           } satisfies DaemonNodeEvent, token, signal),
         { agent, sequence },
+        Buffer.byteLength(JSON.stringify(collaboration)),
       );
     },
   };
@@ -1094,12 +1112,35 @@ function createExecutionEnvironment(
 
 async function ensureLocalAgentReady(agent: AgentName, signal?: AbortSignal): Promise<void> {
   const def = getAgent(agent);
-  const result = await localProcessExecStream("bash", ["-c", def.preflight.command()], { signal });
+  prepareLocalAgentSkills();
+  const result = await localProcessExecStream("bash", ["-c", def.preflight.command()], {
+    signal,
+    env: Object.fromEntries(agentCredentialEnv(agent)),
+  });
   if (result.exit_code !== 0) {
     const detail = (result.stderr || result.stdout || result.error_message || "").trim();
     throw new Error(`${def.preflight.label} preflight failed.${detail ? ` ${detail}` : ""}`);
   }
 }
+
+const LOCAL_AGENT_SKILL_DIRS = [".claude/skills", ".codex/skills", ".pi/skills", ".kimi/skills"];
+let localSkillsPreparedFor: string | undefined;
+
+/**
+ * Mirror the configured skills into each CLI's inventory directory once per
+ * daemon lifetime. A local node's agent home is the operator's real home
+ * directory, so this writes into files they own — doing it on every run would
+ * rewrite that tree continuously, and synchronously, in the run's hot path.
+ */
+function prepareLocalAgentSkills(): void {
+  const home = agentHomePath();
+  if (localSkillsPreparedFor === home) return;
+  for (const relativeDir of LOCAL_AGENT_SKILL_DIRS) {
+    prepareHostAgentSkills(join(home, relativeDir));
+  }
+  localSkillsPreparedFor = home;
+}
+
 
 function createBoxliteEnvironment(
   sandboxId: string,
@@ -1170,6 +1211,7 @@ export async function localProcessExecStream(
     stderrRenderer?: (chunk: string) => string;
     sink?: (text: string) => void;
     signal?: AbortSignal;
+    env?: Record<string, string>;
   } = {},
 ): Promise<StreamExecResult> {
   if (options.signal?.aborted) {
@@ -1184,12 +1226,12 @@ export async function localProcessExecStream(
     const detached = process.platform !== "win32";
     const child = spawn(cmd, args, {
       cwd: options.cwd,
-      env: localAgentSubprocessEnv(),
+      env: { ...localAgentSubprocessEnv(), ...options.env },
       stdio: ["ignore", "pipe", "pipe"],
       detached,
     });
-    const stdoutParts: string[] = [];
-    const stderrParts: string[] = [];
+    const stdoutCapture = new BoundedTextCapture();
+    const stderrCapture = new BoundedTextCapture();
     let killTimer: NodeJS.Timeout | undefined;
     const terminate = (signal: NodeJS.Signals): void => {
       if (detached && child.pid) {
@@ -1213,12 +1255,12 @@ export async function localProcessExecStream(
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (text: string) => {
-      stdoutParts.push(text);
+      stdoutCapture.append(text);
       const rendered = options.stdoutRenderer ? options.stdoutRenderer(text) : text;
       if (rendered) options.sink?.(rendered);
     });
     child.stderr.on("data", (text: string) => {
-      stderrParts.push(text);
+      stderrCapture.append(text);
       const rendered = options.stderrRenderer ? options.stderrRenderer(text) : text;
       if (rendered) options.sink?.(rendered);
     });
@@ -1227,8 +1269,8 @@ export async function localProcessExecStream(
       options.signal?.removeEventListener("abort", abort);
       resolve({
         exit_code: code ?? -1,
-        stdout: stdoutParts.join(""),
-        stderr: stderrParts.join(""),
+        stdout: stdoutCapture.toString(),
+        stderr: stderrCapture.toString(),
       });
     });
     child.on("error", (error) => {
@@ -1236,8 +1278,8 @@ export async function localProcessExecStream(
       options.signal?.removeEventListener("abort", abort);
       resolve({
         exit_code: -1,
-        stdout: stdoutParts.join(""),
-        stderr: stderrParts.join(""),
+        stdout: stdoutCapture.toString(),
+        stderr: stderrCapture.toString(),
         error_message: error.message,
       });
     });
@@ -1275,6 +1317,12 @@ function localAgentSubprocessEnv(): NodeJS.ProcessEnv {
       delete env[key];
     }
   }
+  // A local node runs agents as child processes of the daemon, so anything in
+  // the daemon's own environment is inherited. Provider credentials must not
+  // ride along: the caller layers the running agent's own keys back on top, and
+  // inheriting the rest would hand every agent every provider's key — exactly
+  // the leak the BoxLite guest avoids by never holding credentials at all.
+  for (const key of allAgentCredentialEnvNames()) delete env[key];
   const home = agentHomePath();
   env.HOME = home;
   env.CODEX_HOME = join(home, ".codex");

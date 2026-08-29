@@ -11,6 +11,7 @@ import {
   larkConversation,
   parseChatCommand,
   parseSseRelayEvent,
+  idleReconnectDelayMs,
   telegramConversation,
   type RelayChatBackend,
 } from "../src/index.js";
@@ -175,6 +176,80 @@ describe("RelayChatClient", () => {
     const event = parseSseRelayEvent('data: {"id":"evt_1","type":"agent.output","sessionId":"sess_1","timestamp":"now","runId":"run_1","agent":"codex","stream":"stdout","text":"hello"}\n\n');
     assert.equal(event?.type, "agent.output");
     assert.equal(parseSseRelayEvent('event: done\ndata: {"status":"completed"}\n\n'), undefined);
+  });
+
+  it("reconnects a timed-out session stream from the last event id", async () => {
+    const calls: string[] = [];
+    const first = [
+      "id: evt_1",
+      'data: {"id":"evt_1","type":"agent.output","sessionId":"sess_1","timestamp":"now","runId":"run_1","agent":"codex","stream":"stdout","text":"one"}',
+      "",
+      "event: done",
+      'data: {"status":"running","reason":"timeout"}',
+      "",
+    ].join("\n");
+    const second = [
+      "id: evt_2",
+      'data: {"id":"evt_2","type":"agent.output","sessionId":"sess_1","timestamp":"now","runId":"run_1","agent":"codex","stream":"stdout","text":"two"}',
+      "",
+      "event: done",
+      'data: {"status":"completed"}',
+      "",
+    ].join("\n");
+    const fetchFn = async (url: string | URL | Request): Promise<Response> => {
+      calls.push(String(url));
+      return new Response(calls.length === 1 ? first : second, { status: 200 });
+    };
+    const client = new RelayChatClient({ baseUrl: "http://relay.local/", token: "svc", fetchFn });
+    const events: RelayEvent[] = [];
+
+    await client.streamSessionEvents("sess_1", (event) => { events.push(event); });
+
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1], "http://relay.local/api/v1/threads/sess_1/events?after=evt_1");
+    assert.deepEqual(events.map((event) => event.id), ["evt_1", "evt_2"]);
+  });
+
+  it("gives up on reconnects that never deliver an event", async () => {
+    // A backend that answers the cursor with an immediate non-terminal control
+    // frame must not turn a resumable stream into a hot request loop.
+    let calls = 0;
+    const idle = ["event: done", 'data: {"status":"running","reason":"timeout"}', "", ""].join("\n");
+    const fetchFn = async (): Promise<Response> => {
+      calls += 1;
+      return new Response(idle, { status: 200 });
+    };
+    const client = new RelayChatClient({ baseUrl: "http://relay.local/", token: "svc", fetchFn });
+
+    await client.streamSessionEvents("sess_idle", () => undefined);
+
+    assert.ok(calls > 1, "a resumable frame should be retried at least once");
+    assert.ok(calls <= 7, `idle reconnects must be bounded, saw ${calls}`);
+  });
+
+  it("backs off further on each unproductive reconnect", () => {
+    assert.ok(idleReconnectDelayMs(2) > idleReconnectDelayMs(1));
+    assert.ok(idleReconnectDelayMs(50) <= 5_000);
+  });
+
+  it("survives a malformed frame instead of tearing down the stream", async () => {
+    const body = [
+      "data: {not json",
+      "",
+      "id: evt_1",
+      'data: {"id":"evt_1","type":"agent.output","sessionId":"sess_1","timestamp":"now","runId":"run_1","agent":"codex","stream":"stdout","text":"one"}',
+      "",
+      "event: done",
+      'data: {"status":"completed"}',
+      "",
+    ].join("\n");
+    const fetchFn = async (): Promise<Response> => new Response(body, { status: 200 });
+    const client = new RelayChatClient({ baseUrl: "http://relay.local/", token: "svc", fetchFn });
+    const events: RelayEvent[] = [];
+
+    await client.streamSessionEvents("sess_1", (event) => { events.push(event); });
+
+    assert.deepEqual(events.map((event) => event.id), ["evt_1"]);
   });
 });
 

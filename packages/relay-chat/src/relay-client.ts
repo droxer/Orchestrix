@@ -106,29 +106,58 @@ export class RelayChatClient implements RelayChatBackend {
     onEvent: (event: RelayEvent) => Promise<void> | void,
     context: RelayChatRequestContext = {},
   ): Promise<void> {
-    const response = await this.fetchFn(relayApiUrl(this.baseUrl, `/threads/${encodeURIComponent(sessionId)}/events`), {
-      method: "GET",
-      signal: context.signal,
-      headers: this.headers(false, context.employeeId),
-    });
-    if (!response.ok) {
-      throw new Error(`Relay session stream failed: ${await responseError(response)}`);
-    }
-    if (!response.body) return;
-    let buffer = "";
-    const decoder = new TextDecoder();
-    for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
-      buffer += decoder.decode(chunk, { stream: true });
-      const frames = buffer.split("\n\n");
-      buffer = frames.pop() ?? "";
-      for (const frame of frames) {
-        const event = parseSseRelayEvent(frame);
-        if (event) await onEvent(event);
+    let after: string | undefined;
+    // A resumable stream must not become a hot loop. Reconnects that deliver no
+    // event are backed off and then given up on, so a backend that ignores the
+    // cursor or returns its timeout frame immediately cannot be hammered.
+    let idleReconnects = 0;
+    while (!context.signal?.aborted) {
+      if (idleReconnects > 0) {
+        if (idleReconnects > MAX_IDLE_STREAM_RECONNECTS) return;
+        await delay(idleReconnectDelayMs(idleReconnects), context.signal);
+        if (context.signal?.aborted) return;
       }
+      const url = new URL(relayApiUrl(this.baseUrl, `/threads/${encodeURIComponent(sessionId)}/events`));
+      if (after) url.searchParams.set("after", after);
+      const response = await this.fetchFn(url, {
+        method: "GET",
+        signal: context.signal,
+        headers: this.headers(false, context.employeeId),
+      });
+      if (!response.ok) {
+        throw new Error(`Relay session stream failed: ${await responseError(response)}`);
+      }
+      if (!response.body) return;
+      let buffer = "";
+      let sawEvent = false;
+      let reconnect = false;
+      let terminal = false;
+      const decoder = new TextDecoder();
+      const consumeFrame = async (frame: string): Promise<void> => {
+        const parsed = parseSseFrame(frame);
+        if (parsed.event) {
+          sawEvent = true;
+          after = parsed.event.id;
+          await onEvent(parsed.event);
+        }
+        if (parsed.done) {
+          terminal = isTerminalSessionStatus(parsed.done.status);
+          reconnect = !terminal;
+        }
+      };
+      for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
+        buffer += decoder.decode(chunk, { stream: true });
+        const frames = buffer.split(/\r?\n\r?\n/);
+        buffer = frames.pop() ?? "";
+        for (const frame of frames) await consumeFrame(frame);
+      }
+      buffer += decoder.decode();
+      if (buffer.trim()) await consumeFrame(buffer);
+      if (terminal || (!reconnect && !sawEvent)) return;
+      // A timeout control frame or an EOF after domain events is resumable.
+      // The cursor prevents duplicate delivery across reconnects.
+      idleReconnects = sawEvent ? 0 : idleReconnects + 1;
     }
-    buffer += decoder.decode();
-    const event = parseSseRelayEvent(buffer);
-    if (event) await onEvent(event);
   }
 
   async resolveConversationSession(ref: ChatConversationRef, signal?: AbortSignal): Promise<RelaySession | undefined> {
@@ -195,17 +224,68 @@ export function normalizeBaseUrl(value: string): string {
   return value.replace(/\/+$/, "");
 }
 
+const MAX_IDLE_STREAM_RECONNECTS = 5;
+const IDLE_STREAM_RECONNECT_BASE_MS = 250;
+const IDLE_STREAM_RECONNECT_MAX_MS = 5_000;
+
+/** Exponential backoff for reconnects that returned no domain event. */
+export function idleReconnectDelayMs(attempt: number): number {
+  return Math.min(IDLE_STREAM_RECONNECT_BASE_MS * 2 ** (attempt - 1), IDLE_STREAM_RECONNECT_MAX_MS);
+}
+
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    function onAbort(): void {
+      clearTimeout(timer);
+      resolve();
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 export function parseSseRelayEvent(frame: string): RelayEvent | undefined {
+  return parseSseFrame(frame).event;
+}
+
+function parseSseFrame(frame: string): { event?: RelayEvent; done?: { status?: string; reason?: string } } {
+  const eventName = frame
+    .split(/\r?\n/)
+    .find((line) => line.startsWith("event:"))
+    ?.slice(6)
+    .trim();
   const data = frame
     .split(/\r?\n/)
     .filter((line) => line.startsWith("data:"))
     .map((line) => line.slice(5).trimStart())
     .join("\n")
     .trim();
-  if (!data) return undefined;
-  const parsed = JSON.parse(data) as unknown;
-  if (isRelayEvent(parsed)) return parsed;
-  return undefined;
+  if (!data) return {};
+  // One malformed frame must not tear down a live session stream.
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(data) as unknown;
+  } catch {
+    return {};
+  }
+  if (isRelayEvent(parsed)) return { event: parsed };
+  if (eventName === "done" && typeof parsed === "object" && parsed !== null) {
+    const control = parsed as { status?: unknown; reason?: unknown };
+    return {
+      done: {
+        ...(typeof control.status === "string" ? { status: control.status } : {}),
+        ...(typeof control.reason === "string" ? { reason: control.reason } : {}),
+      },
+    };
+  }
+  return {};
+}
+
+function isTerminalSessionStatus(status: string | undefined): boolean {
+  return status === "completed" || status === "failed" || status === "cancelled";
 }
 
 function isRelayEvent(value: unknown): value is RelayEvent {

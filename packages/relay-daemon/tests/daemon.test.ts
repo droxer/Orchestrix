@@ -385,6 +385,114 @@ test("collectExecution preserves UTF-8 split across byte chunks", async () => {
   assert.equal(rendered.some((chunk) => chunk.includes("\uFFFD")), false);
 });
 
+test("execution capture retains a bounded transcript tail", async () => {
+  const output = `${"a".repeat(400_000)}terminal-jsonl\n`;
+  const chunks: Array<string | null> = [output, null];
+  const execution = {
+    stdin: async () => ({ close: async () => undefined }),
+    stdout: async () => ({ next: async () => chunks.shift() ?? null }),
+    stderr: async () => ({ next: async () => null }),
+    wait: async () => ({ exitCode: 0 }),
+  };
+
+  const result = await collectExecution(execution);
+
+  assert.ok(result.stdout.length <= 262_144);
+  assert.match(result.stdout, /terminal-jsonl\n$/);
+});
+
+test("local execution capture retains a bounded transcript tail", async () => {
+  const result = await localProcessExecStream(process.execPath, [
+    "-e",
+    'process.stdout.write("a".repeat(400000) + "terminal-jsonl\\n")',
+  ]);
+
+  assert.equal(result.exit_code, 0);
+  assert.ok(result.stdout.length <= 262_144);
+  assert.match(result.stdout, /terminal-jsonl\n$/);
+});
+
+test("codex TOML inventory scopes keys to their own mcp_servers table", () => {
+  const toml = [
+    '[mcp_servers.docs]',
+    'command = "docs-server"',
+    '',
+    '[mcp_servers.remote]',
+    'url = "https://user:pw@mcp.example.com/sse?token=secret"',
+    '',
+    '[mcp_servers.literal]',
+    "command = 'literal-server'",
+    '',
+    '[projects]',
+    'command = "not-an-mcp-server"',
+    'url = "https://not-an-mcp-server.example.com"',
+  ].join("\n");
+
+  const parsed = parseInventoryOutput(
+    ["MCP", "codex", ".codex/config.toml", Buffer.from(toml).toString("base64")].join("\t"),
+  );
+
+  const servers = parsed.codex?.mcpServers ?? [];
+  const byName = new Map(servers.map((server) => [server.name, server]));
+  // `[projects]` keys stay out: leaving a table ends the current server.
+  assert.deepEqual([...byName.keys()].sort(), ["docs", "literal", "remote"]);
+  assert.equal(byName.get("docs")?.command, "docs-server");
+  assert.equal(byName.get("literal")?.command, "literal-server");
+  // Credentials and query strings are stripped before the server is reported.
+  assert.equal(byName.get("remote")?.command, "https://mcp.example.com/sse");
+});
+
+test("local agent processes never inherit another provider's credentials", async () => {
+  // A local node runs agents as daemon child processes, so anything left in the
+  // daemon environment is inherited unless it is explicitly stripped.
+  const providerEnv = {
+    ANTHROPIC_API_KEY: "anthropic-secret",
+    OPENAI_API_KEY: "openai-secret",
+    CODEX_API_KEY: "codex-secret",
+    PI_API_KEY: "pi-secret",
+    KIMI_API_KEY: "kimi-secret",
+    MOONSHOT_API_KEY: "moonshot-secret",
+  };
+  const previous = captureEnv(Object.keys(providerEnv));
+  Object.assign(process.env, providerEnv);
+  try {
+    const result = await localProcessExecStream(process.execPath, [
+      "-e",
+      `console.log(JSON.stringify(${JSON.stringify(Object.keys(providerEnv))}.map((k) => [k, process.env[k] ?? null])))`,
+    ], { env: { ANTHROPIC_API_KEY: "anthropic-secret" } });
+
+    assert.equal(result.exit_code, 0);
+    assert.deepEqual(JSON.parse(result.stdout), [
+      ["ANTHROPIC_API_KEY", "anthropic-secret"],
+      ["OPENAI_API_KEY", null],
+      ["CODEX_API_KEY", null],
+      ["PI_API_KEY", null],
+      ["KIMI_API_KEY", null],
+      ["MOONSHOT_API_KEY", null],
+    ]);
+  } finally {
+    restoreCapturedEnv(previous);
+  }
+});
+
+test("execution capture honors the documented transcript override", async () => {
+  const previous = process.env.RELAY_AGENT_RESULT_LOG_LIMIT;
+  process.env.RELAY_AGENT_RESULT_LOG_LIMIT = "600000";
+  try {
+    const result = await localProcessExecStream(process.execPath, [
+      "-e",
+      'process.stdout.write("a".repeat(400000) + "terminal-jsonl\\n")',
+    ]);
+
+    assert.equal(result.exit_code, 0);
+    // Without the override this would have been clipped to 256 KiB upstream of
+    // the completed-run log, making the documented knob a no-op.
+    assert.equal(result.stdout.length, 400_000 + "terminal-jsonl\n".length);
+  } finally {
+    restoreEnv("RELAY_AGENT_RESULT_LOG_LIMIT", previous);
+  }
+});
+
 test("relay daemon ignores duplicate run.start commands already active", async () => {
   const stop = new AbortController();
   const events: DaemonNodeEvent[] = [];
@@ -696,6 +804,71 @@ test("local node refreshes agent availability before heartbeat registration", as
   assert.equal(registrations[1].supportedAgents.includes("codex"), true);
 });
 
+test("capability refresh never probes agents while a run is active", async () => {
+  const stop = new AbortController();
+  const command = runCommand("cmd_active_refresh");
+  let served = false;
+  let polls = 0;
+  let readinessChecks = 0;
+  let checksBeforeRelease = 0;
+  let released = false;
+  let releaseRun!: () => void;
+  const runGate = new Promise<void>((resolve) => { releaseRun = resolve; });
+  await runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_active_refresh",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    sandbox: "none",
+    token: "node_token",
+    pollIntervalMs: 1,
+    heartbeatIntervalMs: 1,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: fakeEnvironment({
+      ensure: async () => { readinessChecks += 1; },
+      exec: async (_cmd, args, options) => {
+        if (isInventoryProbe(args)) return { exit_code: 0, stdout: "", stderr: "" };
+        await runGate;
+        options?.stdoutRenderer?.("done\n");
+        return { exit_code: 0, stdout: "done\n", stderr: "" };
+      },
+    }),
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        if (!served) {
+          served = true;
+          return jsonResponse({ commands: [command] });
+        }
+        polls += 1;
+        // The run's own readiness check races the poll loop, so wait for it to
+        // land rather than sampling at a fixed poll number. Any capability
+        // refresh during the active run would push the count past the expected
+        // five, which the assertion below still catches.
+        if (!released && polls >= 10 && readinessChecks >= 5) {
+          released = true;
+          checksBeforeRelease = readinessChecks;
+          releaseRun();
+        }
+        return jsonResponse({ commands: [] });
+      }
+      if (path.endsWith("/events")) {
+        const event = await jsonBody<DaemonNodeEvent>(init);
+        if (event.type === "run.completed" || event.type === "run.failed") setTimeout(() => stop.abort(), 0);
+        return jsonResponse({ ok: true }, 202);
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  // Four startup probes plus the run's own readiness check.
+  assert.equal(checksBeforeRelease, 5);
+});
+
 test("daemon renews liveness while an idle command poll is in flight", async () => {
   const stop = new AbortController();
   let commandPolls = 0;
@@ -959,6 +1132,60 @@ test("relay daemon batches large alternating output without losing order", async
   );
   assert.match(entries[0]?.text ?? "", /^000:/);
   assert.match(entries.at(-1)?.text ?? "", /^299:/);
+});
+
+test("relay daemon fails safely when undelivered output exceeds its memory budget", async () => {
+  const previousLimit = process.env.RELAY_DAEMON_OUTPUT_BACKLOG_BYTES;
+  process.env.RELAY_DAEMON_OUTPUT_BACKLOG_BYTES = "1024";
+  const stop = new AbortController();
+  const command = runCommand("cmd_output_budget");
+  let served = false;
+  let terminalType = "";
+  try {
+    await runRelayDaemon({
+      backendUrl: "http://relay.test",
+      sandboxId: "sbx_output_budget",
+      sandbox: "none",
+      employeeId: "alice",
+      workspacePath: process.cwd(),
+      token: "node_token",
+      pollIntervalMs: 1,
+      shutdownGraceMs: 50,
+      logger: testLogger(),
+      signal: stop.signal,
+      environment: fakeEnvironment({
+        exec: async (_cmd, args, options) => {
+          if (!isInventoryProbe(args)) options?.stdoutRenderer?.("x".repeat(2048));
+          return { exit_code: 0, stdout: "done", stderr: "" };
+        },
+      }),
+      fetchFn: async (url, init) => {
+        const path = new URL(String(url)).pathname;
+        if (path === "/api") return jsonResponse({ name: "Relay backend" });
+        if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
+        if (path.endsWith("/commands")) {
+          if (!served) {
+            served = true;
+            return jsonResponse({ commands: [command] });
+          }
+          return jsonResponse({ commands: [] });
+        }
+        if (path.endsWith("/events")) {
+          const event = await jsonBody<DaemonNodeEvent>(init);
+          if (event.type === "run.completed" || event.type === "run.failed") {
+            terminalType = event.type;
+            setTimeout(() => stop.abort(), 0);
+          }
+          return jsonResponse({ ok: true }, 202);
+        }
+        throw new Error(`unexpected URL ${url}`);
+      },
+    });
+  } finally {
+    restoreEnv("RELAY_DAEMON_OUTPUT_BACKLOG_BYTES", previousLimit);
+  }
+
+  assert.equal(terminalType, "run.failed");
 });
 
 test("daemon logger flushes non-blocking node and run logs", async (t) => {
@@ -1848,13 +2075,19 @@ test("parseInventoryOutput reads skill frontmatter and MCP servers per agent", (
   const mcpJson = JSON.stringify({
     mcpServers: {
       codegraph: { command: "codegraph", args: ["serve"] },
-      remote: { url: "https://example.com/sse", type: "sse" },
+      remote: { url: "https://user:pass@example.com/sse?token=secret#fragment", type: "sse" },
     },
   });
   const stdout = [
     inventoryLine("SKILL", "claude", "superpowers/brainstorming/SKILL.md", skillMd),
     inventoryLine("SKILL", "claude", "frontend-design/SKILL.md", "---\nname: frontend-design\n---\n"),
     inventoryLine("MCP", "claude", ".claude.json", mcpJson),
+    inventoryLine(
+      "MCP",
+      "codex",
+      ".codex/config.toml",
+      '[mcp_servers.context7]\ncommand = "npx"\nargs = ["-y", "@upstash/context7-mcp"]\n\n[mcp_servers.remote]\nurl = "https://example.com/mcp?token=secret"\n',
+    ),
     inventoryLine("SKILL", "bogus-agent", "x/SKILL.md", skillMd),
     "",
   ].join("\n");
@@ -1876,7 +2109,36 @@ test("parseInventoryOutput reads skill frontmatter and MCP servers per agent", (
       { name: "remote", transport: "sse" },
     ],
   );
+  assert.equal(claude.mcpServers.find((server) => server.name === "remote")?.command, "https://example.com/sse");
+  assert.deepEqual(
+    inventory.codex?.mcpServers.map((server) => ({ name: server.name, transport: server.transport, command: server.command })),
+    [
+      { name: "context7", transport: "stdio", command: "npx" },
+      { name: "remote", transport: "http", command: "https://example.com/mcp" },
+    ],
+  );
   assert.equal(inventory["bogus-agent" as "claude"], undefined);
+});
+
+test("agent skills are provisioned and inventoried for every supported CLI", () => {
+  const boxSource = readFileSync(join(process.cwd(), "packages/relay-daemon/src/box.ts"), "utf8");
+  for (const directory of [".claude/skills", ".codex/skills", ".pi/skills", ".kimi/skills"]) {
+    assert.match(boxSource, new RegExp(directory.replace(".", "\\.")));
+  }
+  const daemonSource = readFileSync(join(process.cwd(), "packages/relay-daemon/src/index.ts"), "utf8");
+  assert.match(daemonSource, /ensureLocalAgentReady[\s\S]*prepareHostAgentSkills/);
+});
+
+test("devbox pins every installed agent CLI to an exact version", () => {
+  const source = readFileSync(join(process.cwd(), "dockerfile"), "utf8");
+  for (const packageName of [
+    "@anthropic-ai/claude-code",
+    "@openai/codex",
+    "@earendil-works/pi-coding-agent",
+    "@moonshot-ai/kimi-code",
+  ]) {
+    assert.match(source, new RegExp(`${packageName.replace("/", "\\/")}@[0-9]+\\.[0-9]+\\.[0-9]+`));
+  }
 });
 
 test("discoverAgentInventory returns empty on non-zero exit and never throws", async () => {

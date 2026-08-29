@@ -12,7 +12,7 @@ import type { AgentState } from "./state.js";
 
 export function buildCodexCommand(state: AgentState, workspacePath?: string): string {
   const argv = [...codexBaseArgv({ workspacePath }), codexTaskPrompt(state)];
-  return runAsAgent(shellCommand(argv), "codex", workspacePath);
+  return runAsAgent(shellCommand(argv), workspacePath);
 }
 
 function codexBaseArgv({ workspacePath }: { workspacePath?: string } = {}): string[] {
@@ -61,7 +61,7 @@ function buildClaudeInvocation(
   const model = anthropicModel();
   if (model) argv.push("--model", model);
   argv.push(prompt);
-  return runAsAgent(shellCommand(argv), "claude", workspacePath);
+  return runAsAgent(shellCommand(argv), workspacePath);
 }
 
 export function buildPiCommand(state: AgentState, workspacePath?: string): string {
@@ -82,24 +82,26 @@ function buildPiInvocation(prompt: string, workspacePath?: string): string {
     "pi --help 2>&1 | grep -Eq '(^|[[:space:]])(-P|--print-streaming)([=,[:space:]]|$)'";
   return runAsAgent(
     `if ${supportsJsonMode}; then ${jsonCommand}; elif ${supportsStreamingPrint}; then ${streamingCommand}; else ${printCommand}; fi`,
-    "pi",
     workspacePath,
   );
 }
 
-// Kimi (Moonshot AI) CLI. The exact flags are provisional — confirm `-p`/model
-// flags against the installed Kimi CLI version before relying on this in prod.
+// Kimi (Moonshot AI) CLI. Flags verified against kimi-code 0.39; re-check
+// `--auto`/`--output-format` against the installed version when bumping it.
 export function buildKimiCommand(state: AgentState, workspacePath?: string): string {
   return buildKimiInvocation(kimiTaskPrompt(state), workspacePath);
 }
 function buildKimiInvocation(prompt: string, workspacePath?: string): string {
-  const argv = ["kimi"];
+  // Kimi asks before tool calls by default. The run is headless, so nothing can
+  // answer and the agent would stall; --auto is its equivalent of Claude's
+  // bypassPermissions and Codex's approval bypass.
+  const argv = ["kimi", "--auto"];
   const model = kimiModel();
   if (model) argv.push("--model", model);
   // stream-json emits one JSON message object per stdout line (parsed by
   // KimiStreamRenderer) and keeps thinking + the resume notice off stdout.
   argv.push("--output-format", "stream-json", "--prompt", prompt);
-  return runAsAgent(shellCommand(argv), "kimi", workspacePath);
+  return runAsAgent(shellCommand(argv), workspacePath);
 }
 
 export function buildPiPreflightCommand(): string {
@@ -121,5 +123,5 @@ export function buildPiPreflightCommand(): string {
   } else {
     modelCheck = shellCommand(listModelsArgv);
   }
-  return runAsAgent(["node --version", "command -v pi", "pi --version", modelCheck].join(" && "), "pi");
+  return runAsAgent(["node --version", "command -v pi", "pi --version", modelCheck].join(" && "));
 }

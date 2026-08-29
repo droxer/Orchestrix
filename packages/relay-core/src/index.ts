@@ -140,6 +140,8 @@ export {
   encodeBase64,
   codexCliConfigOverrides,
   agentCredentialEnv,
+  agentCredentialEnvNames,
+  allAgentCredentialEnvNames,
   GUEST_AGENT_SYNC_SCRIPT,
   guestAgentEnv,
   guestCodexAuthJson,
@@ -205,6 +207,7 @@ export {
   codexNode,
   piNode,
   runAgentNode,
+  agentTranscriptLimit,
 } from "./nodes.js";
 
 export {

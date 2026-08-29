@@ -29,6 +29,8 @@ interface AgentInventorySource {
   readonly skillsDir?: string;
   /** Home-relative JSON files carrying an `mcpServers` map. */
   readonly mcpJson?: readonly string[];
+  /** Home-relative Codex TOML files carrying `[mcp_servers.<name>]` tables. */
+  readonly mcpToml?: readonly string[];
 }
 
 // Conservative, easily-extended per-agent source map. Only Claude has a
@@ -36,7 +38,7 @@ interface AgentInventorySource {
 // skills/MCP a node does install surface without further code changes.
 const AGENT_INVENTORY_SOURCES: Record<AgentName, AgentInventorySource> = {
   claude: { skillsDir: ".claude/skills", mcpJson: [".claude.json", ".mcp.json"] },
-  codex: { skillsDir: ".codex/skills", mcpJson: [".codex/mcp.json"] },
+  codex: { skillsDir: ".codex/skills", mcpJson: [".codex/mcp.json"], mcpToml: [".codex/config.toml"] },
   pi: { skillsDir: ".pi/skills", mcpJson: [".pi/mcp.json"] },
   kimi: { skillsDir: ".kimi/skills", mcpJson: [".kimi/mcp.json"] },
 };
@@ -88,7 +90,7 @@ function buildInventoryScript(): string {
         `fi`,
       );
     }
-    for (const rel of source.mcpJson ?? []) {
+    for (const rel of [...(source.mcpJson ?? []), ...(source.mcpToml ?? [])]) {
       if (!SAFE_REL_PATH.test(rel)) continue;
       lines.push(
         `m="$home/${rel}"`,
@@ -123,7 +125,7 @@ export function parseInventoryOutput(stdout: string): Partial<Record<AgentName, 
       const skill = parseSkill(id, content);
       if (skill) ensure(agent).skills.push(skill);
     } else if (kind === "MCP") {
-      for (const server of parseMcpServers(content)) ensure(agent).mcpServers.push(server);
+      for (const server of parseMcpServers(id, content)) ensure(agent).mcpServers.push(server);
     }
   }
 
@@ -177,7 +179,8 @@ function stripQuotes(value: string): string {
 }
 
 /** Read the `mcpServers` map from a CLI config file. */
-function parseMcpServers(content: string): DaemonAgentMcpServer[] {
+function parseMcpServers(path: string, content: string): DaemonAgentMcpServer[] {
+  if (path.endsWith(".toml")) return parseTomlMcpServers(content);
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
@@ -195,11 +198,67 @@ function parseMcpServers(content: string): DaemonAgentMcpServer[] {
       typeof entry.command === "string"
         ? entry.command
         : typeof entry.url === "string"
-          ? entry.url
+          ? redactMcpUrl(entry.url)
           : undefined;
     servers.push({ name, transport, ...(command ? { command } : {}) });
   }
   return servers;
+}
+
+function parseTomlMcpServers(content: string): DaemonAgentMcpServer[] {
+  const servers: DaemonAgentMcpServer[] = [];
+  let current: { name: string; values: Record<string, string> } | undefined;
+  const flush = (): void => {
+    if (!current) return;
+    const entry = current;
+    current = undefined;
+    const url = entry.values.url;
+    const command = entry.values.command ?? (url ? redactMcpUrl(url) : undefined);
+    servers.push({
+      name: entry.name,
+      transport: url ? "http" : "stdio",
+      ...(command ? { command } : {}),
+    });
+  };
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    const section = /^\[mcp_servers\.(?:"([^"]+)"|([A-Za-z0-9_-]+))\]$/.exec(line);
+    if (section) {
+      flush();
+      current = { name: section[1] ?? section[2], values: {} };
+      continue;
+    }
+    // Any other table ends the current server. Without this, a `command`/`url`
+    // key in an unrelated later section would be attributed to the last MCP
+    // server seen.
+    if (line.startsWith("[")) {
+      flush();
+      current = undefined;
+      continue;
+    }
+    if (!current || !line || line.startsWith("#")) continue;
+    const field = /^(command|url)\s*=\s*(?:"((?:\\.|[^"])*)"|'([^']*)')/.exec(line);
+    if (field) {
+      current.values[field[1]] = field[2] !== undefined
+        ? field[2].replace(/\\"/g, '"')
+        : field[3];
+    }
+  }
+  flush();
+  return servers;
+}
+
+function redactMcpUrl(value: string): string | undefined {
+  try {
+    const url = new URL(value);
+    url.username = "";
+    url.password = "";
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/$/, url.pathname === "/" ? "/" : "");
+  } catch {
+    return undefined;
+  }
 }
 
 function resolveTransport(entry: { url?: unknown; type?: unknown; transport?: unknown }): DaemonMcpTransport {

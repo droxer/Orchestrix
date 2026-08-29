@@ -167,6 +167,22 @@ def test_daemon_node_event_parser_keeps_error_messages_and_raw_logs() -> None:
         "source": "codex",
     }
 
+    parsed_with_round_result = daemon_node_event(
+        {
+            "type": "run.completed",
+            "commandId": "cmd_1",
+            "sessionId": "ses_1",
+            "runId": "run_1",
+            "agent": "codex",
+            "exitCode": 0,
+            "roundResult": {"status": "done", "note": "all checks passed"},
+        }
+    )
+    assert parsed_with_round_result["roundResult"] == {
+        "status": "done",
+        "note": "all checks passed",
+    }
+
     # Token usage is telemetry hanging off a terminal event. Rejecting the
     # whole event over it would strand the run: the daemon drops the report,
     # the session stays "running", and — runs being exclusive — the node

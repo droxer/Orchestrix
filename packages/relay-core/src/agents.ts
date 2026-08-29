@@ -46,7 +46,12 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     createRenderer: () => new ClaudeStreamRenderer(),
     label: "Claude Code",
     needsGuestAuth: false,
-    preflight: { label: "Claude Code", command: () => runAsAgent("claude --version", "claude") },
+    preflight: {
+      label: "Claude Code auth",
+      command: () => runAsAgent(
+        'if [ -n "${ANTHROPIC_API_KEY:-}" ]; then claude --version; else claude auth status; fi',
+      ),
+    },
   },
   pi: {
     name: "pi",
@@ -68,7 +73,7 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     createRenderer: () => new CodexStreamRenderer(),
     label: "Codex",
     needsGuestAuth: true,
-    preflight: { label: "Codex auth", command: () => runAsAgent("codex login status", "codex") },
+    preflight: { label: "Codex auth", command: () => runAsAgent("codex login status") },
   },
   kimi: {
     name: "kimi",
@@ -79,7 +84,7 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     createRenderer: () => new KimiStreamRenderer(),
     label: "Kimi",
     needsGuestAuth: true,
-    preflight: { label: "Kimi", command: () => runAsAgent("kimi --version && kimi doctor", "kimi") },
+    preflight: { label: "Kimi", command: () => runAsAgent("kimi --version && kimi doctor") },
   },
 };
 

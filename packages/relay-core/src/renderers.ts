@@ -377,7 +377,10 @@ export class KimiStreamRenderer {
     // form ({type,message:{...}}) for forward compatibility.
     const message = asRecord(event.message ?? event);
     const role = message.role ?? event.role;
-    if (role !== undefined && role !== "assistant") return "";
+    // Require the assistant role rather than merely tolerating it. A record
+    // with no role is not a turn — rendering its text/content field would put
+    // stream bookkeeping on screen as if the agent had said it.
+    if (role !== "assistant") return "";
 
     const output: string[] = [];
     const text = textFromContentRecord(message).trim();
