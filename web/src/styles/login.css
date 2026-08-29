@@ -16,7 +16,6 @@
   --lg-canvas: var(--dark-canvas);
   --lg-elevated: var(--dark-elevated);
   --lg-ink: var(--dark-ink);
-  --lg-body: var(--dark-body);
   --lg-muted: var(--dark-ink-soft);
   --lg-hairline: var(--dark-line);
   --lg-hairline-soft: var(--dark-line-soft);
@@ -25,7 +24,6 @@
      cobalt, so the pre-auth CTA is the same control as post-auth). */
   --lg-steel: var(--action);
   --lg-steel-active: var(--action-hover);
-  --lg-on-steel: var(--on-action); /* text on the action fill */
   --lg-err: var(--dark-ink); /* error is the loud/bright tier — dots stay calm */
   --lg-accent: var(--lg-steel);
   /* The canvas is pinned dark whatever theme is saved, so the shared focus

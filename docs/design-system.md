@@ -29,9 +29,10 @@ Phosphor.
   (`--on-action`, 5.4:1 on the fill and 6.5:1 on the pressed state). The source
   system runs two primaries — cobalt inside the commerce flow, a black pill on
   marketing surfaces — and Relay is entirely in-product, so cobalt is the
-  action here and the black pill survives as `--ink-button` for pre-auth and
-  landing chrome. There is no disabled hex — disabled is opacity. Links are
-  **not** `--action`: they take `--link` (the source system's meta-link blue),
+  action on every surface, pre-auth chrome included; the black marketing pill
+  has no consumer here and is deliberately not carried as a token, so there is
+  no second primary to keep in step with. There is no disabled hex —
+  disabled is opacity. Links are **not** `--action`: they take `--link` (the source system's meta-link blue),
   reserved for wayfinding — anchors in prose and the focus ring.
 - **Status is chromatic, and still dot / border / text — never fills.**
   `--ok` `--warn` `--err` carry the source system's success / warning / critical
@@ -129,7 +130,7 @@ Tailwind `@theme` machinery:
    `.<class>.code` override.
 
 **Naming rule:** component CSS only ever references a palette token
-(`--surface-*`, `--ink-*`, `--line-*`, `--action*`, `--ink-button`,
+(`--surface-*`, `--ink-*`, `--line-*`, `--action*`,
 `--ok/--warn/--err/--info`, `--live`, `--link-blue*`, `--r-*`, `--sp-*`,
 `--measure*`, `--fs-*`, `--track-*`, `--font-*`, `--z-*`, `--t-*`, `--ease`)
 or a role (`--type-*`, `--shadow-*`, `--focus-*`, `--link*`) — never a literal
@@ -161,11 +162,10 @@ Dark register / light register:
 | `--action-hover` | `#0457cb` | `#0457cb` | pressed / active — register-invariant |
 | `--action-soft` | 15% soft-cobalt wash | 12% cobalt wash | selection wash, active nav |
 | `--on-action` | `#ffffff` | `#ffffff` | text on the action fill |
-| `--ink-button` / `--on-ink-button` | `#ffffff` / `#0a1317` | `#000000` / `#ffffff` | the source system's marketing pill |
 | `--link` / `--link-hover` | `#8ab4f8` / `#b9d3fb` | `#385898` / `#0457cb` | anchors in prose, focus ring |
 | `--ok` | `#4ac16a` | `#12752f` | ready, passed, done |
-| `--warn` | `#f7b928` | `#8a5a00` | attention, degraded |
-| `--err` | `#ff6b7f` | `#c81232` | failed, destructive |
+| `--warn` | `#fc9f30` | `#8f560f` | attention, degraded — amber, not the highlighter yellow |
+| `--err` | `#ff6367` | `#c81232` | failed, destructive |
 | `--on-err` | `#0a1317` | `#ffffff` | text on the critical fill |
 | `--info` | = `--ink-3` | = `--ink-3` | neutral notice |
 | `--live` | `#cf7ef0` | `#a121ce` | an agent is working *right now* |
@@ -204,8 +204,8 @@ can land on**, not against the canvas. Ratios against that plane:
 
 | | ink-1 | ink-2 | ink-3 | ink-4 | ok | warn | err |
 |---|---|---|---|---|---|---|---|
-| dark (vs `--surface-3`) | 13.53 | 10.50 | 7.20 | 5.95 | 5.88 | 7.68 | 4.94 |
-| light (vs `--surface-2`) | 14.94 | 13.29 | 7.22 | 5.02 | 4.63 | 4.72 | 4.66 |
+| dark (vs `--surface-3`) | 13.53 | 10.50 | 7.20 | 5.95 | 5.88 | 6.53 | 4.66 |
+| light (vs `--surface-2`) | 14.94 | 13.29 | 7.22 | 5.02 | 4.63 | 4.77 | 4.66 |
 
 `paletteTokens.test.ts` computes these from the declared hexes rather than
 pinning the hexes themselves, so a future palette move is checked for
@@ -218,8 +218,8 @@ register must not turn a green into a grey.
 transparency, so the selection wash always tracks the action colour.
 
 A **pinned group** (`--dark-canvas`, `--dark-surface`, `--dark-elevated`,
-`--dark-ink`, `--dark-ink-strong`, `--dark-body`, `--dark-ink-soft`,
-`--dark-line`, `--dark-line-soft`, plus `--light-canvas`, `--light-ink`)
+`--dark-ink`, `--dark-ink-soft`, `--dark-line`,
+`--dark-line-soft`, plus `--light-canvas`)
 mirrors the registers for chrome that must *not* follow the active theme: the
 pre-auth login ramp, the theme-picker swatches that show both registers at
 once, the diff viewer, ink-fill buttons. A test asserts each pinned token
@@ -640,11 +640,11 @@ Key characteristics:
 | Source token | Relay token | What changed and why |
 |---|---|---|
 | `primary` / `primary-deep` / `on-primary` | `--action` / `--action-hover` / `--on-action` | Unchanged values. Relay is entirely in-product, so cobalt is *the* action rather than a commerce-only variant. |
-| `ink-button` / `on-ink-button` | `--ink-button` / `--on-ink-button` | Verbatim in light; inverted in dark, where a black pill would vanish into the canvas. |
+| `ink-button` / `on-ink-button` | — | Not adopted. Relay is entirely in-product, so cobalt is the primary on every surface; a black marketing pill has no caller here. |
 | `primary-soft` | `--action-soft` | Carried as a `color-mix` wash rather than a flat hex, so the selection tint tracks the action colour. |
 | `meta-link` | `--link-blue` (light) | Verbatim. Dark lifts it to `#8ab4f8` for AA on the ink-deep canvas. |
 | `oculus-purple` | `--live` | Verbatim in light, lifted in dark. Relay spends the second sanctioned accent on liveness because cobalt is already the action. |
-| `success` / `warning` / `critical` | `--ok` / `--warn` / `--err` | Hue family kept; lightness retuned per register so each clears 4.5:1 as *small text* — the published values are badge-fill colours. |
+| `success` / `warning` / `critical` | `--ok` / `--warn` / `--err` | Hue family kept; lightness retuned per register so each clears 4.5:1 as *small text* — the published values are badge-fill colours. The warning additionally walks from the published golden yellow (hue 82) to an amber at hue 65, so a caution stops out-shouting the critical red beside it and keeps 43° of clearance from it. |
 | `canvas` / `surface-soft` | `--surface-3` / `--surface-2`, `--surface-0` | Traded places: in a three-pane app the cloud grey carries the page and white carries cards and floating chrome. |
 | `ink-deep` / `ink` / `charcoal` | `--ink-1` / `--ink-2` / `--ink-3` | Verbatim. |
 | `steel` | `--ink-4` | Deepened to `#556170`; the published value measures 4.34:1 against the recessed fill. |
