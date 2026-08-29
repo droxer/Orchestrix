@@ -471,6 +471,12 @@
   white-space: nowrap;
 }
 
+/* GEOMETRY ONLY. These are the row delete actions; their destructive paint —
+   --err ink, the --err hairline that survives forced-colors, and the danger
+   focus ring — now comes from <Button danger>, the one modifier every quiet
+   destructive action in the app shares. It used to be re-implemented here as a
+   descendant rule, which both duplicated the grammar and (by layer order) beat
+   whatever variant the call site asked for. */
 .adm-chat-rows button {
   display: inline-flex;
   align-items: center;
@@ -478,23 +484,8 @@
   flex: none;
   width: 28px;
   height: var(--control-h-xs);
-  border: none;
   border-radius: var(--r-2);
-  background: transparent;
-  color: var(--ink-3);
   cursor: pointer;
-  transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
-}
-
-.adm-chat-rows button:hover {
-  color: var(--err);
-  background: var(--row-hover);
-}
-
-.adm-chat-rows button:focus-visible {
-  color: var(--err);
-  outline: var(--focus-outline-danger);
-  outline-offset: var(--focus-offset);
 }
 
 @media (max-width: 1040px) {

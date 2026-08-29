@@ -405,6 +405,7 @@ export function ChannelDetail({
                 </span>
                 <Button
                   variant="ghost"
+                  danger
                   type="button"
                   onClick={() => void onDeleteIdentityLink(link)}
                   aria-label={t("admin.v2.chat_delete_link")}
@@ -468,6 +469,7 @@ export function ChannelDetail({
                 </span>
                 <Button
                   variant="ghost"
+                  danger
                   type="button"
                   onClick={() => void onDeleteConversation(conversation)}
                   aria-label={t("admin.v2.chat_delete_allow")}

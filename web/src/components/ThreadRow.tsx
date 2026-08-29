@@ -172,7 +172,8 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose, tone, l
       </Button>
       <span className="conversation-row-actions">
         {onRename ? (
-          <Button variant="ghost"
+          <Button variant="icon"
+            size="icon-xs"
             className="conversation-rename-btn"
             type="button"
             aria-label={t("thread.rename")}
@@ -183,7 +184,9 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose, tone, l
           </Button>
         ) : null}
         {onClose ? (
-          <Button variant="ghost"
+          <Button variant="icon"
+            size="icon-xs"
+            danger
             className="conversation-remove-btn"
             type="button"
             aria-label={deleteEnabled ? t("thread.delete") : t("thread.delete_blocked")}

@@ -581,6 +581,16 @@
   transform: translateY(-50%);
 }
 
+/* GEOMETRY + the hover-reveal only. Paint comes from the `icon` variant both
+   buttons now carry (--ink-3 at rest, --ink-1 + a --control-fill-hover wash on
+   hover), with `danger` on the remove action supplying --err ink plus the
+   --err hairline that keeps the destructive signal alive in forced-colors mode
+   — where a hue-only hover, which is what this block used to declare, leaves
+   delete looking exactly like rename.
+
+   `color` in particular must NOT be set here: an unconditional colour in
+   `@layer relay` outranks the variant's :hover utility by layer order, so it
+   would pin the icon to its resting ink and no hover colour would ever land. */
 .conversation-rename-btn,
 .conversation-remove-btn {
   display: flex;
@@ -589,26 +599,12 @@
   width: 24px;
   height: var(--control-h-2xs);
   padding: 0;
-  border: 0;
   border-radius: var(--r-2);
-  background: transparent;
-  color: var(--ink-3);
   cursor: pointer;
   touch-action: manipulation;
-  transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
   opacity: 0;
   font-size: var(--fs-2);
   line-height: var(--leading-none);
-}
-
-.conversation-rename-btn:hover {
-  color: var(--ink-1);
-  background: var(--control-fill-hover);
-}
-
-.conversation-remove-btn:hover {
-  color: var(--err);
-  background: var(--control-fill-hover);
 }
 
 .conversation-row:hover .conversation-rename-btn,
