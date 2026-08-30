@@ -13,6 +13,15 @@ service commands, data layout, and test organization.
 - Hardware virtualization for BoxLite
 - API keys for the agents you plan to run
 
+## Technology Stack
+
+| Layer | Technology |
+|---|---|
+| Backend | [FastAPI](https://github.com/fastapi/fastapi), [SQLAlchemy](https://github.com/sqlalchemy/sqlalchemy), [Pydantic](https://github.com/pydantic/pydantic), [Alembic](https://github.com/sqlalchemy/alembic), [uv](https://github.com/astral-sh/uv) |
+| Web | [Next.js](https://github.com/vercel/next.js), [React](https://github.com/facebook/react), [Tailwind CSS](https://github.com/tailwindlabs/tailwindcss), [TanStack Query](https://github.com/TanStack/query), [Zustand](https://github.com/pmndrs/zustand) |
+| Sandboxing | [BoxLite](https://github.com/boxlite-ai/boxlite) |
+| Agents | [Claude Code](https://github.com/anthropics/claude-code), Codex, Pi, Kimi |
+
 ## Environment Files
 
 Relay uses project-local env files at each runtime boundary:
