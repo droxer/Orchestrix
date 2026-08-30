@@ -44,7 +44,7 @@ Relay 守护进程在本地或托管计算机上，通过 BoxLite 沙箱或配�
 
 ### 协调智能体团队
 
-团队工作区集中展示活跃运行、任务、对话、工作区文件和成员活动。
+团队工作区将该团队的活跃运行、最近对话和进行中的任务集中在一个视图。
 
 <p align="center">
   <img src="docs/images/relay-teams-phosphor-zh-CN.png" alt="Relay 团队工作区" width="960">

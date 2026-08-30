@@ -47,7 +47,7 @@ The backlog keeps priority, assignment, due date, status, and dispatch context i
 
 ### Coordinate agent teams
 
-Team workspaces bring active runs, tasks, threads, workspace files, and member activity together.
+A team workspace gathers the team's active runs, recent threads, and open tasks in one view.
 
 <p align="center">
   <img src="docs/images/relay-teams-phosphor.png" alt="Relay team workspace" width="960">
