@@ -13,6 +13,7 @@ from ..persistence.stores import (
     task_status,
     valid_agent,
 )
+from ..persistence.task_store import TaskExecutionActiveError
 from ..services.task_deletion import (
     TaskDeletionError,
     task_has_active_linked_session,
@@ -57,6 +58,15 @@ from .helpers import (
 from .project_helpers import project_for_owner, project_session_fields
 
 router = APIRouter()
+
+
+def update_task_unless_dispatching(
+    ctx: AppContextDep, task_id: str, payload: dict[str, Any]
+) -> dict[str, Any]:
+    try:
+        return ctx.task_store.update_task(task_id, payload, reject_active_claim=True)
+    except TaskExecutionActiveError as error:
+        raise HTTPException(409, "task_execution_active") from error
 
 
 def logical_agent_for_assignment(
@@ -635,7 +645,8 @@ async def update_task(
                 else {}
             ),
         }
-    task = ctx.task_store.update_task(
+    task = update_task_unless_dispatching(
+        ctx,
         task_id,
         {
             "title": title,
@@ -717,7 +728,8 @@ async def assign_task(
             )
         except TeamDispatchError as error:
             raise HTTPException(409, error.code) from error
-        return ctx.task_store.update_task(
+        return update_task_unless_dispatching(
+            ctx,
             task_id,
             {
                 "status": "assigned",
@@ -735,7 +747,8 @@ async def assign_task(
     )
     if not logical_agent or not assigned_agent_id:
         raise HTTPException(400, "agentId is required for task assignment.")
-    return ctx.task_store.update_task(
+    return update_task_unless_dispatching(
+        ctx,
         task_id,
         {
             "status": "assigned",

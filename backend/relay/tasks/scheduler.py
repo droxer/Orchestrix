@@ -339,19 +339,6 @@ class TaskScheduler:
                         daemon_nodes=daemon_nodes,
                         session_store=self.registry.store,
                     )
-                    assignments = [
-                        {
-                            **assignment,
-                            "assignmentId": assignment.get("assignmentId")
-                            or new_database_id(),
-                        }
-                        for assignment in assignments
-                    ]
-                    assignments = compile_assignment_work_graph(
-                        assignments,
-                        purpose="accomplish",
-                        team_snapshot=None,
-                    )
                     agent = assignments[0]["agent"]
                 elif team_id:
                     assignments = resolve_team_task_assignments(
@@ -381,6 +368,27 @@ class TaskScheduler:
                         daemon_store=self.registry.daemon_store,
                         session_store=self.registry.store,
                     )
+                assignments = [
+                    {
+                        **assignment,
+                        "assignmentId": assignment.get("assignmentId")
+                        or new_database_id(),
+                    }
+                    for assignment in assignments
+                ]
+                team_snapshot = next(
+                    (
+                        assignment.get("teamSnapshot")
+                        for assignment in assignments
+                        if isinstance(assignment.get("teamSnapshot"), dict)
+                    ),
+                    None,
+                )
+                assignments = compile_assignment_work_graph(
+                    assignments,
+                    purpose="accomplish",
+                    team_snapshot=team_snapshot,
+                )
                 node = self.registry.get(assignments[0]["daemonNodeId"])
             except ProjectDispatchError as error:
                 state = "rejected" if error.permanent else "queued"
@@ -543,18 +551,35 @@ class TaskScheduler:
         claim = task.get("dispatchClaim") or {}
         claim_id = claim.get("id")
         try:
-            collaboration = None
-            if project_snapshot:
-                collaboration = {
-                    "manifest": create_round_manifest(
-                        source="task",
-                        purpose="accomplish",
-                        address={"kind": "room"},
-                        assignments=assignments,
-                        team_snapshot=None,
-                        project_snapshot=project_snapshot,
-                    )
-                }
+            team_snapshot = next(
+                (
+                    assignment.get("teamSnapshot")
+                    for assignment in assignments
+                    if isinstance(assignment.get("teamSnapshot"), dict)
+                ),
+                None,
+            )
+            collaboration = {
+                "manifest": create_round_manifest(
+                    source="task",
+                    purpose="accomplish",
+                    address=(
+                        {"kind": "room"}
+                        if team_id
+                        else {
+                            "kind": "members",
+                            "agentIds": [
+                                assignment["agentId"]
+                                for assignment in assignments
+                                if assignment.get("agentId")
+                            ],
+                        }
+                    ),
+                    assignments=assignments,
+                    team_snapshot=team_snapshot,
+                    project_snapshot=project_snapshot,
+                )
+            }
             session = await self.backend.run(
                 node_id,
                 {
@@ -573,7 +598,7 @@ class TaskScheduler:
                         if project_snapshot
                         else {}
                     ),
-                    **({"collaboration": collaboration} if collaboration else {}),
+                    "collaboration": collaboration,
                     **({"sessionId": session_id} if session_id else {}),
                     **({"idempotencyKey": claim_id} if claim_id else {}),
                 },
