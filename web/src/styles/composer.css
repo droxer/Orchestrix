@@ -103,6 +103,15 @@
   font: var(--type-label);
 }
 
+/* Lead-in word for the pinned computer. Quieter than the machine name so the
+   pair reads as a statement of fact beside the agent plate, not a second
+   control that lost its chrome. */
+.thread-runtime-readout-label {
+  color: var(--ink-4);
+  font: var(--type-label);
+  white-space: nowrap;
+}
+
 .thread-runtime-readout-name {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -174,12 +183,30 @@
     gap: var(--sp-2);
   }
 
+  /* Phone width goes to the machine name; the lead-in words are the first
+     thing that can go, in the picker rail and the readout alike. */
   .thread-runtime-context,
-  .thread-runtime-divider {
+  .thread-runtime-divider,
+  .thread-runtime-readout-label {
     display: none;
   }
 
   .thread-runtime-select { max-width: 100%; }
+}
+
+/* Targets rail — who runs the round, and on which computer. It sits above
+   the input card, on the panel ground rather than on the card, so the two
+   answers read before the draft instead of trailing it. Same measure and
+   centering as the card so the controls line up with its left edge. */
+.composer-targets {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  width: min(100%, var(--thread-measure));
+  min-width: 0;
+  min-height: var(--control-h-sm);
+  margin: 0 auto var(--sp-2);
 }
 
 .composer-input-wrap {
@@ -274,26 +301,15 @@
   color: var(--ink-3);
 }
 
+/* The footer now carries the send control alone — the targets moved above
+   the card — so it packs right instead of splitting a two-sided row. */
 .composer-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--sp-3);
-  padding: var(--sp-1) var(--sp-3) var(--sp-3) var(--composer-inline);
-}
-
-.composer-footer-left,
-.composer-footer-right {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
   min-height: var(--control-h-sm);
-  flex: 0 0 auto;
-}
-
-.composer-footer-left {
-  flex-wrap: wrap;
-  min-width: 0;
+  padding: var(--sp-1) var(--sp-3) var(--sp-3) var(--composer-inline);
 }
 
 .composer-project-room {

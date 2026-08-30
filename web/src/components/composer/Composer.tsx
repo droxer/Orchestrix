@@ -160,8 +160,58 @@ const ComposerView = forwardRef<ComposerHandle, {
     setText: (text: string) => setComposerText(text),
   }), [composerText, setComposerText, textareaRef]);
 
+  // A project room owns its computer and its workspace, so the room names
+  // itself here instead of offering a machine; a thread that has started names
+  // the computer it was pinned to; only a thread still being staged gets a
+  // picker.
+  const computerSlot = projectName ? (
+    <span className="composer-project-room" title={t("project.shared_workspace")}>
+      <WorkspaceFolder size={ICON.sm} aria-hidden="true" />
+      {projectName}
+    </span>
+  ) : initializingThread ? (
+    <ThreadRuntimeSelect
+      nodes={runtimeNodes}
+      value={runtimeNodeId}
+      selectedNode={selectedRuntimeNode}
+      onValueChange={onRuntimeNodeChange}
+    />
+  ) : activeRuntimeNode ? (
+    <ThreadRuntimeReadout node={activeRuntimeNode} />
+  ) : null;
+
   return (
     <form className="composer" onSubmit={(e) => { e.preventDefault(); triggerSend(); }}>
+      {/* Targets rail: who runs this round, and on which computer. It sits
+          above the input card rather than in its footer so both answers read
+          before the draft, and the card below is left to the draft and its one
+          commit control.
+
+          The two are not peers. A thread is pinned to its computer the moment
+          it starts — the workspace belongs to the thread — while the agent
+          stays switchable for the thread's whole life, because every agent on
+          that computer shares that workspace. So the rail leads with whichever
+          one the author can still act on: the computer picker while staging
+          (it gates which agents exist at all), the agent picker afterwards,
+          with the settled computer trailing it as quiet context. */}
+      <div className="composer-targets">
+        {initializingThread ? computerSlot : null}
+        <AgentSelect
+          logicalAgents={logicalAgents}
+          activeLogicalAgentId={addressedLogicalAgentId ?? activeLogicalAgentId}
+          onLogicalAgentPicked={pickLogicalAgent}
+          teams={projectName ? [] : teams}
+          activeTeamId={projectName ? null : activeTeamId}
+          onTeamPicked={pickTeam}
+          teamLocked={teamLocked}
+          teamOptionsEnabled={initializingThread && !projectName}
+          room={projectName ? projectRoom : null}
+          roomSelected={roomSelected}
+          onRoomPicked={pickRoom}
+          running={running}
+        />
+        {initializingThread ? null : computerSlot}
+      </div>
       <div className="composer-input-wrap" data-running={running || undefined}>
         <div className="composer-input">
           <MentionPopup
@@ -219,72 +269,37 @@ const ComposerView = forwardRef<ComposerHandle, {
             />
           </div>
           <div className="composer-footer">
-            <div className="composer-footer-left">
-              {/* A new thread picks its computer; a started one keeps a
-                  compact readout beside the agent controls. */}
-              {projectName ? (
-                <span className="composer-project-room" title={t("project.shared_workspace")}>
-                  <WorkspaceFolder size={ICON.sm} aria-hidden="true" />
-                  {projectName}
-                </span>
-              ) : initializingThread ? (
-                <ThreadRuntimeSelect
-                  nodes={runtimeNodes}
-                  value={runtimeNodeId}
-                  selectedNode={selectedRuntimeNode}
-                  onValueChange={onRuntimeNodeChange}
-                />
-              ) : activeRuntimeNode ? (
-                <ThreadRuntimeReadout node={activeRuntimeNode} />
-              ) : null}
-              <AgentSelect
-                logicalAgents={logicalAgents}
-                activeLogicalAgentId={addressedLogicalAgentId ?? activeLogicalAgentId}
-                onLogicalAgentPicked={pickLogicalAgent}
-                teams={projectName ? [] : teams}
-                activeTeamId={projectName ? null : activeTeamId}
-                onTeamPicked={pickTeam}
-                teamLocked={teamLocked}
-                teamOptionsEnabled={initializingThread && !projectName}
-                room={projectName ? projectRoom : null}
-                roomSelected={roomSelected}
-                onRoomPicked={pickRoom}
-                running={running}
-              />
-            </div>
-            <div className="composer-footer-right">
-              {/* One mounted element for send↔stop so keyboard focus survives
-                  the run starting; the glyph cross-fades instead. */}
-              {/* Button's default size carries h-(--control-h) and px-6, which
-                  would stretch the plate into a wide oval; the size overrides
-                  ride the same className so tailwind-merge drops the defaults
-                  and the documented control-h-sm disc survives. */}
-              <Button variant="default"
-                type={running ? "button" : "submit"}
-                className={running
-                  ? "send-button send-button-cancel h-(--control-h-sm) w-(--control-h-sm) px-0"
-                  : "send-button h-(--control-h-sm) w-(--control-h-sm) px-0"}
-                disabled={!running && (
-                  sendPending
-                  || readOnly
-                  || !composerText.trim()
-                  || parsed.blocked
-                  || (initializingThread && !projectName && !runtimeNodeId)
-                )}
-                onClick={running ? onCancelRun : undefined}
-                aria-busy={sendPending || undefined}
-                aria-label={running ? t("composer.cancel_run") : sendPending ? t("composer.sending", { defaultValue: "Sending…" }) : t("composer.send")}
-                title={running
-                  ? t("composer.cancel_run")
-                  : parsed.blocked
-                    ? t("composer.mention_blocked")
-                    : sendShortcutTitle}
-              >
-                <span className="send-button-icon" key={running ? "stop" : "send"}>
-                  {running ? <ComposerStop size={ICON.sm} /> : <ActionSend size={ICON.md} />}
-                </span>
-              </Button>
-            </div>
+            {/* One mounted element for send↔stop so keyboard focus survives
+                the run starting; the glyph cross-fades instead. */}
+            {/* Button's default size carries h-(--control-h) and px-6, which
+                would stretch the plate into a wide oval; the size overrides
+                ride the same className so tailwind-merge drops the defaults
+                and the documented control-h-sm disc survives. */}
+            <Button variant="default"
+              type={running ? "button" : "submit"}
+              className={running
+                ? "send-button send-button-cancel h-(--control-h-sm) w-(--control-h-sm) px-0"
+                : "send-button h-(--control-h-sm) w-(--control-h-sm) px-0"}
+              disabled={!running && (
+                sendPending
+                || readOnly
+                || !composerText.trim()
+                || parsed.blocked
+                || (initializingThread && !projectName && !runtimeNodeId)
+              )}
+              onClick={running ? onCancelRun : undefined}
+              aria-busy={sendPending || undefined}
+              aria-label={running ? t("composer.cancel_run") : sendPending ? t("composer.sending", { defaultValue: "Sending…" }) : t("composer.send")}
+              title={running
+                ? t("composer.cancel_run")
+                : parsed.blocked
+                  ? t("composer.mention_blocked")
+                  : sendShortcutTitle}
+            >
+              <span className="send-button-icon" key={running ? "stop" : "send"}>
+                {running ? <ComposerStop size={ICON.sm} /> : <ActionSend size={ICON.md} />}
+              </span>
+            </Button>
           </div>
         </div>
       </div>

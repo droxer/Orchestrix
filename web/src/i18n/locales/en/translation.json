@@ -175,6 +175,7 @@
     "new_thread": "New thread",
     "runtime_label": "Thread running environment",
     "runs_on": "Runs on",
+    "runtime_pinned": "Fixed for this thread",
     "choose_computer": "Choose running computer",
     "no_computers": "No computer available",
     "talk_to_agent": "Talk to agent",

@@ -37,19 +37,23 @@ export function ThreadRuntimeReadout({ node }: { node: DaemonNodeMonitorRecord }
   const name = runtimeLabel(node);
   const ownershipLabel = t(`admin.v2.node_ownership_${ownership}`);
   const presenceLabel = online ? t("nodes.presence_online") : t("nodes.presence_offline");
-  // Bare context, not a control: no rail plate, no label, no divider — just
-  // the presence dot and the machine's name on the composer card. Ownership
-  // and presence stay in the tooltip and the sr-only line.
+  // Context, not a control: no plate, no divider, no chevron — a quiet
+  // "Runs on <machine>" line beside the agent picker. The lead-in word is what
+  // keeps it from reading as a second, mysteriously flat picker now that the
+  // pair sits on the panel ground: the agent is the choice, the computer is a
+  // fact the thread was born with. Ownership and presence stay in the tooltip
+  // and the sr-only line; the tooltip also says the pin out loud.
   return (
     <span
       className="thread-runtime-readout"
       data-online={online ? "true" : "false"}
       aria-label={t("thread.runtime_label")}
-      title={`${name} · ${ownershipLabel} · ${presenceLabel}`}
+      title={`${name} · ${ownershipLabel} · ${presenceLabel} — ${t("thread.runtime_pinned")}`}
     >
+      <span className="thread-runtime-readout-label">{t("thread.runs_on")}</span>
       <span className="adm-presence" data-online={online ? "true" : "false"} aria-hidden="true" />
       <span className="thread-runtime-readout-name" translate="no">{name}</span>
-      <span className="sr-only">{ownershipLabel} · {presenceLabel}</span>
+      <span className="sr-only">{ownershipLabel} · {presenceLabel} · {t("thread.runtime_pinned")}</span>
     </span>
   );
 }
