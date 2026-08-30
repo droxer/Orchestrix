@@ -3,12 +3,17 @@ import { describe, it } from "node:test";
 
 import type { AgentRun, RelayArtifact } from "relay-core";
 import { labelForAgentRun } from "../src/lib/agentDisplayNames.js";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import {
   buildSpaceItems,
   clampSpaceWidth,
+  defaultSpaceTab,
   isThreadSpaceEmpty,
   maxSpaceWidth,
   resolveSelectedSpaceItem,
+  resolveSpaceTab,
   SPACE_WIDTH_DEFAULT,
   SPACE_WIDTH_MAX,
   SPACE_WIDTH_MIN,
@@ -215,5 +220,59 @@ describe("maxSpaceWidth", () => {
 
   it("never reports a ceiling below the panel minimum", () => {
     assert.equal(maxSpaceWidth(SPACE_WIDTH_MIN, 0), SPACE_WIDTH_MIN);
+  });
+});
+
+describe("space tabs", () => {
+  it("opens a project thread on the shared workspace", () => {
+    assert.equal(defaultSpaceTab("prj-1"), "files");
+  });
+
+  it("opens a thread with no project on its own output", () => {
+    assert.equal(defaultSpaceTab(null), "output");
+    assert.equal(defaultSpaceTab(undefined), "output");
+    assert.equal(defaultSpaceTab(""), "output");
+  });
+
+  it("never shows files for a thread with no project", () => {
+    assert.equal(resolveSpaceTab("files", null, false), "output");
+  });
+
+  it("follows a selected artifact back to output", () => {
+    // The transcript can select an artifact while the panel sits on Files.
+    assert.equal(resolveSpaceTab("files", "prj-1", true), "output");
+  });
+
+  it("otherwise keeps the tab the user picked", () => {
+    assert.equal(resolveSpaceTab("output", "prj-1", false), "output");
+    assert.equal(resolveSpaceTab("files", "prj-1", false), "files");
+  });
+});
+
+describe("thread space panel wiring", () => {
+  const readWeb = (path: string) => readFileSync(resolve("web", path), "utf8");
+
+  it("hands the panel the thread's project so its files are browsable", () => {
+    assert.match(
+      readWeb("src/components/ThreadsView.tsx"),
+      /projectId=\{activeSession\.projectId \?\? null\}/,
+    );
+    assert.match(
+      readWeb("src/components/space/ThreadSpacePanel.tsx"),
+      /<ThreadSpaceFiles projectId=\{projectId\} \/>/,
+    );
+  });
+
+  it("gives the empty output state an action, not just a sentence", () => {
+    const panel = readWeb("src/components/space/ThreadSpacePanel.tsx");
+    assert.match(panel, /space\.empty_cta_files/);
+    assert.match(panel, /space\.empty_cta_back/);
+  });
+
+  it("names the panel toggle instead of leaving a bare glyph", () => {
+    assert.match(
+      readWeb("src/components/ArtifactNavButton.tsx"),
+      /className="chat-artifacts-label"/,
+    );
   });
 });

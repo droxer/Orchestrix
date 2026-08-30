@@ -5,21 +5,26 @@ import { useTranslation } from "react-i18next";
 import { artifactRenderMode } from "../../lib/artifactPreview";
 import {
   clampSpaceWidth,
+  defaultSpaceTab,
   isThreadSpaceEmpty,
   maxSpaceWidth,
   resolveSelectedSpaceItem,
+  resolveSpaceTab,
   SPACE_WIDTH_DEFAULT,
   SPACE_WIDTH_MAX,
   SPACE_WIDTH_MIN,
   type SpaceItem,
+  type SpaceTab,
 } from "../../lib/threadSpace";
 import { ArtifactBody } from "../artifact/ArtifactBody";
 import { ArtifactPreviewHeader } from "../artifact/ArtifactPreviewHeader";
 import { ArtifactViewToggle, type ArtifactView } from "../artifact/ArtifactViewToggle";
+import { ThreadSpaceFiles } from "./ThreadSpaceFiles";
 import { ThreadSpaceList } from "./ThreadSpaceList";
 import {
   ICON,
   NavBack,
+  ThreadSpaceToggle,
 } from "../icons";
 import { Button } from "@/components/ui/button";
 import { OverlayCloseButton } from "@/components/ui/OverlayCloseButton";
@@ -43,8 +48,11 @@ function transcriptWidth(): number | null {
   return chat ? chat.getBoundingClientRect().width : null;
 }
 
+const SPACE_TABS: readonly SpaceTab[] = ["files", "output"];
+
 export function ThreadSpacePanel({
   sessionId,
+  projectId,
   items,
   showProducer,
   selectedArtifactId,
@@ -55,6 +63,9 @@ export function ThreadSpacePanel({
   onResizeActive,
 }: {
   sessionId: string;
+  /** The project this thread belongs to, when it has one: its workspace is the
+   *  shared record the thread contributes to, so the panel leads with it. */
+  projectId?: string | null;
   items: SpaceItem[];
   showProducer: boolean;
   selectedArtifactId: string | null;
@@ -73,9 +84,16 @@ export function ThreadSpacePanel({
   // so selecting another one starts from preview again rather than carrying a
   // source view onto a file the user has not looked at yet.
   const [view, setView] = useState<ArtifactView>("preview");
+
+  // The tab is per-thread: switching threads re-derives the default rather
+  // than carrying a personal-thread "output" choice onto a project thread.
+  const [tab, setTab] = useState<SpaceTab>(() => defaultSpaceTab(projectId));
+  useEffect(() => setTab(defaultSpaceTab(projectId)), [projectId, sessionId]);
   const selectedId = selected?.artifact.id ?? null;
   useEffect(() => setView("preview"), [selectedId]);
   const renderMode = selected ? artifactRenderMode(selected.artifact) : "none";
+  const activeTab = resolveSpaceTab(tab, projectId, Boolean(selected));
+  const showTabs = Boolean(projectId) && !selected;
 
   // A drag registers listeners outside React; this releases them if the panel
   // unmounts (or the thread changes) mid-gesture, which would otherwise leak
@@ -179,26 +197,71 @@ export function ThreadSpacePanel({
           ) : null}
           <OverlayCloseButton label={t("sheet.close")} onClick={onClose} />
         </header>
-        {selected ? (
-          <div className="thread-space-preview">
-            <ArtifactPreviewHeader artifact={selected.artifact} sessionId={sessionId} />
-            <div className="artifact-preview-body">
-              <ArtifactBody artifact={selected.artifact} sessionId={sessionId} view={view} />
+        {showTabs ? (
+          <div className="thread-space-tabs" role="tablist" aria-label={t("space.tabs_label")}>
+            {SPACE_TABS.map((name) => (
+              <button
+                key={name}
+                type="button"
+                role="tab"
+                id={`thread-space-tab-${name}`}
+                aria-selected={activeTab === name}
+                aria-controls="thread-space-tabpanel"
+                tabIndex={activeTab === name ? 0 : -1}
+                className={`thread-space-tab${activeTab === name ? " is-active" : ""}`}
+                onClick={() => setTab(name)}
+              >
+                {name === "files" ? t("space.tab_files") : t("space.tab_output")}
+                {name === "output" && items.length ? (
+                  <span className="thread-space-tab-count tnum">{items.length}</span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <div
+          className="thread-space-body"
+          id={showTabs ? "thread-space-tabpanel" : undefined}
+          role={showTabs ? "tabpanel" : undefined}
+          aria-labelledby={showTabs ? `thread-space-tab-${activeTab}` : undefined}
+        >
+          {activeTab === "files" && projectId ? (
+            <ThreadSpaceFiles projectId={projectId} />
+          ) : selected ? (
+            <div className="thread-space-preview">
+              <ArtifactPreviewHeader artifact={selected.artifact} sessionId={sessionId} />
+              <div className="artifact-preview-body">
+                <ArtifactBody artifact={selected.artifact} sessionId={sessionId} view={view} />
+              </div>
             </div>
-          </div>
-        ) : isThreadSpaceEmpty(items) ? (
-          <div className="thread-space-empty">
-            <p className="thread-space-empty-title">{t("space.empty_title")}</p>
-            <p className="thread-space-empty-body">{t("space.empty_body")}</p>
-          </div>
-        ) : (
-          <ThreadSpaceList
-            items={items}
-            showProducer={showProducer}
-            selectedId={selectedArtifactId}
-            onSelect={(artifactId) => onSelectArtifact(artifactId)}
-          />
-        )}
+          ) : isThreadSpaceEmpty(items) ? (
+            <div className="thread-space-empty">
+              <span className="thread-space-empty-mark" aria-hidden="true">
+                <ThreadSpaceToggle size={ICON.lg} />
+              </span>
+              <p className="thread-space-empty-title">{t("space.empty_title")}</p>
+              <p className="thread-space-empty-body">
+                {projectId ? t("space.empty_body_project") : t("space.empty_body")}
+              </p>
+              {projectId ? (
+                <Button type="button" variant="outline" size="sm" onClick={() => setTab("files")}>
+                  {t("space.empty_cta_files")}
+                </Button>
+              ) : (
+                <Button type="button" variant="outline" size="sm" onClick={onClose}>
+                  {t("space.empty_cta_back")}
+                </Button>
+              )}
+            </div>
+          ) : (
+            <ThreadSpaceList
+              items={items}
+              showProducer={showProducer}
+              selectedId={selectedArtifactId}
+              onSelect={(artifactId) => onSelectArtifact(artifactId)}
+            />
+          )}
+        </div>
       </div>
     </aside>
   );

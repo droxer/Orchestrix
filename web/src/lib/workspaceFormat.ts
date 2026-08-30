@@ -32,3 +32,25 @@ export function compactDueDate(value: string | undefined, locale: string): strin
     day: "numeric",
   }).format(date);
 }
+
+/** The containing directory of a workspace path ("" for a top-level entry). */
+export function parentPath(path: string): string {
+  const parts = path.split("/").filter(Boolean);
+  return parts.slice(0, -1).join("/");
+}
+
+/** Byte count as a compact human size ("" when the size is unknown). */
+export function formatBytes(bytes: number | null | undefined, locale?: string): string {
+  if (bytes === null || bytes === undefined || Number.isNaN(bytes)) return "";
+  if (bytes < 1024) return `${new Intl.NumberFormat(locale || undefined).format(bytes)} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = bytes / 1024;
+  let unit = units[0];
+  for (let index = 1; index < units.length && value >= 1024; index += 1) {
+    value /= 1024;
+    unit = units[index];
+  }
+  return `${new Intl.NumberFormat(locale || undefined, {
+    maximumFractionDigits: value >= 10 ? 0 : 1,
+  }).format(value)} ${unit}`;
+}

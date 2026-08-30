@@ -169,25 +169,35 @@
   color: var(--err);
 }
 
+/* Named pill, not a bare glyph: the panel it opens holds both the project's
+   files and the thread's own output, so the control says which place it is. */
 .chat-artifacts-button {
-  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--ink-2);
+  font: var(--type-label-strong);
 }
 
+.chat-artifacts-button[aria-expanded="true"] {
+  color: var(--ink-1);
+}
+
+.chat-artifacts-label {
+  white-space: nowrap;
+}
+
+/* Inline count chip on the pill. Neutral, because it reports how much is in
+   there — a filled ink badge read as an unseen-notification signal. */
 .chat-artifacts-count {
-  position: absolute;
-  /* Off-scale optical nudge: the -3px pull overlaps the button corner so the
-     count badge reads as pinned to it, not floating beside it. */
-  right: -3px;
-  bottom: -3px;
+  display: inline-grid;
+  place-items: center;
   min-width: 18px;
   height: 18px;
-  display: grid;
-  place-items: center;
   padding: 0 var(--sp-1);
-  border: 0.5px solid var(--surface-0);
   border-radius: var(--r-2);
-  background: var(--ink-1);
-  color: var(--surface-0);
+  background: var(--surface-2);
+  color: var(--ink-2);
   font-size: var(--fs-1);
   font-weight: 700;
   line-height: var(--leading-none);

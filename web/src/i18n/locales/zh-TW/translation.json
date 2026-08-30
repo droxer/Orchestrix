@@ -1227,8 +1227,14 @@
     "toggle_threads": "顯示對話列表",
     "resize_label": "調整產物面板寬度",
     "list_label": "對話產物",
+    "tabs_label": "對話產物分區",
+    "tab_files": "檔案",
+    "tab_output": "產物",
     "empty_title": "還沒有產物",
-    "empty_body": "此對話產生的檔案和報告會自動顯示在這裡。"
+    "empty_body": "此對話產生的檔案和報告會自動顯示在這裡。",
+    "empty_body_project": "此對話還沒有產物。共享檔案在專案工作區中。",
+    "empty_cta_files": "瀏覽專案檔案",
+    "empty_cta_back": "返回對話"
   },
   "agent_stream": {
     "empty_working": "執行中…",
