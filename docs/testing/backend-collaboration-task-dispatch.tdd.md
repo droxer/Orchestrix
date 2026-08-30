@@ -39,3 +39,51 @@ SQLite resource warnings; no test failed or was skipped because of this change.
 
 - RED checkpoint: `5a01b7e5 test: reproduce backend collaboration and task dispatch races`
 - GREEN checkpoint: `ee5af7d3 fix: preserve collaboration and task dispatch contracts`
+
+## Dispatch claim fencing round
+
+A follow-up review found four more races in the dispatch path:
+
+- The scheduler claimed a task against the assignment it resolved even when the
+  task was reassigned between routing and claim.
+- The task PATCH route rejected metadata-only edits while a dispatch claim was
+  active, and the pickup route could still reassign a claimed task.
+- A `run.failed` event for a non-action participant aborted the round instead
+  of letting later assignments continue collecting results.
+
+| Guarantee | Test target | RED evidence | GREEN evidence |
+|---|---|---|---|
+| Scheduler claim fences the resolved assignment | `test_scheduler_claim_fences_the_resolved_logical_assignment` | Task dispatched despite reassignment (`dispatched == 1`) | Passed |
+| Claimed task rejects pickup reassignment | `test_claimed_task_rejects_pickup_assignment_update` | Pickup returned HTTP 202 | Passed |
+| Claimed task still allows metadata edits | `test_claimed_task_allows_metadata_update` | Metadata PATCH returned HTTP 409 | Passed |
+| Both task stores guard updates during dispatch | `test_local_task_store_guards_updates_during_dispatch`, `test_database_task_store_guards_updates_during_dispatch` | `update_task_if_not_dispatching` did not exist | Passed |
+| A non-action `run.failed` keeps the round collecting | `test_discussion_round_keeps_collecting_after_a_run_failed_event` | No continuation run request was recorded | Passed |
+
+Exact RED command (run from `backend/` at the RED checkpoint):
+
+```sh
+pytest tests/api/test_tasks.py::test_claimed_task_rejects_pickup_assignment_update \
+  tests/api/test_tasks.py::test_claimed_task_allows_metadata_update \
+  tests/unit/test_daemon_registry.py::test_discussion_round_keeps_collecting_after_a_run_failed_event \
+  tests/unit/test_task_scheduler.py::test_scheduler_claim_fences_the_resolved_logical_assignment \
+  tests/unit/test_task_store.py::test_local_task_store_guards_updates_during_dispatch \
+  tests/unit/test_task_store.py::test_database_task_store_guards_updates_during_dispatch -q
+```
+
+The RED run reported `6 failed`. The identical GREEN run reported `6 passed`.
+
+### Regression evidence (fencing round)
+
+- Focused backend regression command: `pytest tests/unit/test_collaboration_policy.py
+  tests/unit/test_collaboration_service.py tests/unit/test_task_scheduler.py
+  tests/unit/test_task_store.py tests/unit/test_daemon_registry.py
+  tests/api/test_tasks.py tests/api/test_task_artifacts.py
+  tests/api/test_task_history.py tests/api/test_agent_api.py
+  tests/api/test_team_routes.py -q` — `394 passed`.
+- Repository command: `npm test` — build succeeded, `1236` TypeScript/web tests
+  passed, and `976` Python tests passed.
+
+### Merge evidence (fencing round)
+
+- RED checkpoint: `116fd83f test: reproduce team collaboration dispatch races`
+- GREEN checkpoint: `2cfb6bc2 fix: fence team collaboration dispatch assignments`
