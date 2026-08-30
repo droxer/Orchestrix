@@ -26,7 +26,7 @@ Relay owns team collaboration in an event-sourced **Collaboration Conductor**.
 Its public inputs describe intent, not transport:
 
 - offer work with `accomplish`, `discuss`, or `review` intent;
-- optionally address one current room member;
+- optionally address one or more current room members;
 - request typed `rerun` or `handoff` recovery;
 - retain legacy run input only as a compatibility adapter.
 
@@ -122,7 +122,7 @@ POST /api/v1/threads/{threadId}/recoveries
 ```
 
 Message requests contain `text`, semantic `intent`, and optional
-`addressAgentId`, `userMessageId`, and `idempotencyKey`. Recovery requests
+`addressAgentId` or `addressAgentIds`, `userMessageId`, and `idempotencyKey`. Recovery requests
 contain `kind`, `targetAgentId`, `mode`, an optional note, and an optional
 `idempotencyKey`. Neither interface accepts daemon IDs, executor kinds, or
 assignment arrays.

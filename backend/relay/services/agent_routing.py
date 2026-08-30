@@ -45,10 +45,12 @@ def dispatch_failure_code(error: Exception) -> str:
 def placement_node(
     placement: Mapping[str, Any], nodes: Mapping[str, dict[str, Any]]
 ) -> dict[str, Any] | None:
-    """找到当前承载该 placement 所属 Computer 的在线 node。
+    """Find the live node currently hosting this placement's Computer.
 
-    placement 记的是 computerId（稳定），不是 node id（会变）。老 placement
-    没有 computerId，退回按 node id 直查，行为等同改造前。
+    A placement records a `computerId` (stable), not a node id (which
+    changes). An older placement without a `computerId` falls back to a direct
+    node-id lookup, behaving exactly as it did before the identity model
+    landed.
     """
     identity = placement.get("computerId")
     if not identity:
@@ -73,20 +75,26 @@ def resolve_session_daemon_node_id(
     session: dict[str, Any] | None,
     daemon_nodes: list[dict[str, Any]],
 ) -> str | None:
-    """把 thread 钉住的 Computer 解析到它当前的 runtime node。
+    """Resolve the Computer a thread is pinned to into its current runtime node.
 
-    Computer 离线时返回 None —— 不改派到别的机器。thread 的产物在那台机器
-    的目录里，换机器执行等于给 agent 一个空目录：看着在干活，实际上下文已丢。
+    Returns None while that Computer is offline — the thread is never moved to
+    another machine. Its artifacts live in that machine's directories, so
+    running elsewhere hands the agent an empty workspace: it looks like work,
+    but the context is gone.
 
-    身份优先级：
-    1. `session["computerId"]`（Task 5 起，session.created / session.runtime_affinity
-       事件 replay 后物化的稳定身份）。
-    2. 没有 `computerId` 但有 `managedNodeId`（Task 5 之前创建、尚未回填的 session）——
-       派生 `managed:{managedNodeId}`，与 `_apply_session_runtime_affinity` 在 replay
-       层做的兼容派生完全一致，理由同样成立：老 session 不该因为身份模型升级就无法
-       跟着托管节点换 id 后继续解析。
-    3. 都没有——落回 `session["daemonNodeId"]` 字面值。这是 `POST /tasks` 产生的
-       pending thread（尚未选定任何 node）唯一能解析出节点的路径，必须保留。
+    Identity priority:
+    1. `session["computerId"]` — the stable identity materialized by replaying
+       the `session.created` / `session.runtime_affinity` events.
+    2. No `computerId` but a `managedNodeId` (a session created before the
+       affinity events existed, not yet backfilled) — derive
+       `managed:{managedNodeId}`, exactly the compatibility derivation
+       `_apply_session_runtime_affinity` performs at the replay layer, and for
+       the same reason: an older session must not lose the ability to follow
+       its managed node through an id change just because the identity model
+       moved on.
+    3. Neither — fall back to the literal `session["daemonNodeId"]`. This is
+       the only way a pending thread from `POST /tasks` (which has not chosen
+       a node yet) resolves to one, so it has to stay.
     """
     if not session:
         return None
@@ -210,10 +218,7 @@ def resolve_agent_assignments(
                 candidates.append(attached)
         if not candidates:
             code = _best_rejection_code(rejection_reasons)
-            raise AgentRoutingError(
-                code,
-                f"Agent {agent['displayName']} has no eligible runtime placement ({code}).",
-            )
+            raise AgentRoutingError(code, _rejection_message(agent, code))
         placement, node = min(
             candidates,
             key=lambda item: (
@@ -245,6 +250,24 @@ def resolve_agent_assignments(
             }
         )
     return resolved
+
+
+def _rejection_message(agent: Mapping[str, Any], code: str) -> str:
+    """Say what actually went wrong, not just that nothing was eligible.
+
+    A round is pinned to one computer, so a team whose members live on
+    different machines fails here. Reporting that as "no eligible runtime
+    placement" sends the reader off to inspect an agent that is perfectly
+    healthy.
+    """
+    if code == "workspace_unavailable":
+        return (
+            f"Agent {agent['displayName']} runs on a different computer than "
+            "the rest of this round; every participant must share one computer."
+        )
+    return (
+        f"Agent {agent['displayName']} has no eligible runtime placement ({code})."
+    )
 
 
 def _attach_never_run_agent_to_managed_capacity(

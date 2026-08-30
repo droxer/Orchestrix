@@ -1,8 +1,8 @@
-"""一台 Computer 的稳定身份。
+"""The stable identity of one Computer.
 
-daemon node id 每次重新 provision 都会变，因此绝不能作为身份持久化。
-本模块是全代码库唯一解析 computer 身份的地方 —— 不要在别处内联重写这个
-优先级顺序。
+A daemon node id changes on every reprovision, so it must never be persisted
+as an identity. This module is the only place in the codebase that resolves a
+computer identity — do not reimplement this priority order anywhere else.
 """
 
 from __future__ import annotations
@@ -16,18 +16,19 @@ def _clean(value: Any) -> str | None:
 
 
 def computer_id(node: Mapping[str, Any]) -> str:
-    """返回 node 所属 Computer 的稳定身份。
+    """Return the stable identity of the Computer this node belongs to.
 
-    带前缀是为了让命名空间不可能相撞：某个 managedNodeId 与某台机器的
-    machine-id 恰好取值相同时，不能被解析成同一台 computer。
+    The prefix makes a namespace collision impossible: a managedNodeId that
+    happens to equal some machine's machine-id must never resolve to the same
+    computer.
     """
     managed_node_id = _clean(node.get("managedNodeId"))
     if managed_node_id:
         return f"managed:{managed_node_id}"
     employee_id = _clean(node.get("employeeId"))
-    # 字段名是历史遗留：workspaceId 的值是宿主 machine-id（daemon 端的
-    # ensureMachineId()），与工作目录无关。不要因为名字里有 workspace 就
-    # 以为它跟 workspacePath 有关。
+    # The field name is historical: `workspaceId` holds the host machine-id
+    # (the daemon's `ensureMachineId()`), not anything about a directory.
+    # Do not read it as related to `workspacePath`.
     machine_id = _clean(node.get("workspaceId"))
     if employee_id and machine_id:
         return f"device:{employee_id}:{machine_id}"

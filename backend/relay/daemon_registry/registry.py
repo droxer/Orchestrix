@@ -683,9 +683,10 @@ class DaemonNodeRegistry:
     def _superseded_incarnations(self, sandbox: dict[str, Any]) -> list[dict[str, Any]]:
         """Live node rows describing the same Computer as `sandbox`.
 
-        身份判定统一走 core.computer_identity.computer_id —— 不要在这里内联
-        重写它。无法解析出身份的 node（回退到 node:<id>）只匹配自己，因此
-        天然不会误退役别人。
+        Identity always goes through `core.computer_identity.computer_id` —
+        do not reimplement it inline here. A node whose identity cannot be
+        resolved (falling back to `node:<id>`) matches only itself, so it can
+        never retire someone else's node by accident.
         """
         identity = computer_id(sandbox)
         if identity == f"node:{sandbox['id']}":

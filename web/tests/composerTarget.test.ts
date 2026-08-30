@@ -47,13 +47,16 @@ describe("composer agent selection", () => {
     // The placement-derived list moved into useThreadTargets when App.tsx was
     // broken up; the assertion follows it rather than pinning the file it
     // used to live in. Both surfaces still read ONE effective list — ordinary
-    // threads use placements, project rooms narrow that list to the project's
-    // fixed roster — which is the property under test.
+    // threads use placements, while project and team threads narrow that list
+    // to their fixed roster — which is the property under test.
     const targets = await readFile(resolve("web/src/hooks/useThreadTargets.ts"), "utf8");
     assert.match(targets, /agentsForThreadNode\(logicalAgents,\s*selectedThreadNodeId\)/);
     assert.match(app, /mentionCandidates\(effectiveSelectableLogicalAgents\)/);
     assert.match(app, /effectiveSelectableLogicalAgents = useMemo/);
-    assert.match(app, /activeProject\.members\.filter/);
+    // Both rosters narrow through the same seam, so neither surface can offer
+    // a target its own round would refuse with `agent_forbidden`.
+    assert.match(app, /activeProject[\s\S]{0,400}addressableThreadAgents/);
+    assert.match(app, /activeTeam[\s\S]{0,400}addressableThreadAgents/);
   });
 
   it("dispatches a new thread to the agents the draft addresses", async () => {

@@ -77,6 +77,11 @@ def test_rejects_collaboration_across_nodes_even_with_shared_workspace(
         )
 
     assert error.value.code == "workspace_unavailable"
+    # "no eligible runtime placement" reads like the agent is broken. The real
+    # cause is that the round spans two computers, and only the message can
+    # say so.
+    assert "Builder" in str(error.value)
+    assert "computer" in str(error.value)
 
 
 def test_agents_on_same_computer_resolve_together(tmp_path: Path) -> None:

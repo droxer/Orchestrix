@@ -5,8 +5,10 @@ from relay.collaboration.service import (
     CollaborationConductor,
     _request_fingerprint,
     _scoped_idempotency_key,
+    compile_assignment_work_graph,
     create_round_manifest,
 )
+from relay.services.team_dispatch import team_member_assignments
 
 
 def test_addressed_agent_placement_follows_replacement_runtime_on_same_computer() -> (
@@ -313,3 +315,81 @@ def test_request_fingerprint_rejects_reusing_a_key_for_different_intent() -> Non
     )
 
     assert _request_fingerprint(first) != _request_fingerprint(second)
+
+
+def test_team_discussion_survives_assignment_compilation() -> None:
+    """A discuss round must reach the agents as a discussion, not as action work.
+
+    `team_member_assignments` and `_compile_assignments` meet here; a mode
+    dropped at that seam silently turns a question into workspace work.
+    """
+    team = {
+        "id": "team_1",
+        "leadAgentId": "lead",
+        "memberAgentIds": ["lead", "support"],
+        "updatedAt": "2026-08-08T00:00:00Z",
+    }
+    agents = [
+        {"id": "lead", "executorKind": "codex", "defaultRole": "planner"},
+        {"id": "support", "executorKind": "claude", "defaultRole": "reviewer"},
+    ]
+    raw = team_member_assignments(agents, mode="ask", team=team)
+
+    compiled = CollaborationConductor._compile_assignments(
+        raw, "team_1", {"lead", "support"}, raw[0]["teamSnapshot"]
+    )
+
+    assert [item["mode"] for item in compiled] == ["ask", "ask"]
+    assert [item["phase"] for item in compiled] == ["discussion", "discussion"]
+
+
+def test_compiling_an_already_compiled_round_changes_nothing() -> None:
+    """The conductor compiles, then `create_round_manifest` compiles again.
+
+    That second pass must stay a no-op: re-decorating an objective would
+    restate the work-item preamble every time the manifest is built.
+    """
+    assignments = [
+        {"assignmentId": "a1", "agentId": "lead", "mode": "action"},
+        {"assignmentId": "a2", "agentId": "support", "mode": "action"},
+    ]
+    once = compile_assignment_work_graph(
+        assignments, purpose="accomplish", team_snapshot=None
+    )
+
+    assert (
+        compile_assignment_work_graph(
+            once, purpose="accomplish", team_snapshot=None
+        )
+        == once
+    )
+
+
+def test_partial_work_graph_metadata_is_completed_before_manifest_creation() -> None:
+    """A legacy workItemId alone is not a complete versioned work graph."""
+    manifest = create_round_manifest(
+        source="legacy",
+        purpose="accomplish",
+        address={"kind": "members", "agentIds": ["agent_1"]},
+        assignments=[
+            {
+                "assignmentId": "assignment_1",
+                "agentId": "agent_1",
+                "workItemId": "legacy_item",
+            }
+        ],
+        team_snapshot=None,
+    )
+
+    assert manifest["workGraph"]["items"] == [
+        {
+            "workItemId": "assignment_1",
+            "assignmentId": "assignment_1",
+            "ownerAgentId": "agent_1",
+            "delegationAuthority": "conductor",
+            "kind": "implementation",
+            "objective": "Implement a distinct part of the shared goal.",
+            "dependsOnWorkItemIds": [],
+            "required": True,
+        }
+    ]

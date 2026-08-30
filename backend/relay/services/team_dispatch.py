@@ -133,16 +133,7 @@ def team_member_assignments(
     team: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     lead_agent_id = team.get("leadAgentId") if team else None
-    snapshot = (
-        {
-            "teamId": team["id"],
-            "teamRevision": team.get("updatedAt") or team.get("createdAt"),
-            "memberAgentIds": [agent["id"] for agent in agents],
-            "leadAgentId": team.get("leadAgentId"),
-        }
-        if team
-        else None
-    )
+    snapshot = team_runtime_snapshot(team, agents) if team else None
     synthesis_round = mode in ("ask", "review")
     ordered_agents = (
         [
@@ -193,6 +184,18 @@ def _ordered_accomplish_agents(
     ]
 
 
+def team_runtime_snapshot(
+    team: dict[str, Any], members: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Capture the roster and revision that a round actually used."""
+    return {
+        "teamId": team["id"],
+        "teamRevision": team.get("updatedAt") or team.get("createdAt"),
+        "memberAgentIds": [member["id"] for member in members],
+        "leadAgentId": team.get("leadAgentId"),
+    }
+
+
 def _task_team_agents(
     task: dict[str, Any],
     *,
@@ -219,7 +222,8 @@ def _team_member_assignment(
     return {
         "agentId": agent["id"],
         "agent": agent["executorKind"],
-        "phase": _member_phase(role, mode, coordinator),
+        "mode": mode,
+        "phase": team_assignment_phase(role, mode, coordinator),
         **({"role": role} if role else {}),
         **({"coordinator": True} if coordinator else {}),
         **({"synthesizer": True} if synthesizer else {}),
@@ -251,7 +255,7 @@ def _member_brief(
     return "Contribute a distinct part of the shared goal and avoid duplicating completed teammate work."
 
 
-def _member_phase(
+def team_assignment_phase(
     role: str | None, requested_mode: str, coordinator: bool = False
 ) -> str:
     if requested_mode == "ask":
