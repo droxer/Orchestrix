@@ -103,6 +103,11 @@ def test_scheduler_dispatches_assigned_task_to_ready_node() -> None:
             assert command["agent"] == "codex"
             assert command["taskGoal"] == "Ship scheduled backlog\n\nRun automatically."
             assert command["state"]["agent_instructions"] == personality
+            assert command["delivery"]["type"] == "assignment-attempt"
+            [session_id] = updated["linkedSessionIds"]
+            [manifest] = session_store.get_session(session_id)["collaborationRounds"]
+            assert manifest["source"] == "task"
+            assert manifest["workGraph"]["items"][0]["ownerAgentId"] == agent["id"]
 
     asyncio.run(run_flow())
 
@@ -924,7 +929,15 @@ def test_scheduler_dispatches_all_team_members_lead_first() -> None:
             assert result.dispatched == 1
             [lead_command] = registry.take_commands("sbx_alice", "node_token")
             assert lead_command["logicalAgentId"] == lead["id"]
+            assert lead_command["delivery"]["type"] == "assignment-attempt"
             assert task_store.get_task(first["id"])["status"] == "running"
+            [session_id] = task_store.get_task(first["id"])["linkedSessionIds"]
+            [manifest] = registry.store.get_session(session_id)["collaborationRounds"]
+            assert manifest["teamSnapshot"]["teamId"] == team["id"]
+            assert len(manifest["workGraph"]["items"]) == 2
+            assert manifest["workGraph"]["items"][1]["dependsOnWorkItemIds"] == [
+                manifest["workGraph"]["items"][0]["workItemId"]
+            ]
             registry.handle_event(
                 "sbx_alice",
                 {

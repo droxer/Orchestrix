@@ -75,7 +75,9 @@ class ServerDaemonNodeBackend:
                 assert_session_owned_by_employee(
                     self.registry.store, session["id"], actor_employee_id
                 )
-            return session
+            return self._reconcile_idempotent_participants(
+                request, session, actor_employee_id
+            )
 
     def idempotent_session_run(
         self,
@@ -104,7 +106,34 @@ class ServerDaemonNodeBackend:
                 assert_session_owned_by_employee(
                     self.registry.store, session["id"], actor_employee_id
                 )
+            return self._reconcile_idempotent_participants(
+                request, session, actor_employee_id
+            )
+
+    def _reconcile_idempotent_participants(
+        self,
+        run_request: dict[str, Any],
+        session: dict[str, Any],
+        actor_employee_id: str | None,
+    ) -> dict[str, Any]:
+        """Repair room admission if dispatch committed before that event did."""
+        manifest = (run_request.get("state") or {}).get(
+            COLLABORATION_MANIFEST_STATE_KEY
+        )
+        if not isinstance(manifest, dict):
             return session
+        agent_ids = [
+            assignment["agentId"]
+            for assignment in manifest.get("assignments", [])
+            if isinstance(assignment, dict)
+            and isinstance(assignment.get("agentId"), str)
+            and assignment["agentId"]
+        ]
+        if not agent_ids:
+            return session
+        return SessionController(self.registry.store).record_participants_joined(
+            session["id"], agent_ids, actor_employee_id
+        )
 
     def _validate_logical_assignment(self, assignment: dict[str, Any]) -> None:
         if self.agent_store is None or self.agent_placement_store is None:

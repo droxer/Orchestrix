@@ -1057,6 +1057,85 @@ def test_mentioning_two_agents_dispatches_one_round_with_both(monkeypatch) -> No
         assert persisted["participantAgentIds"] == [owner["id"], other["id"]]
 
 
+def test_message_retry_reconciles_participants_after_post_dispatch_failure(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        node = app.state.registry.register(
+            {
+                "sandboxId": "node_admin",
+                "employeeId": "admin",
+                "token": "node_token",
+                "workspacePath": "/workspace/admin",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex", "claude"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        computer = computer_id(node)
+        owner = app.state.agent_store.create_agent(
+            "admin",
+            {
+                "displayName": "Codex",
+                "executorKind": "codex",
+                "defaultRole": "implementer",
+                "computerId": computer,
+            },
+        )
+        joiner = app.state.agent_store.create_agent(
+            "admin",
+            {
+                "displayName": "Claude",
+                "executorKind": "claude",
+                "defaultRole": "implementer",
+                "computerId": computer,
+            },
+        )
+        sync_node_agents(app.state, node)
+        session = app.state.session_store.create_session(
+            {
+                "daemonNodeId": node["id"],
+                "workspacePath": "/workspace/admin",
+                "ownerEmployeeId": "admin",
+                "ownerAgentId": owner["id"],
+                "taskGoal": "Keep one room",
+            }
+        )
+        original = SessionController.record_participants_joined
+        attempts = 0
+
+        def fail_once(controller, session_id, agent_ids, actor_employee_id=None):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise ValueError("simulated participant admission interruption")
+            return original(controller, session_id, agent_ids, actor_employee_id)
+
+        monkeypatch.setattr(SessionController, "record_participants_joined", fail_once)
+        body = {
+            "text": "join this thread",
+            "intent": "accomplish",
+            "addressAgentIds": [owner["id"], joiner["id"]],
+            "idempotencyKey": "message_admission_retry_1",
+        }
+
+        interrupted = client.post(
+            f"/api/v1/threads/{session['id']}/messages", json=body
+        )
+        retried = client.post(f"/api/v1/threads/{session['id']}/messages", json=body)
+
+        assert interrupted.status_code == 409
+        assert retried.status_code == 202, retried.text
+        persisted = app.state.session_store.get_session(session["id"])
+        assert persisted["participantAgentIds"] == [owner["id"], joiner["id"]]
+        assert len(app.state.daemon_store.take_queued_commands(node["id"])) == 1
+
+
 def test_room_message_fans_out_to_every_participant(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

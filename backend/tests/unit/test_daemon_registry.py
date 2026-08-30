@@ -4329,6 +4329,35 @@ def test_an_adaptive_round_does_not_run_later_members_after_terminal_failure() -
     asyncio.run(run_flow())
 
 
+def test_discussion_round_keeps_collecting_after_a_participant_failure() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store, _daemon_store, registry = _pipeline_registry(root)
+            session = await ServerDaemonNodeBackend(registry).run(
+                "sbx_alice",
+                {
+                    "taskGoal": "compare the options",
+                    "assignments": [
+                        {"agent": "codex", "mode": "ask"},
+                        {"agent": "claude", "mode": "ask"},
+                    ],
+                },
+            )
+
+            [first] = registry.take_commands("sbx_alice", "node_token")
+            _finish_run(registry, first, 3)
+
+            [second] = registry.take_commands("sbx_alice", "node_token")
+            assert second["agent"] == "claude"
+            _finish_run(registry, second, 0)
+
+            completed = session_store.get_session(session["id"])
+            assert completed["status"] == "completed"
+            assert "1 participant assignment(s) failed" in completed["finalOutcome"]
+
+    asyncio.run(run_flow())
+
+
 def test_a_failed_final_agent_cannot_publish_a_success_verdict() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:

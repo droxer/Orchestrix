@@ -659,9 +659,9 @@ async def start_routine_occurrence_on_ready_node(
             code="already_active",
             message="The current routine occurrence is already active.",
         )
-    result = await start_task_on_ready_node(
-        ctx, occurrence, actor, assignments=assignments
-    )
+    # The occurrence is an immutable assignment snapshot. A routine may be
+    # reassigned after promotion, but that must only affect later occurrences.
+    result = await start_task_on_ready_node(ctx, occurrence, actor, assignments=None)
     if result and result.get("session"):
         ctx.task_store.link_session(routine["id"], result["session"]["id"])
     return result

@@ -63,6 +63,7 @@ class TaskStore(Protocol):
         payload: dict[str, Any],
         *,
         assignment: dict[str, Any] | None = None,
+        reject_active_claim: bool = False,
     ) -> dict[str, Any]: ...
     def delete_task(
         self,

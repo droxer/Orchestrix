@@ -418,10 +418,14 @@ class LocalTaskStore:
         payload: dict[str, Any],
         *,
         assignment: dict[str, Any] | None = None,
+        reject_active_claim: bool = False,
     ) -> dict[str, Any]:
-        return self.append_events(
-            task_id, task_update_events(task_id, payload, assignment=assignment)
-        )
+        with self._lock:
+            if reject_active_claim and dispatch_claim_active(self.get_task(task_id)):
+                raise TaskExecutionActiveError("task_execution_active")
+            return self.append_events(
+                task_id, task_update_events(task_id, payload, assignment=assignment)
+            )
 
     def claim_next_task_for_agent(
         self, agent: AgentName, assignee_employee_id: str | None = None
@@ -1132,9 +1136,12 @@ class DatabaseTaskStore:
         payload: dict[str, Any],
         *,
         assignment: dict[str, Any] | None = None,
+        reject_active_claim: bool = False,
     ) -> dict[str, Any]:
         return self.append_events(
-            task_id, task_update_events(task_id, payload, assignment=assignment)
+            task_id,
+            task_update_events(task_id, payload, assignment=assignment),
+            reject_active_claim=reject_active_claim,
         )
 
     def claim_next_task_for_agent(

@@ -3046,6 +3046,15 @@ class DaemonNodeRegistry:
                 agent_label,
             ):
                 return
+            if self._continue_after_non_action_failure(
+                run_request,
+                terminal_claim_id,
+                next_state,
+                outcome,
+                agent_label,
+                assignment.get("mode") or "action",
+            ):
+                return
             if session_before.get("status") != "failed":
                 controller.fail_session(run_request["sessionId"], outcome)
             self.daemon_store.update_run_request_if_claimed(
