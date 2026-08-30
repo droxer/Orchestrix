@@ -478,10 +478,11 @@ def _apply_session_archived(session: dict[str, Any], _event: dict[str, Any]) -> 
 def _apply_session_runtime_affinity(
     session: dict[str, Any], event: dict[str, Any]
 ) -> None:
-    """Thread 一次性钉住一台 Computer；先到先得，后来者不覆盖。
+    """A thread pins one Computer once; first write wins, later ones do not
+    overwrite it.
 
-    老事件只带 managedNodeId，在此派生为 managed:<id>，因此不需要任何
-    Alembic 回填 —— snapshot 是 replay 的产物。
+    Older events carry only `managedNodeId`, derived here as `managed:<id>`,
+    so no Alembic backfill is needed — the snapshot is a product of replay.
     """
     if session.get("computerId"):
         return

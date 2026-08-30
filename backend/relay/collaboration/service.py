@@ -22,7 +22,9 @@ from ..services.project_runtime import (
 from ..services.team_dispatch import (
     TeamDispatchError,
     team_agents,
+    team_assignment_phase,
     team_member_assignments,
+    team_runtime_snapshot,
 )
 from ..sessions.controller import SessionController
 from .models import (
@@ -310,12 +312,19 @@ class CollaborationConductor:
         elif team_id and not raw_assignments:
             team, members = self._team_for_round(team_id, session, actor)
             team_member_ids = {agent["id"] for agent in members}
-            team_snapshot = _team_snapshot(team, members)
+            team_snapshot = team_runtime_snapshot(team, members)
             raw_assignments = team_member_assignments(
                 members, mode=intent.mode, team=team
             )
         elif team_id and raw_assignments:
             if is_recovery:
+                # Recovery deliberately skips `team_agents`. A rerun or handoff
+                # is how a stuck thread gets rescued, so it must still work
+                # after the team was disabled or a sibling member broke;
+                # requiring the whole roster to be healthy would strand the
+                # thread. Ownership and membership are still enforced, and the
+                # target agent's own liveness is checked by
+                # `resolve_agent_assignments` below.
                 team = self.ctx.team_store.get_team(team_id)
                 if not team or team.get("deletedAt"):
                     raise CollaborationError("team_not_found")
@@ -331,7 +340,7 @@ class CollaborationConductor:
             else:
                 team, members = self._team_for_round(team_id, session, actor)
                 team_member_ids = {agent["id"] for agent in members}
-            team_snapshot = _team_snapshot(team, members)
+            team_snapshot = team_runtime_snapshot(team, members)
         elif session and not raw_assignments:
             # A bare message goes to the whole room: every agent the thread has
             # accumulated, not just the one it started with.
@@ -606,13 +615,10 @@ class CollaborationConductor:
             coordinator = item.get("coordinator") is True or bool(
                 team_snapshot and item["agentId"] == team_snapshot.get("leadAgentId")
             )
-            phase = (
-                "discussion"
-                if mode == "ask"
-                else "review"
-                if mode == "review" or (role == "reviewer" and not coordinator)
-                else "execution"
-            )
+            # Always derived, never trusted from the caller: only this seam
+            # knows who the team lead is, and a lead never leaves a writable
+            # phase just because its default role is reviewer.
+            phase = team_assignment_phase(role, mode, coordinator)
             assignments.append(
                 {
                     "assignmentId": item.get("assignmentId") or new_database_id(),
@@ -708,17 +714,6 @@ def _purpose_for_mode(mode: Any) -> str:
     if mode == "review":
         return "review"
     return "accomplish"
-
-
-def _team_snapshot(
-    team: dict[str, Any], members: list[dict[str, Any]]
-) -> dict[str, Any]:
-    return {
-        "teamId": team["id"],
-        "teamRevision": team.get("updatedAt") or team.get("createdAt"),
-        "memberAgentIds": [member["id"] for member in members],
-        "leadAgentId": team.get("leadAgentId"),
-    }
 
 
 def create_round_manifest(
@@ -826,7 +821,14 @@ def compile_assignment_work_graph(
 
     Delivery may remain sequential, but the immutable graph records the actual
     ownership and prerequisites independently of that transport choice.
+
+    Compiling is idempotent by construction, because the conductor compiles for
+    dispatch and ``create_round_manifest`` compiles again for the record. Taking
+    the already-compiled roster straight back keeps that second pass from
+    depending on the objective decoration being re-entrant.
     """
+    if assignments and all(_is_compiled_work_assignment(assignment) for assignment in assignments):
+        return [dict(assignment) for assignment in assignments]
     work_item_ids = [assignment["assignmentId"] for assignment in assignments]
     compiled: list[dict[str, Any]] = []
     for index, assignment in enumerate(assignments):
@@ -861,6 +863,19 @@ def compile_assignment_work_graph(
             }
         )
     return compiled
+
+
+def _is_compiled_work_assignment(assignment: dict[str, Any]) -> bool:
+    return all(
+        assignment.get(field) is not None
+        for field in (
+            "workItemId",
+            "workOwnerAgentId",
+            "workKind",
+            "workObjective",
+            "dependsOnWorkItemIds",
+        )
+    )
 
 
 def _work_owner_agent_id(assignment: dict[str, Any]) -> str:

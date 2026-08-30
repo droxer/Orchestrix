@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+
 from relay.services.team_dispatch import (
     TeamDispatchError,
     team_agents,
@@ -100,6 +101,7 @@ def test_team_member_assignments_sends_a_reviewer_to_review() -> None:
         {
             "agentId": "lead",
             "agent": "codex",
+            "mode": "action",
             "phase": "execution",
             "coordinator": True,
             "brief": (
@@ -110,6 +112,7 @@ def test_team_member_assignments_sends_a_reviewer_to_review() -> None:
         {
             "agentId": "support",
             "agent": "claude",
+            "mode": "action",
             "phase": "review",
             "role": "reviewer",
             "brief": (
@@ -199,3 +202,12 @@ def test_accomplish_keeps_a_reviewer_lead_in_writable_coordination_mode() -> Non
     assert assignments[0]["agentId"] == "lead"
     assert assignments[0]["phase"] == "execution"
     assert assignments[0]["brief"].startswith("Coordinate the round")
+
+
+def test_team_member_assignments_carry_the_round_mode() -> None:
+    team = _team(updatedAt="2026-08-08T00:00:00Z")
+    agents = [_agent("lead", "codex"), _agent("support", "claude")]
+
+    for mode in ("action", "ask", "review"):
+        assignments = team_member_assignments(agents, mode=mode, team=team)
+        assert [item["mode"] for item in assignments] == [mode, mode], mode

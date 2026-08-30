@@ -436,7 +436,7 @@ class SessionController:
     def record_runtime_affinity(
         self, session_id: str, computer_id: str
     ) -> dict[str, Any]:
-        """把 thread 钉到一台 Computer。写一次，之后不可改。"""
+        """Pin the thread to one Computer. Written once, never rewritten."""
         return self.store.record_runtime_affinity(session_id, computer_id)
 
     def delete_session(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import unicodedata
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -43,6 +44,12 @@ def _leading_mention_agent_ids(
     mention. A leading mention is also durable user intent, though, and older or
     partially loaded clients may omit the metadata. Resolve that intent here so
     ``@Kimi`` can never silently become a room message.
+
+    The grammar mirrors ``parseMentions`` in ``web/src/lib/mentions.ts`` line
+    for line: only horizontal whitespace may precede the run, and a bare ``@``
+    that no word follows is prose, not a failed mention. Anything the composer
+    sends must resolve here, or the user gets a 400 for a message their own
+    client told them was fine.
     """
     candidates = [
         agent
@@ -52,18 +59,21 @@ def _leading_mention_agent_ids(
         and isinstance(agent.get("displayName"), str)
         and agent["displayName"]
     ]
-    cursor = len(text) - len(text.lstrip())
+    cursor = _leading_space(text)
     addressed: list[str] = []
-    while cursor < len(text) and text[cursor] == "@":
+    while text.startswith("@", cursor):
         rest = text[cursor + 1 :]
         matches = [
             agent
             for agent in candidates
-            if rest.casefold() == agent["displayName"].casefold()
-            or rest.casefold().startswith(f"{agent['displayName'].casefold()} ")
-            or rest.casefold().startswith(f"{agent['displayName'].casefold()}\n")
+            if _names_the_agent(rest, agent["displayName"])
         ]
         if not matches:
+            if not rest[:1].strip():
+                # "@ still here" is a message that opens with an at sign, the
+                # same reading the composer takes. Stop scanning, address
+                # nobody, and let the round go to the room.
+                break
             raise HTTPException(
                 400,
                 {
@@ -84,8 +94,33 @@ def _leading_mention_agent_ids(
         selected = best[0]
         addressed.append(selected["id"])
         cursor += 1 + len(selected["displayName"])
-        cursor += len(text[cursor:]) - len(text[cursor:].lstrip())
+        cursor += _leading_space(text[cursor:])
     return tuple(dict.fromkeys(addressed))
+
+
+def _names_the_agent(rest: str, display_name: str) -> bool:
+    # `str.lower`, not `str.casefold`: the composer compares with JavaScript's
+    # `toLowerCase`, and casefold would resolve names the browser would not.
+    lowered = rest.lower()
+    name = display_name.lower()
+    return lowered == name or lowered.startswith((f"{name} ", f"{name}\n"))
+
+
+def _leading_space(text: str) -> int:
+    """Match JavaScript's ``/^[^\\S\\n]*/`` cursor movement exactly."""
+    cursor = 0
+    while cursor < len(text) and _is_javascript_non_newline_space(text[cursor]):
+        cursor += 1
+    return cursor
+
+
+def _is_javascript_non_newline_space(character: str) -> bool:
+    if character == "\n":
+        return False
+    return (
+        character in "\t\v\f\r \u00a0\ufeff\u2028\u2029"
+        or unicodedata.category(character) == "Zs"
+    )
 
 
 @router.post("/threads/{thread_id}/messages", status_code=202)

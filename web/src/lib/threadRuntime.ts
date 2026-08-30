@@ -138,6 +138,57 @@ export function teamsForThreadNode<T extends ThreadTeam>(
   );
 }
 
+export type ThreadRoster = {
+  leadAgentId?: string | null;
+  memberAgentIds: readonly string[];
+};
+
+type ThreadRosterTeam = {
+  id: string;
+  deletedAt?: string;
+  leadAgentId?: string | null;
+  memberAgentIds: readonly string[];
+};
+
+/** Return a thread's current team roster, or an empty locked roster if gone. */
+export function teamRosterForThread<T extends ThreadRosterTeam>(
+  teamId: string | null | undefined,
+  teams: readonly T[],
+): ThreadRoster | null {
+  if (!teamId) return null;
+  const team = teams.find((candidate) => candidate.id === teamId && !candidate.deletedAt);
+  return team
+    ? { leadAgentId: team.leadAgentId, memberAgentIds: team.memberAgentIds }
+    : { memberAgentIds: [] };
+}
+
+/**
+ * The agents a thread may actually address.
+ *
+ * A team or project thread refuses a non-member outright — the backend answers
+ * `agent_forbidden` — so the composer's `@` popup and the handoff picker must
+ * offer the roster, not every agent the employee owns. A thread with no roster
+ * is unrestricted and keeps the list it was given. Members are returned lead
+ * first, matching dispatch order, and roster ids the agent list cannot name
+ * (deleted, or another employee's) are dropped rather than offered as a
+ * pick that cannot resolve.
+ */
+export function addressableThreadAgents<T extends { id: string; deletedAt?: string }>(
+  agents: readonly T[],
+  roster: ThreadRoster | null,
+): T[] {
+  if (!roster) return [...agents];
+  const byId = new Map(agents.filter((agent) => !agent.deletedAt).map((agent) => [agent.id, agent]));
+  const ordered = [
+    ...roster.memberAgentIds.filter((agentId) => agentId === roster.leadAgentId),
+    ...roster.memberAgentIds.filter((agentId) => agentId !== roster.leadAgentId),
+  ];
+  return ordered.flatMap((agentId) => {
+    const agent = byId.get(agentId);
+    return agent ? [agent] : [];
+  });
+}
+
 export function threadRuntimeNodeId(
   session: ThreadRuntimeSession | undefined,
   agents: readonly ThreadAgent[] = [],

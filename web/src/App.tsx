@@ -47,7 +47,9 @@ import {
   isThreadRunInFlight,
 } from "./lib/threadRunning";
 import {
+  addressableThreadAgents,
   resolveNewThreadComputer,
+  teamRosterForThread,
 } from "./lib/threadRuntime";
 import { validatedReturnTo } from "./lib/appRoute";
 import { showThreadChrome } from "./lib/projectPage";
@@ -281,18 +283,28 @@ export function App() {
   useEffect(() => {
     setProjectRoomTarget(true);
   }, [activeProject?.id, activeSession?.id]);
+  // A thread that belongs to a team answers only its members, exactly as a
+  // project thread answers only its own. Both rosters narrow the same lists —
+  // the `@` popup and the handoff picker — so neither surface can offer a
+  // target the round would refuse.
+  const activeTeamRoster = useMemo(
+    () => teamRosterForThread(activeSession?.teamId, teams),
+    [activeSession?.teamId, teams],
+  );
   const effectiveSelectableLogicalAgents = useMemo(() => {
-    if (!activeProject) return selectableLogicalAgents;
-    const agentsById = new Map(logicalAgents.map((agent) => [agent.id, agent]));
-    const orderedMembers = [
-      ...activeProject.members.filter((member) => member.agentId === activeProject.leadAgentId),
-      ...activeProject.members.filter((member) => member.agentId !== activeProject.leadAgentId),
-    ];
-    return orderedMembers.flatMap((member) => {
-      const agent = agentsById.get(member.agentId);
-      return member.enabled && agent && !agent.deletedAt ? [agent] : [];
-    });
-  }, [activeProject, logicalAgents, selectableLogicalAgents]);
+    if (activeProject) {
+      return addressableThreadAgents(logicalAgents, {
+        leadAgentId: activeProject.leadAgentId,
+        memberAgentIds: activeProject.members
+          .filter((member) => member.enabled)
+          .map((member) => member.agentId),
+      });
+    }
+    if (activeTeamRoster) {
+      return addressableThreadAgents(selectableLogicalAgents, activeTeamRoster);
+    }
+    return selectableLogicalAgents;
+  }, [activeProject, activeTeamRoster, logicalAgents, selectableLogicalAgents]);
   const threadMentionCandidates = useMemo(
     () => mentionCandidates(effectiveSelectableLogicalAgents),
     [effectiveSelectableLogicalAgents],
