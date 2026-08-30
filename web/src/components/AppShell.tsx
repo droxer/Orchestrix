@@ -35,6 +35,9 @@ const WORK_ROUTE_LABEL_KEYS: Record<Exclude<AppRoute, "main" | "projects">, stri
 
 export type MobileChatChrome = {
   artifactCount: number;
+  /** Whether the open thread sits in a project — the panel leads with the
+   *  project workspace when it does, and the toggle is named for that. */
+  inProject: boolean;
   spaceOpen: boolean;
   spaceDisabled: boolean;
   onToggleSpace: () => void;
@@ -244,6 +247,7 @@ export function AppShell({
                 {mobileChatChrome ? (
                   <ArtifactNavButton
                     artifactCount={mobileChatChrome.artifactCount}
+                    inProject={mobileChatChrome.inProject}
                     onOpenArtifacts={mobileChatChrome.onToggleSpace}
                     expanded={mobileChatChrome.spaceOpen}
                     disabled={mobileChatChrome.spaceDisabled}
