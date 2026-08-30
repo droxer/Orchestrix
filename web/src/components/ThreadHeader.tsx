@@ -64,6 +64,7 @@ export function ThreadHeader({ activeSession, participants, artifactCount, space
         ) : null}
         <ArtifactNavButton
           artifactCount={artifactCount}
+          inProject={Boolean(activeSession?.projectId)}
           onOpenArtifacts={onToggleSpace}
           expanded={spaceOpen}
           disabled={!activeSession}

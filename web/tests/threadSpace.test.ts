@@ -225,27 +225,27 @@ describe("maxSpaceWidth", () => {
 
 describe("space tabs", () => {
   it("opens a project thread on the shared workspace", () => {
-    assert.equal(defaultSpaceTab("prj-1"), "files");
+    assert.equal(defaultSpaceTab("prj-1"), "project");
   });
 
-  it("opens a thread with no project on its own output", () => {
-    assert.equal(defaultSpaceTab(null), "output");
-    assert.equal(defaultSpaceTab(undefined), "output");
-    assert.equal(defaultSpaceTab(""), "output");
+  it("opens a thread with no project on its own files", () => {
+    assert.equal(defaultSpaceTab(null), "thread");
+    assert.equal(defaultSpaceTab(undefined), "thread");
+    assert.equal(defaultSpaceTab(""), "thread");
   });
 
-  it("never shows files for a thread with no project", () => {
-    assert.equal(resolveSpaceTab("files", null, false), "output");
+  it("never shows the project tab for a thread with no project", () => {
+    assert.equal(resolveSpaceTab("project", null, false), "thread");
   });
 
-  it("follows a selected artifact back to output", () => {
-    // The transcript can select an artifact while the panel sits on Files.
-    assert.equal(resolveSpaceTab("files", "prj-1", true), "output");
+  it("follows a selected file back to this thread", () => {
+    // The transcript can select one while the panel sits on Project.
+    assert.equal(resolveSpaceTab("project", "prj-1", true), "thread");
   });
 
   it("otherwise keeps the tab the user picked", () => {
-    assert.equal(resolveSpaceTab("output", "prj-1", false), "output");
-    assert.equal(resolveSpaceTab("files", "prj-1", false), "files");
+    assert.equal(resolveSpaceTab("thread", "prj-1", false), "thread");
+    assert.equal(resolveSpaceTab("project", "prj-1", false), "project");
   });
 });
 
@@ -263,7 +263,7 @@ describe("thread space panel wiring", () => {
     );
   });
 
-  it("gives the empty output state an action, not just a sentence", () => {
+  it("gives the empty state an action, not just a sentence", () => {
     const panel = readWeb("src/components/space/ThreadSpacePanel.tsx");
     assert.match(panel, /space\.empty_cta_files/);
     assert.match(panel, /space\.empty_cta_back/);
@@ -274,5 +274,20 @@ describe("thread space panel wiring", () => {
       readWeb("src/components/ArtifactNavButton.tsx"),
       /className="chat-artifacts-label"/,
     );
+  });
+
+  it("names the toggle for where it lands, and drops the count it would not open on", () => {
+    const button = readWeb("src/components/ArtifactNavButton.tsx");
+    assert.match(button, /inProject \? t\("space\.title_project"\) : t\("space\.title"\)/);
+    assert.match(button, /const showCount = !inProject && artifactCount > 0;/);
+  });
+
+  it("keeps the word \"output\" out of the panel's vocabulary", () => {
+    const en = JSON.parse(readWeb("src/i18n/locales/en/translation.json")) as {
+      space: Record<string, string>;
+    };
+    for (const [key, value] of Object.entries(en.space)) {
+      assert.ok(!/output/i.test(value), `space.${key} still says "output": ${value}`);
+    }
   });
 });

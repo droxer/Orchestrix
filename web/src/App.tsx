@@ -956,6 +956,7 @@ export function App() {
       threadListResizing={threadListResizing}
       mobileChatChrome={threadChromeVisible ? {
         artifactCount: visibleArtifacts.length,
+        inProject: Boolean(activeSession?.projectId),
         spaceOpen: spaceVisible,
         spaceDisabled: !activeSession,
         onToggleSpace: space.toggleSpace,

@@ -25,6 +25,7 @@ import {
   ICON,
   NavBack,
   ThreadSpaceToggle,
+  WorkspaceFolder,
 } from "../icons";
 import { Button } from "@/components/ui/button";
 import { OverlayCloseButton } from "@/components/ui/OverlayCloseButton";
@@ -48,7 +49,7 @@ function transcriptWidth(): number | null {
   return chat ? chat.getBoundingClientRect().width : null;
 }
 
-const SPACE_TABS: readonly SpaceTab[] = ["files", "output"];
+const SPACE_TABS: readonly SpaceTab[] = ["project", "thread"];
 
 export function ThreadSpacePanel({
   sessionId,
@@ -86,7 +87,7 @@ export function ThreadSpacePanel({
   const [view, setView] = useState<ArtifactView>("preview");
 
   // The tab is per-thread: switching threads re-derives the default rather
-  // than carrying a personal-thread "output" choice onto a project thread.
+  // than carrying a solo thread's own-files choice onto a project thread.
   const [tab, setTab] = useState<SpaceTab>(() => defaultSpaceTab(projectId));
   useEffect(() => setTab(defaultSpaceTab(projectId)), [projectId, sessionId]);
   const selectedId = selected?.artifact.id ?? null;
@@ -94,6 +95,10 @@ export function ThreadSpacePanel({
   const renderMode = selected ? artifactRenderMode(selected.artifact) : "none";
   const activeTab = resolveSpaceTab(tab, projectId, Boolean(selected));
   const showTabs = Boolean(projectId) && !selected;
+  // The panel is named for what it holds: a project thread's panel is the
+  // project's shared workspace, a solo thread's is just its own files. Same
+  // word as the header pill that opened it.
+  const panelName = projectId ? t("space.title_project") : t("space.title");
 
   // A drag registers listeners outside React; this releases them if the panel
   // unmounts (or the thread changes) mid-gesture, which would otherwise leak
@@ -187,10 +192,10 @@ export function ThreadSpacePanel({
               onClick={() => onSelectArtifact(null)}
             >
               <NavBack size={ICON.sm} />
-              <span>{t("space.title")}</span>
+              <span>{panelName}</span>
             </Button>
           ) : (
-            <h2 className="thread-space-title">{t("space.title")}</h2>
+            <h2 className="thread-space-title">{panelName}</h2>
           )}
           {selected && renderMode !== "none" ? (
             <ArtifactViewToggle view={view} onChange={setView} className="thread-space-view-toggle" />
@@ -211,8 +216,8 @@ export function ThreadSpacePanel({
                 className={`thread-space-tab${activeTab === name ? " is-active" : ""}`}
                 onClick={() => setTab(name)}
               >
-                {name === "files" ? t("space.tab_files") : t("space.tab_output")}
-                {name === "output" && items.length ? (
+                {name === "project" ? t("space.tab_project") : t("space.tab_thread")}
+                {name === "thread" && items.length ? (
                   <span className="thread-space-tab-count tnum">{items.length}</span>
                 ) : null}
               </button>
@@ -225,7 +230,7 @@ export function ThreadSpacePanel({
           role={showTabs ? "tabpanel" : undefined}
           aria-labelledby={showTabs ? `thread-space-tab-${activeTab}` : undefined}
         >
-          {activeTab === "files" && projectId ? (
+          {activeTab === "project" && projectId ? (
             <ThreadSpaceFiles projectId={projectId} />
           ) : selected ? (
             <div className="thread-space-preview">
@@ -244,7 +249,8 @@ export function ThreadSpacePanel({
                 {projectId ? t("space.empty_body_project") : t("space.empty_body")}
               </p>
               {projectId ? (
-                <Button type="button" variant="outline" size="sm" onClick={() => setTab("files")}>
+                <Button type="button" size="sm" onClick={() => setTab("project")}>
+                  <WorkspaceFolder size={ICON.sm} />
                   {t("space.empty_cta_files")}
                 </Button>
               ) : (
