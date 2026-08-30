@@ -239,6 +239,20 @@ describe("pre-auth login palette", () => {
     assert.match(login, /\.login-error \{[^}]*var\(--lg-err\)/s);
   });
 
+  it("holds the shared Input's invalid state to the pinned achromatic tier", () => {
+    // The primitive's aria-invalid ring is drawn from --err, a THEME-register
+    // token, so on this pinned-dark screen a saved light theme painted a deep
+    // red ring — and chromatic at all contradicts .login-error one element
+    // over. Re-pointing --err in the login scope does NOT reach it (both
+    // --focus-outline-danger and --color-destructive substitute --err where
+    // they are declared, on :root), so the rule is spelled out. Guard it.
+    assert.match(
+      login,
+      /\.login-input\[aria-invalid="true"\] \{[^}]*var\(--lg-err\)[^}]*\}/s,
+      "the login field's invalid state must use the pinned --lg-err, not the theme register's --err",
+    );
+  });
+
   it("lets the register-invariant cobalt CTA reach pre-auth", () => {
     // The primary action is one cobalt in EVERY context, pre-auth included, so
     // login.css aliases :root's action tokens rather than pinning its own

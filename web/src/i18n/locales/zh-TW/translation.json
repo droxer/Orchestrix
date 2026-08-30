@@ -1145,6 +1145,10 @@
     "lede_bootstrap": "貼上後端啟動日誌中的 RELAY_ADMIN_TOKEN，然後建立管理員帳戶。",
     "kicker_setup": "首次設定",
     "kicker_attach": "登入",
+    "cover_headline": "讓智能體在你自己的電腦上執行。",
+    "point_computers": "接入一台電腦，智能體就在工作所在之處執行。",
+    "point_control": "工作階段、任務與定期例程，統一在一個控制平面。",
+    "point_log": "每次執行都寫入可重播的追加式事件日誌。",
     "error_generic": "出現問題，請重試。"
   },
   "status": {
