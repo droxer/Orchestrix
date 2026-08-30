@@ -1324,6 +1324,72 @@ def test_claimed_task_rejects_status_and_assignment_updates(monkeypatch) -> None
             assert unchanged["assignedAgentId"] == first["id"]
 
 
+def test_claimed_task_rejects_pickup_assignment_update(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        first = _create_agent(client, "alice", executor_kind="codex")
+        second = _create_agent(client, "alice", executor_kind="claude")
+        task = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Claimed pickup",
+                "assigneeEmployeeId": "alice",
+                "assignedAgentId": first["id"],
+                "status": "assigned",
+            },
+        ).json()
+        claimed = client.app.state.task_store.claim_task_for_dispatch(
+            task["id"], "codex"
+        )
+        assert claimed is not None
+
+        response = client.post(
+            f"/api/v1/tasks/{task['id']}/pickups",
+            json={"agentId": second["id"]},
+        )
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == "task_execution_active"
+        unchanged = client.get(f"/api/v1/tasks/{task['id']}").json()
+        assert unchanged["assignedAgentId"] == first["id"]
+        assert unchanged["dispatchClaim"] == claimed["dispatchClaim"]
+
+
+def test_claimed_task_allows_metadata_update(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        agent = _create_agent(client, "alice", executor_kind="codex")
+        task = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Original title",
+                "assigneeEmployeeId": "alice",
+                "assignedAgentId": agent["id"],
+                "status": "assigned",
+            },
+        ).json()
+        claimed = client.app.state.task_store.claim_task_for_dispatch(
+            task["id"], "codex"
+        )
+        assert claimed is not None
+
+        response = client.patch(
+            f"/api/v1/tasks/{task['id']}",
+            json={"title": "Updated title", "priority": "high"},
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["title"] == "Updated title"
+        assert response.json()["priority"] == "high"
+        assert response.json()["dispatchClaim"] == claimed["dispatchClaim"]
+
+
 def test_assigned_task_rejects_run_assignment_override(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
