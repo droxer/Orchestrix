@@ -99,3 +99,28 @@ export function resolveSelectedSpaceItem(
   if (!selectedId) return null;
   return items.find((item) => item.artifact.id === selectedId) ?? null;
 }
+
+/** Which half of the panel is on screen: the project's shared workspace files
+ *  or what this thread itself produced. */
+export type SpaceTab = "files" | "output";
+
+/** A thread inside a project opens on the workspace — the files are the shared
+ *  record everyone in the project works against, while a single thread's output
+ *  is one contribution to it. A thread with no project has no files tab at all. */
+export function defaultSpaceTab(projectId: string | null | undefined): SpaceTab {
+  return projectId ? "files" : "output";
+}
+
+/** The tab actually rendered. Two facts outrank the user's last click: a thread
+ *  with no project has nothing to show under Files, and a selected artifact is
+ *  output by definition (it is reachable from the transcript, which can select
+ *  one while the panel sits on Files). */
+export function resolveSpaceTab(
+  tab: SpaceTab,
+  projectId: string | null | undefined,
+  hasSelectedArtifact: boolean,
+): SpaceTab {
+  if (!projectId) return "output";
+  if (hasSelectedArtifact) return "output";
+  return tab;
+}

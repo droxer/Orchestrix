@@ -1229,8 +1229,14 @@
     "toggle_threads": "Show thread list",
     "resize_label": "Resize output panel",
     "list_label": "Thread output",
+    "tabs_label": "Thread output sections",
+    "tab_files": "Files",
+    "tab_output": "Output",
     "empty_title": "Nothing produced yet",
-    "empty_body": "Files and reports this thread produces will appear here automatically."
+    "empty_body": "Files and reports this thread produces will appear here automatically.",
+    "empty_body_project": "Nothing from this thread yet. The project workspace holds the shared files.",
+    "empty_cta_files": "Browse project files",
+    "empty_cta_back": "Back to the conversation"
   },
   "agent_stream": {
     "empty_working": "Working…",

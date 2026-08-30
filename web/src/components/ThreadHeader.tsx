@@ -67,7 +67,6 @@ export function ThreadHeader({ activeSession, participants, artifactCount, space
           onOpenArtifacts={onToggleSpace}
           expanded={spaceOpen}
           disabled={!activeSession}
-          className="chat-artifacts-button"
         />
       </div>
     </header>

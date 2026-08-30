@@ -207,7 +207,7 @@ describe("markdown component wiring", () => {
     const artifactBody = readWeb("src/components/artifact/ArtifactBody.tsx");
     assert.equal(artifactBody.match(/variant="document"/g)?.length, 2);
     assert.doesNotMatch(artifactBody, /<Markdown text=\{text\} \/>/);
-    assert.match(readWeb("src/components/ProjectWorkspaceFiles.tsx"), /variant="document"/);
+    assert.match(readWeb("src/components/workspace/WorkspaceFilePreview.tsx"), /variant="document"/);
   });
 });
 

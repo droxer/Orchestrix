@@ -123,6 +123,17 @@
     justify-self: end;
   }
 
+  /* The top bar has room for glyphs, not words: the output pill drops back to
+     its icon here and the count chip rides beside it. */
+  .mobile-topbar-chat-tools .chat-artifacts-label {
+    display: none;
+  }
+
+  .mobile-topbar-chat-tools .chat-artifacts-button {
+    min-height: var(--touch-target);
+    padding-inline: var(--sp-2);
+  }
+
   .mobile-topbar-chat-tools [data-variant="icon"],
   .mobile-topbar-chat-tools .mobile-settings {
     position: relative;

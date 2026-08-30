@@ -44,6 +44,19 @@
   min-height: 0;
 }
 
+/* Project threads add the Files/Output switch between header and body; the
+   body has to keep the 1fr row or its lists stop scrolling. */
+.thread-space-inner:has(.thread-space-tabs) {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.thread-space-body {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
 .thread-space-header {
   display: flex;
   align-items: center;
@@ -156,14 +169,94 @@
   letter-spacing: var(--type-body-sm-track);
 }
 
+/* ---- Files / Output switch ------------------------------------------ */
+
+.thread-space-tabs {
+  display: flex;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 0.5px solid var(--line-1);
+}
+
+.thread-space-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--control-h-sm);
+  padding: 0 var(--sp-3);
+  border: 0;
+  border-radius: var(--r-2);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  font: var(--type-label-strong);
+  white-space: nowrap;
+  transition:
+    background var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease);
+}
+
+.thread-space-tab:hover {
+  color: var(--ink-1);
+  background: var(--row-hover);
+}
+
+.thread-space-tab.is-active {
+  background: var(--surface-2);
+  color: var(--ink-1);
+}
+
+.thread-space-tab-count {
+  color: var(--ink-3);
+  font-size: var(--fs-1);
+}
+
+/* ---- project workspace inside the panel ----------------------------- */
+
+.thread-space-files {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.thread-space-files-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 0.5px solid var(--line-1);
+}
+
+.thread-space-files-body {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ---- empty output --------------------------------------------------- */
+
 .thread-space-empty {
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: var(--sp-2);
+  gap: var(--sp-3);
   min-height: 0;
   padding: var(--sp-7) var(--sp-5);
   text-align: center;
+}
+
+/* One mark tile, the shared empty-state language — the panel's own glyph, so
+   the empty state names the place the user is standing in. */
+.thread-space-empty-mark {
+  display: grid;
+  place-items: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  border-radius: var(--r-2);
+  background: var(--row-hover);
+  color: var(--ink-3);
 }
 
 .thread-space-empty-title {

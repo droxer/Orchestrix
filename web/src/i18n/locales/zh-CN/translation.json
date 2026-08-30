@@ -1228,8 +1228,14 @@
     "toggle_threads": "显示对话列表",
     "resize_label": "调整产物面板宽度",
     "list_label": "对话产物",
+    "tabs_label": "对话产物分区",
+    "tab_files": "文件",
+    "tab_output": "产物",
     "empty_title": "还没有产物",
-    "empty_body": "该对话生成的文件和报告会自动出现在这里。"
+    "empty_body": "该对话生成的文件和报告会自动出现在这里。",
+    "empty_body_project": "该对话还没有产物。共享文件在项目工作区中。",
+    "empty_cta_files": "浏览项目文件",
+    "empty_cta_back": "返回对话"
   },
   "agent_stream": {
     "empty_working": "运行中…",
