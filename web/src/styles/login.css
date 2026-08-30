@@ -1,11 +1,15 @@
 /* =====================================================================
    Login screen
 
-   Minimal centered sign-in card on a flat dark canvas — the pre-auth
-   "cover" stays in the pinned dark register (no theme preference
-   loaded yet). The local --lg-* names alias the always-dark register in
-   tokens/palette.css so the screen stays dark whatever theme the
-   operator has saved; the one thing shared with the post-auth product
+   A split canvas: the left half is the COVER (what Relay is — mark,
+   headline, three proof lines, no controls) and the right half is the
+   GATE (one column, one action). The two halves separate by fill step
+   and a single hairline, not by shadow; the system stays flat.
+
+   The pre-auth screen stays in the pinned dark register (no theme
+   preference is loaded yet). The local --lg-* names alias the always-dark
+   register in tokens/palette.css so the screen stays dark whatever theme
+   the operator has saved; the one thing shared with the post-auth product
    is the register-invariant action cobalt on the primary CTA. Spacing,
    type scale, and radii are theme-independent tokens and are used
    directly.
@@ -32,15 +36,25 @@
      theme. Binding the variable (not a per-control override) keeps every
      login control on the shared --focus-outline mechanism. */
   --focus-outline: var(--focus-w) solid var(--lg-ink);
+  /* The cover's text measure, shared by the cover and the foot so both
+     centre on the same left margin inside the cover column. */
+  --lg-cover-measure: 38rem;
+  /* RelayMark strokes its lead path with --ink-1, the THEME register's ink.
+     On this pinned-dark canvas a saved light theme would paint it dark on
+     dark. Re-point the variable in this scope rather than special-casing
+     the shared mark. */
+  --ink-1: var(--lg-ink);
 
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  /* The split. The cover takes the wider column — it carries a hero
+     headline and three lines of prose, the gate carries two fields. */
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-rows: 1fr auto;
+  grid-template-areas:
+    "cover panel"
+    "foot  panel";
   min-height: 100vh;
   min-height: 100svh;
-  padding: var(--sp-6) var(--sp-4);
-  /* Flat canvas — the card separates by its fill step and hairline alone,
-     no spotlight wash behind it. */
   background: var(--lg-canvas);
   color: var(--lg-ink);
   font-family: var(--font-sans);
@@ -48,14 +62,19 @@
 
 /* The bled double-chevron — the login signature, echoed from the empty-state
    bleed mark. Fixed so it can leave the viewport without creating scrollable
-   overflow; the 5% ink wash keeps it a watermark, not a logo. */
+   overflow; the 5% ink wash keeps it a watermark, not a logo. It lands in the
+   cover column, which is why the gate is a positioned element below: the
+   panel's own plate has to paint over the watermark, and a fixed element
+   otherwise sits above a non-positioned sibling's background. */
 .login-bleed {
   position: fixed;
-  left: calc(-1 * var(--sp-7));
-  bottom: calc(-1 * var(--sp-7));
-  width: 40vmin;
-  height: 40vmin;
-  color: color-mix(in srgb, var(--lg-ink) 5%, transparent);
+  left: calc(-1 * var(--sp-8));
+  bottom: calc(-1 * var(--sp-8));
+  /* Capped, not a bare vmin: at the narrow end of the split a 40vmin mark
+     stopped being a watermark and started competing with the proof lines. */
+  width: min(34vmin, 300px);
+  height: min(34vmin, 300px);
+  color: color-mix(in srgb, var(--lg-ink) 4%, transparent);
   pointer-events: none;
   user-select: none;
 }
@@ -66,40 +85,35 @@
   height: 100%;
 }
 
-/* ---------- The card ------------------------------------------------- */
+/* ---------- The cover ------------------------------------------------ */
 
-.login-card {
+.login-cover {
+  grid-area: cover;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: var(--sp-6);
-  width: min(100%, 420px);
-  padding: var(--sp-7) var(--sp-6);
-  background: color-mix(in srgb, var(--lg-elevated) 35%, var(--lg-canvas));
-  border: 0.5px solid var(--lg-hairline-soft);
-  border-radius: var(--r-3);
-  /* A 1px inner top highlight — edge refraction on the pinned dark plate,
-     not elevation; the system stays flat (no drop shadow). */
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--lg-ink) 6%, transparent);
+  /* The cover's text column stops well short of the split so the headline
+     breaks on its own terms instead of against the hairline, and centres in
+     its half rather than hugging the viewport edge — past ~1600px the edge
+     placement left a void between the last proof line and the seam. The
+     foot repeats both values so the two boxes stay on one left margin. */
+  width: 100%;
+  max-width: var(--lg-cover-measure);
+  margin-inline: auto;
+  padding: var(--sp-8) var(--sp-7);
   animation: rise var(--t-slow) var(--ease);
-}
-
-.login-identity {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--sp-3);
 }
 
 .login-brand {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: var(--sp-2);
   color: var(--lg-ink);
 }
 
 .login-wordmark {
-  /* The wordmark is a name, not a display tier: 16px/600 sets solid. */
+  /* The wordmark is a name, not a display tier — the --type-name role. */
   font: var(--type-name);
   letter-spacing: var(--type-name-track);
 }
@@ -107,28 +121,97 @@
 .login-intro {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
-  text-align: center;
+  gap: var(--sp-3);
 }
 
-/* --type-display is 500 at the 48px rung and sets SOLID — the source system
-   tracks its reading roles, not its display tier, so --type-display-track is 0
-   by design. The pinned --lg-* register is a colour fork, not a type fork, so
-   the role carries the font. */
+/* The one place a headline owns the viewport — the --fs-hero clamp, which
+   tracks the viewport between the 24px tier and 40px and never joins the
+   type ladder. The display family sets solid (--track-display is 0 by
+   design); the pinned --lg-* register is a colour fork, not a type fork. */
 .login-headline {
   margin: 0;
-  font: var(--type-display);
-  letter-spacing: var(--type-display-track);
+  font-family: var(--font-display);
+  font-size: var(--fs-hero);
+  font-weight: 500;
   line-height: var(--leading-display);
+  letter-spacing: var(--track-display);
   color: var(--lg-ink);
+  /* text-wrap: balance comes from the shared heading rule in a11y.css. */
 }
 
 .login-lede {
   margin: 0;
+  max-width: 42ch;
   font: var(--type-body-sm);
   letter-spacing: var(--type-body-sm-track);
   line-height: var(--leading-loose);
   color: var(--lg-muted);
+}
+
+/* Three proof lines. Not a bulleted list skin: the marker IS the product
+   mark at 14px, so the cover is signed by one shape at two sizes. */
+.login-points {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 0.5px solid var(--lg-hairline-soft);
+  padding-top: var(--sp-5);
+}
+
+.login-point {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+  line-height: var(--leading-normal);
+  color: var(--lg-muted);
+}
+
+.login-point-mark {
+  flex: none;
+  /* Nudged onto the first line's baseline box — a 14px square glyph sits
+     high against 13px text set at --leading-normal. */
+  translate: 0 2px;
+  /* Muted ink, not --lg-accent: the cobalt on this screen is the CTA and
+     nothing else, so a decorative marker must not spend it. */
+  color: var(--lg-muted);
+}
+
+/* ---------- The gate ------------------------------------------------- */
+
+.login-panel {
+  grid-area: panel;
+  /* Positioned so its plate paints over the fixed watermark. */
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-8) var(--sp-7);
+  /* A firmer step than the old card's 35%: across half a viewport the two
+     planes have to separate on fill alone, with the hairline as a seam
+     rather than as the whole boundary. */
+  background: color-mix(in srgb, var(--lg-elevated) 55%, var(--lg-canvas));
+  border-left: 0.5px solid var(--lg-hairline-soft);
+  /* A 1px inner left highlight — edge refraction where the two halves meet,
+     not elevation; the system stays flat (no drop shadow). */
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--lg-ink) 6%, transparent);
+}
+
+.login-panel-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  width: min(100%, 340px);
+}
+
+.login-panel-title {
+  margin: 0;
+  font: var(--type-title);
+  letter-spacing: var(--type-title-track);
+  color: var(--lg-ink);
 }
 
 /* ---------- Form ------------------------------------------------------ */
@@ -181,6 +264,25 @@
   /* The focused well lifts 2% toward the ink so it reads active at a glance,
      not just by its cobalt edge. */
   background: color-mix(in srgb, var(--lg-ink) 2%, var(--lg-elevated));
+}
+
+/* The shared Input primitive draws its aria-invalid state from --err via
+   Tailwind's border-destructive and --focus-outline-danger. Two problems on
+   this screen: --err is a THEME-register token, so a saved light theme
+   painted the deepened light-register red on a near-black plate; and the tone is
+   chromatic, which contradicts the achromatic status grammar the rest of
+   this screen (and paletteTokens.test.ts) commits to.
+
+   Restating the variables cannot fix it — --focus-outline-danger and
+   --color-destructive both SUBSTITUTE --err where they are DECLARED, on
+   :root, so re-pointing --err in this scope reaches neither. The rule is
+   spelled out instead; login.css sits in layer(relay), the last layer, so
+   it outranks the primitive's utilities. Dashed-vs-solid is the system's
+   own danger/normal distinction, and it survives the tone going achromatic. */
+.login-input[aria-invalid="true"] {
+  border-color: var(--lg-err);
+  outline: var(--focus-w) dashed var(--lg-err);
+  outline-offset: var(--focus-offset);
 }
 
 .login-input:-webkit-autofill {
@@ -253,13 +355,17 @@
 
 /* ---------- Foot ------------------------------------------------------ */
 
+/* A direct grid child, so the split canvas seats it under the cover column
+   and the stacked layout drops it to the page bottom — same element, no
+   duplicated markup, no hairline running under the gate. */
 .login-foot {
+  grid-area: foot;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: var(--sp-3);
-  padding-top: var(--sp-4);
-  border-top: 0.5px solid var(--lg-hairline-soft);
+  width: 100%;
+  max-width: var(--lg-cover-measure);
+  margin-inline: auto;
+  padding: 0 var(--sp-7) var(--sp-7);
 }
 
 .login-foot-meta {
@@ -309,19 +415,24 @@
 
 /* ---------- Motion --------------------------------------------------- */
 
-/* Staged entrance: the card rises as one object, then its sections follow
+/* Staged entrance: the cover rises as one object, then its sections follow
    on the shared --t-stagger ladder — the same choreography rule as the
-   transcript hero. The error eases in on the same small travel instead of
-   popping. */
+   transcript hero. The gate arrives on the same ladder one beat behind the
+   cover's headline, so the eye lands left before it lands right. The error
+   eases in on the same small travel instead of popping. */
 @media (prefers-reduced-motion: no-preference) {
-  .login-card > * {
+  .login-cover > *,
+  .login-panel-inner,
+  .login-foot {
     --rise-from: var(--rise-sm);
     animation: rise var(--t-slow) var(--ease) both;
   }
 
-  .login-card > .login-identity { animation-delay: calc(var(--t-stagger) * 1); }
-  .login-card > .login-form { animation-delay: calc(var(--t-stagger) * 2); }
-  .login-card > .login-foot { animation-delay: calc(var(--t-stagger) * 3); }
+  .login-cover > .login-brand { animation-delay: calc(var(--t-stagger) * 1); }
+  .login-cover > .login-intro { animation-delay: calc(var(--t-stagger) * 2); }
+  .login-cover > .login-points { animation-delay: calc(var(--t-stagger) * 3); }
+  .login-panel-inner { animation-delay: calc(var(--t-stagger) * 3); }
+  .login-foot { animation-delay: calc(var(--t-stagger) * 4); }
 
   .login-error {
     --rise-from: var(--rise-sm);
@@ -331,10 +442,55 @@
 
 /* ---------- Responsive ----------------------------------------------- */
 
-@media (max-width: 480px) {
-  .login-card {
-    padding: var(--sp-6) var(--sp-4);
+/* The app-wide phone tier. Below the split the canvas stacks: cover, gate, foot. The cover keeps its
+   identity and headline but drops the proof lines — three lines of product
+   prose above a sign-in form is a wall, not a cover. */
+@media (max-width: 820px) {
+  .login-screen {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas:
+      "cover"
+      "panel"
+      "foot";
+  }
+
+  .login-cover,
+  .login-foot {
+    max-width: none;
+  }
+
+  .login-cover {
+    gap: var(--sp-4);
+    padding: var(--sp-7) var(--sp-6) var(--sp-6);
+  }
+
+  .login-points {
+    display: none;
+  }
+
+  .login-panel {
+    padding: var(--sp-6);
+    border-left: 0;
+    border-top: 0.5px solid var(--lg-hairline-soft);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--lg-ink) 6%, transparent);
+  }
+
+  .login-foot {
+    padding: 0 var(--sp-6) var(--sp-6);
   }
 }
 
-/* ---------- Reduced motion ------------------------------------------- */
+@media (max-width: 480px) {
+  .login-cover {
+    padding: var(--sp-6) var(--sp-4) var(--sp-5);
+  }
+
+  .login-panel {
+    padding: var(--sp-5) var(--sp-4);
+  }
+
+  .login-foot {
+    padding: 0 var(--sp-4) var(--sp-5);
+  }
+}
