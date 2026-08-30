@@ -1230,6 +1230,100 @@ def test_routine_start_reuses_an_open_overdue_occurrence(monkeypatch) -> None:
         assert refreshed["occurrenceIds"] == [occurrence_id]
 
 
+def test_routine_start_reuses_the_occurrence_assignment_snapshot(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        registered = client.post(
+            "/api/v1/daemon-node-registrations",
+            json={
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex", "claude"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            },
+            headers={"Authorization": "Bearer ui_token"},
+        )
+        assert registered.status_code == 200
+        original_agent = _create_agent(
+            client, "alice", executor_kind="codex", node_id="sbx_alice"
+        )
+        replacement_agent = _create_agent(
+            client, "alice", executor_kind="claude", node_id="sbx_alice"
+        )
+        routine = client.post(
+            "/api/v1/tasks",
+            json={
+                "title": "Stable assignment report",
+                "ownerEmployeeId": "alice",
+                "assigneeEmployeeId": "alice",
+                "assignedAgentId": original_agent["id"],
+                "isRoutine": True,
+                "routineCadence": "daily",
+                "routineNextRunDate": "2020-01-01",
+                "routineEnabled": True,
+            },
+        ).json()
+        occurrence = app.state.task_store.promote_due_routine(
+            routine["id"], "2026-08-30", "2026-08-31"
+        )
+        assert occurrence and occurrence["assignedAgentId"] == original_agent["id"]
+        reassigned = client.patch(
+            f"/api/v1/tasks/{routine['id']}",
+            json={"assignedAgentId": replacement_agent["id"]},
+        )
+        assert reassigned.status_code == 200
+
+        started = client.post(f"/api/v1/tasks/{routine['id']}/runs", json={})
+
+        assert started.status_code == 202, started.text
+        assert started.json()["task"]["id"] == occurrence["id"]
+        assert started.json()["task"]["assignedAgentId"] == original_agent["id"]
+        [command] = app.state.registry.take_commands("sbx_alice", "node_token")
+        assert command["logicalAgentId"] == original_agent["id"]
+        assert command["agent"] == "codex"
+
+
+def test_claimed_task_rejects_status_and_assignment_updates(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        first = _create_agent(client, "alice", executor_kind="codex")
+        second = _create_agent(client, "alice", executor_kind="claude")
+
+        for patch in ({"status": "done"}, {"assignedAgentId": second["id"]}):
+            task = client.post(
+                "/api/v1/tasks",
+                json={
+                    "title": "Claimed task",
+                    "assigneeEmployeeId": "alice",
+                    "assignedAgentId": first["id"],
+                    "status": "assigned",
+                },
+            ).json()
+            claimed = client.app.state.task_store.claim_task_for_dispatch(
+                task["id"], "codex"
+            )
+            assert claimed is not None
+
+            updated = client.patch(f"/api/v1/tasks/{task['id']}", json=patch)
+
+            assert updated.status_code == 409
+            assert updated.json()["detail"] == "task_execution_active"
+            unchanged = client.get(f"/api/v1/tasks/{task['id']}").json()
+            assert unchanged["status"] == "assigned"
+            assert unchanged["assignedAgentId"] == first["id"]
+
+
 def test_assigned_task_rejects_run_assignment_override(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
