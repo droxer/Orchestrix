@@ -10,6 +10,7 @@ from typing import Any
 from loguru import logger
 
 from ..collaboration.service import (
+    assignment_team_snapshot,
     compile_assignment_work_graph,
     create_round_manifest,
 )
@@ -19,6 +20,7 @@ from ..core.models import AgentName
 from ..daemon_registry import node_accepts_run
 from ..persistence.agent_placement_store import create_node_placement
 from ..persistence.stores import valid_agent
+from ..persistence.protocols import TaskDispatchAssignment
 from ..persistence.task_store import routine_due_sort_key, task_claim_sort_key
 from ..services.agent_routing import (
     AgentRoutingError,
@@ -376,18 +378,10 @@ class TaskScheduler:
                     }
                     for assignment in assignments
                 ]
-                team_snapshot = next(
-                    (
-                        assignment.get("teamSnapshot")
-                        for assignment in assignments
-                        if isinstance(assignment.get("teamSnapshot"), dict)
-                    ),
-                    None,
-                )
                 assignments = compile_assignment_work_graph(
                     assignments,
                     purpose="accomplish",
-                    team_snapshot=team_snapshot,
+                    team_snapshot=assignment_team_snapshot(assignments),
                 )
                 node = self.registry.get(assignments[0]["daemonNodeId"])
             except ProjectDispatchError as error:
@@ -433,7 +427,11 @@ class TaskScheduler:
                 self._ensure_managed_capacity(task)
                 skipped += 1
                 continue
-            claimed = self.task_store.claim_task_for_dispatch(task["id"], agent)
+            claimed = self.task_store.claim_task_for_dispatch(
+                task["id"],
+                agent,
+                expected_assignment=TaskDispatchAssignment.capture(task),
+            )
             if not claimed:
                 skipped += 1
                 continue
@@ -551,14 +549,6 @@ class TaskScheduler:
         claim = task.get("dispatchClaim") or {}
         claim_id = claim.get("id")
         try:
-            team_snapshot = next(
-                (
-                    assignment.get("teamSnapshot")
-                    for assignment in assignments
-                    if isinstance(assignment.get("teamSnapshot"), dict)
-                ),
-                None,
-            )
             collaboration = {
                 "manifest": create_round_manifest(
                     source="task",
@@ -576,7 +566,7 @@ class TaskScheduler:
                         }
                     ),
                     assignments=assignments,
-                    team_snapshot=team_snapshot,
+                    team_snapshot=assignment_team_snapshot(assignments),
                     project_snapshot=project_snapshot,
                 )
             }

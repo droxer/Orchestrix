@@ -1,7 +1,31 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any, Protocol
+
+
+@dataclass(frozen=True)
+class TaskDispatchAssignment:
+    """Task fields that must remain stable between routing and dispatch claim."""
+
+    agent_id: str | None
+    team_id: str | None
+    project_id: str | None
+    employee_id: str | None
+
+    @classmethod
+    def capture(cls, task: dict[str, Any]) -> TaskDispatchAssignment:
+        return cls(
+            agent_id=task.get("assignedAgentId"),
+            team_id=task.get("assignedTeamId"),
+            project_id=task.get("projectId"),
+            employee_id=task.get("assigneeEmployeeId")
+            or task.get("ownerEmployeeId"),
+        )
+
+    def matches(self, task: dict[str, Any]) -> bool:
+        return self == self.capture(task)
 
 
 class SessionStore(Protocol):
@@ -63,7 +87,13 @@ class TaskStore(Protocol):
         payload: dict[str, Any],
         *,
         assignment: dict[str, Any] | None = None,
-        reject_active_claim: bool = False,
+    ) -> dict[str, Any]: ...
+    def update_task_if_not_dispatching(
+        self,
+        task_id: str,
+        payload: dict[str, Any],
+        *,
+        assignment: dict[str, Any] | None = None,
     ) -> dict[str, Any]: ...
     def delete_task(
         self,
@@ -88,7 +118,12 @@ class TaskStore(Protocol):
         message: str | None = None,
     ) -> dict[str, Any]: ...
     def claim_task_for_dispatch(
-        self, task_id: str, agent: str, message: str | None = None
+        self,
+        task_id: str,
+        agent: str,
+        message: str | None = None,
+        *,
+        expected_assignment: TaskDispatchAssignment | None = None,
     ) -> dict[str, Any] | None: ...
     def release_dispatch_claim(self, task_id: str, claim_id: str) -> dict[str, Any]: ...
     def assign_task(

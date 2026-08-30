@@ -2921,20 +2921,32 @@ class DaemonNodeRegistry:
         state.pop(TERMINAL_CLAIM_EXPIRES_STATE_KEY, None)
         if event["type"] == "run.failed":
             agent_log = event.get("agentLog") or event["error"]
+            exit_code = event.get("exitCode", 1)
             self.clear_run_output(event["runId"])
-            if not existing_completion:
-                controller.record_agent_completed(
+            next_state = (
+                merge_agent_state(
+                    state,
+                    {
+                        "agent_logs": [agent_log],
+                        "last_exit_code": exit_code,
+                        "token_usage": event.get("tokenUsage"),
+                    },
+                )
+                if existing_completion
+                else controller.record_agent_completed(
                     run_request["sessionId"],
                     state,
                     {
                         "runId": event["runId"],
                         "agent": event["agent"],
                         "status": "failed",
-                        "exitCode": event.get("exitCode", 1),
+                        "exitCode": exit_code,
                         "agentLog": agent_log,
+                        "tokenUsage": event.get("tokenUsage"),
                         "assignmentId": assignment.get("assignmentId"),
                     },
                 )
+            )
             # Preserve deliverables when the agent process succeeded but the
             # daemon could not deliver every live output event. Failed events
             # without an explicit report retain the historical no-artifact
@@ -2943,13 +2955,28 @@ class DaemonNodeRegistry:
                 self._record_generated_workspace_artifacts(
                     sandbox, run_request, event, artifact_snapshot, assignment
                 )
+            agent_label = (
+                assignment.get("agentDisplayName")
+                or assignment.get("executorKind")
+                or assignment.get("agent")
+                or "Agent"
+            )
+            if self._continue_after_non_action_failure(
+                run_request,
+                terminal_claim_id,
+                next_state,
+                event["error"],
+                agent_label,
+                assignment.get("mode") or "action",
+            ):
+                return
             if session_before.get("status") != "failed":
                 controller.fail_session(run_request["sessionId"], event["error"])
             self.daemon_store.update_run_request_if_claimed(
                 run_request["id"],
                 TERMINAL_CLAIM_ID_STATE_KEY,
                 terminal_claim_id,
-                {"status": "failed", "error": event["error"]},
+                {"status": "failed", "state": next_state, "error": event["error"]},
             )
             self.update_status(
                 run_request["nodeId"], {"status": "ready", "lastError": event["error"]}

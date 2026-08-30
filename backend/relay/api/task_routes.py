@@ -64,7 +64,7 @@ def update_task_unless_dispatching(
     ctx: AppContextDep, task_id: str, payload: dict[str, Any]
 ) -> dict[str, Any]:
     try:
-        return ctx.task_store.update_task(task_id, payload, reject_active_claim=True)
+        return ctx.task_store.update_task_if_not_dispatching(task_id, payload)
     except TaskExecutionActiveError as error:
         raise HTTPException(409, "task_execution_active") from error
 
@@ -645,19 +645,20 @@ async def update_task(
                 else {}
             ),
         }
-    task = update_task_unless_dispatching(
-        ctx,
-        task_id,
-        {
-            "title": title,
-            "description": description,
-            "priority": priority,
-            "status": status,
-            "dueDate": due_date,
-            "assigneeEmployeeId": assignee,
-            **routine,
-            **assignment_patch,
-        },
+    update_payload = {
+        "title": title,
+        "description": description,
+        "priority": priority,
+        "status": status,
+        "dueDate": due_date,
+        "assigneeEmployeeId": assignee,
+        **routine,
+        **assignment_patch,
+    }
+    task = (
+        update_task_unless_dispatching(ctx, task_id, update_payload)
+        if status or assignment_changed or assignee_changed
+        else ctx.task_store.update_task(task_id, update_payload)
     )
     if status == "done":
         complete_linked_task_sessions(ctx, task, "Task marked done.")
@@ -953,7 +954,8 @@ async def pickup_task(
     if not logical_agent or not agent_id:
         raise HTTPException(400, "agentId is required to pick up a task.")
     agent = logical_agent["executorKind"]
-    task = ctx.task_store.update_task(
+    task = update_task_unless_dispatching(
+        ctx,
         task_id,
         {
             "assigneeEmployeeId": logical_agent["supervisorEmployeeId"],
