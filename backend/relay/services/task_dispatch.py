@@ -215,6 +215,7 @@ class TaskDispatcher:
         self.team_assignment_resolved = False
         self.project_assignment_resolved = False
         self.project_snapshot: dict[str, Any] | None = None
+        self.team_snapshot: dict[str, Any] | None = None
         self.agent: str | None = None
         self.agent_first = False
         self.temporary_group_status = False
@@ -354,10 +355,13 @@ class TaskDispatcher:
             }
             for assignment in self.run_assignments
         ]
+        # compile_assignment_work_graph preserves the snapshot key on each
+        # assignment, so the manifest in _run_request reuses this capture.
+        self.team_snapshot = assignment_team_snapshot(self.run_assignments)
         self.run_assignments = compile_assignment_work_graph(
             self.run_assignments,
             purpose="accomplish",
-            team_snapshot=assignment_team_snapshot(self.run_assignments),
+            team_snapshot=self.team_snapshot,
         )
         if (
             self.task.get("assignedAgentId") or self.task.get("assignedTeamId")
@@ -535,7 +539,7 @@ class TaskDispatcher:
                         }
                     ),
                     assignments=self.run_assignments,
-                    team_snapshot=assignment_team_snapshot(self.run_assignments),
+                    team_snapshot=self.team_snapshot,
                     project_snapshot=self.project_snapshot,
                 )
             },
