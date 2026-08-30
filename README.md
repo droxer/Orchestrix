@@ -13,9 +13,9 @@
 
 Relay is a local-first control plane for AI work. Employees start threads, assign persistent tasks, schedule routines, and coordinate named AI agents and teams from one interface — while Relay records identity, approvals, and history, and tracks which computer hosts each agent.
 
-The Python backend never executes agents itself. Relay daemons run [Claude Code](https://github.com/anthropics/claude-code), Codex, Pi, and Kimi on local or managed computers, inside [BoxLite](https://github.com/boxlite-ai/boxlite) or a configured local environment.
+Relay daemons run [Claude Code](https://github.com/anthropics/claude-code), Codex, Pi, and Kimi on local or managed computers, inside [BoxLite](https://github.com/boxlite-ai/boxlite) sandboxes or a configured local environment.
 
-## What you can do
+## Features
 
 | | |
 |---|---|
@@ -55,57 +55,41 @@ Team workspaces bring active runs, tasks, threads, workspace files, and member a
 
 ## Quick start
 
-### Prerequisites
-
-- Node.js 22.19 or newer
-- npm
-- Python 3.12 or newer
-- [uv](https://docs.astral.sh/uv/)
-- Docker and hardware virtualization when using BoxLite
-- Credentials or local login state for each agent CLI you want to run
-
-Install dependencies and build the TypeScript packages, daemons, supervisor, and web app:
+Prerequisites: Node.js 22.19+, npm, Python 3.12+, [uv](https://docs.astral.sh/uv/), credentials for the agent CLIs you want to run, and — when using BoxLite — Docker with hardware virtualization.
 
 ```bash
 npm install
 npm run build
 ```
 
-Configure authentication, storage, and agent credentials as described in [Local Development](docs/local-development.md). Then start each service in a separate terminal:
+Copy the environment examples and add your agent credentials (details in [Local Development](docs/local-development.md)):
 
 ```bash
-make backend                     # FastAPI control plane on 127.0.0.1:8790
+cp backend/.env.example backend/.env
+cp web/.env.example web/.env.local
+cp packages/.env.example packages/.env
+```
+
+Start each service in its own terminal:
+
+```bash
+make backend                     # control plane on 127.0.0.1:8790
 make daemon SANDBOX_ID=node_dev  # execution node connected to the backend
-make web                         # Next.js app on 127.0.0.1:5000
+make web                         # web UI on 127.0.0.1:5000
 ```
 
 Open <http://127.0.0.1:5000>.
 
-Run verification and operational commands as needed:
-
-```bash
-npm test                # build and run the TypeScript and Python test suites
-make supervisor         # reconcile requested managed computers
-make backend-migrate    # apply Alembic migrations
-make pre-commit-run     # run repository checks
-make stop               # stop Relay, daemon, supervisor, and BoxLite
-```
-
-Use `make run-fresh` only after changing `dockerfile` or the BoxLite image contents.
-
-## Built with
-
-| Layer | Technology |
-|---|---|
-| Backend | [FastAPI](https://github.com/fastapi/fastapi), [SQLAlchemy](https://github.com/sqlalchemy/sqlalchemy), [Pydantic](https://github.com/pydantic/pydantic), [Alembic](https://github.com/sqlalchemy/alembic), [uv](https://github.com/astral-sh/uv) |
-| Web | [Next.js](https://github.com/vercel/next.js), [React](https://github.com/facebook/react), [Tailwind CSS](https://github.com/tailwindlabs/tailwindcss), [TanStack Query](https://github.com/TanStack/query), [Zustand](https://github.com/pmndrs/zustand) |
-| Sandboxing | [BoxLite](https://github.com/boxlite-ai/boxlite) |
-| Agents | [Claude Code](https://github.com/anthropics/claude-code), Codex, Pi, Kimi |
+Tests, database migrations, the supervisor, pre-commit hooks, and shutdown commands are covered in [Local Development](docs/local-development.md).
 
 ## Deployment
 
-To host Relay rather than run it locally, [`docs/deployment.md`](docs/deployment.md) covers the web UI on Vercel and the backend plus Postgres on Railway. Daemons stay off both platforms — they run wherever the sandbox lives and connect out to the backend URL.
+[`docs/deployment.md`](docs/deployment.md) covers hosting the web UI on Vercel and the backend plus Postgres on Railway. Daemons stay off both platforms — they run wherever the sandbox lives and connect out to the backend URL.
 
 ## Documentation
 
-Start with the [`docs/` index](docs/README.md) for the canonical setup, API, product, architecture, design, decision, and operations documents.
+Start with the [`docs/` index](docs/README.md) for the canonical setup, API, architecture, chat-integration, design, and decision documents.
+
+## License
+
+[MIT](LICENSE)
