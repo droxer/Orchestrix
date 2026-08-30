@@ -1,11 +1,16 @@
 import type { AgentName, Tone } from "../types.js";
 import type { TFunction } from "i18next";
 
+import { normalizeOverEscapedQuotes } from "./markdown.ts";
+
 export type AgentSegment =
   | { kind: "text"; text: string }
   | { kind: "thinking"; text: string }
-  | { kind: "tool"; name: string; target?: string }
-  | { kind: "command"; command: string }
+  /** `id` is the CLI's own id for the call, present whenever the stream gives
+   *  one. It is what makes a segment addressable across re-renders — see
+   *  {@link segmentKeys}. */
+  | { kind: "tool"; name: string; target?: string; id?: string }
+  | { kind: "command"; command: string; id?: string }
   | { kind: "status"; tone: StatusTone; text: string }
   | { kind: "narration"; key: string; params?: Record<string, string | number> }
   | { kind: "raw"; text: string };
@@ -134,6 +139,33 @@ export class AgentStreamAccumulator {
   }
 }
 
+/** Stable React keys for a rendered segment list.
+ *
+ * Segments carry no key of their own, and a bare kind + occurrence counter ties
+ * a row to its *position*: insert one segment mid-stream and every later row of
+ * that kind inherits the previous row's component state — an expanded command
+ * would collapse and its neighbour would open. Where the CLI gave the call an
+ * id, that id is the identity; the ordinal remains the fallback for segments
+ * (prose, reasoning, status) that never had one.
+ */
+export function segmentKeys(segments: AgentSegment[]): string[] {
+  const kindCounts = new Map<string, number>();
+  const keyCounts = new Map<string, number>();
+  return segments.map((segment) => {
+    const seen = kindCounts.get(segment.kind) ?? 0;
+    kindCounts.set(segment.kind, seen + 1);
+    const id = "id" in segment ? segment.id : undefined;
+    const base = id ? `${segment.kind}#${id}` : `${segment.kind}-${seen}`;
+    // A CLI reuses a call id across turns (`call_1` twice in one transcript),
+    // so the id alone is not unique over a whole run — two rows would collide
+    // on one React key. Repeats get an occurrence suffix; the first keeps the
+    // bare key so the common case stays readable.
+    const repeats = keyCounts.get(base) ?? 0;
+    keyCounts.set(base, repeats + 1);
+    return repeats === 0 ? base : `${base}@${repeats}`;
+  });
+}
+
 export function userVisibleAgentSegments(segments: AgentSegment[]): AgentSegment[] {
   const visible = segments.filter(
     (segment) => segment.kind === "text" || segment.kind === "status" || segment.kind === "narration",
@@ -174,6 +206,43 @@ export function reasoningDisplay(
   if (live) return { lines, toggle: null };
   if (expanded) return { lines, toggle: "collapse" };
   return { lines: [], toggle: "expand" };
+}
+
+/** Command lines shown before the rest collapses behind a toggle.
+ *
+ * A `command` segment is one shell invocation, but an agent that writes a file
+ * with `cat > file << 'EOF'` puts the whole file inside that invocation — runs
+ * of hundreds of lines that push the answer off the screen. Six lines is
+ * enough to read what the command is doing; the body opens on a click. */
+const COMMAND_PREVIEW_LINES = 6;
+
+export type CommandDisplay = {
+  lines: string[];
+  /** Lines withheld from the preview — 0 when the whole command is shown. */
+  hidden: number;
+  toggle: "expand" | "collapse" | null;
+};
+
+/** Decide which lines of a command render, and which toggle (if any) follows.
+ *
+ * The command text is repaired first: a CLI that hands back a JSON-encoded
+ * command leaks `\"` for every quote, which turns a heredoc full of Python
+ * docstrings into `\"\"\"`. {@link normalizeOverEscapedQuotes} only fires when
+ * every quote in the text is escaped, so real code carrying a genuine escape
+ * is left alone. */
+export function commandDisplay(
+  command: string,
+  { expanded }: { expanded: boolean },
+): CommandDisplay {
+  const text = normalizeOverEscapedQuotes(command).replace(/\s+$/, "");
+  const lines = text.split("\n");
+  if (lines.length <= COMMAND_PREVIEW_LINES) return { lines, hidden: 0, toggle: null };
+  if (expanded) return { lines, hidden: 0, toggle: "collapse" };
+  return {
+    lines: lines.slice(0, COMMAND_PREVIEW_LINES),
+    hidden: lines.length - COMMAND_PREVIEW_LINES,
+    toggle: "expand",
+  };
 }
 
 /**
@@ -487,12 +556,18 @@ function upsertSegmentById(
   id: string | undefined,
   segment: AgentSegment,
 ): void {
+  // The id rides along on the stored segment: the transcript keys its rows off
+  // it, so a row keeps its React identity — and any state hanging off it — when
+  // an earlier segment is inserted or replaced mid-stream.
+  const identified = id && (segment.kind === "tool" || segment.kind === "command")
+    ? { ...segment, id }
+    : segment;
   const existing = id ? segmentById.get(id) : undefined;
   if (existing !== undefined) {
-    out[existing] = mergeLifecycleSegment(out[existing], segment);
+    out[existing] = mergeLifecycleSegment(out[existing], identified);
     return;
   }
-  out.push(segment);
+  out.push(identified);
   if (id) segmentById.set(id, out.length - 1);
 }
 

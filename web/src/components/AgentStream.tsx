@@ -12,13 +12,16 @@ import type { CodexCollaborationEvent } from "relay-core";
 import type { AgentName } from "../types";
 import {
   AgentStreamAccumulator,
+  commandDisplay,
   displayAgentStreamSegments,
   emptyAgentStreamSegments,
   hasTerminalOutcome,
   parseAgentStderr,
   reasoningDisplay,
+  segmentKeys,
   type AgentSegment,
 } from "../lib/agentStream";
+import { highlightToHtml } from "../lib/syntax";
 import { MarkdownContent } from "./Markdown";
 import { buildCollaborationTree } from "../lib/collaborationTree";
 import { SubagentTree } from "./SubagentTree";
@@ -33,15 +36,12 @@ function StreamActivity({ label }: { label: string }) {
   );
 }
 
-// Segments carry no ids; stream order is append-mostly, so kind + per-kind
-// occurrence is a cheap stable key for React's reconciliation.
+// Keys come from lib/agentStream so the identity rule — the CLI's own id where
+// there is one, the per-kind ordinal otherwise — is testable and lives next to
+// the segments it keys.
 function keyedSegments(segments: AgentSegment[]): Array<{ key: string; segment: AgentSegment }> {
-  const counts = new Map<string, number>();
-  return segments.map((segment) => {
-    const seen = counts.get(segment.kind) ?? 0;
-    counts.set(segment.kind, seen + 1);
-    return { key: `${segment.kind}-${seen}`, segment };
-  });
+  const keys = segmentKeys(segments);
+  return segments.map((segment, index) => ({ key: keys[index]!, segment }));
 }
 
 type AgentStreamProps = {
@@ -150,12 +150,7 @@ function SegmentView({
     );
   }
   if (segment.kind === "command") {
-    return (
-      <div className="agent-command code">
-        <span className="agent-tool-marker" aria-hidden="true">⏺</span>
-        <code>{segment.command}</code>
-      </div>
-    );
+    return <CommandSegment command={segment.command} />;
   }
   if (segment.kind === "narration") {
     return (
@@ -173,7 +168,7 @@ function SegmentView({
       </div>
     );
   }
-  return <pre className="agent-raw code">{segment.text}</pre>;
+  return <RawSegment text={segment.text} />;
 }
 
 // Reasoning is a `○` marker plus dim italic body (design-system.md agent-turn).
@@ -207,6 +202,57 @@ function ThinkingSegment({ text, live }: { text: string; live: boolean }) {
             onClick={() => setExpanded((open) => !open)}
           >
             {t(toggle === "collapse" ? "agent_stream.reasoning_collapse" : "agent_stream.reasoning_expand")}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// CLI output the parser could not classify. It is still the agent talking —
+// usually its Markdown answer arriving in a shape this parser does not know —
+// so it renders as Markdown rather than as a monospace dump with its own ```
+// fences left showing. The block keeps its frame so it still reads as
+// unrecognised output rather than as ordinary prose.
+function RawSegment({ text }: { text: string }) {
+  return (
+    <div className="agent-raw">
+      <div className="md-body agent-prose">
+        <MarkdownContent text={text} />
+      </div>
+    </div>
+  );
+}
+
+// A shell command the agent ran: the `⏺` mono line of the tool log, but
+// highlighted as bash so the invocation reads as code rather than as a wall of
+// monospace. A command that carries a file body (`cat > f << \'EOF\'`) collapses
+// to its first lines — otherwise one write buries the answer it was working
+// towards — and opens on a click.
+function CommandSegment({ command }: { command: string }) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const { lines, hidden, toggle } = useMemo(
+    () => commandDisplay(command, { expanded }),
+    [command, expanded],
+  );
+  const html = useMemo(() => highlightToHtml(lines.join("\n"), "bash"), [lines]);
+
+  return (
+    <div className="agent-command code">
+      <span className="agent-tool-marker" aria-hidden="true">⏺</span>
+      <div className="agent-command-body">
+        <code className="hljs" dangerouslySetInnerHTML={{ __html: html }} />
+        {toggle ? (
+          <button
+            type="button"
+            className="agent-command-toggle"
+            aria-expanded={toggle === "collapse"}
+            onClick={() => setExpanded((open) => !open)}
+          >
+            {toggle === "collapse"
+              ? t("agent_stream.command_collapse")
+              : t("agent_stream.command_expand", { count: hidden })}
           </button>
         ) : null}
       </div>

@@ -460,13 +460,17 @@
   border-top-left-radius: var(--r-1);
 }
 
+/* The user's turn is Markdown too (MessageBlock), so markdown.css owns the
+   blocks inside it; this rule sets the voice — one weight heavier than the
+   agent's prose — and keeps a pasted URL from widening the column.
+   No `white-space: pre-wrap`: remark-breaks already keeps typed line breaks,
+   and pre-wrap would double the blank line between Markdown blocks. */
 .msg-user .user-text {
   margin: 0;
   color: var(--ink-1);
   font-size: var(--fs-3);
   font-weight: 500;
   line-height: var(--leading-prose);
-  white-space: pre-wrap;
   word-break: break-word;
 }
 

@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { AgentMark } from "./AgentMark";
 import { AgentStream } from "./AgentStream";
+import { MarkdownContent } from "./Markdown";
 import { MessageTurnActions } from "./MessageTurnActions";
 import type { AgentName } from "../types";
 import { AGENT_NAMES } from "../types";
@@ -198,7 +199,12 @@ export const MessageBlock = memo(function MessageBlock({
           <IdentityUser size={ICON.sm} />
         </span>
         <div className="turn-body">
-          <p className="user-text">{message.text}</p>
+          {/* The user's own Markdown renders like the agent's: a pasted fence
+              is a highlighted block, not a paragraph with backticks in it.
+              Same escaped pipeline as the agent side — no raw HTML. */}
+          <div className="user-text md-body agent-prose">
+            <MarkdownContent text={message.text} />
+          </div>
         </div>
         <MsgTime value={message.timestamp} />
       </article>
