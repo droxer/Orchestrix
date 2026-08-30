@@ -39,12 +39,6 @@
   font-size: var(--fs-3);
 }
 
-
-.relay-search:focus-within input:focus-visible,
-.adm-search:focus-within .adm-search-input:focus-visible {
-  outline: none;
-}
-
 .relay-search input::placeholder,
 .adm-search-input::placeholder {
   color: var(--ink-3);
@@ -166,7 +160,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .employee-avatar.running::before { animation: none; opacity: 0.45; }
+  .employee-avatar.running::before { opacity: 0.45; }
 }
 
 .agent-avatar {

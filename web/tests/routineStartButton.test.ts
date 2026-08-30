@@ -5,7 +5,13 @@ import { describe, it } from "node:test";
 
 describe("routine start button", () => {
   it("uses the shared compact icon treatment in both routine views", async () => {
-    const source = await readFile(resolve("web/src/components/RoutinesPage.tsx"), "utf8");
+    // The card and row renderers moved to task-board/RoutineRecords.tsx when
+    // RoutinesPage.tsx was split, mirroring the BacklogPage split; the page
+    // still owns the handler they call.
+    const source = await readFile(
+      resolve("web/src/components/task-board/RoutineRecords.tsx"),
+      "utf8",
+    );
     // The board and the list own their own action clusters, and the split of
     // backlog.css put them in different sheets — both still have to agree.
     const [boardStyles, listStyles] = await Promise.all([

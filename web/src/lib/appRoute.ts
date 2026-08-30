@@ -266,11 +266,6 @@ export function validatedReturnTo(value: string | null, origin = "http://relay.l
   }
 }
 
-export function readInitialRoute(): AppRoute {
-  if (typeof window === "undefined") return "main";
-  return parseAppPath(window.location.pathname, window.location.search).route;
-}
-
 /**
  * The browser URL a state change should land on.
  *
@@ -295,14 +290,6 @@ export function syncAppStateToUrl(state: AppLocationState, replace = false): voi
   if (`${window.location.pathname}${window.location.search}${window.location.hash}` === nextUrl) return;
   window.history[replace ? "replaceState" : "pushState"]({ relayRoute: state }, "", nextUrl);
   window.dispatchEvent(new Event(APP_NAVIGATION_EVENT));
-}
-
-export function syncRouteToUrl(route: AppRoute, replace = false): void {
-  syncAppStateToUrl({
-    route,
-    mobileView: route === "main" || route === "projects" ? "threads" : "chat",
-    sessionId: null,
-  }, replace);
 }
 
 /** Push an in-app path (search params allowed) and notify route/search listeners. */

@@ -4,10 +4,6 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
-// `default` and `secondary` share styling; both names stay public for callers.
-const secondaryBadgeClasses =
-  "border-transparent bg-secondary text-secondary-foreground [a]:hover:bg-secondary/90"
-
 const badgeVariants = cva(
   /* Badge chrome: caption-bold (12px/700) on a `4px 8px` pad inside the
      CONTROL radius (--r-2, 6px), not a pill. The source system squares
@@ -17,41 +13,34 @@ const badgeVariants = cva(
      inline pad has no token on the --sp-* grid (2.5 is a banned half-step),
      and the 12px step — carried over from the pill, where it cleared the
      curve — reads wide against a 6px radius, so the badge takes the 8px step.
-     The dot-carrying status tones below keep their leading dot perfectly
-     round; the dot is the part that is supposed to be a circle. */
+     The leading status dot is a `StateMark` child, not a pseudo-element —
+     see the variant table below. */
   "group/badge inline-flex w-fit shrink-0 items-center justify-center gap-1 truncate overflow-hidden rounded-md border px-2 py-0.5 text-micro font-bold whitespace-nowrap transition-[color,box-shadow,border-color,background-color] duration-(--t-fast) ease-(--ease) focus-visible:[outline:var(--focus-outline)] focus-visible:[outline-offset:var(--focus-offset)] focus-visible:ring-0 [&>svg]:pointer-events-none [&>svg]:size-3",
   {
     variants: {
+      /* Chrome only — border + ink per tone. The leading status dot is NOT
+         drawn here: it is a `StateMark`, which is the one place the tone →
+         shape grammar (ring for bad, pulse for live) is written down. Badge
+         variants used to carry their own `before:` pseudo-dot, which made a
+         member badge on /projects and a status pill on a thread row two
+         different drawings of the same object. */
       variant: {
-        default: secondaryBadgeClasses,
-        secondary: secondaryBadgeClasses,
-        destructive:
-          "border-destructive/30 bg-background text-danger [a]:hover:border-destructive",
-        outline:
-          "text-foreground [a]:hover:bg-accent [a]:hover:text-accent-foreground",
-        // Status tones — carry a leading dot so they read as live status
-        // indicators (the former .pill good/info/warn/bad vocabulary).
-        neutral:
-          "border-hairline bg-surface-strong text-ink before:content-[''] before:size-1.5 before:rounded-full before:bg-muted-soft",
-        success:
-          "border-success/35 bg-background text-success before:content-[''] before:size-1.5 before:rounded-full before:bg-success",
-        info:
-          "border-info/30 bg-background text-info before:content-[''] before:size-1.5 before:rounded-full before:bg-info",
-        warning:
-          "border-warning/30 bg-background text-warning before:content-[''] before:size-1.5 before:rounded-full before:bg-warning",
-        danger:
-          "border-danger/35 bg-background text-danger before:content-[''] before:size-1.5 before:rounded-full before:bg-transparent before:shadow-[inset_0_0_0_1px_var(--err)]",
+        neutral: "border-hairline bg-surface-strong text-ink",
+        success: "border-success/35 bg-background text-success",
+        info: "border-info/30 bg-background text-info",
+        warning: "border-warning/30 bg-background text-warning",
+        danger: "border-danger/35 bg-background text-danger",
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: "neutral",
     },
   }
 )
 
 function Badge({
   className,
-  variant = "default",
+  variant = "neutral",
   render,
   ...props
 }: useRender.ComponentProps<"span"> & VariantProps<typeof badgeVariants>) {
@@ -71,4 +60,4 @@ function Badge({
   })
 }
 
-export { Badge, badgeVariants }
+export { Badge }

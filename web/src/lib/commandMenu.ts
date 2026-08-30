@@ -25,8 +25,6 @@ export type CommandItem = {
   keywords: string[];
 };
 
-export const COMMAND_GROUPS: readonly CommandGroup[] = ["navigate", "create", "view"];
-
 const NAV_COMMANDS: readonly { route: AppRoute; labelKey: string; hint: string; keywords: string[] }[] = [
   { route: "main", labelKey: "nav.threads", hint: "G T", keywords: ["threads", "chat", "home"] },
   { route: "projects", labelKey: "project.projects", hint: "G P", keywords: ["projects", "project rooms"] },

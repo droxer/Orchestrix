@@ -1,13 +1,16 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { RelayEmptyState } from "./RelayEmptyState";
 import {
   ActionCompose,
   ICON,
 } from "./icons";
 
-// Shared empty-state for task boards (Backlog + Routine). Left-aligned,
-// inline with the page's normal content column — no centered icon block.
+// Shared empty-state for task boards (Backlog + Routine): the same
+// `RelayEmptyState` primitive every other zero-data surface uses, turned
+// left-aligned and inline with the page's normal content column by the
+// `relay-empty--board` modifier — no centered mark tile.
 export function BoardEmpty({
   title,
   body,
@@ -24,10 +27,12 @@ export function BoardEmpty({
   onClear?: () => void;
 }) {
   return (
-    <div className="backlog-board-empty">
-      <h2 className="relay-empty-title">{title}</h2>
-      <p className="backlog-board-empty-body relay-empty-body">{body}</p>
-      {onCreate && createLabel ? (
+    <RelayEmptyState
+      className="relay-empty--board"
+      fill
+      title={title}
+      body={body}
+      actions={onCreate && createLabel ? (
         // The board's one move earns the full 40px default tier — same as
         // every other empty-state primary; the clear action stays demoted.
         <Button onClick={onCreate}>
@@ -38,7 +43,7 @@ export function BoardEmpty({
         <Button size="sm" variant="ghost" onClick={onClear}>
           {clearLabel}
         </Button>
-      ) : null}
-    </div>
+      ) : undefined}
+    />
   );
 }

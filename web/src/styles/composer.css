@@ -233,10 +233,6 @@
   box-shadow: 0 0 0 0.5px var(--tone-line), var(--shadow-2);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .composer-input-wrap[data-running] { animation: none; }
-}
-
 .composer-input {
   display: flex;
   flex-direction: column;
@@ -365,14 +361,6 @@
   display: inline-flex;
   --rise-from: 0;
   animation: rise var(--t-fast) var(--ease);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .send-button {
-    transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
-  }
-
-  .send-button-icon { animation: none; }
 }
 
 /* ============================ mentions ============================ */

@@ -20,7 +20,6 @@ import type {
   CreateManagedNodeResponse,
   ManagedNodesResponse,
   ManagedNodeRecord,
-  CreateSessionInput,
   CreateProjectInput,
   CreateTaskInput,
   ControlPanelDaemonNodesResponse,
@@ -47,10 +46,10 @@ import type {
   RunInput,
   SandboxesResponse,
   SandboxRecord,
-  SessionsResponse,
+
   SessionSummariesResponse,
   StartTaskResponse,
-  UserRole,
+
   TaskArtifactsResponse,
   TaskDeletionResponse,
   TaskEventsResponse,
@@ -60,8 +59,8 @@ import type {
   ThreadRecoveryInput,
   TasksResponse,
   WorkspaceBriefResponse,
-  NodeWorkspaceFilesResponse,
-  NodeWorkspaceFileResponse,
+
+
   ProjectWorkspaceFilesResponse,
   ProjectWorkspaceFileResponse,
 } from "./types.js";
@@ -486,27 +485,6 @@ export function updateControlPanelDaemonNodeDisabledAgents(
   );
 }
 
-export function updateControlPanelDaemonNodeAgentRoleDefaults(
-  nodeId: string,
-  agentRoleDefaults: Partial<Record<AgentName, AgentRole>>,
-): Promise<UnassignControlPanelDaemonNodeResponse> {
-  return apiJson<UnassignControlPanelDaemonNodeResponse>(
-    `/admin/daemon-nodes/${encodeURIComponent(nodeId)}/agent-role-defaults`,
-    { method: "PATCH", body: { agentRoleDefaults } },
-  );
-}
-
-export function updateDaemonNodeAgentRoleOverrides(
-  nodeId: string,
-  agentRoleOverrides: Partial<Record<AgentName, AgentRole>>,
-  token?: string,
-): Promise<UnassignControlPanelDaemonNodeResponse> {
-  return apiJson<UnassignControlPanelDaemonNodeResponse>(
-    `/daemon-nodes/${encodeURIComponent(nodeId)}/agent-role-overrides`,
-    { method: "PATCH", body: { agentRoleOverrides }, token },
-  );
-}
-
 export function deleteControlPanelEmployee(
   employeeId: string,
 ): Promise<{ employee: { id: string; deletedAt: string }; unassignedNodes: string[] }> {
@@ -547,21 +525,6 @@ export function login(input: { username: string; password: string }): Promise<{ 
 
 export function logout(): Promise<{ ok: boolean }> {
   return apiJson<{ ok: boolean }>("/auth/logout", { method: "POST" });
-}
-
-export function listUsers(): Promise<{ users: CurrentUser[] }> {
-  return apiJson<{ users: CurrentUser[] }>("/admin/users");
-}
-
-export function createUser(input: { username: string; password: string; role?: UserRole; email?: string; employeeId?: string }): Promise<{ user: CurrentUser }> {
-  return apiJson<{ user: CurrentUser }>("/admin/users", {
-    method: "POST",
-    body: input,
-  });
-}
-
-export function listSessions(signal?: AbortSignal): Promise<SessionsResponse> {
-  return apiJson<SessionsResponse>("/threads", { signal });
 }
 
 export function listSessionSummaries(signal?: AbortSignal): Promise<SessionSummariesResponse> {
@@ -615,24 +578,6 @@ export function readProjectWorkspaceFile(
   return apiJson<ProjectWorkspaceFileResponse>(`/projects/${encodeURIComponent(input.projectId)}/workspace/file?${params.toString()}`, { signal });
 }
 
-export function listNodeWorkspaceFiles(
-  input: { nodeId: string; path?: string },
-  signal?: AbortSignal,
-): Promise<NodeWorkspaceFilesResponse> {
-  const params = new URLSearchParams();
-  if (input.path) params.set("path", input.path);
-  const query = params.toString();
-  return apiJson<NodeWorkspaceFilesResponse>(`/admin/daemon-nodes/${encodeURIComponent(input.nodeId)}/workspace/files${query ? `?${query}` : ""}`, { signal });
-}
-
-export function readNodeWorkspaceFile(
-  input: { nodeId: string; path: string },
-  signal?: AbortSignal,
-): Promise<NodeWorkspaceFileResponse> {
-  const params = new URLSearchParams({ path: input.path });
-  return apiJson<NodeWorkspaceFileResponse>(`/admin/daemon-nodes/${encodeURIComponent(input.nodeId)}/workspace/file?${params.toString()}`, { signal });
-}
-
 export function listTasks(signal?: AbortSignal): Promise<TasksResponse> {
   return apiJson<TasksResponse>("/tasks?view=summary", { signal });
 }
@@ -683,13 +628,6 @@ export function assignTask(taskId: string, agentId: string): Promise<RelayTask> 
   return apiJson<RelayTask>(`/tasks/${encodeURIComponent(taskId)}/assignment`, {
     method: "PUT",
     body: { agentId },
-  });
-}
-
-export function assignTaskToTeam(taskId: string, teamId: string): Promise<RelayTask> {
-  return apiJson<RelayTask>(`/tasks/${encodeURIComponent(taskId)}/assignment`, {
-    method: "PUT",
-    body: { teamId },
   });
 }
 
@@ -870,20 +808,6 @@ export function provisionSandbox(employeeId: string, token?: string, nodeToken?:
   });
 }
 
-export function createSession(input: CreateSessionInput, token?: string): Promise<RelaySession> {
-  return apiJson<RelaySession>("/threads", {
-    method: "POST",
-    token,
-    body: {
-      taskGoal: input.taskGoal,
-      ...(input.daemonNodeId ? { daemonNodeId: input.daemonNodeId } : {}),
-      assignments: input.assignments,
-      workspacePath: input.workspacePath,
-      ...(input.ownerEmployeeId ? { ownerEmployeeId: input.ownerEmployeeId } : {}),
-    },
-  });
-}
-
 export function runSandbox(input: RunInput, token?: string): Promise<RelaySession> {
   return apiJson<RelaySession>(`/sandboxes/${encodeURIComponent(input.sandboxId)}/runs`, {
     method: "POST",
@@ -969,18 +893,6 @@ export function recordDecision(
   });
 }
 
-export function appendAssignment(
-  sessionId: string,
-  assignment: { agent: AgentName },
-  token?: string,
-): Promise<RelaySession> {
-  return apiJson<RelaySession>(`/threads/${encodeURIComponent(sessionId)}/assignments`, {
-    method: "POST",
-    token,
-    body: { assignments: [assignment] },
-  });
-}
-
 export function archiveSession(sessionId: string, token?: string): Promise<RelaySession> {
   return apiJson<RelaySession>(`/threads/${encodeURIComponent(sessionId)}`, {
     method: "PATCH",
@@ -1001,18 +913,5 @@ export function renameSession(sessionId: string, title: string, token?: string):
     method: "PATCH",
     token,
     body: { title },
-  });
-}
-
-export function recordHandoff(
-  sessionId: string,
-  targetAgent: AgentName,
-  note?: string,
-  token?: string,
-): Promise<RelaySession> {
-  return apiJson<RelaySession>(`/threads/${encodeURIComponent(sessionId)}/handoffs`, {
-    method: "POST",
-    token,
-    body: { targetAgent, note },
   });
 }

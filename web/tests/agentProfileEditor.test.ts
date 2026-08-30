@@ -43,12 +43,23 @@ describe("agent profile editor", () => {
 
   it("lets the agent owner delete their own agent, not just admins", async () => {
     const panelSource = await readFile(resolve("web/src/components/AgentProfilePanel.tsx"), "utf8");
-    const detailBranchStart = panelSource.indexOf("if (isDetail) {");
-    const detailBranchEnd = panelSource.indexOf("\n  return (\n    <div className=\"workspace-profile-panel\">");
-    const detailBranch = panelSource.slice(detailBranchStart, detailBranchEnd);
-    assert.ok(detailBranchStart > -1 && detailBranchEnd > detailBranchStart, "could not isolate the detail branch");
-    assert.match(detailBranch, /\{canEditProfile \? \(\s*<div className="workspace-dossier-admin">/);
-    assert.match(detailBranch, /\{canManage \? \(/);
-    assert.doesNotMatch(detailBranch, /\{canManage \? \(\s*<div className="workspace-dossier-admin">/);
+    assert.match(panelSource, /\{canEditProfile \? \(\s*<div className="workspace-dossier-admin">/);
+    assert.match(panelSource, /\{canManage \? \(/);
+    assert.doesNotMatch(panelSource, /\{canManage \? \(\s*<div className="workspace-dossier-admin">/);
+  });
+
+  it("renders the agent record ONE way", async () => {
+    // The panel used to carry a second, `variant="admin"` render branch that
+    // duplicated every fact and control the detail record already showed —
+    // through its own fork of the personality editor. Its only caller always
+    // passed variant="detail", so the branch was unreachable. Keep it gone:
+    // a second branch is a second place for the record to drift.
+    const panelSource = await readFile(resolve("web/src/components/AgentProfilePanel.tsx"), "utf8");
+    // The panel's OWN variant prop, not the Button `variant=` props it renders.
+    assert.doesNotMatch(panelSource, /\bisDetail\b/);
+    assert.doesNotMatch(panelSource, /variant\?:\s*"admin"/);
+    assert.doesNotMatch(panelSource, /variant = "admin"/);
+    assert.doesNotMatch(panelSource, /LegacyPersonalityEditor/);
+    assert.equal(panelSource.match(/^  return \(/gm)?.length, 1, "exactly one top-level return");
   });
 });

@@ -6,7 +6,7 @@ import { useTeams } from "../hooks/useTeams";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { selectedTeamForWorkspace } from "../lib/teamWorkspace";
 import { teamAvailability } from "../lib/taskAssignment";
-import { StatusPill } from "./StatusPill";
+import { StatusPill, TonePill } from "./StatusPill";
 import type { CurrentUser } from "../types";
 import {
   ActionAdd,
@@ -19,7 +19,6 @@ import { IdentityMark } from "./IdentityMark";
 import { ProfileImage } from "./ProfileImagePicker";
 import { TeamDrawer } from "./admin/TeamDrawer";
 import { TeamWorkspacePage } from "./TeamWorkspacePage";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 
@@ -173,7 +172,7 @@ export function TeamsPage({
                           {/* "ready" is the default healthy state and stays
                               implicit; other roster states get named. */}
                           {!team.enabled ? (
-                            <Badge variant="neutral">{t("teams.disabled")}</Badge>
+                            <TonePill tone="neutral" label={t("teams.disabled")} />
                           ) : teamAvailability(team) !== "ready" ? (
                             <StatusPill value={teamAvailability(team)} />
                           ) : null}

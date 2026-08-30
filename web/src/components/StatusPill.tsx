@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
-import type { CSSProperties } from "react";
 import type { Tone } from "../types";
 import type { StatusValue } from "../lib/threadStatus";
 import { statusTone } from "../lib/statusTone";
+import { StateMark } from "./StateMark";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -15,16 +15,6 @@ const TONE_VARIANT: Record<Tone, "success" | "info" | "danger" | "warning" | "ne
   neutral: "neutral",
 };
 
-// Explicit dot element (replaces the badge's `before:` pseudo-dot) so live
-// states can carry the shared pulse-ring motion used across the app.
-const DOT_TONE: Record<Tone, string> = {
-  good: "bg-success",
-  info: "bg-info",
-  bad: "bg-danger",
-  warn: "bg-warning",
-  neutral: "bg-muted-soft",
-};
-
 export type TonePillProps = {
   tone: Tone;
   label: string;
@@ -34,27 +24,19 @@ export type TonePillProps = {
   className?: string;
 };
 
+/**
+ * The one tone-badge in the app: Badge draws the chrome, StateMark draws the
+ * dot. Nothing here decides what a tone LOOKS like — StateMark owns the whole
+ * shape grammar, so `bad` gets the hollow ring (a solid --err dot at this size
+ * reads as emphasis, not as a problem) and `live` gets the pulse ring at the
+ * --t-pulse cadence, in both cases from the same rules the board marks and the
+ * node presence dots use. Reach for this instead of a bare `<Badge>`: a badge
+ * without the mark is chrome with no status in it.
+ */
 export function TonePill({ tone, label, live = false, title, className }: TonePillProps) {
-  // Bad states drop out of the brightness race: --err resolves to the loudest
-  // ink step, so a solid dot in it reads as emphasis, not "problem". Render
-  // the shared hollow ring (.dot-ring) instead — the same shape the node
-  // presence + node status dots use.
-  //
-  // Live states are the one place a status dot earns --live, and palette.css
-  // legislates the pairing: --live is legal only where --t-pulse is used, so
-  // the dot fill, the pulse tint, and the cadence move together.
-  const ringBad = tone === "bad";
   return (
-    <Badge variant={TONE_VARIANT[tone]} title={title} className={cn("before:content-none", className)}>
-      <span
-        aria-hidden="true"
-        className={cn(
-          "size-1.5 shrink-0 rounded-full",
-          ringBad ? "dot-ring" : live ? "bg-[var(--live)]" : DOT_TONE[tone],
-          live && "animate-[pulse-ring_var(--t-pulse)_var(--ease)_infinite]",
-        )}
-        style={live ? ({ "--pulse-color": "var(--live)" } as CSSProperties) : undefined}
-      />
+    <Badge variant={TONE_VARIANT[tone]} title={title} className={cn(className)}>
+      <StateMark tone={live ? "live" : tone} />
       {label}
     </Badge>
   );

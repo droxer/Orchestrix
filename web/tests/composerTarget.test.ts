@@ -26,6 +26,10 @@ describe("composer team targeting", () => {
   it("offers teams in the composer picker and keeps a started team thread locked", async () => {
     const select = await readFile(resolve("web/src/components/composer/AgentSelect.tsx"), "utf8");
     const app = await readFile(resolve("web/src/App.tsx"), "utf8");
+    // The composer-send path moved into hooks/useThreadDispatch when App.tsx
+    // was broken up; the assertion follows it rather than pinning the file it
+    // used to live in.
+    const dispatch = await readFile(resolve("web/src/hooks/useThreadDispatch.ts"), "utf8");
 
     assert.match(select, /teamSelectValue/);
     assert.match(select, /composer\.teams_group/);
@@ -33,7 +37,7 @@ describe("composer team targeting", () => {
     // A team thread keeps its roster for life, so the picker locks onto it.
     assert.match(app, /teamLocked=\{Boolean\(activeSession\?\.teamId\)\}/);
     // Team dispatch goes through teamId — the backend expands the roster.
-    assert.match(app, /teamId: pendingTeam\.id/);
+    assert.match(dispatch, /teamId: pendingTeam\.id/);
   });
 });
 
@@ -53,13 +57,13 @@ describe("composer agent selection", () => {
   });
 
   it("dispatches a new thread to the agents the draft addresses", async () => {
-    const app = await readFile(resolve("web/src/App.tsx"), "utf8");
-    assert.match(app, /newThreadAgentIds = messageAddress\.addressAgentIds/);
-    assert.match(app, /assignments: newThreadAgentIds!\.map/);
+    const dispatch = await readFile(resolve("web/src/hooks/useThreadDispatch.ts"), "utf8");
+    assert.match(dispatch, /newThreadAgentIds = messageAddress\.addressAgentIds/);
+    assert.match(dispatch, /assignments: newThreadAgentIds!\.map/);
   });
 
   it("addresses a continued direct thread to the footer's selected agent", async () => {
-    const app = await readFile(resolve("web/src/App.tsx"), "utf8");
+    const app = await readFile(resolve("web/src/hooks/useThreadDispatch.ts"), "utf8");
     assert.match(
       app,
       /resolveThreadMessageAddress\(\{[\s\S]*?defaultAgentId: projectRoomRound \|\| pendingTeam \|\| activeSession\?\.teamId[\s\S]*?: activeLogicalAgentId/,
@@ -69,7 +73,7 @@ describe("composer agent selection", () => {
   });
 
   it("includes the resolved responder in continued-thread retry identity", async () => {
-    const app = await readFile(resolve("web/src/App.tsx"), "utf8");
+    const app = await readFile(resolve("web/src/hooks/useThreadDispatch.ts"), "utf8");
     assert.match(
       app,
       /threadMessageOperationKey\(\{[\s\S]*?addressAgentIds: messageAddress\.addressAgentIds/,
@@ -124,15 +128,19 @@ describe("composer agent selection", () => {
   it("narrows a project round to the picked member and widens it back", async () => {
     const app = await readFile(resolve("web/src/App.tsx"), "utf8");
     const composer = await readFile(resolve("web/src/components/composer/Composer.tsx"), "utf8");
+    // The composer-send path moved into hooks/useThreadDispatch when App.tsx
+    // was broken up; the assertion follows it rather than pinning the file it
+    // used to live in.
+    const dispatch = await readFile(resolve("web/src/hooks/useThreadDispatch.ts"), "utf8");
 
     // Room target means "no default agent", which the backend expands to the
     // whole roster; a picked member routes the round to them alone.
-    assert.match(app, /const projectRoomRound = Boolean\(activeProject\) && projectRoomTarget/);
+    assert.match(dispatch, /const projectRoomRound = Boolean\(activeProject\) && projectRoomTarget/);
     assert.match(app, /handleProjectRoomPicked[\s\S]*?setProjectRoomTarget\(true\)/);
     assert.match(app, /handleLogicalAgentPicked[\s\S]*?setProjectRoomTarget\(false\)/);
     // A new project thread carries the narrowed roster as assignments.
     assert.match(
-      app,
+      dispatch,
       /activeProject\s*\?\s*newThreadAgentIds!\.length\s*\?\s*\{ assignments: newThreadAgentIds!\.map/,
     );
     // A mention outranks the room pick, exactly as it outranks an agent pick.

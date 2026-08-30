@@ -32,11 +32,8 @@ import { OverlayCloseButton } from "@/components/ui/OverlayCloseButton";
 import { useModalDrawer } from "@/hooks/useModalDrawer";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useChatColumnResize } from "@/hooks/useChatColumnResize";
+import { OVERLAY_TAKEOVER_QUERY } from "@/lib/breakpoints";
 
-/** Matches the breakpoint in responsive.css where the panel leaves the shell
- *  grid and covers the viewport. Below it the panel is a modal overlay and
- *  owes the full dialog contract (Escape, focus trap, scroll lock). */
-const OVERLAY_QUERY = "(max-width: 820px)";
 
 const KEYBOARD_RESIZE_STEP = 16;
 
@@ -78,7 +75,7 @@ export function ThreadSpacePanel({
 }) {
   const { t } = useTranslation();
   const selected = resolveSelectedSpaceItem(items, selectedArtifactId);
-  const isOverlay = useMediaQuery(OVERLAY_QUERY);
+  const isOverlay = useMediaQuery(OVERLAY_TAKEOVER_QUERY);
   const panelRef = useModalDrawer<HTMLElement>(onClose, isOverlay);
 
   // Each artifact opens on its rendered reading; the choice is per-artifact,

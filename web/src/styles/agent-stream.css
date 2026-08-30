@@ -333,17 +333,6 @@
   animation: blink var(--t-tick) steps(1, end) infinite reverse;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .agent-stream.streaming .agent-text.is-live .agent-prose > :last-child:is(p, h1, h2, h3, h4, h5, h6, div, span):not(.md-fence, .md-table)::after,
-  .agent-stream.streaming .agent-text.is-live .agent-prose > :last-child:is(ul, ol) li:last-child::after,
-  .agent-stream.streaming .agent-text.is-live .agent-prose > blockquote:last-child p:last-child::after,
-  .agent-stream.streaming .agent-text.is-live .agent-prose > .md-fence:last-child pre > code::after,
-  .agent-stream.streaming .agent-text.is-live .agent-prose > .md-table:last-child tbody tr:last-child td:last-child::after,
-  .agent-stream.streaming .agent-thinking:last-child .agent-thinking-body p:last-child::after {
-    animation: none;
-  }
-}
-
 /* Live-run footer — a pulsing dot when the agent is still working but the
    last visible segment is not streaming text (tool runs, status, silence). */
 .agent-stream-activity {
@@ -364,10 +353,6 @@
   /* Re-tint the shared pulse-ring so the halo matches the dot. */
   --pulse-color: var(--live);
   animation: pulse-ring var(--t-pulse) var(--ease) infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .agent-stream-pulse { animation: none; }
 }
 
 .attachment-list {
@@ -444,7 +429,8 @@
    stay neutral. No horizontal rule — the calm transcript flow is the point. */
 .msg-system {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
+  /* Third track is the timestamp gutter; narrowed to `auto` on phones below. */
+  grid-template-columns: 20px minmax(0, 1fr) 5.5rem;
   column-gap: var(--sp-3);
   align-items: baseline;
   padding: var(--sp-0-5) 0;
@@ -482,9 +468,9 @@
   grid-row: 1;
 }
 
-@media (min-width: 720px) {
+@media (max-width: 820px) {
   .msg-system {
-    grid-template-columns: 20px minmax(0, 1fr) 5.5rem;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
   }
 }
 

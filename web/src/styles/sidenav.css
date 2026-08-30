@@ -1,5 +1,10 @@
 /* ============================ side navigation ============================ */
 
+/* The rail owns the rail|list seam. In light the zone steps measure ≈1.05
+   (palette.css) — a luminance step that quiet cannot carry the app's primary
+   structural boundary alone (the palette rejects 1.03 for a well on the list
+   panel), so the seam draws the same --line-1 hairline the list|canvas edge
+   (thread.css) has. */
 .sidenav-panel {
   position: relative;
   isolation: isolate;
@@ -7,7 +12,10 @@
   flex-direction: column;
   align-items: center;
   gap: var(--sp-3);
-  /* padding, background, and border-right are owned by atelier.css */
+  padding: var(--sp-4) var(--sp-2) var(--sp-3);
+  background: var(--surface-rail);
+  border-right: 0.5px solid var(--line-1);
+  color: var(--ink-2);
   min-height: 0;
   overflow: hidden;
 }
@@ -42,7 +50,7 @@
   flex: 1;
   width: auto;
   height: auto;
-  padding: 0 var(--sp-1);
+  padding: 0 var(--sp-1) 0 var(--sp-2);
   justify-content: flex-start;
 }
 
@@ -265,14 +273,17 @@
   }
 }
 
-/* NOTE: size, radius, and state fills for .sidenav-btn are owned by
-   atelier.css (44px control, --r-3, solid action plate for the
-   active route) — this file keeps only the structural + focus rules. */
+/* A nav button is a CONTROL, not a container: --r-2 puts it on the same
+   corner as every other button instead of the 8px the menus it opens use. */
 .sidenav-btn {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  border-radius: var(--r-2);
+  color: var(--ink-3);
   background: transparent;
   border: 0.5px solid transparent;
   font: inherit;
@@ -285,6 +296,38 @@
     border-color var(--t-fast) var(--ease);
   flex-shrink: 0;
 }
+
+.sidenav-btn:hover {
+  background: var(--surface-3);
+  border-color: transparent;
+  color: var(--ink-1);
+}
+
+/* Active route reads as selected the same way a conversation row does: a
+   soft wash + full-strength ink + a 2px left accent bar. Reserving the solid
+   --action plate for true primary actions (Add employee, Send) keeps one
+   flat hierarchy — selection is calm, action is loud. */
+.sidenav-btn.active,
+.sidenav-btn.active:hover {
+  background: var(--action-soft);
+  border-color: transparent;
+  color: var(--ink-1);
+  box-shadow: none;
+}
+
+.sidenav-btn.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: var(--accent-bar-w);
+  height: 18px;
+  transform: translateY(-50%);
+  border-radius: calc(var(--r-1) / 2);
+  background: var(--action);
+}
+
+.sidenav-toggle { color: var(--ink-3); }
 
 
 .sidenav-btn[data-nav="logout"]:hover {
@@ -410,31 +453,6 @@
   background: transparent;
   border-color: transparent;
   color: var(--ink-3);
-}
-
-.sidenav-badge {
-  display: none;
-  align-items: center;
-  gap: var(--sp-1);
-  padding: var(--sp-0-5) var(--sp-2);
-  border: 0.5px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-1);
-  color: var(--ink-3);
-  font: var(--type-micro);
-  text-transform: uppercase;
-  letter-spacing: var(--type-micro-track);
-  white-space: nowrap;
-}
-
-.sidenav-panel[data-expanded="true"] .sidenav-btn .sidenav-badge,
-.sidenav-more-item .sidenav-badge {
-  display: inline-flex;
-}
-
-.sidenav-panel[data-expanded="true"] .sidenav-btn .sidenav-badge,
-.sidenav-more-item .sidenav-badge {
-  margin-left: auto;
 }
 
 /* Mobile-only More overflow trigger (Channels / Admin) — hidden on desktop

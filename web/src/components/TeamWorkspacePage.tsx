@@ -25,10 +25,9 @@ import { TeamMemberOption } from "./TeamMemberOption";
 import { ProfileImage, ProfileImagePicker } from "./ProfileImagePicker";
 import { ActivitiesSkeleton, WorkspaceActivities, WorkspaceError } from "./workspace/WorkspacePrimitives";
 import { RecordBand, type RecordFact } from "./workspace/RecordBand";
-import { StatusPill } from "./StatusPill";
+import { StatusPill, TonePill } from "./StatusPill";
 import { truncateId } from "../lib/adminHelpers";
 import { formatRelativeTime } from "./admin/helpers";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { useDialogs } from "@/components/ui/DialogProvider";
@@ -317,7 +316,7 @@ function TeamProfile({
                             carries the team's own availability. */}
                         <span className="team-profile-member-state">
                           {!member.enabled
-                            ? <Badge variant="neutral">{t("teams.disabled")}</Badge>
+                            ? <TonePill tone="neutral" label={t("teams.disabled")} />
                             : member.availability !== "ready"
                               ? <StatusPill value={member.availability} />
                               : null}
@@ -503,7 +502,7 @@ export function TeamWorkspacePage({
       key: "availability",
       label: t("admin.v2.agent_availability_label"),
       value: !team.enabled
-        ? <Badge variant="neutral">{t("teams.disabled")}</Badge>
+        ? <TonePill tone="neutral" label={t("teams.disabled")} />
         : <StatusPill value={teamAvailability(team)} />,
     },
     {

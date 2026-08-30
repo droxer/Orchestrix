@@ -2,10 +2,7 @@
 
 import { type ReactNode, type RefObject } from "react";
 import {
-  ActionAdd,
-  AdminChannel,
   AdminConnect,
-  AdminDelete,
   AdminEmployees,
   AdminLocked,
   AdminVerified,
@@ -15,27 +12,6 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  activateChatIntegration,
-  addChatAllowedConversation,
-  addChatIdentityLink,
-  checkChatIntegration,
-  createChatIntegration,
-  deleteChatAllowedConversation,
-  deleteChatIdentityLink,
-  listChatIntegrations,
-  listControlPanelAgents,
-  listControlPanelDaemonNodes,
-  rotateTelegramWebhookSecret,
-  updateChatIntegration,
-} from "../../api";
 import type { ChatIntegration, ChatProvider, Tone } from "../../types";
 /**
  * Channel presentation primitives, split out of a 1072-line ChannelsView.tsx:

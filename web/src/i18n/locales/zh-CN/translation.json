@@ -49,7 +49,6 @@
     "save_project": "无法保存项目。请检查项目电脑与智能体角色后重试。",
     "archive_project": "无法归档项目。请刷新后重试。"
   },
-  "skip_to_thread": "跳至对话",
   "skip_to_content": "跳至内容",
   "nav": {
     "threads": "对话",

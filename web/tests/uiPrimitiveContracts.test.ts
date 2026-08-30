@@ -181,7 +181,7 @@ describe("UI primitive contracts", () => {
     // floating chrome gets the 0.5px hairline ring and nothing else.
     assert.match(roles, /--shadow-2:\s*0 0 0 0\.5px var\(--line-1\);/);
 
-    for (const file of ["select.tsx", "card.tsx", "table.tsx"]) {
+    for (const file of ["select.tsx", "card.tsx"]) {
       const source = await readFile(resolve(`web/src/components/ui/${file}`), "utf8");
       assert.doesNotMatch(
         stripComments(source),
@@ -259,19 +259,6 @@ describe("UI primitive contracts", () => {
     // A nested <label> is invalid, so label text is a <span> unless the wrapper
     // is a <div> carrying an explicit htmlFor target.
     assert.match(field, /wrapper === "div" && htmlFor/);
-  });
-
-  it("shares one grid template between a table header and its rows", async () => {
-    const source = await readFile(resolve("web/src/components/ui/table.tsx"), "utf8");
-    // Head and rows both read --table-cols, so the two declarations that each
-    // surface used to hand-maintain cannot drift apart again.
-    const uses = source.match(/grid-cols-\(--table-cols\)/g) ?? [];
-    assert.equal(uses.length, 2, "header and row must both read --table-cols");
-    assert.match(source, /"--table-cols": columns/);
-    // div+ARIA, not <table>: these lists restack into cards below 820px.
-    for (const role of ["table", "row", "columnheader", "rowgroup", "cell"]) {
-      assert.match(source, new RegExp(`role: "${role}"`));
-    }
   });
 
   it("supports polite announcements for async workspace results", async () => {

@@ -286,7 +286,6 @@
 @media (prefers-reduced-motion: reduce) {
   .project-member-tile {
     opacity: 1;
-    animation: none;
     transform: none;
   }
 }

@@ -42,6 +42,39 @@
   min-height: min(360px, 50vh);
 }
 
+/* Board variant (Backlog + Routine zero-data): the same primitive turned
+   left-aligned and inline with the page's normal content column. A board is
+   already a full-width working surface, so a centered card floating in it
+   read as a second, smaller page. Pairs with --fill. */
+.relay-empty--board {
+  align-items: flex-start;
+  gap: var(--sp-1);
+  max-width: none;
+  width: 100%;
+  padding: var(--sp-7);
+  text-align: left;
+}
+
+.relay-empty--board .relay-empty-body {
+  max-width: var(--measure);
+}
+
+/* Artifacts variant: the illustration slot carries a ghost ledger rather than
+   a mark tile, so the measure tightens to the ledger's own width and the
+   slot drops the tile's bottom margin — the rows ARE the spacing. */
+.relay-empty--artifacts {
+  gap: var(--sp-2);
+  max-width: 360px;
+  padding: var(--sp-8) var(--sp-7);
+  width: 100%;
+}
+
+.relay-empty--artifacts .relay-empty-illustration {
+  display: block;
+  width: 100%;
+  margin-bottom: 0;
+}
+
 .relay-empty-illustration {
   display: flex;
   align-items: center;
@@ -93,6 +126,7 @@
 .relay-empty-hint {
   margin: var(--sp-1) 0 0;
   font: var(--type-label);
+  font-weight: 500;
   letter-spacing: var(--type-label-track);
   color: var(--ink-3);
 }

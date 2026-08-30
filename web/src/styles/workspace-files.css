@@ -51,15 +51,6 @@
   white-space: nowrap;
 }
 
-/* The thread picker is a toolbar control, not a form field — it must not
-   out-weigh the breadcrumb it sits beside. */
-.workspace-files-bar .workspace-thread-select {
-  max-width: 190px;
-  min-height: 28px;
-  font: var(--type-label);
-  letter-spacing: var(--type-label-track);
-}
-
 .workspace-path-crumb {
   display: flex;
   align-items: center;
@@ -168,11 +159,13 @@
   color: var(--ink-1);
   cursor: pointer;
   text-align: left;
-  transition: background var(--t-fast) var(--ease);
+  transition: background var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease);
 }
 
 .workspace-pick:hover {
   background: var(--row-hover);
+  border-color: var(--line-strong);
 }
 
 .workspace-pick.is-active {
@@ -444,18 +437,6 @@
    that fade out downward. Geometry mirrors .workspace-pick and the tag
    mirrors .artifact-kind-tag, so the promise — "runs file documents
    here" — reads in the list's own vocabulary. */
-.artifacts-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--sp-2);
-  margin: auto;
-  padding: var(--sp-8) var(--sp-7);
-  width: 100%;
-  max-width: 360px;
-  text-align: center;
-}
-
 .artifacts-empty-ghosts {
   display: flex;
   flex-direction: column;

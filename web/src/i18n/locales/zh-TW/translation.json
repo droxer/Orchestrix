@@ -46,9 +46,9 @@
     "team_unavailable": "智能體團隊目前無法使用。",
     "team_lead_not_member": "團隊負責人必須是團隊成員。",
     "task_agent_and_team_conflict": "智能體與團隊只能選擇一個。",
-    "save_project": "無法儲存專案。請檢查專案電腦與智能體角色後重試。"
+    "save_project": "無法儲存專案。請檢查專案電腦與智能體角色後重試。",
+    "archive_project": "無法封存專案。請重新整理後再試一次。"
   },
-  "skip_to_thread": "跳至對話",
   "skip_to_content": "跳至內容",
   "nav": {
     "threads": "對話",
@@ -1273,6 +1273,7 @@
     "started": "{{agent}} 已啟動",
     "artifact": "產物 · {{kind}}",
     "decision": "你 · {{kind}}",
+    "cancelled": "要求已取消。",
     "agent_completed": "{{agent}} · {{status}}",
     "exit_code": "結束碼 {{exitCode}}",
     "session_status": "狀態 · {{phase}}",

@@ -407,12 +407,6 @@ html:lang(zh-TW) .md-body blockquote {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .md-fence-copy {
-    transition: none;
-  }
-}
-
 /* ---- diagrams ----
    Mermaid output. The SVG carries its own intrinsic size, which can exceed a
    narrow transcript column, so the figure scrolls rather than overflowing. */

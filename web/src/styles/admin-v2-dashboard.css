@@ -380,10 +380,6 @@
   animation: pulse-ring var(--t-pulse) var(--ease) infinite;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .adm-dash-stat.tone-live .adm-dash-stat-dot { animation: none; }
-}
-
 /* Bad is told by shape, not brightness: at the --dot-sm tier a solid --err
    dot reads as just another loud dot, not as "problem". Hollow ring instead
    — the same shape StatusPill and the node presence dots use. */

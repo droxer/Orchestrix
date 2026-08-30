@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { AgentName, DaemonNodeMonitorRecord, Tone } from "../types.js";
+import type { AgentName, DaemonNodeMonitorRecord } from "../types.js";
 
 export type AgentReadiness = "ready" | "disabled" | "failed" | "unknown";
 
@@ -21,27 +21,6 @@ export function agentReadiness(node: NodeAgentState, agent: AgentName): AgentRea
 
 export function isAgentDispatchReady(node: NodeAgentState, agent: AgentName): boolean {
   return agentReadiness(node, agent) === "ready";
-}
-
-/** Readiness → tone. Unknown ("no signal yet") maps to warn so it stays
-    distinct from disabled — a deliberate operator choice that maps to calm
-    neutral. The two must never collapse onto the same tier. */
-export function agentReadinessTone(readiness: AgentReadiness): Tone {
-  switch (readiness) {
-    case "ready":
-      return "good";
-    case "failed":
-      return "bad";
-    case "unknown":
-      return "warn";
-    case "disabled":
-      return "neutral";
-  }
-}
-
-export function agentReadinessLabel(readiness: AgentReadiness, t: TFunction): string {
-  if (readiness === "disabled") return t("admin.v2.agent_disabled");
-  return t(`status.${readiness}`, { defaultValue: readiness });
 }
 
 export function dispatchReadyAgents(node: NodeAgentState, agentNames: AgentName[]): AgentName[] {
