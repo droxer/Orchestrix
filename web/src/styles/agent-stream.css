@@ -142,8 +142,13 @@
   color: var(--ink-3);
 }
 
+/* Reasoning is verbatim model output, one line per paragraph. `pre-wrap` keeps
+   the indentation that structure depends on — a stack trace, a snippet, an
+   outline all collapsed to a flush-left run without it — while still wrapping
+   a long line to the column. */
 .agent-thinking-body p {
   margin: 0 0 var(--sp-1);
+  white-space: pre-wrap;
 }
 
 .agent-thinking-body p:last-child {
@@ -223,16 +228,54 @@
   color: var(--ink-3);
 }
 
+/* A command can be several lines long — an agent writing a file puts the whole
+   heredoc in one invocation — so the marker anchors to the first line instead
+   of a baseline that only exists for single-line commands, and the scroller
+   moves onto the body: a wide line scrolls inside the block, never sideways
+   through the marker. */
 .agent-command {
-  overflow-x: auto;
+  /* A command can be several lines long, so its marker anchors to the first
+     line. A tool line is always one line and keeps the shared baseline. */
+  align-items: flex-start;
+}
+
+.agent-command-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .agent-command code {
+  display: block;
+  overflow-x: auto;
   background: transparent;
   padding: 0;
   font: inherit;
   white-space: pre;
   color: var(--ink-2);
+}
+
+/* Reveals the rest of a collapsed command. Same affordance as the reasoning
+   toggle — muted sans text inside the log tier, not a control competing with
+   the answer. */
+.agent-command-toggle {
+  margin-top: var(--sp-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: var(--fs-2);
+  cursor: pointer;
+}
+
+.agent-command-toggle:hover {
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.agent-command-toggle:focus-visible {
+  border-radius: var(--r-2);
 }
 
 /* Reads the tone driver. This was a FOURTH spelling of the tone vocabulary,
@@ -254,6 +297,9 @@
   flex-shrink: 0;
 }
 
+/* Unclassified CLI output. It renders as Markdown (see RawSegment), so the
+   block carries the frame and lets markdown.css own the typography inside —
+   a `white-space: pre-wrap` here would fight every element rule in it. */
 .agent-raw {
   margin: 0;
   padding: var(--sp-3) var(--sp-4);
@@ -261,10 +307,7 @@
   border-radius: var(--r-2);
   background: var(--surface-1);
   color: var(--ink-2);
-  font-size: var(--fs-3);
-  line-height: var(--leading-loose);
-  white-space: pre-wrap;
-  overflow-x: auto;
+  min-width: 0;
 }
 
 /* The caret rides whatever block the streamed text currently ends in — plain

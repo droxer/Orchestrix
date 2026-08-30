@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TFunction } from "i18next";
 
-import { AgentStreamAccumulator, displayAgentSegments, reasoningDisplay, displayAgentStreamSegments, emptyAgentStreamSegments, hasStreamingTextCaret, hasTerminalOutcome, parseAgentStderr, parseAgentStream, userVisibleAgentSegments, agentMessagePlainText, type AgentSegment } from "../src/lib/agentStream.js";
+import { AgentStreamAccumulator, commandDisplay, displayAgentSegments, reasoningDisplay, displayAgentStreamSegments, emptyAgentStreamSegments, hasStreamingTextCaret, hasTerminalOutcome, parseAgentStderr, parseAgentStream, segmentKeys, userVisibleAgentSegments, agentMessagePlainText, type AgentSegment } from "../src/lib/agentStream.js";
 
 describe("agent stream parsing", () => {
   it("filters Codex stdin notice from stderr", () => {
@@ -176,7 +176,7 @@ describe("agent stream parsing", () => {
     assert.deepEqual(parseAgentStream("pi", raw), [
       { kind: "thinking", text: "Checking files." },
       { kind: "tool", name: "read" },
-      { kind: "tool", name: "bash", target: "npm test" },
+      { kind: "tool", name: "bash", target: "npm test", id: "call_1" },
     ]);
   });
 
@@ -202,7 +202,7 @@ describe("agent stream parsing", () => {
 
     assert.deepEqual(parseAgentStream("pi", raw), [
       { kind: "text", text: "Checking files." },
-      { kind: "tool", name: "read", target: "src/app.ts" },
+      { kind: "tool", name: "read", target: "src/app.ts", id: "call_1" },
     ]);
   });
 
@@ -296,8 +296,8 @@ describe("agent stream parsing", () => {
     ].join("\n");
 
     assert.deepEqual(parseAgentStream("pi", raw), [
-      { kind: "tool", name: "read" },
-      { kind: "tool", name: "bash" },
+      { kind: "tool", name: "read", id: "call_1" },
+      { kind: "tool", name: "bash", id: "call_1" },
     ]);
   });
 
@@ -350,9 +350,9 @@ describe("agent stream parsing", () => {
     ].join("\n");
 
     assert.deepEqual(parseAgentStream("codex", raw), [
-      { kind: "tool", name: "context7.query-docs", target: "current docs" },
-      { kind: "tool", name: "web_search", target: "Relay SSE rendering" },
-      { kind: "tool", name: "lookup", target: "session events" },
+      { kind: "tool", name: "context7.query-docs", target: "current docs", id: "mcp_1" },
+      { kind: "tool", name: "web_search", target: "Relay SSE rendering", id: "web_1" },
+      { kind: "tool", name: "lookup", target: "session events", id: "db_1" },
     ]);
   });
 
@@ -369,7 +369,7 @@ describe("agent stream parsing", () => {
     });
 
     assert.deepEqual(parseAgentStream("codex", raw), [
-      { kind: "tool", name: "context7.query-docs", target: "current docs" },
+      { kind: "tool", name: "context7.query-docs", target: "current docs", id: "mcp_1" },
     ]);
   });
 
@@ -398,7 +398,7 @@ describe("agent stream parsing", () => {
     ].join("\n");
 
     assert.deepEqual(parseAgentStream("codex", raw), [
-      { kind: "tool", name: "context7.query-docs", target: "current docs" },
+      { kind: "tool", name: "context7.query-docs", target: "current docs", id: "mcp_1" },
     ]);
   });
 
@@ -424,7 +424,7 @@ describe("agent stream parsing", () => {
     ].join("\n");
 
     assert.deepEqual(parseAgentStream("codex", raw), [
-      { kind: "tool", name: "context7.query-docs", target: "current docs" },
+      { kind: "tool", name: "context7.query-docs", target: "current docs", id: "mcp_1" },
     ]);
   });
 
@@ -452,10 +452,10 @@ describe("agent stream parsing", () => {
     const accumulator = new AgentStreamAccumulator("codex");
 
     assert.deepEqual(accumulator.update(started), [
-      { kind: "tool", name: "context7.query-docs", target: undefined },
+      { kind: "tool", name: "context7.query-docs", target: undefined, id: "mcp_1" },
     ]);
     assert.deepEqual(accumulator.update(`${started}\n${completed}`), [
-      { kind: "tool", name: "context7.query-docs", target: "current docs" },
+      { kind: "tool", name: "context7.query-docs", target: "current docs", id: "mcp_1" },
     ]);
   });
 
@@ -476,10 +476,10 @@ describe("agent stream parsing", () => {
 
     assert.deepEqual(parseAgentStream("codex", raw), [
       { kind: "narration", key: "agent_stream.codex_started", params: { tone: "info" } },
-      { kind: "tool", name: "read", target: "one.ts" },
+      { kind: "tool", name: "read", target: "one.ts", id: "tool_1" },
       { kind: "narration", key: "agent_stream.codex_finished", params: { tone: "good" } },
       { kind: "narration", key: "agent_stream.codex_started", params: { tone: "info" } },
-      { kind: "tool", name: "write", target: "two.ts" },
+      { kind: "tool", name: "write", target: "two.ts", id: "tool_1" },
     ]);
   });
 
@@ -494,7 +494,7 @@ describe("agent stream parsing", () => {
     });
 
     assert.deepEqual(parseAgentStream("codex", raw), [
-      { kind: "command", command: "npm test" },
+      { kind: "command", command: "npm test", id: "cmd_1" },
     ]);
   });
 
@@ -511,7 +511,7 @@ describe("agent stream parsing", () => {
     ].join("\n");
 
     assert.deepEqual(parseAgentStream("codex", raw), [
-      { kind: "command", command: "npm test" },
+      { kind: "command", command: "npm test", id: "cmd_1" },
     ]);
   });
 
@@ -808,7 +808,7 @@ describe("agent stream parsing", () => {
     ].join("\n");
 
     assert.deepEqual(parseAgentStream("claude", raw), [
-      { kind: "tool", name: "Read", target: "src/app.ts" },
+      { kind: "tool", name: "Read", target: "src/app.ts", id: "tool_1" },
     ]);
   });
 
@@ -1193,5 +1193,109 @@ describe("agent stream parsing", () => {
       agentMessagePlainText("pi", stdout, stderr, t as TFunction),
       "Ship the fix.\n\nstderr warning",
     );
+  });
+});
+
+describe("command segment display", () => {
+  it("shows a short command whole, with no toggle", () => {
+    assert.deepEqual(commandDisplay("npm test", { expanded: false }), {
+      lines: ["npm test"],
+      hidden: 0,
+      toggle: null,
+    });
+  });
+
+  it("collapses a heredoc that carries a whole file", () => {
+    // The shape that pushed an answer off the screen: `cat > file << EOF`
+    // puts every line of the file inside one command segment.
+    const body = Array.from({ length: 40 }, (_, index) => `line ${index}`);
+    const command = ["cat > tool_manager.py << 'EOF'", ...body, "EOF"].join("\n");
+
+    const collapsed = commandDisplay(command, { expanded: false });
+    assert.equal(collapsed.lines.length, 6);
+    assert.equal(collapsed.lines[0], "cat > tool_manager.py << 'EOF'");
+    assert.equal(collapsed.hidden, 36);
+    assert.equal(collapsed.toggle, "expand");
+
+    const expanded = commandDisplay(command, { expanded: true });
+    assert.equal(expanded.lines.length, 42);
+    assert.equal(expanded.hidden, 0);
+    assert.equal(expanded.toggle, "collapse");
+  });
+
+  it("repairs a command whose quotes arrived JSON-escaped", () => {
+    // A CLI that echoes a JSON-encoded command leaks \" for every quote, so a
+    // Python docstring inside a heredoc reads as \"\"\".
+    const command = 'python -c \\"print(\\"a\\", \\"b\\")\\"';
+
+    assert.deepEqual(commandDisplay(command, { expanded: false }).lines, [
+      'python -c "print("a", "b")"',
+    ]);
+  });
+
+  it("leaves a command with one genuine escaped quote alone", () => {
+    const command = 'grep \\"needle\\" "a" "b" "c"';
+
+    assert.deepEqual(commandDisplay(command, { expanded: false }).lines, [command]);
+  });
+});
+
+describe("segment keys", () => {
+  it("keys a segment by the CLI id when the stream gave one", () => {
+    const segments: AgentSegment[] = [
+      { kind: "command", command: "npm test", id: "c1" },
+      { kind: "tool", name: "Read", target: "a.ts", id: "t1" },
+    ];
+
+    assert.deepEqual(segmentKeys(segments), ["command#c1", "tool#t1"]);
+  });
+
+  it("falls back to a per-kind ordinal for segments with no id", () => {
+    const segments: AgentSegment[] = [
+      { kind: "text", text: "one" },
+      { kind: "thinking", text: "why" },
+      { kind: "text", text: "two" },
+    ];
+
+    assert.deepEqual(segmentKeys(segments), ["text-0", "thinking-0", "text-1"]);
+  });
+
+  it("keeps a command's key when a segment is inserted before it", () => {
+    // The ordinal-only scheme moved every later row's key by one, so an
+    // expanded command handed its open state to its neighbour.
+    const before: AgentSegment[] = [{ kind: "command", command: "npm test", id: "c2" }];
+    const after: AgentSegment[] = [
+      { kind: "command", command: "npm run build", id: "c1" },
+      { kind: "command", command: "npm test", id: "c2" },
+    ];
+
+    assert.equal(segmentKeys(before)[0], "command#c2");
+    assert.equal(segmentKeys(after)[1], "command#c2");
+  });
+
+  it("disambiguates a call id the CLI reused across turns", () => {
+    // Pi and Codex both restart their id counters per turn, so `call_1` can
+    // appear twice in one transcript — React keys still have to be unique.
+    const segments: AgentSegment[] = [
+      { kind: "tool", name: "read", id: "call_1" },
+      { kind: "tool", name: "bash", id: "call_1" },
+    ];
+
+    const keys = segmentKeys(segments);
+    assert.deepEqual(keys, ["tool#call_1", "tool#call_1@1"]);
+    assert.equal(new Set(keys).size, keys.length);
+  });
+
+  it("carries the CLI id onto a Codex command segment", () => {
+    const stdout = [
+      JSON.stringify({ type: "item.started", item: { type: "command_execution", id: "call_1", command: "npm test" } }),
+      JSON.stringify({ type: "item.completed", item: { type: "command_execution", id: "call_1", command: "npm test" } }),
+    ].join("\n");
+
+    const segments = parseAgentStream("codex", stdout);
+    const command = segments.find((segment) => segment.kind === "command");
+
+    assert.equal(command?.kind === "command" ? command.id : undefined, "call_1");
+    assert.equal(segments.filter((segment) => segment.kind === "command").length, 1);
   });
 });

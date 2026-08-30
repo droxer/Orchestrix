@@ -29,7 +29,11 @@ const REMARK_PLUGINS: MarkdownOptions["remarkPlugins"] = [
   // Agent CLIs emit hard-wrapped prose and expect the wrap to show. CommonMark
   // folds a single newline into a space; remark-breaks keeps it a line break.
   remarkBreaks,
-  remarkMath,
+  // Display math only. `$…$` is not math in this transcript, it is money and
+  // shell variables — "costs $5 per seat and $10 for pro" was typeset as an
+  // equation, dollar signs and spacing gone. `$$…$$` is unambiguous enough to
+  // keep, so a real equation still renders.
+  [remarkMath, { singleDollarTextMath: false }],
 ];
 
 // No rehype-raw: Markdown here is agent-authored and therefore untrusted, so
