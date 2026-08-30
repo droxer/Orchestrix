@@ -52,7 +52,7 @@ Relay 守护进程在本地或托管计算机上，通过 BoxLite 沙箱或配�
 
 ## 快速开始
 
-前置条件：Node.js 22.19+、npm、Python 3.12+、[uv](https://docs.astral.sh/uv/)、所需智能体 CLI 的凭据，以及（使用 BoxLite 时）支持硬件虚拟化的 Docker。
+前置条件：Node.js 22.19+、npm、Python 3.12+、[uv](https://docs.astral.sh/uv/)、PostgreSQL、所需智能体 CLI 的凭据，以及（守护进程默认的 BoxLite 沙箱所需）支持硬件虚拟化的 Docker。
 
 ```bash
 npm install
@@ -67,6 +67,18 @@ cp web/.env.example web/.env.local
 cp packages/.env.example packages/.env
 ```
 
+会话、任务、事件与产物始终存储在 PostgreSQL 中。请先创建 `backend/.env` 中 `RELAY_DATABASE_URL` 指向的数据库——示例配置期望 `localhost:5432` 上存在角色 `relay` 与数据库 `relay`——然后应用数据库结构：
+
+```bash
+make backend-migrate
+```
+
+创建第一个管理员账户（没有默认密码）：
+
+```bash
+script/init_users.sh --password 'choose-a-strong-password'
+```
+
 在不同终端中分别启动服务：
 
 ```bash
@@ -75,7 +87,7 @@ make daemon SANDBOX_ID=node_dev  # 连接后端的执行节点
 make web                         # Web 界面，监听 127.0.0.1:5000
 ```
 
-打开 <http://127.0.0.1:5000>。
+打开 <http://127.0.0.1:5000>，以 `admin` 身份登录。
 
 测试、数据库迁移、协调器、pre-commit 钩子和停止命令请参阅[本地开发指南](docs/local-development.md)。
 

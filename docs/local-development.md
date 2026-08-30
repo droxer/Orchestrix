@@ -9,6 +9,8 @@ service commands, data layout, and test organization.
 - npm
 - Python 3.12 or newer
 - uv
+- PostgreSQL — sessions, tasks, events, and artifacts always live in the
+  database; see [Backend Database Migrations](#backend-database-migrations)
 - Docker with the local daemon running
 - Hardware virtualization for BoxLite
 - API keys for the agents you plan to run
@@ -49,16 +51,25 @@ Create web settings from the example:
 cp web/.env.example web/.env.local
 ```
 
-Create package settings from the examples:
+Create package settings from the example. `packages/.env` is the only one the
+Quick start needs: `relay-core` loads it on import, before any package-local
+file, so credentials placed there reach the core runtime, the daemon, and the
+supervisor alike.
 
 ```bash
 cp packages/.env.example packages/.env
+```
+
+Add a package-local file only to override that fallback for one package — for
+example a different `OPENAI_BASE_URL` for the daemon than for the supervisor:
+
+```bash
 cp packages/relay-core/.env.example packages/relay-core/.env
 cp packages/relay-daemon/.env.example packages/relay-daemon/.env
 ```
 
-Set agent credentials in `packages/.env`, `packages/relay-core/.env`,
-`packages/relay-daemon/.env`, or another package-local `.env` file:
+Set agent credentials in `packages/.env`, or in a package-local `.env` file to
+override them for that package:
 
 ```bash
 ANTHROPIC_API_KEY=...
@@ -74,8 +85,9 @@ KIMI_MODEL=...            # optional override
 MOONSHOT_API_KEY=...      # alternative Moonshot credential
 ```
 
-Shell environment values always win. Package-local env files override
-`packages/.env` fallback values for that package.
+Precedence, widest to narrowest: shell environment values always win, then a
+package-local `.env`/`.env.local`, then the `packages/.env` fallback. A key
+already set by a wider source is never overwritten by a narrower one.
 
 Do not put long-lived secrets into prompts, events, artifacts, or memory.
 

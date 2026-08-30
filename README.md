@@ -55,7 +55,7 @@ Team workspaces bring active runs, tasks, threads, workspace files, and member a
 
 ## Quick start
 
-Prerequisites: Node.js 22.19+, npm, Python 3.12+, [uv](https://docs.astral.sh/uv/), credentials for the agent CLIs you want to run, and — when using BoxLite — Docker with hardware virtualization.
+Prerequisites: Node.js 22.19+, npm, Python 3.12+, [uv](https://docs.astral.sh/uv/), PostgreSQL, credentials for the agent CLIs you want to run, and — for the daemon's default BoxLite sandbox — Docker with hardware virtualization.
 
 ```bash
 npm install
@@ -70,6 +70,18 @@ cp web/.env.example web/.env.local
 cp packages/.env.example packages/.env
 ```
 
+Sessions, tasks, events, and artifacts always live in PostgreSQL. Create the database that `RELAY_DATABASE_URL` in `backend/.env` names — the example expects role `relay` and database `relay` on `localhost:5432` — then apply the schema:
+
+```bash
+make backend-migrate
+```
+
+Create the first admin account (there is no default password):
+
+```bash
+script/init_users.sh --password 'choose-a-strong-password'
+```
+
 Start each service in its own terminal:
 
 ```bash
@@ -78,7 +90,7 @@ make daemon SANDBOX_ID=node_dev  # execution node connected to the backend
 make web                         # web UI on 127.0.0.1:5000
 ```
 
-Open <http://127.0.0.1:5000>.
+Open <http://127.0.0.1:5000> and sign in as `admin`.
 
 Tests, database migrations, the supervisor, pre-commit hooks, and shutdown commands are covered in [Local Development](docs/local-development.md).
 
