@@ -6,7 +6,6 @@ import { PriorityBadge } from "../PriorityBadge";
 import { cn } from "@/lib/utils";
 import { type RelaySession, type RelayTaskListItem } from "../../types";
 import {
-  ActionAdd,
   ActionApprove,
   ActionCalendar,
   ActionStart,
@@ -14,8 +13,6 @@ import {
   ICON,
   NavAgents,
   NavRefresh,
-  ViewBoard,
-  ViewList,
 } from "../icons";
 import { dueTone } from "../../lib/backlog";
 import { TaskAssignee, TaskExecutionBadge } from "../TaskAssignee";

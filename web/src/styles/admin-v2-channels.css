@@ -506,7 +506,7 @@
   }
 }
 
-@media (max-width: 719px) {
+@media (max-width: 820px) {
   .adm-chat-split {
     grid-template-columns: 1fr;
   }

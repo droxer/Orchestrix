@@ -67,7 +67,6 @@ function formatArtifactSize(bytes: number | undefined, t: TFunction, locale: str
 }
 
 function PlanSummary({ steps, agentDisplayNames }: { steps: PlanStep[]; agentDisplayNames?: Partial<Record<AgentName, string>> }) {
-  const { t } = useTranslation();
   return (
     <ol className="artifact-plan-summary">
       {steps.map((step, index) => (

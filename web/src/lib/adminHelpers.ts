@@ -419,16 +419,6 @@ export function nodeSandboxProfile(
   return "pending";
 }
 
-export function nodeLocalityKind(
-  node: ControlPanelDaemonNodeRecord,
-  options: { storedTokens: StoredNodeTokenMap; colocated: boolean },
-): NodeLocalityKind {
-  if (!options.colocated) return "remote";
-  const cached = options.storedTokens[node.id];
-  if (cached?.nodeToken || cached?.sandboxToken || cached?.daemonCommand) return "saved_here";
-  return "remote";
-}
-
 export function nodeLocalityKinds(
   node: ControlPanelDaemonNodeRecord,
   options: { storedTokens: StoredNodeTokenMap; colocated: boolean },

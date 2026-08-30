@@ -106,7 +106,8 @@ describe("memoized transcript messages", () => {
   });
 
   it("resolves append-vs-create before requiring a locally routable agent", () => {
-    const source = readFileSync("web/src/App.tsx", "utf8");
+    // Moved to hooks/useThreadDispatch when App.tsx was broken up.
+    const source = readFileSync("web/src/hooks/useThreadDispatch.ts", "utf8");
     const actionIndex = source.indexOf("const action = composingNew");
     const routingGateIndex = source.indexOf("const messageAddress = resolveThreadMessageAddress");
 
@@ -116,11 +117,27 @@ describe("memoized transcript messages", () => {
   });
 
   it("retains operation ids for rerun and handoff recovery retries", () => {
-    const source = readFileSync("web/src/App.tsx", "utf8");
+    const source = readFileSync("web/src/hooks/useThreadDispatch.ts", "utf8");
 
+    // Rerun, retry and handoff share ONE dispatch path. They used to be three
+    // copies that each had to spell the `${sessionId}:kind:${agentId}` key the
+    // same way by hand; if two drifted, a retried turn minted a second
+    // operation id for work the backend had already accepted. Assert the
+    // single path, not the three copies.
     assert.match(source, /recoveryOperationIdsRef/);
-    assert.match(source, /kind:\s*"rerun"[\s\S]{0,220}idempotencyKey/);
-    assert.match(source, /kind:\s*"handoff"[\s\S]{0,260}idempotencyKey/);
+    assert.match(source, /idempotencyKey: recoveryOperationId\(recoveryKey\)/);
+    assert.equal(
+      source.match(/idempotencyKey:/g)?.length,
+      1,
+      "only dispatchRecovery may mint a recovery idempotency key",
+    );
+    // Both recovery kinds still route through it.
+    for (const kind of ["rerun", "handoff"]) {
+      assert.match(source, new RegExp(`kind: "${kind}",\\n\\s*(note:[^\\n]*\\n\\s*)?failureLabel`));
+    }
+    // And the handoff target stays an explicit pick — no executor-kind fallback.
+    const handoff = source.slice(source.indexOf("async function sendHandoff()"));
+    assert.doesNotMatch(handoff.slice(0, 400), /fallback:/);
   });
 });
 

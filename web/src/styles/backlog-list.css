@@ -439,12 +439,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .backlog-row-actions,
-  .state-mark {
-    animation: none;
-    transition: none;
-  }
-
   /* Pulse rings live on pseudos now — hide them outright under reduced
      motion (animation: none alone would leave the ring at full opacity). */
   .state-mark[data-shape="live"]::after {
@@ -605,8 +599,24 @@
 /* The checkbox always holds its column so nothing shifts when a selection
    starts, and it stays visible — a hidden control is an undiscoverable one. */
 
+/* Selection is --action-soft plus the leading accent bar, the same grammar
+   .rail-row carries on the thread / agent / team rails (tokens/base.css). It
+   used to be --row-hover — byte-identical to the hover rule directly above —
+   so a selected row was indistinguishable from a hovered one, and hovering an
+   unselected row made it look selected. The checkbox was doing all the work. */
 .backlog-row[data-selected="true"] {
-  background: var(--row-hover);
+  background: var(--action-soft);
+}
+
+.backlog-row[data-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: var(--accent-bar-inset);
+  bottom: var(--accent-bar-inset);
+  width: var(--accent-bar-w);
+  border-radius: calc(var(--r-1) / 2);
+  background: var(--action);
 }
 
 /* The card floats on the lane rather than sitting in a table, so its selected

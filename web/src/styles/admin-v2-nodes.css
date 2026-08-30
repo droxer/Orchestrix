@@ -149,7 +149,7 @@
   text-overflow: ellipsis;
 }
 
-@media (max-width: 719px) {
+@media (max-width: 820px) {
   .adm-node-cols {
     display: none;
   }
@@ -457,10 +457,6 @@
   border-color: var(--presence);
   --pulse-color: var(--presence);
   animation: pulse-ring var(--t-pulse-calm) var(--ease) infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .adm-presence[data-online="true"]::before { animation: none; }
 }
 
 /* Labeled presence pill — the explicit online/offline readout on the fleet

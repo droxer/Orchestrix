@@ -5,51 +5,31 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ActionAdd,
   AdminChannel,
-  AdminConnect,
-  AdminDelete,
-  AdminEmployees,
-  AdminLocked,
-  AdminVerified,
   ICON,
 } from "../icons";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { RelayEmptyState } from "../RelayEmptyState";
 import { TonePill } from "../StatusPill";
 import { Drawer } from "@/components/ui/Drawer";
 import {
   activateChatIntegration,
-  addChatAllowedConversation,
-  addChatIdentityLink,
   checkChatIntegration,
   createChatIntegration,
-  deleteChatAllowedConversation,
-  deleteChatIdentityLink,
   listChatIntegrations,
   listControlPanelAgents,
   listControlPanelDaemonNodes,
-  rotateTelegramWebhookSecret,
-  updateChatIntegration,
 } from "../../api";
 import { backendPublicOrigin } from "../../lib/apiOrigin";
 import { useUrlSearchState } from "../../hooks/useUrlSearchState";
-import type { ChatIntegration, ChatProvider, Tone } from "../../types";
+import type { ChatIntegration } from "../../types";
 
 import {
   ChannelCreateForm,
-  ChannelSection,
   normalizePublicBaseUrl,
   ProviderAvatar,
   providerLabel,
-  readiness,
   statusTone,
   TELEGRAM_CREDENTIAL_FIELDS,
 } from "./ChannelPrimitives";

@@ -540,7 +540,6 @@
 
   @media (prefers-reduced-motion: reduce) {
     .messenger-shell .sidenav-btn {
-      animation: none;
       opacity: 1;
     }
   }

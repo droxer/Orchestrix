@@ -3,9 +3,8 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { logout } from "./api";
-import type { AgentName, AgentTeam, CurrentUser, DaemonNodeMonitorRecord, EmployeeAgent, RelayArtifact, RelaySession } from "./types";
+import type { AgentName, AgentTeam, EmployeeAgent, RelayArtifact, RelaySession } from "./types";
 import { LoginScreen } from "./components/LoginScreen";
-import type { ThreadItem } from "./components/ThreadRow";
 import { useRelayData } from "./hooks/useRelayData";
 import { useRelayMutations } from "./hooks/useRelayMutations";
 import { useMutationError } from "./hooks/useMutationError";
@@ -14,16 +13,11 @@ import { useSessionEvents } from "./hooks/useSessionEvents";
 import { useSessionDetail } from "./hooks/useSessionDetail";
 import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeThreadRuntimeNodes, mergeVisibleDaemonNodes } from "./lib/daemonNodes";
-import { formatDispatchError } from "./lib/agentReadiness";
 import { isEmployeeAgentRoutable, preferredRoutableAgent } from "./lib/agentDisplayNames";
-import {
-  resolveThreadMessageAddress,
-  threadMessageInput,
-  threadMessageOperationKey,
-} from "./lib/messageRouting";
 import { mentionCandidates } from "./lib/mentions";
 import { applyTheme, readTokens, selectedEmployeeKey } from "./lib/appStorage";
 import { canUseLocalControlPanel } from "./lib/controlPanel";
+import { useThreadDispatch } from "./hooks/useThreadDispatch";
 import { useRelayStore } from "./lib/store";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { useClientMounted } from "./hooks/useClientMounted";
@@ -34,13 +28,12 @@ import { useThreadTargets } from "./hooks/useThreadTargets";
 import { useUserPreferences } from "./hooks/useUserPreferences";
 import { usePanelLayout } from "./hooks/usePanelLayout";
 import { useThreadSpace } from "./hooks/useThreadSpace";
-import { chooseSendAction, sendThreadSessionId, suppressActiveSessionDuringPendingSend } from "./lib/sendAction";
 import { myThreadSessions, pickActiveThreadSession } from "./lib/threads";
 import { shouldTailSessionEvents } from "./lib/sessionEventStream";
 import { useEmployeeProvisioning } from "./hooks/useEmployeeProvisioning";
 import { useEmployeeAgents } from "./hooks/useEmployeeAgents";
 import { useTeams } from "./hooks/useTeams";
-import { isAwaitingFeedbackDecision, rerunAssignmentForSession } from "./lib/workflow";
+import { isAwaitingFeedbackDecision } from "./lib/workflow";
 import { useDialogs } from "./components/ui/DialogProvider";
 import { AppShell, RouteFallback } from "./components/AppShell";
 import { ThreadsView } from "./components/ThreadsView";
@@ -50,21 +43,11 @@ import { ProjectMessagesAccumulator } from "./lib/projectMessages";
 import type { AppRoute } from "./lib/viewTypes";
 import { visibleThreadArtifacts } from "./lib/threadArtifacts";
 import {
-  canCancelThreadRun,
   findActiveRunOwnerForSession,
   isThreadRunInFlight,
-  threadCancelNodeId,
 } from "./lib/threadRunning";
 import {
-  agentsForThreadNode,
-  assignableThreadComputers,
   resolveNewThreadComputer,
-  selectableThreadComputers,
-  teamsForThreadNode,
-  threadComputerSignature,
-  threadNeedsRuntimeSelection,
-  threadNodeOffline,
-  threadRuntimeNodeId,
 } from "./lib/threadRuntime";
 import { validatedReturnTo } from "./lib/appRoute";
 import { showThreadChrome } from "./lib/projectPage";
@@ -109,7 +92,6 @@ export function App() {
     runLogicalAgentsMutation,
     submitThreadMessageMutation,
     requestThreadRecoveryMutation,
-    invalidateRelay,
   } = useRelayMutations();
   const selectedEmployee = useRelayStore((s) => s.selectedEmployee);
   const setSelectedEmployee = useRelayStore((s) => s.setSelectedEmployee);
@@ -186,11 +168,6 @@ export function App() {
     [localNodes, nodes],
   );
   const selectedSandbox = useMemo(() => sandboxes.find((s) => s.employeeId === selectedEmployee), [sandboxes, selectedEmployee]);
-  const selectedNode = useMemo(() => visibleNodes.find((n) => n.employeeId === selectedEmployee || n.id === selectedSandbox?.id), [visibleNodes, selectedEmployee, selectedSandbox?.id]);
-  const activeLogicalAgent = useMemo(
-    () => logicalAgents.find((agent) => agent.id === activeLogicalAgentId),
-    [activeLogicalAgentId, logicalAgents],
-  );
   // The logged-in user is themselves an employee; their threads are the
   // sessions they own. The backend already owner-scopes /api/v1/threads, so this is
   // just the non-archived sessions sorted most-recent first.
@@ -417,7 +394,7 @@ export function App() {
     && space.open
     && Boolean(activeSession);
 
-  const { threadItems, filteredThreads, directoryProjects, directoryThreads } = useThreadDirectory({
+  const { directoryProjects, directoryThreads } = useThreadDirectory({
     route,
     myThreads,
     projects,
@@ -582,155 +559,27 @@ export function App() {
     }
   }
 
-  async function sendMessage() {
-    const raw = composerRef.current?.getText().trim() ?? "";
-    if (!raw) return;
-    if (!selectedEmployee) return;
-    if (threadRunning) return;
-    if (projectDispatchDisabled) return;
-    if (requiresRuntimeSelection && !selectedThreadNodeId) {
-      reportMutationError("Computer required", null, t("errors.thread_computer_required"));
-      return;
-    }
-    // When staging a new thread, always create; otherwise continue the
-    // open one. composingNew forces a fresh owner-scoped session here.
-    const action = composingNew ? { kind: "create" as const } : chooseSendAction({ activeSessionId: activeSession?.id ?? null, session: activeSession });
-    const sessionId = action.kind === "append" ? action.sessionId : undefined;
-    const creatingSession = suppressActiveSessionDuringPendingSend(action);
-    // A team picked while staging a new thread turns the message into a team
-    // thread: no single-agent routing, the backend expands the roster.
-    const pendingTeam = action.kind === "create" && pendingThreadTeamId
-      ? composerTeams.find((team) => team.id === pendingThreadTeamId)
-      : undefined;
-    let goal = raw;
-    let newThreadAgentIds: string[] | undefined;
-    // A project round addresses the whole roster unless the composer (or a
-    // mention) names one member — the backend expands whichever it is given.
-    const projectRoomRound = Boolean(activeProject) && projectRoomTarget;
-    // A mention overrides the footer selection. Team messages intentionally
-    // default to the room; every single-agent message requires one valid
-    // footer selection and never fails open to the room.
-    const messageAddress = resolveThreadMessageAddress({
-      text: raw,
-      candidates: threadMentionCandidates,
-      defaultAgentId: projectRoomRound || pendingTeam || activeSession?.teamId
-        ? undefined
-        : activeLogicalAgentId,
-    });
-    if (messageAddress.blocked) {
-      reportMutationError(
-        messageAddress.reason === "mention" ? "Mention unresolved" : "Agent not ready for dispatch",
-        null,
-        messageAddress.reason === "mention"
-          ? t("composer.mention_blocked")
-          : t("errors.agent_not_ready", { agent: activeAgent }),
-      );
-      return;
-    }
-    // Participant availability is a creation concern. Continued threads send
-    // semantic intent to the conductor, which resolves the room against live
-    // membership and placement state on the server.
-    if (!sessionId && !pendingTeam) {
-      newThreadAgentIds = messageAddress.addressAgentIds;
-    }
-    // Echo the turn immediately. For a continued session we mint the message id
-    // here and hand it to the backend so the persisted event reconciles by id.
-    const messageOperationKey = sessionId
-      ? threadMessageOperationKey({
-          sessionId,
-          text: goal,
-          intent: "accomplish",
-          addressAgentIds: messageAddress.addressAgentIds,
-        })
-      : null;
-    const retainedMessageId = messageOperationKey
-      ? messageOperationIdsRef.current.get(messageOperationKey)
-      : null;
-    const userMessageId = retainedMessageId ?? `evt_${crypto.randomUUID()}`;
-    if (messageOperationKey && !retainedMessageId) {
-      messageOperationIdsRef.current.set(messageOperationKey, userMessageId);
-    }
-    // While creating a fresh thread, keep suppressing the previous active
-    // thread so the optimistic user turn does not appear in the wrong transcript.
-    if (!creatingSession) setComposingNew(false);
-    // Route synchronization clears any pending message when it reapplies an
-    // existing session from the URL. Navigate before adding this optimistic
-    // turn so that cleanup cannot erase the message in the same render batch.
-    // The URL must name the thread this turn belongs to: a create stays on
-    // /threads/new (so composingNew survives) and a continued send stays on
-    // its own path. The bare /threads route parses as neither, which reset
-    // composingNew and rendered the new turn inside the previously active
-    // thread until the create resolved and snapped the view back.
-    syncThreadUrl(sendThreadSessionId(action), true, activeProject?.id);
-    setPendingUserMessage({ id: userMessageId, text: goal });
-    setIsRunning(true);
-    composerRef.current?.clear();
-    transcript.pinToBottom();
-    try {
-      const done = sessionId
-        ? await submitThreadMessageMutation.mutateAsync({
-            sessionId,
-            input: threadMessageInput({
-              text: goal,
-              addressAgentIds: messageAddress.addressAgentIds,
-              userMessageId,
-            }),
-          })
-        : await runLogicalAgentsMutation.mutateAsync({
-            taskGoal: goal,
-            ...(activeProject ? { projectId: activeProject.id } : {}),
-            ...(!activeProject && selectedThreadNodeId ? { daemonNodeId: selectedThreadNodeId } : {}),
-            ...(activeProject
-              ? newThreadAgentIds!.length
-                ? { assignments: newThreadAgentIds!.map((agentId) => ({ agentId })) }
-                : {}
-              : pendingTeam
-              ? { teamId: pendingTeam.id }
-              : {
-                  assignments: newThreadAgentIds!.map((agentId) => ({ agentId })),
-                }),
-          });
-      setPendingThreadTeamId(null);
-      setActiveSessionId(done.id);
-      setSelectedSessionId(done.id);
-      setComposingNew(false);
-      syncThreadUrl(done.id, true, done.projectId ?? activeProject?.id);
-      if (messageOperationKey) {
-        messageOperationIdsRef.current.delete(messageOperationKey);
-      }
-    } catch (error) {
-      setPendingUserMessage(null);
-      // The composer was cleared optimistically; a rejected dispatch (busy
-      // node, offline runtime) is retryable, so hand the text back — exactly
-      // as typed, mention included — instead of making the author retype it.
-      if (!composerRef.current?.getText().trim()) composerRef.current?.setText(raw);
-      reportMutationError(
-        "Failed to send message",
-        error,
-        formatDispatchError(error, t) ?? t("errors.send_message"),
-      );
-    } finally { setIsRunning(false); }
-  }
-
-  async function cancelActiveRun() {
-    if (!activeSession) return;
-    if (!canCancelThreadRun({ activeRun, session: activeSession })) return;
-    const cancelNodeId = threadCancelNodeId({
-      node: activeRunOwner?.node ?? activeRuntimeNode ?? undefined,
-      sandbox: selectedSandbox,
-    });
-    try {
-      const session = await cancelRunMutation.mutateAsync({
-        sessionId: activeRun?.sessionId ?? activeSession.id,
-        token: (cancelNodeId ? tokens[cancelNodeId] : undefined) ?? selectedToken,
-        reason: t("cancel.reason"),
-      });
-      setSelectedSessionId(session.id);
-      syncThreadUrl(session.id, true, session.projectId ?? activeSession.projectId);
-    } catch {
-      // mutation onError surfaces a toast.
-    }
-  }
+  const {
+    sendMessage,
+    cancelActiveRun,
+    sendDecision,
+    retryAgentMessage,
+    sendHandoff,
+  } = useThreadDispatch({
+    activeSession, activeProject, activeRun, activeRunOwner, activeRuntimeNode,
+    threadRunning, requiresRuntimeSelection, projectDispatchDisabled, projectRoomTarget,
+    activeAgent, activeLogicalAgentId, effectiveSelectableLogicalAgents,
+    threadMentionCandidates, composerTeams, pendingThreadTeamId, handoffAgentId, handoffNote,
+    selectedEmployee, selectedSandbox, selectedThreadNodeId, selectedToken, tokens,
+    composerRef, transcript, composingNew,
+    messageOperationIdsRef, recoveryOperationIdsRef,
+    submitThreadMessageMutation, runLogicalAgentsMutation, requestThreadRecoveryMutation,
+    recordDecisionMutation, cancelRunMutation,
+    setActiveAgent, setActiveLogicalAgentId, setActiveSessionId, setSelectedSessionId,
+    setComposingNew, setPendingThreadTeamId, setPendingUserMessage, setIsRunning,
+    setHandoffNote, setHandoffOpen, syncThreadUrl, navigateToRoute,
+    reportMutationError, t,
+  });
 
   const handleComposerSend = useStableEvent(() => { void sendMessage(); });
   const handleCancelRun = useStableEvent(() => { void cancelActiveRun(); });
@@ -748,159 +597,6 @@ export function App() {
   const handleTeamPicked = useStableEvent((team: AgentTeam) => {
     setPendingThreadTeamId(team.id);
   });
-
-  function recoveryOperationId(key: string): string {
-    const existing = recoveryOperationIdsRef.current.get(key);
-    if (existing) return existing;
-    const created = crypto.randomUUID();
-    recoveryOperationIdsRef.current.set(key, created);
-    return created;
-  }
-
-  async function sendDecision(kind: "approve" | "reject" | "rerun" | "mark_done") {
-    if (!activeSession) return;
-    if (kind === "rerun") {
-      if (!selectedEmployee) return;
-      if (threadRunning) return;
-      setIsRunning(true);
-      try {
-        const assignment = rerunAssignmentForSession(activeSession, activeAgent);
-        // The last run's own agent first; its executor kind is only a fallback
-        // for legacy runs that recorded no logical agent.
-        const logicalAgent = effectiveSelectableLogicalAgents.find(
-          (agent) => agent.id === assignment.agentId && isEmployeeAgentRoutable(agent),
-        ) ?? effectiveSelectableLogicalAgents.find(
-          (agent) => agent.executorKind === assignment.agent && isEmployeeAgentRoutable(agent),
-        );
-        if (!logicalAgent) {
-          reportMutationError(
-            "Agent not ready for rerun",
-            null,
-            t("errors.agent_not_ready", { agent: assignment.agent }),
-          );
-          return;
-        }
-        setActiveAgent(logicalAgent.executorKind);
-        setActiveLogicalAgentId(logicalAgent.id);
-        setSelectedSessionId(activeSession.id);
-        navigateToRoute("main");
-        transcript.pinToBottom();
-        const recoveryKey = `${activeSession.id}:rerun:${logicalAgent.id}`;
-        const done = await requestThreadRecoveryMutation.mutateAsync({
-          sessionId: activeSession.id,
-          input: {
-            kind: "rerun",
-            idempotencyKey: recoveryOperationId(recoveryKey),
-            targetAgentId: logicalAgent.id,
-          },
-        });
-        recoveryOperationIdsRef.current.delete(recoveryKey);
-        setSelectedSessionId(done.id);
-        syncThreadUrl(done.id, true, done.projectId ?? activeSession.projectId);
-      } catch (error) {
-        reportMutationError(
-          "Failed to rerun assignment",
-          error,
-          formatDispatchError(error, t) ?? t("errors.rerun_assignment"),
-        );
-      } finally {
-        setIsRunning(false);
-      }
-      return;
-    }
-    try {
-      const session = await recordDecisionMutation.mutateAsync({
-        sessionId: activeSession.id,
-        kind,
-        token: selectedToken,
-      });
-      setSelectedSessionId(session.id);
-      syncThreadUrl(session.id, true, session.projectId ?? activeSession.projectId);
-    } catch {
-      // mutation onError surfaces a toast.
-    }
-  }
-
-  async function retryAgentMessage(agent: AgentName, agentId?: string) {
-    if (!activeSession) return;
-    if (!selectedEmployee) return;
-    if (threadRunning) return;
-    setIsRunning(true);
-    try {
-      // Retry means "this agent again", so prefer the turn's own logical agent;
-      // the executor-kind lookup is only for turns that carry no agent id.
-      const logicalAgent = effectiveSelectableLogicalAgents.find(
-        (candidate) => candidate.id === agentId && isEmployeeAgentRoutable(candidate),
-      ) ?? effectiveSelectableLogicalAgents.find(
-        (candidate) => candidate.executorKind === agent && isEmployeeAgentRoutable(candidate),
-      );
-      if (!logicalAgent) {
-        reportMutationError("Agent not ready for retry", null, t("errors.agent_not_ready", { agent }));
-        return;
-      }
-      setActiveAgent(logicalAgent.executorKind);
-      setActiveLogicalAgentId(logicalAgent.id);
-      setSelectedSessionId(activeSession.id);
-      navigateToRoute("main");
-      transcript.pinToBottom();
-      const recoveryKey = `${activeSession.id}:rerun:${logicalAgent.id}`;
-      const done = await requestThreadRecoveryMutation.mutateAsync({
-        sessionId: activeSession.id,
-        input: {
-          kind: "rerun",
-          idempotencyKey: recoveryOperationId(recoveryKey),
-          targetAgentId: logicalAgent.id,
-        },
-      });
-      recoveryOperationIdsRef.current.delete(recoveryKey);
-      setSelectedSessionId(done.id);
-      syncThreadUrl(done.id, true, done.projectId ?? activeSession.projectId);
-    } catch (error) {
-      reportMutationError(
-        "Failed to retry agent response",
-        error,
-        formatDispatchError(error, t) ?? t("errors.rerun_assignment"),
-      );
-    } finally {
-      setIsRunning(false);
-    }
-  }
-
-  async function sendHandoff() {
-    if (!activeSession) return;
-    if (!selectedEmployee) return;
-    if (threadRunning) return;
-    const logicalAgent = effectiveSelectableLogicalAgents.find(
-      (agent) => agent.id === handoffAgentId && isEmployeeAgentRoutable(agent),
-    );
-    if (!logicalAgent) {
-      reportMutationError("Agent not ready for handoff", null, t("errors.agent_not_ready", { agent: handoffAgentId }));
-      return;
-    }
-    setIsRunning(true);
-    try {
-      const note = handoffNote.trim();
-      const recoveryKey = `${activeSession.id}:handoff:${logicalAgent.id}:${note}`;
-      const done = await requestThreadRecoveryMutation.mutateAsync({
-        sessionId: activeSession.id,
-        input: {
-          kind: "handoff",
-          idempotencyKey: recoveryOperationId(recoveryKey),
-          targetAgentId: logicalAgent.id,
-          ...(note ? { note } : {}),
-        },
-      });
-      recoveryOperationIdsRef.current.delete(recoveryKey);
-      setSelectedSessionId(done.id); setHandoffNote(""); setHandoffOpen(false); setActiveAgent(logicalAgent.executorKind); setActiveLogicalAgentId(logicalAgent.id);
-      syncThreadUrl(done.id, true, done.projectId ?? activeSession.projectId);
-    } catch (error) {
-      reportMutationError(
-        "Failed to send handoff",
-        error,
-        formatDispatchError(error, t) ?? t("errors.send_handoff"),
-      );
-    } finally { setIsRunning(false); }
-  }
 
 
   async function handleLogout() {

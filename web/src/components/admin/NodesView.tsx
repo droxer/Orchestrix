@@ -29,7 +29,6 @@ import { SortMenu } from "@/components/ui/SortMenu";
 import type { StoredNodeTokenMap } from "./helpers";
 import { NodeCard } from "./NodeCard";
 import { NodeRow } from "./NodeRow";
-import { NodeProfileBadges } from "./NodeProfileBadges";
 import { AdminLayoutToggle, type AdminLayout } from "./AdminLayoutToggle";
 
 interface NodesViewProps {

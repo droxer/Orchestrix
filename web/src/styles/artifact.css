@@ -579,7 +579,7 @@
 /* Empty library: ArtifactsEmpty replaces the strip + preview pane entirely,
    so it must escape the shell's 48px rail column / strip row and span the
    full grid — its own auto margins then center the ghost ledger. */
-.artifact-library-shell > .artifacts-empty {
+.artifact-library-shell > .relay-empty--artifacts {
   grid-column: 1 / -1;
   grid-row: 1 / -1;
 }

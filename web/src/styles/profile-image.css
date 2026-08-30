@@ -173,12 +173,6 @@
   border-radius: inherit;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .profile-image-picker-action {
-    transition: none;
-  }
-}
-
 /* Coarse pointers: grow the remove button to the touch-target hit area
    without moving the 24px visual — the disc is redrawn as a centered
    ::before so the picker layout and offsets stay untouched. */

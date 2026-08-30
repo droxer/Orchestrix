@@ -39,7 +39,7 @@ import {
   WorkspaceError,
 } from "./workspace/WorkspacePrimitives";
 import { RecordBand, type RecordFact } from "./workspace/RecordBand";
-import { Badge } from "@/components/ui/badge";
+import { TonePill } from "./StatusPill";
 import { Button } from "@/components/ui/button";
 
 const PROJECT_ACTIVITY_POLL_MS = 3000;
@@ -89,9 +89,9 @@ function ProjectMemberLane({
         <span className="project-member-tile-identity">
           <span className="project-member-tile-name">
             <strong>{name}</strong>
-            {lead ? <Badge variant="info">{t("project.lead_badge")}</Badge> : null}
-            {!member.enabled ? <Badge variant="neutral">{t("project.member_disabled")}</Badge> : null}
-            {!available ? <Badge variant="warning">{t("project.member_missing")}</Badge> : null}
+            {lead ? <TonePill tone="info" label={t("project.lead_badge")} /> : null}
+            {!member.enabled ? <TonePill tone="neutral" label={t("project.member_disabled")} /> : null}
+            {!available ? <TonePill tone="warn" label={t("project.member_missing")} /> : null}
           </span>
           <span className="project-member-tile-meta">
             {agent ? agentLabel(agent.executorKind) : member.agentId}
@@ -237,9 +237,10 @@ export function ProjectWorkspacePage({
       key: "state",
       label: t("project.band_state"),
       value: (
-        <Badge variant={state === "active" ? "success" : state === "disabled" ? "warning" : "neutral"}>
-          {t(`project.state_${state}`)}
-        </Badge>
+        <TonePill
+          tone={state === "active" ? "good" : state === "disabled" ? "warn" : "neutral"}
+          label={t(`project.state_${state}`)}
+        />
       ),
     },
     {

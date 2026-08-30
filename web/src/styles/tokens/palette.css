@@ -24,15 +24,19 @@
      480px   narrow phone — backlog card grid, login stack
      600px   dialog stack
      640px   compact — dashboard, admin shell, composer, workspace panes
-     720px   transcript grid drops its fixed time column. Written as the
-             complementary pair `min-width: 720px` / `max-width: 719px`;
-             never use `max-width: 720px`, which overlaps the wide rule at
-             exactly 720px.
      768px   CONTAINER tier, not a viewport one — the `computer` and `record`
              containers widen here. Container queries are breakpoints too and
              belong in this list; leaving them out is what made this row look
              dead when it is not.
-     820px   MOBILE — the app-wide tier (14 rules). Default to this one.
+     820px   MOBILE — the app-wide PHONE tier, and the only one. Default to it.
+             Mirrored in JS by lib/breakpoints.ts; import that rather than
+             re-typing the query string. A second phone tier (719/720px, for
+             the transcript grid and the admin tables) used to sit beside it,
+             which left a 100px band where the drawers were already
+             full-viewport sheets but the transcript and tables were still in
+             desktop layout. Everything narrow-vs-wide belongs on this tier;
+             prefer making the wide value the base and narrowing here over
+             adding a `min-width` partner.
      900px   dashboard + backlog medium
     1040px   TABLET — the app-wide tier
     1100px   multi-pane → single pane (agents, backlog, teams, workspace)

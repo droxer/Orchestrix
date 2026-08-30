@@ -497,17 +497,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .workspace-activity-section {
-    animation: none;
     opacity: 1;
     transform: none;
-  }
-
-  .artifacts-empty-ghost {
-    animation: none;
-  }
-
-  .workspace-loading-bar::after {
-    animation: none;
   }
 }
 

@@ -9,15 +9,7 @@ import { useTeams } from "../hooks/useTeams";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import {
   ActionAdd,
-  ActionApprove,
-  ActionCalendar,
-  ActionStart,
-  ActionStop,
   ICON,
-  NavAgents,
-  NavRefresh,
-  ViewBoard,
-  ViewList,
 } from "./icons";
 import { agentReadyForTask, backlogSortColumns, canDiscussTask, discussionAgentsForTask, filterTasks, isTaskStatus, TASK_STATUSES, tasksByStatus } from "../lib/backlog";
 import { applySort } from "../lib/listSort";
@@ -56,12 +48,9 @@ interface BacklogPageProps {
 }
 
 import {
-  ACTIVE_STATUSES,
-  activeFilterCount,
   VIEW_STORAGE_KEY,
   initialFilters,
   parseBacklogView,
-  TASK_STATUS_SHAPE,
   type BacklogView,
 } from "./task-board/backlogVocabulary";
 import { BacklogStats, BacklogFiltersBar, BacklogViewToggle } from "./task-board/BacklogChrome";
@@ -451,7 +440,6 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   }
 
   function taskHandlers(task: RelayTaskListItem) {
-    const discussionAgents = discussionAgentsForTask(task, nodes, logicalAgents);
     const discussionAssignments = logicalAgents
       .filter((agent) => agent.enabled && agent.availability === "ready")
       .map((agent) => ({ agentId: agent.id, agent: agent.executorKind }));

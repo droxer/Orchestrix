@@ -18,19 +18,15 @@ describe("agent skills on the agent record", () => {
     assert.match(types, /skills\?: DaemonAgentSkill\[\];/);
   });
 
-  it("prints the skills section for every viewer of the detail record, not only editors", async () => {
+  it("prints the skills section for every viewer of the record, not only editors", async () => {
     const panelSource = await readFile(resolve("web/src/components/AgentProfilePanel.tsx"), "utf8");
-    const detailBranchStart = panelSource.indexOf("if (isDetail) {");
-    const detailBranchEnd = panelSource.indexOf("\n  return (\n    <div className=\"workspace-profile-panel\">");
-    assert.ok(detailBranchStart > -1 && detailBranchEnd > detailBranchStart, "could not isolate the detail branch");
-    const detailBranch = panelSource.slice(detailBranchStart, detailBranchEnd);
-    assert.match(detailBranch, /agents_page\.skills_title/);
-    assert.match(detailBranch, /agents_page\.skills_empty/);
-    assert.match(detailBranch, /agent-skill-list/);
+    assert.match(panelSource, /agents_page\.skills_title/);
+    assert.match(panelSource, /agents_page\.skills_empty/);
+    assert.match(panelSource, /agent-skill-list/);
     // The section must sit above the canEditProfile-gated management block,
     // so a read-only viewer still sees what the agent can do.
     assert.ok(
-      detailBranch.indexOf("agents_page.skills_title") < detailBranch.indexOf("{canEditProfile ? ("),
+      panelSource.indexOf("agents_page.skills_title") < panelSource.indexOf("{canEditProfile ? ("),
       "skills section must render outside the management gate",
     );
   });

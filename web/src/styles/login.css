@@ -338,10 +338,3 @@
 }
 
 /* ---------- Reduced motion ------------------------------------------- */
-
-@media (prefers-reduced-motion: reduce) {
-  .login-card,
-  .login-checking-text {
-    animation: none;
-  }
-}

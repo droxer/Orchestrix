@@ -182,7 +182,6 @@ export function AgentDetailPage({
             <AgentProfilePanel
               agent={agent}
               canEditMeta={canEditMeta}
-              variant="detail"
               onDirtyChange={onProfileDirtyChange}
             />
           </div>

@@ -49,7 +49,6 @@
     "save_project": "Couldn't save the project. Check its Computer and agent roles, then try again.",
     "archive_project": "Couldn't archive the project. Refresh it and try again."
   },
-  "skip_to_thread": "Skip to thread",
   "skip_to_content": "Skip to content",
   "nav": {
     "threads": "Threads",

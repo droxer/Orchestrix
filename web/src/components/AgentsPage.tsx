@@ -17,7 +17,6 @@ import { StatusPill, TonePill } from "./StatusPill";
 import { AgentDetailPage } from "./AgentDetailPage";
 import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FilterSelect } from "./FiltersBar";
 import { SearchInput } from "@/components/ui/search-input";
@@ -161,7 +160,7 @@ function RosterRow({
               state, already carried by the badge pip. */}
           {!agent.enabled ? (
             <span className="agents-roster-row-status">
-              <Badge variant="neutral">{t("agents_page.disabled")}</Badge>
+              <TonePill tone="neutral" label={t("agents_page.disabled")} />
             </span>
           ) : agent.availability !== "ready" ? (
             <span className="agents-roster-row-status">

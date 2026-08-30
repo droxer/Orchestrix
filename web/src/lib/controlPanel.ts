@@ -1,5 +1,4 @@
-import type { ControlPanelDaemonNodeRecord, SandboxRecord } from "../types";
-import { fetchControlPanelNodes } from "./controlPanelQueries";
+import type { ControlPanelDaemonNodeRecord } from "../types";
 
 export function canUseLocalControlPanel(): boolean {
   if (typeof window === "undefined") return false;
@@ -28,24 +27,4 @@ export function preferLocalControlPanelNode(
       const delta = score(b) - score(a);
       return delta || (b.lastSeenAt ?? "").localeCompare(a.lastSeenAt ?? "");
     })[0];
-}
-
-export async function localControlPanelNodes(): Promise<ControlPanelDaemonNodeRecord[]> {
-  if (!canUseLocalControlPanel()) return [];
-  try {
-    return await fetchControlPanelNodes();
-  } catch {
-    return [];
-  }
-}
-
-export function sessionBelongsToEmployee(
-  session: { workspacePath: string },
-  employeeId: string,
-  sandbox?: SandboxRecord,
-  node?: { workspacePath?: string },
-): boolean {
-  if (sandbox && session.workspacePath === sandbox.workspacePath) return true;
-  if (node?.workspacePath && session.workspacePath === node.workspacePath) return true;
-  return session.workspacePath === `/workspace/${employeeId}` || session.workspacePath.endsWith(`/${employeeId}`);
 }

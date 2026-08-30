@@ -113,17 +113,22 @@
   background: var(--action-soft);
 }
 
-/* ...and the 2px leading accent every other selectable row in the app carries
+/* ...and the leading accent every other selectable row in the app carries
    (.conversation-row, .agents-roster-row, .teams-list-row). A project folder
    drives the same detail pane those rows do; without the bar it was the one
-   selection in the product that spoke with only half the vocabulary. */
+   selection in the product that spoke with only half the vocabulary.
+
+   The geometry comes from the same --accent-bar-* tokens .rail-row uses in
+   tokens/base.css. It was hand-written here as `top/bottom: 6px; width: 2px`,
+   which made the folder's bar 4px longer at each end than every other selected
+   row — a copy of the treatment that had already drifted off the token. */
 .project-folder.selected > .project-folder-header::after {
   content: "";
   position: absolute;
   left: 0;
-  top: 6px;
-  bottom: 6px;
-  width: 2px;
+  top: var(--accent-bar-inset);
+  bottom: var(--accent-bar-inset);
+  width: var(--accent-bar-w);
   border-radius: calc(var(--r-1) / 2);
   background: var(--action);
 }

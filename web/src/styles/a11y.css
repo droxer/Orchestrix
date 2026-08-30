@@ -32,10 +32,18 @@
 /* Reduced motion — system-wide safety net. Individual surfaces
    (empty-state, login) already neutralize their entrances, but several
    keyframe animations (modal/drawer rise, sidenav + tooltip reveals, the
-   agent-stream caret blink) are not guarded locally. This global reset
-   collapses every animation and transition to an imperceptible duration so
-   nothing pulses or slides for motion-sensitive users, without dropping the
-   end state. Loads from a11y.css (last in source order) so it wins. */
+   agent-stream caret blink) are guarded HERE and nowhere else. This global
+   reset collapses every animation and transition to an imperceptible duration
+   so nothing pulses or slides for motion-sensitive users, without dropping the
+   end state. Loads from a11y.css (last in source order) so it wins.
+
+   Because it wins with !important, a local `@media (prefers-reduced-motion)`
+   block that only restates `animation: none` / `transition: none` is dead
+   weight — and one that tries to RESTORE a transition cannot work at all. The
+   handful of local blocks that remain are there for the other half of the job:
+   settling an end state this reset does not reach (an entrance animation's
+   final opacity/transform, a pulse ring that would otherwise sit at full
+   opacity). Add a local block only for that. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

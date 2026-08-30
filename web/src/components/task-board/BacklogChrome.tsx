@@ -4,14 +4,7 @@ import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { type EmployeeAgent, type RelayTaskListItem } from "../../types";
 import {
-  ActionAdd,
-  ActionApprove,
-  ActionCalendar,
-  ActionStart,
-  ActionStop,
   ICON,
-  NavAgents,
-  NavRefresh,
   ViewBoard,
   ViewList,
 } from "../icons";

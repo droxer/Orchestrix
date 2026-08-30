@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { agentLabel } from "../../lib/plan";
 import { compactDate, compactDueDate } from "../../lib/workspaceFormat";
