@@ -4358,6 +4358,47 @@ def test_discussion_round_keeps_collecting_after_a_participant_failure() -> None
     asyncio.run(run_flow())
 
 
+def test_discussion_round_keeps_collecting_after_a_run_failed_event() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store, _daemon_store, registry = _pipeline_registry(root)
+            session = await ServerDaemonNodeBackend(registry).run(
+                "sbx_alice",
+                {
+                    "taskGoal": "compare the options",
+                    "assignments": [
+                        {"agent": "codex", "mode": "ask"},
+                        {"agent": "claude", "mode": "ask"},
+                    ],
+                },
+            )
+
+            [first] = registry.take_commands("sbx_alice", "node_token")
+            registry.handle_event(
+                "sbx_alice",
+                {
+                    "type": "run.failed",
+                    "commandId": first["id"],
+                    "sessionId": first["sessionId"],
+                    "runId": first["runId"],
+                    "agent": first["agent"],
+                    "error": "daemon lost agent output",
+                    "exitCode": 1,
+                },
+                "node_token",
+            )
+
+            [second] = registry.take_commands("sbx_alice", "node_token")
+            assert second["agent"] == "claude"
+            _finish_run(registry, second, 0)
+
+            completed = session_store.get_session(session["id"])
+            assert completed["status"] == "completed"
+            assert "1 participant assignment(s) failed" in completed["finalOutcome"]
+
+    asyncio.run(run_flow())
+
+
 def test_a_failed_final_agent_cannot_publish_a_success_verdict() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:

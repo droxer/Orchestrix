@@ -37,6 +37,20 @@ VALID_MODES = frozenset({"action", "ask", "review"})
 VALID_ROLES = frozenset({"implementer", "reviewer", "planner", "tester", "fixer"})
 
 
+def assignment_team_snapshot(
+    assignments: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Return the team snapshot carried by a resolved assignment roster."""
+    return next(
+        (
+            assignment["teamSnapshot"]
+            for assignment in assignments
+            if isinstance(assignment.get("teamSnapshot"), dict)
+        ),
+        None,
+    )
+
+
 class CollaborationError(ValueError):
     def __init__(self, code: str, message: str | None = None, *, status: int = 409):
         self.code = code

@@ -484,6 +484,33 @@ def test_database_task_store_claims_exact_task_for_dispatch() -> None:
         assert second_claim is None
 
 
+def assert_store_guards_updates_during_dispatch(store) -> None:
+    task = store.create_task(
+        {"title": "Guard me", "assignedAgent": "codex", "status": "assigned"}
+    )
+    claimed = store.claim_task_for_dispatch(task["id"], "codex")
+    assert claimed is not None
+
+    with pytest.raises(TaskExecutionActiveError, match="task_execution_active"):
+        store.update_task_if_not_dispatching(task["id"], {"status": "done"})
+
+    metadata = store.update_task(task["id"], {"title": "Metadata remains editable"})
+    assert metadata["title"] == "Metadata remains editable"
+    assert metadata["dispatchClaim"] == claimed["dispatchClaim"]
+
+
+def test_local_task_store_guards_updates_during_dispatch() -> None:
+    with TemporaryDirectory() as root:
+        assert_store_guards_updates_during_dispatch(LocalTaskStore(root))
+
+
+def test_database_task_store_guards_updates_during_dispatch() -> None:
+    with TemporaryDirectory() as root:
+        assert_store_guards_updates_during_dispatch(
+            DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True)
+        )
+
+
 def assert_store_lists_scheduler_queues(
     store: LocalTaskStore | DatabaseTaskStore,
 ) -> None:

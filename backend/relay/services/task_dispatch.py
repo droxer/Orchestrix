@@ -6,6 +6,7 @@ from typing import Any, Protocol, TypedDict
 from loguru import logger
 
 from ..collaboration.service import (
+    assignment_team_snapshot,
     compile_assignment_work_graph,
     create_round_manifest,
 )
@@ -18,6 +19,7 @@ from ..persistence.protocols import (
     ProjectStore,
     SessionStore,
     TaskStore,
+    TaskDispatchAssignment,
     TeamStore,
 )
 from ..persistence.stores import valid_agent
@@ -213,6 +215,7 @@ class TaskDispatcher:
         self.team_assignment_resolved = False
         self.project_assignment_resolved = False
         self.project_snapshot: dict[str, Any] | None = None
+        self.team_snapshot: dict[str, Any] | None = None
         self.agent: str | None = None
         self.agent_first = False
         self.temporary_group_status = False
@@ -352,18 +355,13 @@ class TaskDispatcher:
             }
             for assignment in self.run_assignments
         ]
-        team_snapshot = next(
-            (
-                assignment.get("teamSnapshot")
-                for assignment in self.run_assignments
-                if isinstance(assignment.get("teamSnapshot"), dict)
-            ),
-            None,
-        )
+        # compile_assignment_work_graph preserves the snapshot key on each
+        # assignment, so the manifest in _run_request reuses this capture.
+        self.team_snapshot = assignment_team_snapshot(self.run_assignments)
         self.run_assignments = compile_assignment_work_graph(
             self.run_assignments,
             purpose="accomplish",
-            team_snapshot=team_snapshot,
+            team_snapshot=self.team_snapshot,
         )
         if (
             self.task.get("assignedAgentId") or self.task.get("assignedTeamId")
@@ -472,7 +470,10 @@ class TaskDispatcher:
         if not claim_agent:
             return None
         claimed = self.ctx.task_store.claim_task_for_dispatch(
-            self.task["id"], claim_agent, message=f"Claimed by {self.agent}."
+            self.task["id"],
+            claim_agent,
+            message=f"Claimed by {self.agent}.",
+            expected_assignment=TaskDispatchAssignment.capture(self.task),
         )
         if not claimed:
             current = self.ctx.task_store.get_task(self.task["id"])
@@ -516,14 +517,6 @@ class TaskDispatcher:
         return _result(updated, "started", session=session)
 
     def _run_request(self) -> dict[str, Any]:
-        team_snapshot = next(
-            (
-                assignment.get("teamSnapshot")
-                for assignment in self.run_assignments
-                if isinstance(assignment.get("teamSnapshot"), dict)
-            ),
-            None,
-        )
         request: dict[str, Any] = {
             "taskGoal": task_goal_text(self.task),
             "assignments": self.run_assignments,
@@ -546,7 +539,7 @@ class TaskDispatcher:
                         }
                     ),
                     assignments=self.run_assignments,
-                    team_snapshot=team_snapshot,
+                    team_snapshot=self.team_snapshot,
                     project_snapshot=self.project_snapshot,
                 )
             },

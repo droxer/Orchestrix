@@ -167,6 +167,90 @@ def test_scheduler_dispatches_when_employee_owns_multiple_computers() -> None:
     asyncio.run(run_flow())
 
 
+def test_scheduler_claim_fences_the_resolved_logical_assignment() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            task_store = LocalTaskStore(root)
+            registry = DaemonNodeRegistry(
+                session_store, LocalDaemonStore(root), task_store=task_store
+            )
+            registry.register(
+                {
+                    "sandboxId": "sbx_alice",
+                    "employeeId": "alice",
+                    "token": "node_token",
+                    "workspacePath": "/workspace/alice",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "capabilities": ["thread-workspaces"],
+                    "status": "ready",
+                },
+                "ui_token",
+            )
+            backend, original_agent = _logical_backend(root, registry, "sbx_alice")
+            replacement_agent = backend.agent_store.create_agent(
+                "alice",
+                {
+                    "displayName": "Replacement",
+                    "executorKind": "codex",
+                    "defaultRole": "implementer",
+                },
+            )
+            backend.agent_placement_store.create_placement(
+                replacement_agent, "sbx_alice"
+            )
+            task = task_store.create_task(
+                {
+                    "title": "Fence the selected agent",
+                    "assignedAgent": "codex",
+                    "assignedAgentId": original_agent["id"],
+                    "assigneeEmployeeId": "alice",
+                    "status": "assigned",
+                }
+            )
+            original_claim = task_store.claim_task_for_dispatch
+
+            def reassign_before_claim(
+                task_id,
+                agent,
+                message=None,
+                *,
+                expected_assignment=None,
+            ):
+                task_store.update_task(
+                    task_id,
+                    {
+                        "assignedAgent": "codex",
+                        "assignedAgentId": replacement_agent["id"],
+                        "assignedTeamId": None,
+                    },
+                )
+                if expected_assignment is None:
+                    return original_claim(task_id, agent, message)
+                return original_claim(
+                    task_id,
+                    agent,
+                    message,
+                    expected_assignment=expected_assignment,
+                )
+
+            task_store.claim_task_for_dispatch = reassign_before_claim
+            scheduler = TaskScheduler(
+                task_store=task_store, registry=registry, backend=backend
+            )
+
+            result = await scheduler.tick()
+
+            assert result.dispatched == 0
+            assert registry.take_commands("sbx_alice", "node_token") == []
+            updated = task_store.get_task(task["id"])
+            assert updated["assignedAgentId"] == replacement_agent["id"]
+            assert "dispatchClaim" not in updated
+
+    asyncio.run(run_flow())
+
+
 def test_scheduler_requests_managed_capacity_once_when_no_node_is_ready() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:

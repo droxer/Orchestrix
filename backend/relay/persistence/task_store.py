@@ -33,6 +33,7 @@ from sqlalchemy import (
 from sqlalchemy.exc import IntegrityError
 
 from ..core.ids import new_relay_id
+from .protocols import TaskDispatchAssignment
 from .store_common import (
     DEFAULT_RELAY_DATA_DIR,
     AgentName,
@@ -418,10 +419,20 @@ class LocalTaskStore:
         payload: dict[str, Any],
         *,
         assignment: dict[str, Any] | None = None,
-        reject_active_claim: bool = False,
+    ) -> dict[str, Any]:
+        return self.append_events(
+            task_id, task_update_events(task_id, payload, assignment=assignment)
+        )
+
+    def update_task_if_not_dispatching(
+        self,
+        task_id: str,
+        payload: dict[str, Any],
+        *,
+        assignment: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         with self._lock:
-            if reject_active_claim and dispatch_claim_active(self.get_task(task_id)):
+            if dispatch_claim_active(self.get_task(task_id)):
                 raise TaskExecutionActiveError("task_execution_active")
             return self.append_events(
                 task_id, task_update_events(task_id, payload, assignment=assignment)
@@ -442,14 +453,22 @@ class LocalTaskStore:
         ]
         for task in sorted(candidates, key=task_claim_sort_key):
             claimed = self.claim_task_for_dispatch(
-                task["id"], agent, message=f"Claimed by {agent}."
+                task["id"],
+                agent,
+                message=f"Claimed by {agent}.",
+                expected_assignment=TaskDispatchAssignment.capture(task),
             )
             if claimed:
                 return claimed
         return None
 
     def claim_task_for_dispatch(
-        self, task_id: str, agent: AgentName, message: str | None = None
+        self,
+        task_id: str,
+        agent: AgentName,
+        message: str | None = None,
+        *,
+        expected_assignment: TaskDispatchAssignment | None = None,
     ) -> dict[str, Any] | None:
         with self._lock:
             task = self.get_task(task_id)
@@ -460,6 +479,8 @@ class LocalTaskStore:
             ):
                 return None
             if task.get("isRoutine"):
+                return None
+            if expected_assignment and not expected_assignment.matches(task):
                 return None
             if dispatch_claim_active(task):
                 return None
@@ -1136,12 +1157,23 @@ class DatabaseTaskStore:
         payload: dict[str, Any],
         *,
         assignment: dict[str, Any] | None = None,
-        reject_active_claim: bool = False,
     ) -> dict[str, Any]:
         return self.append_events(
             task_id,
             task_update_events(task_id, payload, assignment=assignment),
-            reject_active_claim=reject_active_claim,
+        )
+
+    def update_task_if_not_dispatching(
+        self,
+        task_id: str,
+        payload: dict[str, Any],
+        *,
+        assignment: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return self.append_events(
+            task_id,
+            task_update_events(task_id, payload, assignment=assignment),
+            reject_active_claim=True,
         )
 
     def claim_next_task_for_agent(
@@ -1159,14 +1191,22 @@ class DatabaseTaskStore:
         ]
         for task in sorted(candidates, key=task_claim_sort_key):
             claimed = self.claim_task_for_dispatch(
-                task["id"], agent, message=f"Claimed by {agent}."
+                task["id"],
+                agent,
+                message=f"Claimed by {agent}.",
+                expected_assignment=TaskDispatchAssignment.capture(task),
             )
             if claimed:
                 return claimed
         return None
 
     def claim_task_for_dispatch(
-        self, task_id: str, agent: AgentName, message: str | None = None
+        self,
+        task_id: str,
+        agent: AgentName,
+        message: str | None = None,
+        *,
+        expected_assignment: TaskDispatchAssignment | None = None,
     ) -> dict[str, Any] | None:
         with store_transaction(self.engine) as conn:
             row = (
@@ -1189,6 +1229,10 @@ class DatabaseTaskStore:
                     and snapshot.get("assignedAgent") != agent
                 )
                 or snapshot.get("isRoutine")
+                or (
+                    expected_assignment is not None
+                    and not expected_assignment.matches(snapshot)
+                )
                 or dispatch_claim_active(snapshot)
             ):
                 return None
