@@ -236,7 +236,7 @@ def test_daemon_heartbeat_is_authenticated_and_returns_lease_policy(
         )
 
 
-def test_managed_node_provisioning_enrolls_runtime_with_single_use_grant(
+def test_managed_node_provisioning_replays_the_same_runtime_after_lost_response(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
