@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import {
   ManagedNodeReconciler,
@@ -103,7 +103,7 @@ class FakeProvider implements ManagedNodeProvider {
     if (this.ensureError) throw this.ensureError;
     return { id: `${input.node.id}:${input.node.generation}` };
   }
-  async inspect(): Promise<"running" | "stopped" | "unknown"> { return this.status; }
+  async inspect(_instanceId: string): Promise<"running" | "stopped" | "unknown"> { return this.status; }
   async stop(): Promise<void> { this.stopCalls += 1; this.status = "stopped"; }
   async delete(): Promise<void> { this.status = "stopped"; }
 }
@@ -563,6 +563,81 @@ test("managed reconciler retries after a tracked provider process exits", async 
   assert.equal((await reconciler.reconcileOnce()).started, 1);
   assert.equal(provider.calls.length, 2);
 });
+
+test("managed reconciler replaces a tracked provider instance after the desired generation changes", async () => {
+  const node = managedNode();
+  const backend = new FakeManagedBackend([node]);
+  const provider = new FakeProvider();
+  const reconciler = new ManagedNodeReconciler({
+    backend,
+    providers: [provider],
+    backendUrl: "http://backend.test",
+    workspacePathForNode: () => "/workspaces/alice",
+  });
+
+  assert.equal((await reconciler.reconcileOnce()).started, 1);
+  node.generation = 2;
+  node.phase = "requested";
+
+  assert.equal((await reconciler.reconcileOnce()).started, 1);
+  assert.equal(provider.stopCalls, 1);
+  assert.equal(provider.calls.length, 2);
+  assert.equal(provider.calls.at(-1)?.node.generation, 2);
+});
+
+test("one provider inspection failure does not starve later managed nodes", async () => {
+  const first = managedNode();
+  const second = { ...managedNode(), id: "mnode_bob", employeeId: "bob" };
+  const backend = new FakeManagedBackend([first, second]);
+  const provider = new FakeProvider();
+  const inspected: string[] = [];
+  provider.inspect = async (instanceId: string) => {
+    inspected.push(instanceId);
+    if (instanceId.startsWith(first.id)) throw new Error("provider inspection failed");
+    return "running";
+  };
+  const reconciler = new ManagedNodeReconciler({
+    backend,
+    providers: [provider],
+    backendUrl: "http://backend.test",
+    workspacePathForNode: (node) => `/workspaces/${node.employeeId}`,
+  });
+
+  assert.equal((await reconciler.reconcileOnce()).started, 2);
+  const result = await reconciler.reconcileOnce();
+
+  assert.equal(result.failed, 1);
+  assert.ok(inspected.some((instanceId) => instanceId.startsWith(second.id)));
+});
+
+test("local process provider recovers a stale allocating marker after supervisor restart", async (t) => {
+  const stateDirectory = mkdtempSync(join(tmpdir(), "relay-provider-stale-allocation-"));
+  t.after(() => rmSync(stateDirectory, { recursive: true, force: true }));
+  const node = managedNode();
+  const generationKey = `${node.id}:${node.generation}`;
+  const statePath = join(stateDirectory, `${Buffer.from(generationKey, "utf8").toString("base64url")}.json`);
+  writeFileSync(statePath, JSON.stringify({ status: "allocating", createdAt: "2026-01-01T00:00:00.000Z" }));
+  const provider = new LocalProcessProvider({
+    command: join(process.cwd(), "packages/relay-supervisor/tests/fixtures/long-running-daemon.sh"),
+    allocationStaleMs: 0,
+    async readProcessStart() { return "Tue Jul 21 12:00:00 2026"; },
+    stateDirectory,
+  } as ConstructorParameters<typeof LocalProcessProvider>[0] & { allocationStaleMs: number });
+  const attempt = (await new FakeManagedBackend([]).createProvisioningAttempt(node.id)).attempt;
+
+  const instance = await provider.ensure({
+    node,
+    attempt,
+    backendUrl: "http://backend.test",
+    enrollmentCredential: "grant.secret",
+    workspacePath: "/tmp",
+    workspaceId: "employee:alice:home",
+  });
+  t.after(() => provider.stop(instance.id));
+
+  assert.match(instance.id, /^local-process:/);
+});
+
 test("managed reconciler backs off when an active provider instance disappears", async () => {
   const node = {
     ...managedNode(),
