@@ -395,7 +395,9 @@
       "dispatch_queued": "排队等待节点",
       "dispatch_rejected": "派发被拒绝",
       "activity": "活动"
-    }
+    },
+    "col_ref": "编号",
+    "add_due": "添加日期"
   },
   "workspace": {
     "title": "工作区",
@@ -630,7 +632,8 @@
     "bulk_delete_body_other": "将删除所选的 {{count}} 个例行任务及其计划，并且不会再次运行。已有执行记录和话题仍会保留。",
     "toast_bulk_deleted_one": "已删除 {{count}} 个例行任务。",
     "toast_bulk_deleted_other": "已删除 {{count}} 个例行任务。",
-    "sort_label": "例程排序"
+    "sort_label": "例程排序",
+    "set_next_run": "设置下次运行"
   },
   "admin": {
     "title": "管理",

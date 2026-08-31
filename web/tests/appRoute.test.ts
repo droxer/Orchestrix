@@ -177,9 +177,12 @@ describe("app pathname routes", () => {
     assert.equal(canonicalBrowserUrl("/backlog", "?page=1"), "/backlog");
   });
 
-  it("keeps the board's per-lane pages, which only /backlog has", () => {
+  it("keeps per-group pages on the two paths whose lists group", () => {
+    // /backlog groups by task status (board lanes and list bands alike);
+    // /routines groups by schedule health. Every other path drops the param.
     assert.equal(canonicalBrowserUrl("/backlog", "?lanes=running:2"), "/backlog?lanes=running%3A2");
-    assert.equal(canonicalBrowserUrl("/routines", "?lanes=running:2"), "/routines");
+    assert.equal(canonicalBrowserUrl("/routines", "?lanes=running:2"), "/routines?lanes=running%3A2");
+    assert.equal(canonicalBrowserUrl("/threads", "?lanes=running:2"), "/threads");
   });
 
   it("drops a page param on a path with no paged list", () => {

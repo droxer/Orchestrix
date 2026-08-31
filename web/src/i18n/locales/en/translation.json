@@ -395,7 +395,9 @@
       "dispatch_queued": "Queued for a node",
       "dispatch_rejected": "Dispatch rejected",
       "activity": "Activity"
-    }
+    },
+    "col_ref": "Ref",
+    "add_due": "Add date"
   },
   "workspace": {
     "title": "Workspace",
@@ -630,7 +632,8 @@
     "bulk_delete_body_other": "{{count}} selected routines and their schedules will be deleted. They will not run again. Existing occurrences and threads will stay available.",
     "toast_bulk_deleted_one": "1 routine deleted.",
     "toast_bulk_deleted_other": "{{count}} routines deleted.",
-    "sort_label": "Sort routines"
+    "sort_label": "Sort routines",
+    "set_next_run": "Set next run"
   },
   "admin": {
     "title": "Admin",

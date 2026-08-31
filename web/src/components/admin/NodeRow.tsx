@@ -6,8 +6,6 @@ import { useNodeDelete } from "../../hooks/useNodeDelete";
 import {
   isNodeOnline,
   nodeOwnershipProfile,
-  statusTone,
-  visualStatus,
   type StoredNodeTokenMap,
 } from "./helpers";
 import { NodeActions } from "./NodeActions";
@@ -19,7 +17,6 @@ import {
   ICON,
   nodeOwnershipIcon,
 } from "../icons";
-import { TonePill } from "../StatusPill";
 
 interface NodeRowProps {
   node: ControlPanelDaemonNodeRecord;
@@ -36,14 +33,11 @@ interface NodeRowProps {
 export function NodeRow({ node, employeeName, storedTokens, colocated, onReveal, onRename, onManageExecutors, onDelete, t }: NodeRowProps) {
   const { deletePending, deleteError, handleDelete } = useNodeDelete(node, onDelete, t);
   const nodeName = node.displayName || node.id;
-  const status = visualStatus(node);
-  const tone = statusTone(status);
-  const statusLabel = t(`status.${status}`, { defaultValue: status });
   const online = isNodeOnline(node);
-  // The presence pill already says Online/Offline, so the status pill only
-  // renders when it adds state presence can't: running, provisioning,
-  // failed, stopped.
-  const showStatusPill = status !== "ready" && status !== "stale";
+  /* No status pill. The list bands BY status now, so the band above this row
+     is that pill — said once for the whole group. The presence pill stays:
+     online/offline is a fact about the connection, not the lifecycle, and a
+     stopped computer can still be reachable. */
   const ownership = nodeOwnershipProfile(node);
   const OwnershipMark = nodeOwnershipIcon(ownership);
 
@@ -63,9 +57,6 @@ export function NodeRow({ node, employeeName, storedTokens, colocated, onReveal,
               {nodeName}
             </span>
             <NodePresence node={node} t={t} withLabel />
-            {showStatusPill ? (
-              <TonePill tone={tone} label={statusLabel} live={status === "running" || status === "busy"} />
-            ) : null}
           </span>
           <span className="adm-node-card-handle code" translate="no">{node.id}</span>
           <NodeProfileBadges

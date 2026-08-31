@@ -84,6 +84,24 @@ export const ROUTINE_STATE_ORDER: readonly RoutineState[] = [
   "paused",
 ];
 
+/**
+ * Routines partitioned by schedule health, in `ROUTINE_STATE_ORDER` — the
+ * grouping the list view bands on. Mirrors `tasksByStatus` for the backlog;
+ * the state is DERIVED, so the running set has to come from the same place
+ * the rows read it from or a routine lands in a band its own row denies.
+ */
+export function routinesByState(
+  routines: RelayTaskListItem[],
+  running: ReadonlySet<string>,
+  today = isoToday(),
+): Record<RoutineState, RelayTaskListItem[]> {
+  const grouped = Object.fromEntries(
+    ROUTINE_STATE_ORDER.map((state) => [state, [] as RelayTaskListItem[]]),
+  ) as Record<RoutineState, RelayTaskListItem[]>;
+  for (const routine of routines) grouped[routineState(routine, running, today)].push(routine);
+  return grouped;
+}
+
 /** The keys the routine list's sortable column headers speak. */
 export type RoutineSortKey = "title" | "state" | "priority" | "assignee" | "nextRun";
 

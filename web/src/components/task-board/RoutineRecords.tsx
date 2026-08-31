@@ -12,6 +12,14 @@ import { TaskSelectCheckbox } from "./TaskSelection";
 import { formatNextRunDate } from "./RoutineChrome";
 import { routineDueTone, type RoutineState } from "../../lib/routine";
 import { hrefForRoute } from "../../lib/appRoute";
+import { taskRef } from "../../lib/taskRef";
+import { TaskDueCell } from "./TaskDueCell";
+import { SortableColumnHeader } from "@/components/ui/SortableColumnHeader";
+import type { SortState } from "../../lib/listSort";
+import type { ReactNode } from "react";
+
+/** The columns the routine list can order by. Mirrors `routineSortColumns`. */
+export type RoutineSortKey = "title" | "state" | "priority" | "assignee" | "nextRun";
 import type { RelaySession, RelayTaskListItem } from "../../types";
 
 /* One routine, drawn three ways: the board card, the list row, and the meta
@@ -140,6 +148,59 @@ export function RoutineCard({
   );
 }
 
+/**
+ * The routine list's column header row, repeated once per group — same
+ * contract as `BacklogRowsHead`, and deliberately the same columns in the
+ * same order: the two lists are one record grammar in two vocabularies.
+ */
+export function RoutineRowsHead({
+  sort,
+  onSort,
+  selectAll,
+}: {
+  sort: SortState<RoutineSortKey> | null;
+  onSort: (key: RoutineSortKey) => void;
+  selectAll: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="backlog-rows-head" role="row">
+      <span className="backlog-rows-head-cell backlog-rows-head-select" role="columnheader">{selectAll}</span>
+      <span className="backlog-rows-head-cell backlog-rows-head-dot" role="columnheader" />
+      <span className="backlog-rows-head-cell backlog-rows-head-ref" role="columnheader">{t("backlog.col_ref")}</span>
+      <SortableColumnHeader
+        className="backlog-rows-head-cell backlog-rows-head-lead"
+        label={t("backlog.col_task")}
+        sortKey="title"
+        sort={sort}
+        onSort={onSort}
+      />
+      <SortableColumnHeader
+        className="backlog-rows-head-cell backlog-rows-head-tags"
+        label={t("backlog.priority")}
+        sortKey="priority"
+        sort={sort}
+        onSort={onSort}
+      />
+      <SortableColumnHeader
+        className="backlog-rows-head-cell backlog-rows-head-due"
+        label={t("routine.next_run")}
+        sortKey="nextRun"
+        sort={sort}
+        onSort={onSort}
+      />
+      <SortableColumnHeader
+        className="backlog-rows-head-cell backlog-rows-head-assignee"
+        label={t("backlog.assignee")}
+        sortKey="assignee"
+        sort={sort}
+        onSort={onSort}
+      />
+      <span className="backlog-rows-head-cell backlog-rows-head-actions" role="columnheader">{t("backlog.actions")}</span>
+    </div>
+  );
+}
+
 export function RoutineRow({
   task,
   state,
@@ -184,19 +245,24 @@ export function RoutineRow({
       <span className="backlog-row-dot-cell" aria-hidden="true">
         <StateMark shape={ROUTINE_STATE_SHAPE[state]} />
       </span>
+      <span className="backlog-row-ref code" role="cell">{taskRef(task.id)}</span>
       <div className="backlog-row-lead" role="cell">
         <Button variant="ghost" type="button" className="backlog-row-title" onClick={onEdit}>{task.title}</Button>
       </div>
-      <span className="backlog-row-status" role="cell">{t(`routine.states.${state}`)}</span>
       <div className="backlog-row-tags" role="cell">
         <PriorityBadge priority={task.priority} />
       </div>
+      <span className="backlog-row-due" role="cell">
+        <TaskDueCell
+          date={task.routineNextRunDate}
+          tone={tone}
+          format={formatNextRunDate}
+          emptyLabel={t("routine.set_next_run")}
+          onEdit={onEdit}
+        />
+      </span>
       <span className="backlog-row-assignee" role="cell">
         <TaskAssignee task={task} ready={ready} assigneeDisplayName={assigneeDisplayName} assigneeIsSelf={assigneeIsSelf} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} />
-      </span>
-      <span className={cn("backlog-row-due", tone !== "neutral" && tone)} role="cell">
-        <ActionCalendar size={ICON.sm} />
-        {task.routineNextRunDate ? formatNextRunDate(task.routineNextRunDate) : t("routine.no_next_run")}
       </span>
       <div className="backlog-row-actions" role="cell" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
