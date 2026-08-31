@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { updateControlPanelEmployee } from "../../api";
 import type { EmployeeRecord } from "../../types";
+import { employeeHandleOf } from "../../lib/employeeHandle";
 import { Drawer } from "@/components/ui/Drawer";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -42,8 +43,11 @@ export function EditEmployeeDrawer({
   const [email, setEmail] = useState("");
   const [maxLocalComputers, setMaxLocalComputers] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
   const [limitError, setLimitError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const displayNameRef = useRef<HTMLInputElement>(null);
+  const limitRef = useRef<HTMLInputElement>(null);
 
   const initialDisplayName = employee?.displayName ?? "";
   const initialEmail = employee?.email ?? "";
@@ -56,6 +60,7 @@ export function EditEmployeeDrawer({
     setEmail(initialEmail);
     setMaxLocalComputers(initialLimit);
     setError(null);
+    setNameError(null);
     setLimitError(null);
     setIsBusy(false);
   }, [open, initialDisplayName, initialEmail, initialLimit]);
@@ -74,9 +79,13 @@ export function EditEmployeeDrawer({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!employee) return;
+    // Both failures are field errors, under their own control and focused —
+    // the missing name used to surface as a boxed submit-level error at the
+    // foot of the form, and the limit error was never focused at all.
     const trimmedName = displayName.trim();
     if (!trimmedName) {
-      setError(t("admin.v2.edit_employee_name_required"));
+      setNameError(t("admin.v2.edit_employee_name_required"));
+      displayNameRef.current?.focus();
       return;
     }
     const parsedLimit = parseLimitInput(maxLocalComputers);
@@ -85,6 +94,7 @@ export function EditEmployeeDrawer({
         min: MIN_LOCAL_COMPUTERS,
         max: MAX_LOCAL_COMPUTERS_CEILING,
       }));
+      limitRef.current?.focus();
       return;
     }
     setIsBusy(true);
@@ -110,7 +120,7 @@ export function EditEmployeeDrawer({
       onClose={() => { void requestClose(); }}
       kicker={t("admin.v2.provision_kicker_employee")}
       title={t("admin.v2.edit_employee_title")}
-      subtitle={employee ? `@${employee.id}` : undefined}
+      subtitle={employee ? `@${employeeHandleOf(employee)}` : undefined}
       subtitleMono={Boolean(employee)}
       closeLabel={t("drawer.close")}
       bodyClassName="adm-drawer-body--column"
@@ -124,14 +134,25 @@ export function EditEmployeeDrawer({
             </h3>
           </header>
 
-          <Field label={t("admin.display_name")} required>
+          <Field
+            label={t("admin.display_name")}
+            required
+            error={nameError ?? undefined}
+            errorId="edit-emp-name-error"
+          >
             <Input
+              ref={displayNameRef}
               data-modal-initial-focus
               name="display-name"
               value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
+              onChange={(event) => {
+                setDisplayName(event.target.value);
+                setNameError(null);
+              }}
               autoComplete="off"
               placeholder={t("admin.v2.placeholder_display_name")}
+              aria-invalid={Boolean(nameError) || undefined}
+              aria-describedby={nameError ? "edit-emp-name-error" : undefined}
             />
           </Field>
 
@@ -142,7 +163,9 @@ export function EditEmployeeDrawer({
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
+              /* Off: this edits someone ELSE's account, so the admin's own
+                 contact autofill has no business here. */
+              autoComplete="off"
               spellCheck={false}
               placeholder={t("admin.v2.placeholder_email")}
             />
@@ -158,11 +181,13 @@ export function EditEmployeeDrawer({
 
           <Field
             label={t("admin.v2.emp_limit_label")}
+            optional={t("admin.v2.optional")}
             hint={t("admin.v2.emp_limit_hint")}
             error={limitError ?? undefined}
             errorId="edit-emp-limit-error"
           >
             <Input
+              ref={limitRef}
               name="max-local-computers"
               type="number"
               inputMode="numeric"

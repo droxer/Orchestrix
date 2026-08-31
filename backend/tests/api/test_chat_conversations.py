@@ -20,16 +20,16 @@ async def _healthy_provider(_settings):
 
 def _bootstrap_admin(client: TestClient) -> None:
     assert client.post("/api/v1/auth/bootstrap", json={
-        "token": "admin_token", "username": "admin", "password": "secret123",
+        "token": "admin_token", "username": "admin", "password": "kestrel-vault-7719",
     }).status_code == 200
-    assert client.post("/api/v1/auth/login", json={"username": "admin", "password": "secret123"}).status_code == 200
+    assert client.post("/api/v1/auth/login", json={"username": "admin", "password": "kestrel-vault-7719"}).status_code == 200
 
 
 def _active_integration(client: TestClient) -> str:
     client.app.state.chat_probe = _healthy_provider
     assert client.post("/api/v1/admin/users", json={
         "username": "alice",
-        "password": "AlicePass123!",
+        "password": "harbor-quartz-8830",
         "employeeId": "alice",
         "displayName": "Alice",
     }).status_code == 201

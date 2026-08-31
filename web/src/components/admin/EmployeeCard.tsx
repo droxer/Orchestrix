@@ -1,5 +1,6 @@
 "use client";
 
+import { employeeHandleOf } from "../../lib/employeeHandle";
 import type { TFunction } from "i18next";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,7 +48,7 @@ export function EmployeeCard({
         </span>
         <div className="adm-node-card-identity">
           <span className="adm-node-card-name" translate="no">{member.displayName}</span>
-          <span className="adm-node-card-handle code" translate="no">@{member.id}</span>
+          <span className="adm-node-card-handle code" translate="no">@{employeeHandleOf(member)}</span>
           {/* Department belongs to identity, not to status. Sharing the status
               column meant it rendered on line 1 when the pill was absent and
               line 2 when it was present, so the same card component produced

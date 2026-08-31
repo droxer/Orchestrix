@@ -8,6 +8,7 @@ import type {
   CreateManagedNodeResponse,
   EmployeeRecord,
 } from "../../types";
+import { employeeHandleOf } from "../../lib/employeeHandle";
 import { Drawer } from "@/components/ui/Drawer";
 import { RunModeField, type RunLocation } from "./RunModeField";
 import { Button } from "@/components/ui/button";
@@ -40,7 +41,7 @@ export function AddNodeDrawer({
   onSuccess,
 }: AddNodeDrawerProps) {
   const { t } = useTranslation();
-  const profileHeadingId = useId();
+  const nodeHeadingId = useId();
   const assignmentHeadingId = useId();
   const employeeLabelId = useId();
 
@@ -57,6 +58,11 @@ export function AddNodeDrawer({
   const employeeTriggerRef = useRef<HTMLButtonElement>(null);
   const workspacePathRef = useRef<HTMLInputElement>(null);
   const isManaged = nodeLocation === "managed";
+  const hasEmployees = employees.length > 0;
+  // A cloud computer is provisioned FOR an employee, so with an empty directory
+  // that branch has no valid submission at all. Saying so up front beats a
+  // disabled picker that reports "Employee ID is required." on every attempt.
+  const blockedNoEmployees = isManaged && !hasEmployees;
   const hasUnsavedChanges = Boolean(displayName || employeeId || workspacePath || nodeLocation !== "managed");
   const confirmDiscardChanges = useUnsavedChangesGuard(open && hasUnsavedChanges && !isBusy);
 
@@ -64,6 +70,19 @@ export function AddNodeDrawer({
     () => employees.find((employee) => employee.id === employeeId) ?? null,
     [employees, employeeId],
   );
+  // Local computers are the bounded kind. Showing the employee's standing before
+  // submit turns a limit rejection from a raw backend string into something the
+  // admin could see coming.
+  const localQuota =
+    !isManaged
+    && selectedEmployee
+    && selectedEmployee.effectiveMaxLocalComputers !== undefined
+    && selectedEmployee.localComputerCount !== undefined
+      ? {
+          used: selectedEmployee.localComputerCount,
+          limit: selectedEmployee.effectiveMaxLocalComputers,
+        }
+      : null;
 
   // Reset on open, not on close: clearing as the drawer is dismissed wipes the
   // fields while they are still on screen, and leaves stale state visible for a
@@ -86,6 +105,7 @@ export function AddNodeDrawer({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (blockedNoEmployees) return;
 
     const nextFieldErrors: typeof fieldErrors = {};
     if (isManaged && !employeeId) nextFieldErrors.employeeId = t("admin.employee_required");
@@ -148,13 +168,20 @@ export function AddNodeDrawer({
       width="form"
     >
       <form className="adm-form adm-provision-form" onSubmit={(event) => void handleSubmit(event)} noValidate>
-        <section className="adm-provision-section" aria-labelledby={profileHeadingId}>
+        {/* The section covers the whole computer, not just its run mode — the
+            heading said "Run mode" and so did the radiogroup inside it, which
+            read back as the same label twice. */}
+        <section className="adm-provision-section" aria-labelledby={nodeHeadingId}>
           <header className="adm-provision-section-head">
-            <h3 id={profileHeadingId} className="adm-provision-section-title">
-              {t("admin.v2.run_mode")}
+            <h3 id={nodeHeadingId} className="adm-provision-section-title">
+              {t("admin.v2.section_node")}
             </h3>
           </header>
-          <Field label={t("admin.v2.computer_name")} hint={t("admin.v2.computer_name_hint")}>
+          <Field
+            label={t("admin.v2.computer_name")}
+            optional={t("admin.v2.optional")}
+            hint={t("admin.v2.computer_name_hint")}
+          >
             <Input
               name="add-node-display-name"
               autoComplete="off"
@@ -221,62 +248,70 @@ export function AddNodeDrawer({
             </span>
           </header>
 
-          <Field
-            label={t("admin.employee")}
-            labelId={employeeLabelId}
-            wrapper="div"
-            error={fieldErrors.employeeId}
-            errorId="add-node-employee-error"
-          >
-            <Select
-              value={employeeId || null}
-              onValueChange={(value) => {
-                setEmployeeId(value ?? "");
-                clearFieldError("employeeId");
-              }}
-              disabled={employees.length === 0}
+          {hasEmployees ? (
+            <Field
+              label={t("admin.employee")}
+              labelId={employeeLabelId}
+              wrapper="div"
+              error={fieldErrors.employeeId}
+              errorId="add-node-employee-error"
             >
-              <SelectTrigger
-                ref={employeeTriggerRef}
-                {...(isManaged ? { "data-modal-initial-focus": true } : {})}
-                className="w-full code"
-                aria-labelledby={employeeLabelId}
-                aria-invalid={Boolean(fieldErrors.employeeId) || undefined}
-                aria-describedby={fieldErrors.employeeId ? "add-node-employee-error" : undefined}
+              <Select
+                value={employeeId || null}
+                onValueChange={(value) => {
+                  setEmployeeId(value ?? "");
+                  clearFieldError("employeeId");
+                }}
               >
-                <SelectValue
-                  placeholder={employees.length === 0 ? t("admin.no_employees") : t("admin.select_employee")}
+                <SelectTrigger
+                  ref={employeeTriggerRef}
+                  {...(isManaged ? { "data-modal-initial-focus": true } : {})}
+                  className="w-full code"
+                  aria-labelledby={employeeLabelId}
+                  aria-invalid={Boolean(fieldErrors.employeeId) || undefined}
+                  aria-describedby={fieldErrors.employeeId ? "add-node-employee-error" : undefined}
                 >
-                  {(value: string | null) => {
-                    if (!value) {
-                      return employees.length === 0
-                        ? t("admin.no_employees")
-                        : t("admin.select_employee");
-                    }
-                    const employee = employees.find((e) => e.id === value);
-                    if (!employee) return `@${value}`;
-                    return employee.displayName && employee.displayName !== employee.id
-                      ? `${employee.displayName} / @${employee.id}`
-                      : `@${employee.id}`;
-                  }}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {employees.map((employee) => (
-                  <SelectItem key={employee.id} value={employee.id}>
-                    {employee.displayName && employee.displayName !== employee.id
-                      ? `${employee.displayName} / `
-                      : ""}
-                    <span className="text-muted-foreground">@{employee.id}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+                  <SelectValue placeholder={t("admin.select_employee")}>
+                    {(value: string | null) => {
+                      if (!value) return t("admin.select_employee");
+                      const employee = employees.find((e) => e.id === value);
+                      if (!employee) return `@${value}`;
+                      const handle = employeeHandleOf(employee);
+                      return employee.displayName && employee.displayName !== handle
+                        ? `${employee.displayName} / @${handle}`
+                        : `@${handle}`;
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map((employee) => (
+                    <SelectItem key={employee.id} value={employee.id}>
+                      {employee.displayName && employee.displayName !== employeeHandleOf(employee)
+                        ? `${employee.displayName} / `
+                        : ""}
+                      <span className="text-muted-foreground">@{employeeHandleOf(employee)}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          ) : (
+            <p className="adm-form-hint adm-form-hint--notice">{t("admin.v2.add_node_no_employees")}</p>
+          )}
 
-          {!selectedEmployee ? (
+          {/* Guidance, not a pre-emptive error: this used to render the
+              "Employee ID is required." error string as a resting hint, so the
+              same sentence appeared twice — muted here and red below — once
+              validation ran. */}
+          {!selectedEmployee && hasEmployees && !fieldErrors.employeeId ? (
             <p className="adm-form-hint">
-              {t(isManaged ? "admin.employee_required" : "admin.v2.add_node_assign_later")}
+              {t(isManaged ? "admin.v2.add_node_assign_managed" : "admin.v2.add_node_assign_later")}
+            </p>
+          ) : null}
+
+          {localQuota ? (
+            <p className="adm-form-hint">
+              {t("admin.v2.add_node_local_quota", { used: localQuota.used, limit: localQuota.limit })}
             </p>
           ) : null}
         </section>
@@ -287,8 +322,10 @@ export function AddNodeDrawer({
           <Button size="cta" type="button" variant="ghost" onClick={() => void requestClose()} disabled={isBusy}>
             {t("admin.v2.cancel")}
           </Button>
-          <Button size="cta" type="submit" loading={isBusy}>
-            {isBusy ? t("admin.creating") : t(isManaged ? "admin.v2.provision_node" : "admin.v2.generate_node")}
+          <Button size="cta" type="submit" loading={isBusy} disabled={isBusy || blockedNoEmployees}>
+            {isBusy
+              ? t(isManaged ? "admin.creating" : "admin.v2.generating")
+              : t(isManaged ? "admin.v2.provision_node" : "admin.v2.generate_node")}
           </Button>
         </div>
       </form>

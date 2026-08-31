@@ -15,7 +15,7 @@ from relay.sessions.controller import SessionController
 def _bootstrap_admin(client: TestClient) -> None:
     response = client.post(
         "/api/v1/auth/bootstrap",
-        json={"token": "admin_token", "username": "admin", "password": "secret123"},
+        json={"token": "admin_token", "username": "admin", "password": "kestrel-vault-7719"},
     )
     assert response.status_code == 200
 
@@ -285,7 +285,7 @@ def test_unprovisioned_daemon_registration_cannot_mint_logical_agents(
         assert (
             restarted_admin.post(
                 "/api/v1/auth/login",
-                json={"username": "admin", "password": "secret123"},
+                json={"username": "admin", "password": "kestrel-vault-7719"},
             ).status_code
             == 200
         )
@@ -509,7 +509,7 @@ def test_employee_updates_own_agent_meta(monkeypatch) -> None:
         assert (
             client.post(
                 "/api/v1/auth/login",
-                json={"username": "admin", "password": "secret123"},
+                json={"username": "admin", "password": "kestrel-vault-7719"},
             ).status_code
             == 200
         )
@@ -844,7 +844,7 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
         assert (
             client.post(
                 "/api/v1/auth/login",
-                json={"username": "admin", "password": "secret123"},
+                json={"username": "admin", "password": "kestrel-vault-7719"},
             ).status_code
             == 200
         )
@@ -2347,7 +2347,7 @@ def test_agent_stays_on_roster_when_its_computer_is_gone(
         assert (
             client.post(
                 "/api/v1/auth/login",
-                json={"username": "admin", "password": "secret123"},
+                json={"username": "admin", "password": "kestrel-vault-7719"},
             ).status_code
             == 200
         )

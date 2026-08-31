@@ -15,6 +15,7 @@ import type {
   EmployeeRecord,
 } from "../../types";
 import type { AddNodeDrawerSuccess } from "./AddNodeDrawer";
+import { employeeHandleOf } from "../../lib/employeeHandle";
 import { Drawer } from "@/components/ui/Drawer";
 import { RunModeField, type RunLocation } from "./RunModeField";
 import { initialsOf, statusTone, visualStatus } from "./helpers";
@@ -97,9 +98,14 @@ export function AssignNodeDrawer({
   // With no unassigned nodes, creating one is the only path — force it.
   const creatingNode = createNew || !hasNodes;
   const isManaged = nodeLocation === "managed";
+  // Nothing here can be assigned to nobody, so an empty directory blocks the
+  // whole form rather than failing validation against a picker that is not
+  // rendered.
+  const blockedNoEmployees = employees.length === 0 && !employeeLocked;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (blockedNoEmployees) return;
     const nextEmployeeId = employeeId.trim().replace(/^@/, "");
     const nextFieldErrors: typeof fieldErrors = {};
     if (!nextEmployeeId) nextFieldErrors.employeeId = t("admin.employee_required");
@@ -161,11 +167,14 @@ export function AssignNodeDrawer({
   }
 
   const displayHandle = selectedEmployee
-    ? `@${selectedEmployee.id}`
+    ? `@${employeeHandleOf(selectedEmployee)}`
     : employeeId
       ? `@${employeeId.replace(/^@/, "")}`
       : "";
-  const hasUnsavedChanges = createNew || Boolean(displayName || nodeId) || employeeId !== (defaultEmployeeId ?? "");
+  const hasUnsavedChanges =
+    createNew
+    || Boolean(displayName || nodeId || workspacePath)
+    || employeeId !== (defaultEmployeeId ?? "");
   const confirmDiscardChanges = useUnsavedChangesGuard(open && hasUnsavedChanges && !isBusy);
 
   async function requestClose() {
@@ -196,7 +205,7 @@ export function AssignNodeDrawer({
             </span>
             <div className="adm-assign-operator-card">
               <span className="adm-assign-avatar" aria-hidden="true">
-                {initialsOf(selectedEmployee.id)}
+                {initialsOf(employeeHandleOf(selectedEmployee))}
               </span>
                 <div className="adm-assign-operator-text">
                   {selectedEmployee.displayName &&
@@ -213,62 +222,58 @@ export function AssignNodeDrawer({
           </section>
         ) : (
           <section className="adm-assign-picker" aria-label={t("admin.employee")}>
-            <Field
-              label={t("admin.employee")}
-              labelId={employeeLabelId}
-              wrapper="div"
-              error={fieldErrors.employeeId}
-              errorId="assign-node-employee-error"
-            >
-              <Select
-                value={employeeId || null}
-                onValueChange={(value) => {
-                  setEmployeeId(value ?? "");
-                  clearFieldError("employeeId");
-                }}
-                disabled={employees.length === 0}
+            {employees.length === 0 ? (
+              <p className="adm-form-hint adm-form-hint--notice">
+                {t("admin.v2.add_node_no_employees")}
+              </p>
+            ) : (
+              <Field
+                label={t("admin.employee")}
+                labelId={employeeLabelId}
+                wrapper="div"
+                error={fieldErrors.employeeId}
+                errorId="assign-node-employee-error"
               >
-                <SelectTrigger
-                  ref={employeeTriggerRef}
-                  data-modal-initial-focus
-                  className="w-full code"
-                  aria-labelledby={employeeLabelId}
-                  aria-invalid={Boolean(fieldErrors.employeeId) || undefined}
-                  aria-describedby={fieldErrors.employeeId ? "assign-node-employee-error" : undefined}
+                <Select
+                  value={employeeId || null}
+                  onValueChange={(value) => {
+                    setEmployeeId(value ?? "");
+                    clearFieldError("employeeId");
+                  }}
                 >
-                  <SelectValue
-                    placeholder={
-                      employees.length === 0
-                        ? t("admin.no_employees")
-                        : t("admin.select_employee")
-                    }
+                  <SelectTrigger
+                    ref={employeeTriggerRef}
+                    data-modal-initial-focus
+                    className="w-full code"
+                    aria-labelledby={employeeLabelId}
+                    aria-invalid={Boolean(fieldErrors.employeeId) || undefined}
+                    aria-describedby={fieldErrors.employeeId ? "assign-node-employee-error" : undefined}
                   >
-                    {(value: string | null) => {
-                      if (!value) {
-                        return employees.length === 0
-                          ? t("admin.no_employees")
-                          : t("admin.select_employee");
-                      }
-                      const employee = employees.find((e) => e.id === value);
-                      if (!employee) return `@${value}`;
-                      return employee.displayName && employee.displayName !== employee.id
-                        ? `${employee.displayName} / @${employee.id}`
-                        : `@${employee.id}`;
-                    }}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {employees.map((employee) => (
-                    <SelectItem key={employee.id} value={employee.id}>
-                      {employee.displayName && employee.displayName !== employee.id
-                        ? `${employee.displayName} / `
-                        : ""}
-                      <span className="text-muted-foreground">@{employee.id}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
+                    <SelectValue placeholder={t("admin.select_employee")}>
+                      {(value: string | null) => {
+                        if (!value) return t("admin.select_employee");
+                        const employee = employees.find((e) => e.id === value);
+                        if (!employee) return `@${value}`;
+                        const handle = employeeHandleOf(employee);
+                        return employee.displayName && employee.displayName !== handle
+                          ? `${employee.displayName} / @${handle}`
+                          : `@${handle}`;
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {employees.map((employee) => (
+                      <SelectItem key={employee.id} value={employee.id}>
+                        {employee.displayName && employee.displayName !== employeeHandleOf(employee)
+                          ? `${employee.displayName} / `
+                          : ""}
+                        <span className="text-muted-foreground">@{employeeHandleOf(employee)}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
           </section>
         )}
 
@@ -401,7 +406,11 @@ export function AssignNodeDrawer({
         {creatingNode ? (
           <fieldset className="adm-form-section">
             <legend className="adm-form-legend">{t("admin.v2.section_node")}</legend>
-            <Field label={t("admin.v2.computer_name")} hint={t("admin.v2.computer_name_hint")}>
+            <Field
+              label={t("admin.v2.computer_name")}
+              optional={t("admin.v2.optional")}
+              hint={t("admin.v2.computer_name_hint")}
+            >
               <Input
                 name="assign-node-display-name"
                 autoComplete="off"
@@ -424,6 +433,7 @@ export function AssignNodeDrawer({
             {!isManaged ? (
               <Field
                 label={t("nav.workspace_label")}
+                hint={t("admin.v2.workspace_path_hint")}
                 error={fieldErrors.workspacePath}
                 errorId="assign-node-workspace-path-error"
               >
@@ -443,8 +453,11 @@ export function AssignNodeDrawer({
                 />
               </Field>
             ) : null}
+            {/* RunModeField already states what the selected mode does; this
+                line used to print the managed VM's behaviour underneath a local
+                computer's configuration regardless of the choice. */}
             <p className="adm-form-hint">
-              {t("admin.v2.node_help_managed")}
+              {t(isManaged ? "admin.v2.add_node_outcome_managed" : "admin.v2.add_node_outcome_local")}
             </p>
           </fieldset>
         ) : null}
@@ -460,9 +473,11 @@ export function AssignNodeDrawer({
           >
             {t("admin.v2.cancel")}
           </Button>
-          <Button size="cta" type="submit" loading={isBusy}>
+          <Button size="cta" type="submit" loading={isBusy} disabled={isBusy || blockedNoEmployees}>
             {isBusy
-              ? creatingNode ? t("admin.creating") : t("admin.assigning")
+              ? creatingNode
+                ? t(isManaged ? "admin.creating" : "admin.v2.generating")
+                : t("admin.assigning")
               : creatingNode
                 ? t(isManaged ? "admin.v2.provision_node" : "admin.v2.generate_node")
                 : t("admin.assign_node")}

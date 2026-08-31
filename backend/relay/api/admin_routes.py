@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
+from loguru import logger
 
 from ..core.models import AGENT_NAMES
 from ..daemon_registry import public_sandbox_record
@@ -15,7 +16,12 @@ from ..persistence.org_settings_store import (
     normalize_max_local_computers,
     normalize_max_task_rounds,
 )
-from ..security.auth import get_admin_token, reissue_admin_token, require_admin_session
+from ..security.auth import (
+    get_admin_token,
+    reissue_admin_token,
+    require_admin_session,
+    validate_password,
+)
 from ..services.computer_limits import (
     assert_local_computer_allowed,
     decorate_employee_limits,
@@ -37,6 +43,8 @@ from .helpers import (
     daemon_start_env,
     employee_record,
     json_body,
+    normalize_employee_handle,
+    resolve_employee_id,
     string_field,
     valid_employee_workspace_path,
 )
@@ -295,7 +303,7 @@ async def update_employee(
 async def create_employee(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     body = await json_body(request)
-    employee_id = string_field(body, "employeeId")
+    employee_id = normalize_employee_handle(string_field(body, "employeeId"))
     username = string_field(body, "username")
     password = string_field(body, "password")
     node_id = string_field(body, "nodeId") or None
@@ -307,12 +315,27 @@ async def create_employee(request: Request, ctx: AppContextDep) -> dict[str, Any
             max_local_computers = normalize_max_local_computers(body["maxLocalComputers"])
         except OrgSettingsValidationError as error:
             raise HTTPException(400, str(error)) from error
-    if not employee_id:
-        raise HTTPException(400, "employeeId is required.")
     if not username:
         raise HTTPException(400, "username is required.")
-    if not password:
-        raise HTTPException(400, "password is required.")
+    # Up front, so a rejected password is answered before anything else is
+    # looked up or created. The account's own names go in: they are the first
+    # guesses anyone makes, so a password built from them is refused.
+    try:
+        validate_password(
+            password, identifiers=(username, employee_id, display_name, email)
+        )
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+    # An employee id that already exists is a collision, not a second employee.
+    # The stores' ensure_employee reuses a matching row and patches the profile
+    # onto it, so without this check "Add employee" silently rewrote a live
+    # colleague's display name, email, and computer limit and attached a second
+    # login to them. Resolution goes through the store because the database
+    # store maps handles onto UUIDs — comparing raw handles would never match.
+    # Soft-deleted employees are deliberately not blocked: re-creating a removed
+    # employee is an existing, intended path.
+    if employee_record(ctx.auth_store, resolve_employee_id(ctx.auth_store, employee_id)):
+        raise HTTPException(409, f"Employee @{employee_id} already exists.")
     # Node assignment is optional at onboarding — an employee may be created
     # first and bound to a sandbox later via the assign-node flow. Only validate
     # the node when one was supplied.
@@ -352,6 +375,7 @@ async def create_employee(request: Request, ctx: AppContextDep) -> dict[str, Any
             )
         employee = {
             "id": employee_id,
+            "handle": employee_id,
             "displayName": display_name,
             "email": email,
             "createdAt": user.get("createdAt"),
@@ -359,16 +383,35 @@ async def create_employee(request: Request, ctx: AppContextDep) -> dict[str, Any
         }
     employee = decorate_employee_limits(ctx, [employee])[0]
     public_node: dict[str, Any] | None = None
+    assignment_error: str | None = None
     if node_id:
+        # The employee is already committed by this point, so a computer that
+        # got claimed in the meantime cannot be reported as a failed request:
+        # raising here left a created employee behind an error message, and the
+        # retry then failed on "username already exists" with no way forward.
+        # The employee is the outcome; the unattached computer is a warning the
+        # admin resolves from the assign flow.
         try:
             assigned_node = ctx.registry.assign_employee(node_id, employee["id"])
             sync_node_agents(ctx, assigned_node)
-        except KeyError as error:
-            raise HTTPException(404, "Daemon node not found.") from error
+            public_node = _public_control_panel_node(ctx, assigned_node)
+        except KeyError:
+            assignment_error = "Computer not found."
         except ValueError as error:
-            raise HTTPException(409, str(error)) from error
-        public_node = _public_control_panel_node(ctx, assigned_node)
-    return {"employee": employee, "user": user, **({"node": public_node} if public_node else {})}
+            assignment_error = str(error)
+        if assignment_error:
+            logger.warning(
+                "Employee created but computer assignment failed",
+                employee_id=employee["id"],
+                node_id=node_id,
+                error=assignment_error,
+            )
+    return {
+        "employee": employee,
+        "user": user,
+        **({"node": public_node} if public_node else {}),
+        **({"assignmentError": assignment_error} if assignment_error else {}),
+    }
 
 
 @router.put("/admin/daemon-nodes/{node_id}/assignment")

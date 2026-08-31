@@ -20,7 +20,7 @@ def _bootstrap_admin(client: TestClient, token: str = "admin_token") -> None:
     response = client.post("/api/v1/auth/bootstrap", json={
         "token": token,
         "username": "admin",
-        "password": "secret123",
+        "password": "kestrel-vault-7719",
     })
     assert response.status_code == 200
 
@@ -86,7 +86,7 @@ def test_bootstrap_creates_first_admin(monkeypatch) -> None:
         response = client.post("/api/v1/auth/bootstrap", json={
             "token": "admin_token",
             "username": "admin",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
         })
         assert response.status_code == 200
         body = response.json()
@@ -104,7 +104,7 @@ def test_bootstrap_requires_bootstrap_token(monkeypatch) -> None:
         response = client.post("/api/v1/auth/bootstrap", json={
             "token": "wrong",
             "username": "admin",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
         })
         assert response.status_code == 401
 
@@ -118,7 +118,7 @@ def test_bootstrap_only_once(monkeypatch) -> None:
         response = client.post("/api/v1/auth/bootstrap", json={
             "token": "admin_token",
             "username": "admin2",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
         })
         assert response.status_code == 409
 
@@ -139,7 +139,7 @@ def test_user_preferences_persist_across_login_sessions(monkeypatch) -> None:
         assert response.json()["user"]["language"] == "zh-CN"
 
         assert client.post("/api/v1/auth/logout").status_code == 200
-        _login(client, "admin", "secret123")
+        _login(client, "admin", "kestrel-vault-7719")
         current = client.get("/api/v1/auth/me")
         assert current.status_code == 200
         assert current.json()["user"]["theme"] == "dark"
@@ -154,7 +154,7 @@ def test_login_and_session_cookie(monkeypatch) -> None:
 
         response = client.post("/api/v1/auth/login", json={
             "username": "admin",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
         })
         assert response.status_code == 200
         assert "relay_session" in response.cookies
@@ -187,7 +187,7 @@ def test_logout_clears_session(monkeypatch) -> None:
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
-        _login(client, "admin", "secret123")
+        _login(client, "admin", "kestrel-vault-7719")
 
         response = client.post("/api/v1/auth/logout")
         assert response.status_code == 200
@@ -220,7 +220,7 @@ def test_bootstrap_uses_generated_token_without_env_token(monkeypatch) -> None:
         response = client.post("/api/v1/auth/bootstrap", json={
             "token": "anything",
             "username": "admin",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
         })
         assert response.status_code == 401
 
@@ -230,7 +230,7 @@ def test_bootstrap_uses_generated_token_without_env_token(monkeypatch) -> None:
         response = client.post("/api/v1/auth/bootstrap", json={
             "token": generated,
             "username": "admin",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
         })
         assert response.status_code == 200
 
@@ -240,7 +240,7 @@ def test_user_creation_validation_returns_client_errors(monkeypatch) -> None:
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
-        _login(client, "admin", "secret123")
+        _login(client, "admin", "kestrel-vault-7719")
 
         response = client.post("/api/v1/admin/users", json={
             "username": "alice",
@@ -272,7 +272,7 @@ def test_duplicate_username_validation_normalizes_case_and_spacing(monkeypatch) 
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
-        _login(client, "admin", "secret123")
+        _login(client, "admin", "kestrel-vault-7719")
 
         response = client.post("/api/v1/admin/users", json={
             "username": " Alice ",
@@ -299,7 +299,7 @@ def test_bootstrap_validation_returns_client_errors(monkeypatch) -> None:
         response = client.post("/api/v1/auth/bootstrap", json={
             "token": "admin_token",
             "username": "",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
         })
         assert response.status_code == 400
         assert response.json()["detail"] == "username is required."
@@ -318,7 +318,7 @@ def test_regular_user_can_access_sessions_and_tasks_but_not_admin_panel(monkeypa
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
-        _login(client, "admin", "secret123")
+        _login(client, "admin", "kestrel-vault-7719")
 
         response = client.post("/api/v1/admin/users", json={
             "username": "alice",
@@ -412,7 +412,7 @@ def test_user_routes_are_scoped_to_authenticated_employee(monkeypatch) -> None:
         app = create_app(root)
         admin_client = TestClient(app)
         _bootstrap_admin(admin_client)
-        _login(admin_client, "admin", "secret123")
+        _login(admin_client, "admin", "kestrel-vault-7719")
         _create_user(admin_client, "alice", employee_id="alice")
         _create_user(admin_client, "bob", employee_id="bob")
 
@@ -468,7 +468,7 @@ def test_artifact_index_is_scoped_to_authenticated_employee(monkeypatch) -> None
         app = create_app(root)
         admin_client = TestClient(app)
         _bootstrap_admin(admin_client)
-        _login(admin_client, "admin", "secret123")
+        _login(admin_client, "admin", "kestrel-vault-7719")
         _create_user(admin_client, "alice")
         _create_user(admin_client, "bob")
 
@@ -521,7 +521,7 @@ def test_workspace_brief_summarizes_employee_workspace(monkeypatch) -> None:
         app = create_app(root)
         admin_client = TestClient(app)
         _bootstrap_admin(admin_client)
-        _login(admin_client, "admin", "secret123")
+        _login(admin_client, "admin", "kestrel-vault-7719")
         _create_user(admin_client, "alice")
         _create_user(admin_client, "bob")
 
@@ -603,7 +603,7 @@ def test_workspace_brief_only_lists_generated_artifacts(monkeypatch) -> None:
         app = create_app(root)
         admin_client = TestClient(app)
         _bootstrap_admin(admin_client)
-        _login(admin_client, "admin", "secret123")
+        _login(admin_client, "admin", "kestrel-vault-7719")
         _create_user(admin_client, "alice")
 
         alice_client = TestClient(app)
@@ -650,7 +650,7 @@ def test_employee_workspace_file_routes_are_removed(monkeypatch) -> None:
         app = create_app(root)
         admin_client = TestClient(app)
         _bootstrap_admin(admin_client)
-        _login(admin_client, "admin", "secret123")
+        _login(admin_client, "admin", "kestrel-vault-7719")
         _create_user(admin_client, "alice")
         _create_user(admin_client, "bob")
 
@@ -681,7 +681,7 @@ def test_admin_can_create_resources_for_specific_employee(monkeypatch) -> None:
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
-        _login(client, "admin", "secret123")
+        _login(client, "admin", "kestrel-vault-7719")
 
         response = client.post("/api/v1/tasks", json={
             "title": "Bob task",
@@ -754,14 +754,14 @@ def test_auth_responses_do_not_expose_secret_fields(monkeypatch) -> None:
         response = client.post("/api/v1/auth/bootstrap", json={
             "token": "admin_token",
             "username": "admin",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
         })
         assert response.status_code == 200
         _assert_no_secret_fields(response.json())
 
         response = client.post("/api/v1/auth/login", json={
             "username": "admin",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
         })
         assert response.status_code == 200
         _assert_no_secret_fields(response.json())
@@ -788,7 +788,7 @@ def test_control_panel_node_list_exposes_node_token_for_admins(monkeypatch) -> N
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
-        _login(client, "admin", "secret123")
+        _login(client, "admin", "kestrel-vault-7719")
 
         create = client.post("/api/v1/admin/daemon-nodes", json={
             "employeeId": "alice",
@@ -815,7 +815,7 @@ def test_authenticated_user_can_list_own_sandbox_and_daemon_node_without_token(m
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
-        _login(client, "admin", "secret123")
+        _login(client, "admin", "kestrel-vault-7719")
 
         response = client.post("/api/v1/admin/daemon-nodes", json={
             "employeeId": "alice",
@@ -844,7 +844,7 @@ def test_unauthenticated_user_cannot_list_sandboxes_or_daemon_nodes(monkeypatch)
     with TemporaryDirectory() as root:
         admin_client = TestClient(create_app(root))
         _bootstrap_admin(admin_client)
-        _login(admin_client, "admin", "secret123")
+        _login(admin_client, "admin", "kestrel-vault-7719")
 
         response = admin_client.post("/api/v1/admin/daemon-nodes", json={
             "employeeId": "alice",
@@ -879,7 +879,7 @@ def test_cross_site_request_cannot_mutate_cookie_authenticated_session(monkeypat
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
-        _login(client, "admin", "secret123")
+        _login(client, "admin", "kestrel-vault-7719")
 
         rejected = client.post(
             "/api/v1/auth/logout",
@@ -907,7 +907,7 @@ def test_same_origin_browser_mutation_survives_nextjs_proxy(monkeypatch) -> None
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
-        _login(client, "admin", "secret123")
+        _login(client, "admin", "kestrel-vault-7719")
 
         response = client.post(
             "/api/v1/auth/logout",
@@ -931,7 +931,7 @@ def test_json_endpoints_reject_simple_cross_site_content_type(monkeypatch) -> No
 
         response = client.post(
             "/api/v1/auth/login",
-            content='{"username":"admin","password":"secret123"}',
+            content='{"username":"admin","password":"kestrel-vault-7719"}',
             headers={"Content-Type": "text/plain"},
         )
 
@@ -1034,7 +1034,7 @@ def test_app_can_use_database_backed_auth_store(monkeypatch) -> None:
         response = client.post("/api/v1/auth/bootstrap", json={
             "token": "admin_token",
             "username": "admin",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
         })
         assert response.status_code == 200
         admin_employee_id = response.json()["user"]["employeeId"]
@@ -1047,7 +1047,7 @@ def test_app_can_use_database_backed_auth_store(monkeypatch) -> None:
         second_client = TestClient(create_app(root))
         response = second_client.post("/api/v1/auth/login", json={
             "username": "admin",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
         })
         assert response.status_code == 200
 
@@ -1068,7 +1068,7 @@ def test_app_can_use_database_backed_auth_store(monkeypatch) -> None:
 
         response = second_client.post("/api/v1/admin/users", json={
             "username": "eng-user",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
             "role": "user",
             "employeeId": "eng-user",
             "departmentId": engineering_id,
@@ -1147,7 +1147,7 @@ def test_relay_storage_postgres_switches_backend_stores_to_database(monkeypatch)
         response = client.post("/api/v1/admin/employees", json={
             "employeeId": "db-user",
             "username": "db-user",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
             "nodeId": "sbx_unassigned",
         })
         assert response.status_code == 201

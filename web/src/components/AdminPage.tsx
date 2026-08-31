@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { DashboardView } from "./admin/dashboard/DashboardView";
 import { useNodeMetrics } from "../hooks/useNodeMetrics";
 import { useTranslation } from "react-i18next";
+import { handleForEmployeeId } from "../lib/employeeHandle";
 import { StateMark } from "./StateMark";
 import { useMutationError } from "../hooks/useMutationError";
 import { Button } from "@/components/ui/button";
@@ -99,6 +100,10 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
   const [credentialsNodeId, setCredentialsNodeId] = useState<string | null>(null);
   const [manageExecutorsNodeId, setManageExecutorsNodeId] = useState<string | null>(null);
   const [highlightedEmployeeId, setHighlightedEmployeeId] = useState<string | null>(null);
+  const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
+  /** A created employee whose computer could not be attached — the employee is
+      real, so this is a warning to resolve from Assign, not a failed request. */
+  const [assignmentWarning, setAssignmentWarning] = useState<string | null>(null);
   const [storedTokens, setStoredTokens] = useState<StoredNodeTokenMap>(() => readStoredNodeTokens());
 
   async function checkAuth(signal?: AbortSignal) {
@@ -332,6 +337,9 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
 
     setAddEmployeeOpen(false);
     setView("employees");
+    // The employee exists either way; a computer that got claimed in the
+    // meantime is reported alongside them rather than swallowing the result.
+    setAssignmentWarning(result.assignmentError ?? null);
     // Only surface the credentials drawer when a sandbox was bound — it is
     // keyed by node id and has nothing to show for an unassigned employee.
     if (node) setCredentialsNodeId(node.id);
@@ -350,14 +358,24 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
 
   function handleCreateManagedNodeSuccess(result: CreateManagedNodeResponse) {
     const { node } = result;
-    setHighlightedEmployeeId(node.employeeId ?? null);
-    window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === node.employeeId ? null : prev)), HIGHLIGHT_PULSE_MS);
+    // The pulse used to be keyed on the employee, but both node paths switch to
+    // the Computers view, where nothing reads that — so provisioning ended with
+    // the drawer closing and no confirmation anywhere on screen.
+    pulseNode(node.id);
     setAddNodeOpen(false);
     setAssignTarget(null);
     setView("nodes");
     // Managed provisioning is asynchronous. The supervisor enrolls the daemon,
     // and the existing node poll displays it once registration succeeds.
     void refetch();
+  }
+
+  function pulseNode(nodeId: string) {
+    setHighlightedNodeId(nodeId);
+    window.setTimeout(
+      () => setHighlightedNodeId((prev) => (prev === nodeId ? null : prev)),
+      HIGHLIGHT_PULSE_MS,
+    );
   }
 
   function handleCreateManualNodeSuccess(result: CreateControlPanelDaemonNodeResponse) {
@@ -375,8 +393,7 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
       savedAt: new Date().toISOString(),
     });
     setStoredTokens(readStoredNodeTokens());
-    setHighlightedEmployeeId(node.employeeId ?? null);
-    window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === node.employeeId ? null : prev)), HIGHLIGHT_PULSE_MS);
+    pulseNode(node.id);
     setAddNodeOpen(false);
     setAssignTarget(null);
     setView("nodes");
@@ -493,6 +510,19 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
         <div className="adm-content">
           <div className="adm-content-main">
             <div key={view} className="adm-view-stage">
+              {assignmentWarning ? (
+                <div className="adm-form-error" role="alert">
+                  {t("admin.v2.add_employee_assignment_warning", { message: assignmentWarning })}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setAssignmentWarning(null)}
+                  >
+                    {t("admin.v2.dismiss")}
+                  </Button>
+                </div>
+              ) : null}
               {view === "dashboard" ? (
                 <DashboardView nodes={nodes} employees={employees} metrics={metrics} />
               ) : view === "employees" ? (
@@ -521,9 +551,11 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
                     onManageExecutors={handleManageExecutors}
                     onDeleteNode={handleDeleteNode}
                     onAddNode={() => setAddNodeOpen(true)}
+                    highlightedNodeId={highlightedNodeId}
                   />
                   <ManagedNodeHistory
                     nodes={managedNodes}
+                    employees={employees}
                     onRecover={handleRecoverManagedNode}
                     onDeletePermanently={handlePermanentlyDeleteManagedNode}
                   />
@@ -569,6 +601,7 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
         onClose={() => setCredentialsNodeId(null)}
         node={credentialsNode}
         storedToken={credentialsNodeId ? storedTokens[credentialsNodeId] : undefined}
+        employeeHandle={handleForEmployeeId(employees, credentialsNode?.employeeId)}
         onUnassign={handleUnassignNode}
         onDelete={handleDeleteNode}
       />
@@ -576,6 +609,7 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
         open={manageExecutorsNodeId !== null}
         onClose={() => setManageExecutorsNodeId(null)}
         node={manageExecutorsNode}
+        employeeHandle={handleForEmployeeId(employees, manageExecutorsNode?.employeeId)}
         onUpdated={handleNodeUpdated}
         onSave={updateControlPanelDaemonNodeDisabledAgents}
       />

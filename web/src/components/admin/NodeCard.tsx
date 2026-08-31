@@ -35,6 +35,8 @@ interface NodeCardProps {
   onRename: (node: ControlPanelDaemonNodeRecord) => void;
   onManageExecutors: (node: ControlPanelDaemonNodeRecord) => void;
   onDelete?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
+  /** One-shot marker for a computer that was just created here. */
+  highlight?: boolean;
   t: TFunction;
 }
 
@@ -47,6 +49,7 @@ export function NodeCard({
   onRename,
   onManageExecutors,
   onDelete,
+  highlight = false,
   t,
 }: NodeCardProps) {
   const [copied, setCopied] = useState(false);
@@ -75,7 +78,10 @@ export function NodeCard({
   const OwnershipMark = nodeOwnershipIcon(ownership);
 
   return (
-    <article className="adm-node-card" data-online={online ? "true" : "false"}>
+    <article
+      className={`adm-node-card${highlight ? " is-pulse" : ""}`}
+      data-online={online ? "true" : "false"}
+    >
       <header className="adm-node-card-head">
         <span
           className="adm-node-avatar adm-node-avatar--machine"

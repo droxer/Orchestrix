@@ -7,7 +7,7 @@ from relay.app import create_app
 
 
 def _bootstrap(client: TestClient) -> None:
-    assert client.post("/api/v1/auth/bootstrap", json={"token": "admin_token", "username": "admin", "password": "secret123"}).status_code == 200
+    assert client.post("/api/v1/auth/bootstrap", json={"token": "admin_token", "username": "admin", "password": "kestrel-vault-7719"}).status_code == 200
 
 
 def _register_node(app, *, capabilities: list[str]) -> None:

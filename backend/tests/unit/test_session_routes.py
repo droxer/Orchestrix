@@ -37,7 +37,7 @@ def test_session_assignment_and_handoff_have_no_execution_mode(monkeypatch) -> N
         response = client.post("/api/v1/auth/bootstrap", json={
             "token": "admin_token",
             "username": "admin",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
         })
         assert response.status_code == 200
 
@@ -81,7 +81,7 @@ def test_session_creation_persists_the_selected_computer(monkeypatch) -> None:
             json={
                 "token": "admin_token",
                 "username": "admin",
-                "password": "secret123",
+                "password": "kestrel-vault-7719",
             },
         )
         assert response.status_code == 200
@@ -122,7 +122,7 @@ def test_session_creation_on_an_employee_device_computer_persists_a_device_ident
             json={
                 "token": "admin_token",
                 "username": "admin",
-                "password": "secret123",
+                "password": "kestrel-vault-7719",
             },
         )
         assert response.status_code == 200
@@ -163,7 +163,7 @@ def test_session_read_backfills_managed_affinity_from_deleted_runtime_history(
             json={
                 "token": "admin_token",
                 "username": "admin",
-                "password": "secret123",
+                "password": "kestrel-vault-7719",
             },
         )
         assert response.status_code == 200
@@ -218,7 +218,7 @@ def test_thread_read_does_not_500_when_registration_history_disagrees_with_the_s
             json={
                 "token": "admin_token",
                 "username": "admin",
-                "password": "secret123",
+                "password": "kestrel-vault-7719",
             },
         )
         assert response.status_code == 200

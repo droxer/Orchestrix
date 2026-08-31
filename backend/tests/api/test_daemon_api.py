@@ -22,7 +22,7 @@ def _bootstrap_admin(client: TestClient) -> None:
         json={
             "token": "admin_token",
             "username": "admin",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
         },
     )
     assert response.status_code == 200
@@ -33,7 +33,7 @@ def _login_admin(client: TestClient) -> None:
         "/api/v1/auth/login",
         json={
             "username": "admin",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
         },
     )
     assert response.status_code == 200
@@ -3647,7 +3647,7 @@ def test_admin_can_soft_delete_employee_and_unassign_nodes(monkeypatch) -> None:
             "/api/v1/admin/users",
             json={
                 "username": "alice",
-                "password": "AlicePass123!",
+                "password": "harbor-quartz-8830",
                 "employeeId": "alice",
                 "displayName": "Alice",
             },
@@ -3715,7 +3715,7 @@ def test_admin_can_soft_delete_employee_and_unassign_nodes(monkeypatch) -> None:
         assert (
             employee_client.post(
                 "/api/v1/auth/login",
-                json={"username": "alice", "password": "AlicePass123!"},
+                json={"username": "alice", "password": "harbor-quartz-8830"},
             ).status_code
             == 200
         )
@@ -3750,7 +3750,7 @@ def test_admin_can_soft_delete_employee_and_unassign_nodes(monkeypatch) -> None:
         assert (
             employee_client.post(
                 "/api/v1/auth/login",
-                json={"username": "alice", "password": "AlicePass123!"},
+                json={"username": "alice", "password": "harbor-quartz-8830"},
             ).status_code
             == 401
         )

@@ -12,7 +12,7 @@ def _bootstrap(client: TestClient) -> None:
     assert (
         client.post(
             "/api/v1/auth/bootstrap",
-            json={"token": "admin_token", "username": "admin", "password": "secret123"},
+            json={"token": "admin_token", "username": "admin", "password": "kestrel-vault-7719"},
         ).status_code
         == 200
     )
@@ -428,7 +428,7 @@ def test_project_bounds_and_member_deletion_guard(monkeypatch) -> None:
         assert (
             client.post(
                 "/api/v1/auth/login",
-                json={"username": "admin", "password": "secret123"},
+                json={"username": "admin", "password": "kestrel-vault-7719"},
             ).status_code
             == 200
         )
@@ -485,7 +485,7 @@ def test_employee_delete_rejects_archived_project_without_partial_cascade(
         assert (
             client.post(
                 "/api/v1/auth/login",
-                json={"username": "admin", "password": "secret123"},
+                json={"username": "admin", "password": "kestrel-vault-7719"},
             ).status_code
             == 200
         )
@@ -548,7 +548,7 @@ def test_project_routes_are_owner_scoped(monkeypatch) -> None:
         assert (
             client.post(
                 "/api/v1/auth/login",
-                json={"username": "admin", "password": "secret123"},
+                json={"username": "admin", "password": "kestrel-vault-7719"},
             ).status_code
             == 200
         )

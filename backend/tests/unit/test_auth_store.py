@@ -23,7 +23,7 @@ from sqlalchemy import create_engine, text
 def test_local_auth_store_hashes_session_tokens_and_restricts_files() -> None:
     with TemporaryDirectory() as root:
         store = UserAuthStore(root)
-        user = store.create_user("alice", "secret123")
+        user = store.create_user("alice", "kestrel-vault-7719")
         session = store.create_session(user["id"])
 
         persisted = json.loads(store.sessions_path.read_text(encoding="utf-8"))
@@ -44,7 +44,7 @@ def test_database_auth_store_preserves_utc_timestamps_outside_utc() -> None:
             store = DatabaseUserAuthStore(
                 f"sqlite:///{root}/auth.db", create_schema=True
             )
-            created = store.create_user("alice", "secret123")
+            created = store.create_user("alice", "kestrel-vault-7719")
             persisted = store.get_user_by_id(created["id"])
 
             assert persisted is not None
@@ -63,14 +63,14 @@ def test_database_auth_store_persists_users_and_hashes_session_tokens() -> None:
         store = DatabaseUserAuthStore(database_url, create_schema=True)
 
         user = store.create_user(
-            " Alice ", "secret123", role="admin", email="alice@example.com"
+            " Alice ", "kestrel-vault-7719", role="admin", email="alice@example.com"
         )
         assert user["username"] == "alice"
         assert user["role"] == "admin"
         assert user["employeeId"]
         assert "passwordHash" not in user
 
-        assert store.authenticate("ALICE", "secret123")["id"] == user["id"]
+        assert store.authenticate("ALICE", "kestrel-vault-7719")["id"] == user["id"]
         assert store.authenticate("alice", "wrong") is None
 
         session = store.create_session(user["id"])
@@ -113,10 +113,10 @@ def test_database_auth_store_maps_human_handles_independently_and_stably() -> No
         store = DatabaseUserAuthStore(f"sqlite:///{root}/auth.db", create_schema=True)
 
         alice = store.create_user(
-            "alice", "secret123", employee_id="alice", display_name="Same"
+            "alice", "kestrel-vault-7719", employee_id="alice", display_name="Same"
         )
         bob = store.create_user(
-            "bob", "secret123", employee_id="bob", display_name="Same"
+            "bob", "kestrel-vault-7719", employee_id="bob", display_name="Same"
         )
         alice_again = store.ensure_employee("alice", display_name="Renamed Alice")
 
@@ -140,7 +140,7 @@ def test_bootstrap_allows_exactly_one_concurrent_first_admin(store_kind: str) ->
 
         def bootstrap(index: int) -> str:
             try:
-                store.bootstrap_with_token(token, f"admin-{index}", "secret123")
+                store.bootstrap_with_token(token, f"admin-{index}", "kestrel-vault-7719")
             except HTTPException as error:
                 return f"http-{error.status_code}"
             return "created"
@@ -155,10 +155,10 @@ def test_bootstrap_allows_exactly_one_concurrent_first_admin(store_kind: str) ->
 def test_database_auth_store_enforces_unique_normalized_usernames() -> None:
     with TemporaryDirectory() as root:
         store = DatabaseUserAuthStore(f"sqlite:///{root}/auth.db", create_schema=True)
-        store.create_user("Alice", "secret123")
+        store.create_user("Alice", "kestrel-vault-7719")
 
         try:
-            store.create_user(" alice ", "secret123")
+            store.create_user(" alice ", "kestrel-vault-7719")
         except ValueError as error:
             assert str(error) == "username already exists."
         else:
@@ -171,7 +171,7 @@ def test_database_auth_store_persists_user_preferences() -> None:
     with TemporaryDirectory() as root:
         database_url = f"sqlite:///{root}/auth.db"
         store = DatabaseUserAuthStore(database_url, create_schema=True)
-        user = store.create_user("alice", "secret123")
+        user = store.create_user("alice", "kestrel-vault-7719")
 
         updated = store.update_user_preferences(
             user["id"],

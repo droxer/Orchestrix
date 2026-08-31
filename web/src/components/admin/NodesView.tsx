@@ -47,6 +47,8 @@ interface NodesViewProps {
   onManageExecutors: (node: ControlPanelDaemonNodeRecord) => void;
   onDeleteNode?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
   onAddNode?: () => void;
+  /** The computer just created from this console, marked once on arrival. */
+  highlightedNodeId?: string | null;
 }
 
 const FILTERS: NodeQuickFilter[] = ["all", "ready", "running", "provisioning", "failed", "stopped", "unassigned"];
@@ -113,7 +115,7 @@ function NodeCols({
   );
 }
 
-export function NodesView({ nodes, employees, storedTokens, layout, onLayoutChange, onRevealCredentials, onRenameNode, onManageExecutors, onDeleteNode, onAddNode }: NodesViewProps) {
+export function NodesView({ nodes, employees, storedTokens, layout, onLayoutChange, onRevealCredentials, onRenameNode, onManageExecutors, onDeleteNode, onAddNode, highlightedNodeId }: NodesViewProps) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<NodeQuickFilter>("all");
   const [query, setQuery] = useState("");
@@ -270,6 +272,7 @@ export function NodesView({ nodes, employees, storedTokens, layout, onLayoutChan
                 onRename={onRenameNode}
                 onManageExecutors={onManageExecutors}
                 onDelete={onDeleteNode}
+                highlight={node.id === highlightedNodeId}
                 t={t}
               />
             );
@@ -307,6 +310,7 @@ export function NodesView({ nodes, employees, storedTokens, layout, onLayoutChan
                           onRename={onRenameNode}
                           onManageExecutors={onManageExecutors}
                           onDelete={onDeleteNode}
+                          highlight={node.id === highlightedNodeId}
                           t={t}
                         />
                       );

@@ -15,9 +15,9 @@ def _bootstrap(client: TestClient) -> None:
     assert client.post("/api/v1/auth/bootstrap", json={
         "token": "admin_token",
         "username": "admin",
-        "password": "secret123",
+        "password": "kestrel-vault-7719",
     }).status_code == 200
-    assert client.post("/api/v1/auth/login", json={"username": "admin", "password": "secret123"}).status_code == 200
+    assert client.post("/api/v1/auth/login", json={"username": "admin", "password": "kestrel-vault-7719"}).status_code == 200
 
 
 def _create_task_with_session(client: TestClient, workspace_path: str, *, title: str = "Ship the quarterly deck") -> dict[str, Any]:
@@ -173,11 +173,11 @@ def test_task_artifacts_denied_for_other_employee(monkeypatch) -> None:
 
         assert client.post("/api/v1/admin/users", json={
             "username": "worker",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
             "employeeId": "emp_worker",
         }).status_code == 201
         worker = TestClient(app)
-        assert worker.post("/api/v1/auth/login", json={"username": "worker", "password": "secret123"}).status_code == 200
+        assert worker.post("/api/v1/auth/login", json={"username": "worker", "password": "kestrel-vault-7719"}).status_code == 200
 
         response = worker.get(f"/api/v1/tasks/{task['id']}/artifacts")
         assert response.status_code == 403

@@ -111,7 +111,7 @@ def _bootstrap_admin(client: TestClient) -> None:
         json={
             "token": "admin_token",
             "username": "admin",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
         },
     )
     assert response.status_code == 200
@@ -136,13 +136,13 @@ def test_chat_integration_setup_flow_redacts_secrets(monkeypatch) -> None:
         client.app.state.chat_probe = _healthy_provider
         client.app.state.chat_provision = _healthy_provision
         _bootstrap_admin(client)
-        _login(client, "admin", "secret123")
+        _login(client, "admin", "kestrel-vault-7719")
         assert (
             client.post(
                 "/api/v1/admin/users",
                 json={
                     "username": "alice",
-                    "password": "AlicePass123!",
+                    "password": "harbor-quartz-8830",
                     "employeeId": "alice",
                     "displayName": "Alice",
                 },
@@ -299,13 +299,13 @@ def test_chat_integration_check_rejects_invalid_provider_credentials(
         client = TestClient(create_app(root))
         client.app.state.chat_probe = invalid_provider
         _bootstrap_admin(client)
-        _login(client, "admin", "secret123")
+        _login(client, "admin", "kestrel-vault-7719")
         assert (
             client.post(
                 "/api/v1/admin/users",
                 json={
                     "username": "alice",
-                    "password": "AlicePass123!",
+                    "password": "harbor-quartz-8830",
                     "employeeId": "alice",
                 },
             ).status_code
@@ -362,13 +362,13 @@ def test_chat_integration_activation_requires_ui_callback_url(monkeypatch) -> No
         client.app.state.chat_probe = _healthy_provider
         client.app.state.chat_provision = capture_provision
         _bootstrap_admin(client)
-        _login(client, "admin", "secret123")
+        _login(client, "admin", "kestrel-vault-7719")
         assert (
             client.post(
                 "/api/v1/admin/users",
                 json={
                     "username": "alice",
-                    "password": "AlicePass123!",
+                    "password": "harbor-quartz-8830",
                     "employeeId": "alice",
                 },
             ).status_code
@@ -507,7 +507,7 @@ def test_chat_integrations_require_admin(monkeypatch) -> None:
         app = create_app(root)
         admin_client = TestClient(app)
         _bootstrap_admin(admin_client)
-        _login(admin_client, "admin", "secret123")
+        _login(admin_client, "admin", "kestrel-vault-7719")
 
         response = admin_client.post(
             "/api/v1/admin/users",

@@ -19,9 +19,9 @@ def _bootstrap(client: TestClient) -> None:
     assert client.post("/api/v1/auth/bootstrap", json={
         "token": "admin_token",
         "username": "admin",
-        "password": "secret123",
+        "password": "kestrel-vault-7719",
     }).status_code == 200
-    assert client.post("/api/v1/auth/login", json={"username": "admin", "password": "secret123"}).status_code == 200
+    assert client.post("/api/v1/auth/login", json={"username": "admin", "password": "kestrel-vault-7719"}).status_code == 200
 
 
 def _create_agent(app: Any) -> dict[str, Any]:

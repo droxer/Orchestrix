@@ -27,10 +27,12 @@ interface NodeRowProps {
   onRename: (node: ControlPanelDaemonNodeRecord) => void;
   onManageExecutors: (node: ControlPanelDaemonNodeRecord) => void;
   onDelete?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
+  /** One-shot marker for a computer that was just created here. */
+  highlight?: boolean;
   t: TFunction;
 }
 
-export function NodeRow({ node, employeeName, storedTokens, colocated, onReveal, onRename, onManageExecutors, onDelete, t }: NodeRowProps) {
+export function NodeRow({ node, employeeName, storedTokens, colocated, onReveal, onRename, onManageExecutors, onDelete, highlight = false, t }: NodeRowProps) {
   const { deletePending, deleteError, handleDelete } = useNodeDelete(node, onDelete, t);
   const nodeName = node.displayName || node.id;
   const online = isNodeOnline(node);
@@ -42,7 +44,7 @@ export function NodeRow({ node, employeeName, storedTokens, colocated, onReveal,
   const OwnershipMark = nodeOwnershipIcon(ownership);
 
   return (
-    <li className="adm-node-row" data-node={node.id} data-online={online ? "true" : "false"} role="row">
+    <li className={`adm-node-row${highlight ? " is-pulse" : ""}`} data-node={node.id} data-online={online ? "true" : "false"} role="row">
       <div className="adm-node-row-id" role="cell">
         <span
           className="adm-node-avatar adm-node-avatar--machine"
