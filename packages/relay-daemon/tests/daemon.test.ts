@@ -1330,6 +1330,52 @@ test("relay daemon exits backend reconnect after external stop during registrati
   assert.equal(closeCount, 1);
 });
 
+test("managed daemon retries transient enrollment failures before registration", async () => {
+  const stop = new AbortController();
+  let enrollmentAttempts = 0;
+  const daemon = runRelayDaemon({
+    backendUrl: "http://relay.test",
+    enrollmentToken: "grant.secret",
+    workspacePath: process.cwd(),
+    pollIntervalMs: 1,
+    shutdownGraceMs: 20,
+    logger: testLogger(),
+    signal: stop.signal,
+    preflight: false,
+    environment: fakeEnvironment(),
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/api/v1/daemon-node-enrollments") {
+        enrollmentAttempts += 1;
+        if (enrollmentAttempts === 1) return new Response("backend unavailable", { status: 503 });
+        return jsonResponse({
+          sandboxId: "sbx_managed",
+          token: "node_token",
+          employeeId: "alice",
+          sandboxMode: "boxlite",
+          heartbeat: { intervalMs: 5, timeoutMs: 15 },
+        }, 201);
+      }
+      if (path === "/api/v1/daemon-node-registrations") {
+        if (JSON.parse(String(init?.body)).status === "stopped") return jsonResponse({ ok: true });
+        return jsonResponse({ heartbeat: { intervalMs: 5, timeoutMs: 15 } });
+      }
+      if (path === "/api/v1/daemon-nodes/sbx_managed/commands") {
+        stop.abort();
+        return jsonResponse({ commands: [] });
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  await Promise.race([
+    daemon,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("daemon did not stop")), 4_000)),
+  ]);
+
+  assert.equal(enrollmentAttempts, 2);
+});
+
 test("relay daemon removes shutdown listeners after external stop", async () => {
   const stop = new AbortController();
   const beforeSigint = process.listenerCount("SIGINT");

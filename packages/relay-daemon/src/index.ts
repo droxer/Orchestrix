@@ -174,7 +174,12 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   let enrolledSandboxMode: string | undefined;
   let enrolledHeartbeatSettings: DaemonNodeHeartbeatSettings | undefined;
   if (!sandboxId && enrollmentToken) {
-    const enrollment = await enrollManagedDaemon(fetchFn, backendUrl, enrollmentToken, workspacePath, options.signal);
+    const enrollment = await withBackendReconnect(
+      () => enrollManagedDaemon(fetchFn, backendUrl, enrollmentToken, workspacePath, options.signal),
+      options.logger ?? { warn: () => undefined },
+      { sandboxId: "pending-managed-enrollment", what: "managed enrollment" },
+      { signal: options.signal },
+    );
     sandboxId = enrollment.sandboxId;
     enrolledToken = enrollment.token;
     configuredEmployeeId = configuredEmployeeId ?? enrollment.employeeId;
@@ -1569,7 +1574,7 @@ export function backendReconnectDelayMs(attempt: number, random = Math.random): 
 
 async function withBackendReconnect<T>(
   action: () => Promise<T>,
-  logger: DaemonLogger,
+  logger: Pick<DaemonLogger, "warn">,
   context: { sandboxId: string; what: string },
   control: { signal?: AbortSignal; shouldStop?: () => boolean } = {},
 ): Promise<T> {

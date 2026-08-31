@@ -62,6 +62,7 @@ from .artifacts import (
 from .credentials import (
     daemon_node_token_matches,
     hash_daemon_node_token,
+    managed_daemon_node_token,
     new_daemon_node_token,
     sandbox_ui_token_matches,
 )
@@ -1231,10 +1232,43 @@ class DaemonNodeRegistry:
         managed_node: dict[str, Any],
         attempt: dict[str, Any],
         payload: dict[str, Any],
+        enrollment_credential: str | None = None,
     ) -> tuple[dict[str, Any], str]:
-        """Create the observed daemon identity for a consumed enrollment grant."""
+        """Create or replay the observed daemon identity for an enrollment grant."""
+        prior = next(
+            (
+                sandbox
+                for sandbox in self.sandboxes.values()
+                if sandbox.get("provisioningAttemptId") == attempt["id"]
+            ),
+            None,
+        )
+        if prior:
+            if not enrollment_credential:
+                raise ValueError("Provisioning attempt already has a daemon runtime.")
+            replay_token = managed_daemon_node_token(
+                enrollment_credential, prior["id"]
+            )
+            if not daemon_node_token_matches(prior, replay_token):
+                raise PermissionError("Enrollment credential cannot recover this runtime.")
+            return prior, replay_token
+        active_runtime = next(
+            (
+                sandbox
+                for sandbox in self.sandboxes.values()
+                if sandbox.get("managedNodeId") == managed_node["id"]
+                and not sandbox.get("retiredAt")
+            ),
+            None,
+        )
+        if active_runtime:
+            raise ValueError("Managed node already has an active daemon runtime.")
         sandbox_id = new_sandbox_id()
-        node_token = new_daemon_node_token()
+        node_token = (
+            managed_daemon_node_token(enrollment_credential, sandbox_id)
+            if enrollment_credential
+            else new_daemon_node_token()
+        )
         now = now_iso()
         sandbox = {
             "id": sandbox_id,

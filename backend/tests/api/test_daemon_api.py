@@ -236,7 +236,7 @@ def test_daemon_heartbeat_is_authenticated_and_returns_lease_policy(
         )
 
 
-def test_managed_node_provisioning_enrolls_runtime_with_single_use_grant(
+def test_managed_node_provisioning_replays_the_same_runtime_after_lost_response(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
@@ -298,7 +298,8 @@ def test_managed_node_provisioning_enrolls_runtime_with_single_use_grant(
             json={"workspacePath": "/workspace/alice"},
             headers={"Authorization": f"Enrollment {credential}"},
         )
-        assert duplicate.status_code == 401
+        assert duplicate.status_code == 201
+        assert duplicate.json() == runtime
 
         registered = client.post(
             "/api/v1/daemon-node-registrations",
@@ -758,7 +759,22 @@ def test_running_managed_runtime_retirement_preserves_agent_and_placement(
         response = client.delete(f"/api/v1/admin/managed-nodes/{managed['id']}/runtime")
 
         assert response.status_code == 204, response.text
-        assert app.state.registry.get(runtime["id"]) is None
+        retired = app.state.registry.get(runtime["id"])
+        assert retired["managedNodeId"] == managed["id"]
+        assert retired["retiredAt"]
+        assert retired["status"] == "stopped"
+        reconnected = app.state.registry.register(
+            {
+                "sandboxId": runtime["id"],
+                "token": runtime_token,
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        assert reconnected["managedNodeId"] == managed["id"]
+        assert reconnected["retiredAt"]
+        assert reconnected["status"] == "stopped"
         assert not app.state.agent_store.get_agent(agent["id"]).get("deletedAt")
         [preserved] = app.state.agent_placement_store.list_placements(
             agent_id=agent["id"]

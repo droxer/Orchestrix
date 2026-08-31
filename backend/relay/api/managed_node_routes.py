@@ -282,7 +282,9 @@ async def retire_managed_node_runtime(
                     sync_node_agents(ctx, runtime)
                 else:
                     remove_node_agents(ctx, daemon_node_id)
-                ctx.registry.delete(daemon_node_id)
+                # Keep the credential-bearing row fenced so a late heartbeat
+                # cannot recreate this runtime as an unmanaged computer.
+                ctx.registry.fence_managed_node(daemon_node_id)
     except KeyError as error:
         raise HTTPException(404, "Managed node not found.") from error
     except ValueError as error:
@@ -306,15 +308,24 @@ async def enroll_managed_daemon(request: Request, ctx: AppContextDep) -> dict[st
     managed_node: dict[str, Any] | None = None
     attempt: dict[str, Any] | None = None
     try:
-        managed_node, attempt = ctx.managed_node_store.consume_enrollment_grant(
-            credential
-        )
-        daemon_node, runtime_token = ctx.registry.enroll_managed_node(
-            managed_node, attempt, body
-        )
-        ctx.managed_node_store.complete_enrollment(
-            managed_node["id"], attempt["id"], daemon_node["id"]
-        )
+        # Serialize grant validation, runtime allocation, and durable linkage.
+        # A retried request recovers the same daemon identity and token.
+        with ctx.registry.dispatch_lock:
+            managed_node, attempt = (
+                ctx.managed_node_store.consume_enrollment_grant(credential)
+            )
+            daemon_node, runtime_token = ctx.registry.enroll_managed_node(
+                managed_node,
+                attempt,
+                body,
+                enrollment_credential=credential,
+            )
+            ctx.managed_node_store.complete_enrollment(
+                managed_node["id"], attempt["id"], daemon_node["id"]
+            )
+            ctx.managed_node_store.complete_enrollment_grant(
+                credential, daemon_node["id"]
+            )
         return {
             "sandboxId": daemon_node["id"],
             "token": runtime_token,

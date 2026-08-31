@@ -495,7 +495,7 @@ class LocalManagedNodeStore:
             grant = _read_json(path)
             if grant.get("revokedAt"):
                 raise PermissionError("Enrollment grant has been revoked.")
-            if grant.get("consumedAt"):
+            if grant.get("consumedAt") and not grant.get("daemonNodeId"):
                 raise PermissionError("Enrollment grant has already been consumed.")
             if _parse_timestamp(grant["expiresAt"]) <= datetime.now(timezone.utc):
                 raise PermissionError("Enrollment grant has expired.")
@@ -507,11 +507,44 @@ class LocalManagedNodeStore:
             node = self.get_node(attempt["managedNodeId"])
             if not node or node.get("desiredState") != "running" or node.get("generation") != attempt.get("generation"):
                 raise PermissionError("Managed node no longer accepts this enrollment grant.")
-            if attempt.get("status") in TERMINAL_ATTEMPT_STATUSES:
+            if (
+                attempt.get("status") in TERMINAL_ATTEMPT_STATUSES
+                and attempt.get("status") != "succeeded"
+            ):
                 raise PermissionError("Provisioning attempt is not active.")
-            consumed_at = now_iso()
-            _write_json(path, {**grant, "consumedAt": consumed_at})
             return node, attempt
+
+    def complete_enrollment_grant(
+        self, credential: str, daemon_node_id: str
+    ) -> None:
+        grant_id, separator, secret = credential.partition(".")
+        if not separator or not grant_id or not secret:
+            raise PermissionError("Invalid enrollment credential.")
+        with self._lock:
+            path = self.grants_dir / f"{safe_name(grant_id)}.json"
+            if not path.exists():
+                raise PermissionError("Invalid enrollment credential.")
+            grant = _read_json(path)
+            if not hmac.compare_digest(
+                grant["secretHash"], _secret_hash(secret)
+            ):
+                raise PermissionError("Invalid enrollment credential.")
+            existing_daemon_node_id = grant.get("daemonNodeId")
+            if (
+                existing_daemon_node_id
+                and existing_daemon_node_id != daemon_node_id
+            ):
+                raise PermissionError(
+                    "Enrollment grant belongs to a different daemon runtime."
+                )
+            _write_json(
+                path,
+                {
+                    **grant,
+                    "daemonNodeId": daemon_node_id,
+                    "consumedAt": grant.get("consumedAt") or now_iso(),
+                },
+            )
 
     def complete_enrollment(self, node_id: str, attempt_id: str, daemon_node_id: str) -> tuple[dict[str, Any], dict[str, Any]]:
         with self._lock:

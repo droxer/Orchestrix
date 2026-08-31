@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ControlPanelDaemonNodeRecord } from "relay-core";
+import { SupervisorBackendClient } from "../src/backend-client.js";
 import { LocalDaemonLauncher, workspaceForEmployee, workspaceForManagedNode } from "../src/launchers.js";
 import { RelaySupervisor } from "../src/reconcile.js";
 import type {
@@ -198,4 +199,16 @@ test("supervisor restarts a managed daemon after its child exits", async () => {
   assert.equal((await supervisor.reconcileOnce()).started, 1);
   assert.equal((await supervisor.reconcileOnce()).started, 1);
   assert.equal(launcher.starts.length, 2);
+});
+
+test("supervisor backend requests time out instead of freezing reconciliation", async () => {
+  const client = new SupervisorBackendClient({
+    backendUrl: "http://backend.test",
+    requestTimeoutMs: 5,
+    fetchFn: async (_input, init) => await new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+    }),
+  } as ConstructorParameters<typeof SupervisorBackendClient>[0] & { requestTimeoutMs: number });
+
+  await assert.rejects(client.listManagedNodes(), /timeout|aborted/i);
 });
