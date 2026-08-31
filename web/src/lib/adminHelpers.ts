@@ -250,6 +250,79 @@ export function employeeSummaryStatus(
   return { tone: "neutral", key: "no_nodes" };
 }
 
+/**
+ * Employee fleet health, most-urgent first — the order the employee list
+ * bands in. Not the order `EmployeeSummaryStatusKey` happens to be declared
+ * in: that union lists the states, this ranks them. An admin opens this list
+ * to find the people whose machines need something, so a failure sorts above
+ * a healthy fleet and an employee with no computer at all sorts last.
+ */
+export const EMPLOYEE_SUMMARY_STATUS_ORDER: readonly EmployeeSummaryStatusKey[] = [
+  "failed",
+  "running",
+  "ready",
+  "idle",
+  "no_nodes",
+];
+
+/**
+ * Employees partitioned by fleet health, in `EMPLOYEE_SUMMARY_STATUS_ORDER`.
+ * `employeeSummaryStatus` is already exclusive — every employee has exactly
+ * one — so this is a true partition, which is what a band may claim to be.
+ */
+export function employeesByStatus(
+  members: EmployeeNodeSummary[],
+): Record<EmployeeSummaryStatusKey, EmployeeNodeSummary[]> {
+  const grouped = Object.fromEntries(
+    EMPLOYEE_SUMMARY_STATUS_ORDER.map((key) => [key, [] as EmployeeNodeSummary[]]),
+  ) as Record<EmployeeSummaryStatusKey, EmployeeNodeSummary[]>;
+  for (const member of members) grouped[employeeSummaryStatus(member).key].push(member);
+  return grouped;
+}
+
+/**
+ * Fleet lifecycle, most-urgent first — the order the computer list bands in.
+ *
+ * This is NOT the quick-filter chip set: those slices deliberately OVERLAP
+ * (`running` is a superset of `ready`, `failed` also catches `stale`), so
+ * they cannot partition a list. `visualStatus` can — it returns exactly one
+ * value per node — which is why the bands key off it instead.
+ */
+export const NODE_STATUS_ORDER: readonly string[] = [
+  "failed",
+  "stale",
+  "busy",
+  "running",
+  "provisioning",
+  "ready",
+  "stopped",
+];
+
+/**
+ * Computers partitioned by `visualStatus`, ordered by `NODE_STATUS_ORDER`,
+ * with empty bands dropped.
+ *
+ * Returns pairs rather than a record because a node's status arrives over the
+ * wire: `SandboxStatus` is a closed union in THIS build, but a backend one
+ * release ahead can send a value it does not contain, and that node still has
+ * to land in a band (appended after the known ones, alphabetically) rather
+ * than vanish from a list that claims to show the whole fleet.
+ */
+export function nodesByStatus(
+  nodes: ControlPanelDaemonNodeRecord[],
+): { status: string; nodes: ControlPanelDaemonNodeRecord[] }[] {
+  const grouped = new Map<string, ControlPanelDaemonNodeRecord[]>();
+  for (const node of nodes) {
+    const status = visualStatus(node);
+    grouped.set(status, [...(grouped.get(status) ?? []), node]);
+  }
+  const known = NODE_STATUS_ORDER.filter((status) => grouped.has(status));
+  const unknown = [...grouped.keys()]
+    .filter((status) => !NODE_STATUS_ORDER.includes(status))
+    .sort();
+  return [...known, ...unknown].map((status) => ({ status, nodes: grouped.get(status) ?? [] }));
+}
+
 export function employeeEmptyStateTranslationKey(
   query: string,
   filter: EmployeeQuickFilter,

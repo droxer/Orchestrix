@@ -395,7 +395,9 @@
       "dispatch_queued": "排隊等待節點",
       "dispatch_rejected": "派送遭拒",
       "activity": "活動"
-    }
+    },
+    "col_ref": "編號",
+    "add_due": "新增日期"
   },
   "workspace": {
     "title": "工作區",
@@ -630,7 +632,8 @@
     "bulk_delete_body_other": "將刪除所選的 {{count}} 個例行任務及其排程，且不會再次執行。既有執行紀錄與話題仍會保留。",
     "toast_bulk_deleted_one": "已刪除 {{count}} 個例行任務。",
     "toast_bulk_deleted_other": "已刪除 {{count}} 個例行任務。",
-    "sort_label": "例程排序"
+    "sort_label": "例程排序",
+    "set_next_run": "設定下次執行"
   },
   "admin": {
     "title": "管理",

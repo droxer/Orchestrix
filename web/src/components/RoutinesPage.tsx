@@ -12,13 +12,12 @@ import { agentReadyForTask } from "../lib/backlog";
 import { isTaskAssigneeCurrentUser, taskAssigneeDisplayName, teamReady } from "../lib/taskAssignment";
 import { useEmployeeNames } from "../hooks/useEmployeeNames";
 import { writeViewPreference } from "../lib/viewPreference";
-import { filterRoutineTasks, latestRoutineSession, routineSortColumns, routineState, runningRoutineIds } from "../lib/routine";
+import { filterRoutineTasks, latestRoutineSession, routineSortColumns, routineState, runningRoutineIds, routinesByState, ROUTINE_STATE_ORDER, type RoutineState } from "../lib/routine";
 import { applySort } from "../lib/listSort";
-import { paginate } from "../lib/pagination";
-import { usePagination } from "../hooks/usePagination";
+import { LANE_PAGE_SIZE, paginate } from "../lib/pagination";
+import { useLanePagination, usePagination } from "../hooks/usePagination";
 import { Pagination } from "@/components/ui/Pagination";
 import { useListSort } from "../hooks/useListSort";
-import { SortableColumnHeader } from "@/components/ui/SortableColumnHeader";
 import { SortMenu } from "@/components/ui/SortMenu";
 import { emptyRoutineForm, taskAssignmentMutationFields, taskBoardFormsEqual, taskStartMutationInput, type RoutineTaskFormState } from "../lib/taskBoardForm";
 import { TaskDrawer } from "./task-board/TaskDrawer";
@@ -35,7 +34,10 @@ import {
   RoutineCard,
   RoutineDrawerMeta,
   RoutineRow,
+  RoutineRowsHead,
 } from "./task-board/RoutineRecords";
+import { ListGroup } from "./ListGroup";
+import { ROUTINE_STATE_SHAPE } from "./RoutineStateBadge";
 import { TaskSelectAllCheckbox, TaskSelectionBar } from "./task-board/TaskSelection";
 import {
   EMPTY_TASK_SELECTION,
@@ -99,16 +101,32 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
   );
   const { sort, toggleSort, setSort } = useListSort(sortColumns);
   const { page, setPage } = usePagination();
+  const { lanePages: groupPages, setLanePage: setGroupPage } = useLanePagination(ROUTINE_STATE_ORDER);
   const filteredTasks = useMemo(
     () => applySort(filterRoutineTasks(tasks, filters), sortColumns, sort),
     [filters, sort, sortColumns, tasks],
   );
-  // Both views are flat collections of the same routines, so both page — and
-  // off one cursor, so switching card/list keeps the reader where they were.
+  // The CARD view is a flat collection and pages off one cursor. The LIST
+  // groups by schedule health, so it pages per band — one cursor for the
+  // whole list would empty a band because of the cursor rather than because
+  // no routine is in that state.
   const pagedTasks = useMemo(() => paginate(filteredTasks, page), [filteredTasks, page]);
+  const grouped = useMemo(() => routinesByState(filteredTasks, runningIds), [filteredTasks, runningIds]);
+  const pagedGroups = useMemo(
+    () => Object.fromEntries(ROUTINE_STATE_ORDER.map((state) => [
+      state,
+      paginate(grouped[state], groupPages[state] ?? 1, LANE_PAGE_SIZE),
+    ])) as Record<RoutineState, ReturnType<typeof paginate<RelayTaskListItem>>>,
+    [grouped, groupPages],
+  );
   // Selection follows what is on screen, so "select all" then Delete cannot
   // reach a routine on a page the reader never saw.
-  const visibleIds = useMemo(() => pagedTasks.items.map((task) => task.id), [pagedTasks]);
+  const visibleIds = useMemo(
+    () => (view === "list"
+      ? ROUTINE_STATE_ORDER.flatMap((state) => pagedGroups[state].items)
+      : pagedTasks.items).map((task) => task.id),
+    [pagedGroups, pagedTasks, view],
+  );
   // Derived, not stored: a routine hidden by a filter (or deleted elsewhere)
   // drops out of the selection immediately, so a batch action can never reach
   // a record the board is no longer showing.
@@ -323,79 +341,67 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
           onCreate={routineTasks.length === 0 ? () => openRoutineForm(emptyRoutineForm(currentUser)) : undefined}
         />
       ) : view === "list" ? (
-        <>
-          {/* The pager is a sibling of the scroller, not a row inside it, so
-              it stays put while the rows move under it. */}
-          <div className="backlog-rows" role="table" aria-label={t("routine.title")}>
-          <div className="backlog-rows-head" role="row">
-            <span className="backlog-rows-head-cell backlog-rows-head-select" role="columnheader">
-              <TaskSelectAllCheckbox
-                state={selectionCheckState(visibleSelection, visibleIds)}
-                label={t("routine.select_all_routines")}
-                onToggle={() => setSelection((current) => toggleAllSelected(current, visibleIds))}
-              />
-            </span>
-            <span className="backlog-rows-head-cell backlog-rows-head-dot" role="columnheader" />
-            <SortableColumnHeader
-              className="backlog-rows-head-cell backlog-rows-head-lead"
-              label={t("backlog.col_task")}
-              sortKey="title"
-              sort={sort}
-              onSort={toggleSort}
-            />
-            <SortableColumnHeader
-              className="backlog-rows-head-cell backlog-rows-head-status"
-              label={t("routine.state")}
-              sortKey="state"
-              sort={sort}
-              onSort={toggleSort}
-            />
-            <SortableColumnHeader
-              className="backlog-rows-head-cell backlog-rows-head-tags"
-              label={t("backlog.priority")}
-              sortKey="priority"
-              sort={sort}
-              onSort={toggleSort}
-            />
-            <SortableColumnHeader
-              className="backlog-rows-head-cell backlog-rows-head-assignee"
-              label={t("backlog.assignee")}
-              sortKey="assignee"
-              sort={sort}
-              onSort={toggleSort}
-            />
-            <SortableColumnHeader
-              className="backlog-rows-head-cell backlog-rows-head-due"
-              label={t("routine.next_run")}
-              sortKey="nextRun"
-              sort={sort}
-              onSort={toggleSort}
-            />
-            {/* Actions is not a column of data — there is nothing to order by. */}
-            <span className="backlog-rows-head-cell backlog-rows-head-actions" role="columnheader">{t("backlog.actions")}</span>
-          </div>
-          {pagedTasks.items.map((task) => {
-            const session = linkedSession(task);
-            const assignment = taskAssignmentDisplay(task);
+        /* Grouped by schedule health — the fact a routine list is read for.
+           The per-row state word is gone with it: the band above the row has
+           already said it, and the column it held went to the record. */
+        <div className="backlog-rows routine-rows">
+          {ROUTINE_STATE_ORDER.map((state) => {
+            const group = grouped[state];
+            if (group.length === 0) return null;
+            const label = t(`routine.states.${state}`);
+            const groupPage = pagedGroups[state];
+            const groupIds = groupPage.items.map((task) => task.id);
             return (
-              <RoutineRow
-                key={task.id}
-                task={task}
-                selected={visibleSelection.has(task.id)}
-                onToggleSelect={() => setSelection((current) => toggleSelected(current, task.id))}
-                state={routineState(task, runningIds)}
-                session={session}
-                assigneeDisplayName={taskAssigneeDisplayName(task, currentUser, employeeNames)}
-                assigneeIsSelf={isTaskAssigneeCurrentUser(task, currentUser)}
-                agentDisplayName={assignment.name}
-                ready={assignment.ready}
-                {...routineHandlers(task)}
-              />
+              <ListGroup
+                key={state}
+                data-routine-state={state}
+                label={label}
+                count={group.length}
+                shape={ROUTINE_STATE_SHAPE[state]}
+              >
+                <div className="list-group-rows" role="table" aria-label={label}>
+                  <RoutineRowsHead
+                    sort={sort}
+                    onSort={toggleSort}
+                    selectAll={
+                      <TaskSelectAllCheckbox
+                        state={selectionCheckState(visibleSelection, groupIds)}
+                        label={t("routine.select_all_routines")}
+                        onToggle={() => setSelection((current) => toggleAllSelected(current, groupIds))}
+                      />
+                    }
+                  />
+                  {groupPage.items.map((task) => {
+                    const session = linkedSession(task);
+                    const assignment = taskAssignmentDisplay(task);
+                    return (
+                      <RoutineRow
+                        key={task.id}
+                        task={task}
+                        selected={visibleSelection.has(task.id)}
+                        onToggleSelect={() => setSelection((current) => toggleSelected(current, task.id))}
+                        state={state}
+                        session={session}
+                        assigneeDisplayName={taskAssigneeDisplayName(task, currentUser, employeeNames)}
+                        assigneeIsSelf={isTaskAssigneeCurrentUser(task, currentUser)}
+                        agentDisplayName={assignment.name}
+                        ready={assignment.ready}
+                        {...routineHandlers(task)}
+                      />
+                    );
+                  })}
+                </div>
+                <Pagination
+                  compact
+                  className="list-group-pager"
+                  page={groupPage}
+                  onPageChange={(next) => setGroupPage(state, next)}
+                  label={label}
+                />
+              </ListGroup>
             );
           })}
-          </div>
-          <Pagination page={pagedTasks} onPageChange={setPage} label={t("routine.title")} />
-        </>
+        </div>
       ) : (
         <>
           <div className="routine-list">

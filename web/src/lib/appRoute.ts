@@ -142,9 +142,9 @@ const LIST_SORT_PARAMS: Record<string, Record<string, ReadonlySet<string>>> = {
  * then render page 1, because the param never survives the write.
  */
 const LIST_PAGE_PARAMS: Record<string, readonly string[]> = {
-  // `lanes` is the board's per-lane cursor set, not a page number — it is
-  // copied verbatim and validated by `parseLanePages` on read, because the
-  // valid lane names are the task statuses and belong to lib/backlog.
+  // `lanes` is the grouped cursor set, not a page number — see
+  // LANE_PAGE_PATHS below. `backlog` keeps `page` for old links; nothing
+  // writes it now that the list groups.
   backlog: ["page"],
   routines: ["page"],
   computer: ["page"],
@@ -152,12 +152,26 @@ const LIST_PAGE_PARAMS: Record<string, readonly string[]> = {
   admin: ["employeePage", "nodePage"],
 };
 
+/**
+ * Per-group cursor sets each path owns, by the query param the grouped list
+ * writes. Kept opaque here: `parseLanePages` drops unknown groups and
+ * non-pages on read, so this only has to decide whether the path owns the
+ * key at all — the valid group names are task statuses, routine states, and
+ * fleet health, and they belong to lib/backlog, lib/routine, and
+ * lib/adminHelpers respectively.
+ *
+ * /admin has two grouped lists on one path, so each owns its own key — same
+ * reason `employeePage`/`nodePage` are split below.
+ */
+const LANE_PAGE_PARAMS: Record<string, readonly string[]> = {
+  backlog: ["lanes"],
+  routines: ["lanes"],
+  admin: ["employeeLanes", "nodeLanes"],
+};
+
 /** Copies `?page=n` only for a path that pages, and only for a real page. */
 function copyPageParams(head: string, source: URLSearchParams, target: URLSearchParams): void {
-  // The board's per-lane cursors ride along on /backlog. Kept opaque here:
-  // `parseLanePages` drops unknown lanes and non-pages on read, so this only
-  // has to decide whether the path owns the key at all.
-  if (head === "backlog") copyParam(source, target, "lanes");
+  for (const param of LANE_PAGE_PARAMS[head] ?? []) copyParam(source, target, param);
   for (const param of LIST_PAGE_PARAMS[head] ?? []) {
     const value = source.get(param);
     // Page 1 is the default and carries no param, so the URL never advertises

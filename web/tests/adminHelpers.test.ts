@@ -5,7 +5,11 @@ import {
   agentsOnNodes,
   buildEmployeeSummaries,
   employeeEmptyStateTranslationKey,
+  employeesByStatus,
   employeeSummaryStatus,
+  EMPLOYEE_SUMMARY_STATUS_ORDER,
+  nodesByStatus,
+  NODE_STATUS_ORDER,
   initialsOf,
   isStale,
   matchesEmployeeQuickFilter,
@@ -337,5 +341,67 @@ describe("initialsOf", () => {
   it("falls back for empty input", () => {
     assert.equal(initialsOf(""), "?");
     assert.equal(initialsOf("   "), "?");
+  });
+});
+
+describe("employeesByStatus", () => {
+  it("bands every employee under the state their own row derives", () => {
+    const employees = [
+      employee({ id: "a", displayName: "A" }),
+      employee({ id: "b", displayName: "B" }),
+      employee({ id: "c", displayName: "C" }),
+      employee({ id: "d", displayName: "D" }),
+    ];
+    const nodes = [
+      node({ id: "n1", employeeId: "a", status: "running", activeRuns: [{ id: "r" }] as never }),
+      node({ id: "n2", employeeId: "b", status: "ready" }),
+      node({ id: "n3", employeeId: "c", status: "failed" }),
+    ];
+    const summaries = buildEmployeeSummaries(employees, nodes);
+
+    const grouped = employeesByStatus(summaries);
+    const total = EMPLOYEE_SUMMARY_STATUS_ORDER.reduce((sum, key) => sum + grouped[key].length, 0);
+
+    // A partition: every employee lands in exactly one band.
+    assert.equal(total, summaries.length);
+    for (const summary of summaries) {
+      const { key } = employeeSummaryStatus(summary);
+      assert.ok(grouped[key].some((member) => member.id === summary.id));
+    }
+    // The employee with no computer at all is the one band nothing else fills.
+    assert.deepEqual(grouped.no_nodes.map((member) => member.id), ["d"]);
+  });
+
+  it("keeps a band for every declared state, even an empty one", () => {
+    const grouped = employeesByStatus(buildEmployeeSummaries([], []));
+    for (const key of EMPLOYEE_SUMMARY_STATUS_ORDER) assert.deepEqual(grouped[key], []);
+  });
+});
+
+describe("nodesByStatus", () => {
+  it("orders known statuses by urgency and drops empty bands", () => {
+    const grouped = nodesByStatus([
+      node({ id: "n1", status: "ready" }),
+      node({ id: "n2", status: "failed" }),
+      node({ id: "n3", status: "ready" }),
+    ]);
+
+    assert.deepEqual(grouped.map((group) => group.status), ["failed", "ready"]);
+    assert.deepEqual(grouped[1].nodes.map((n) => n.id), ["n1", "n3"]);
+  });
+
+  it("bands a status this build has never heard of rather than dropping it", () => {
+    // `SandboxStatus` is closed in this build, so the cast is the point of
+    // the test: it stands in for a backend one release ahead. A node the
+    // list cannot classify still has to appear — it claims the whole fleet.
+    const grouped = nodesByStatus([
+      node({ id: "n1", status: "ready" }),
+      node({ id: "n2", status: "quarantined" as ControlPanelDaemonNodeRecord["status"] }),
+    ]);
+
+    assert.deepEqual(grouped.map((group) => group.status), ["ready", "quarantined"]);
+    for (const status of grouped.map((group) => group.status)) {
+      assert.ok(NODE_STATUS_ORDER.includes(status) || status === "quarantined");
+    }
   });
 });
