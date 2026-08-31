@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardView } from "./admin/dashboard/DashboardView";
 import { useNodeMetrics } from "../hooks/useNodeMetrics";
 import { useTranslation } from "react-i18next";
@@ -21,6 +21,7 @@ import type {
   CreateControlPanelDaemonNodeResponse,
   CreateControlPanelEmployeeResponse,
   CurrentUser,
+  DaemonNodeMonitorRecord,
   EmployeeRecord,
   ManagedNodeRecord,
 } from "../types";
@@ -39,6 +40,8 @@ import { EditEmployeeDrawer } from "./admin/EditEmployeeDrawer";
 import { SettingsView } from "./admin/SettingsView";
 import type { AdminLayout } from "./admin/AdminLayoutToggle";
 import { useAdminNodes } from "../hooks/useAdminNodes";
+import { NODES_QUERY_KEY } from "../hooks/useRelayData";
+import { withoutDeletedComputer } from "../lib/daemonNodes";
 import { useRelayStore } from "../lib/store";
 import { CONTROL_PANEL_POLL_MS } from "../lib/controlPanelQueries";
 import { useDialogs } from "@/components/ui/DialogProvider";
@@ -56,6 +59,7 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
   const { t } = useTranslation();
   const { prompt } = useDialogs();
   const { reportMutationError } = useMutationError();
+  const queryClient = useQueryClient();
 
   // App only mounts this component for an authenticated admin, so seed the auth
   // state from the session it already holds. This skips the redundant /auth/me
@@ -265,6 +269,10 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
             : current.id !== node.id
         )),
       }));
+      await queryClient.cancelQueries({ queryKey: NODES_QUERY_KEY, exact: true });
+      queryClient.setQueryData<DaemonNodeMonitorRecord[]>(NODES_QUERY_KEY, (current) =>
+        withoutDeletedComputer(current ?? [], node));
+      void queryClient.invalidateQueries({ queryKey: NODES_QUERY_KEY, exact: true });
       setCredentialsNodeId(null);
     } catch (error) {
       reportMutationError("Failed to delete node", error, t("errors.admin_delete_node"));

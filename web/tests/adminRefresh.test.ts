@@ -33,4 +33,17 @@ describe("Admin page refresh stability", () => {
       /Promise\.all\(\[managedNodesQuery\.refetch\(\), refetch\(\)\]\)/,
     );
   });
+
+  it("evicts a deleted computer from the My Computers cache immediately", async () => {
+    const adminPageSource = await readFile(resolve("web/src/components/AdminPage.tsx"), "utf8");
+    const deleteHandler = adminPageSource.match(
+      /async function handleDeleteNode[\s\S]*?\n  }/,
+    )?.[0] ?? "";
+
+    assert.match(adminPageSource, /NODES_QUERY_KEY/);
+    assert.match(deleteHandler, /cancelQueries\(\{ queryKey: NODES_QUERY_KEY, exact: true \}\)/);
+    assert.match(deleteHandler, /setQueryData<DaemonNodeMonitorRecord\[\]>/);
+    assert.match(deleteHandler, /withoutDeletedComputer/);
+    assert.match(deleteHandler, /invalidateQueries\(\{ queryKey: NODES_QUERY_KEY, exact: true \}\)/);
+  });
 });

@@ -6,6 +6,7 @@ import { threadDaemonStatus } from "../src/lib/threadStatus.js";
 import {
   mergeVisibleDaemonNodes,
   mergeThreadRuntimeNodes,
+  withoutDeletedComputer,
   shouldClaimLocalDaemonNode,
 } from "../src/lib/daemonNodes.js";
 import {
@@ -169,6 +170,22 @@ describe("Relay web thread status", () => {
 
     assert.deepEqual(runtimeNodes.map((node) => node.id), ["node_a", "node_b"]);
     assert.equal(runtimeNodes.every((node) => !("nodeToken" in node)), true);
+  });
+
+  it("evicts every cached runtime incarnation of a deleted cloud computer", () => {
+    const cached = [
+      daemonNode({ id: "runtime_old", employeeId: "alice", managedNodeId: "cloud_1" }),
+      daemonNode({ id: "runtime_active", employeeId: "alice", managedNodeId: "cloud_1" }),
+      daemonNode({ id: "runtime_keep", employeeId: "alice", managedNodeId: "cloud_2" }),
+    ];
+
+    const remaining = withoutDeletedComputer(cached, controlPanelNode({
+      id: "runtime_active",
+      employeeId: "alice",
+      managedNodeId: "cloud_1",
+    }));
+
+    assert.deepEqual(remaining.map((node) => node.id), ["runtime_keep"]);
   });
 
   it("keeps the computer's display name when the authenticated record wins the merge", () => {

@@ -78,6 +78,20 @@ export function mergeThreadRuntimeNodes(
   ));
 }
 
+/** Remove a deleted computer from an authenticated node snapshot immediately.
+ * Managed computers may have several retired runtime incarnations, so their
+ * stable managed-node identity is the deletion boundary rather than only the
+ * currently displayed runtime id. */
+export function withoutDeletedComputer(
+  nodes: DaemonNodeMonitorRecord[],
+  deleted: { id: string; managedNodeId?: string },
+): DaemonNodeMonitorRecord[] {
+  return nodes.filter((node) => (
+    node.id !== deleted.id
+    && (!deleted.managedNodeId || node.managedNodeId !== deleted.managedNodeId)
+  ));
+}
+
 export function shouldClaimLocalDaemonNode(
   controlPanelNode: ControlPanelDaemonNodeRecord,
   authenticatedNodes: DaemonNodeMonitorRecord[],
