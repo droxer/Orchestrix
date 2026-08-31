@@ -32,7 +32,7 @@ from ..collaboration.policy import (
     decide_failure,
     validate_round_result,
 )
-from ..core.computer_identity import computer_id
+from ..core.computer_identity import computer_id, local_enrollment_key
 from ..core.environment import load_backend_env
 from ..core.ids import new_database_id, new_relay_id, new_sandbox_id, now_iso
 from ..core.models import (
@@ -222,6 +222,7 @@ def public_sandbox_record(sandbox: dict[str, Any]) -> dict[str, Any]:
             "nodeTokenHash",
             "nodeToken",
             "nodeTokenSecret",
+            "enrollmentKey",
         )
         and v is not None
     }
@@ -581,6 +582,11 @@ class DaemonNodeRegistry:
                     or (existing or {}).get("workspaceId")
                 }
                 if payload.get("workspaceId") or (existing or {}).get("workspaceId")
+                else {}
+            ),
+            **(
+                {"enrollmentKey": existing["enrollmentKey"]}
+                if (existing or {}).get("enrollmentKey")
                 else {}
             ),
             **({"sandboxMode": sandbox_mode} if sandbox_mode else {}),
@@ -1138,6 +1144,11 @@ class DaemonNodeRegistry:
     ) -> tuple[dict[str, Any], str | None, str | None]:
         if sandbox_mode not in DAEMON_SANDBOX_MODES:
             sandbox_mode = "boxlite"
+        enrollment_key = (
+            local_enrollment_key(employee_id, workspace_path)
+            if node_location == "employee-device"
+            else None
+        )
         if employee_id:
             existing = self.find_by_employee(employee_id, workspace_path)
             if existing:
@@ -1196,6 +1207,7 @@ class DaemonNodeRegistry:
             "id": sandbox_id,
             **({"employeeId": employee_id} if employee_id else {}),
             **({"workspacePath": workspace_path} if workspace_path else {}),
+            **({"enrollmentKey": enrollment_key} if enrollment_key else {}),
             **({"displayName": display_name} if display_name else {}),
             "sandboxMode": sandbox_mode,
             **({"nodeLocation": node_location} if node_location else {}),
@@ -1209,16 +1221,24 @@ class DaemonNodeRegistry:
             "updatedAt": now,
             "lastError": "Waiting for daemon node registration.",
         }
-        self.sandboxes[sandbox_id] = sandbox
+        created = True
+        if enrollment_key:
+            sandbox, created = self.daemon_store.claim_pending_node(sandbox)
+            node_token = sandbox.get("nodeTokenSecret") or (
+                node_token if created else None
+            )
+        else:
+            self.daemon_store.register_node(sandbox)
+        self.sandboxes[sandbox["id"]] = sandbox
         self._remember_control_panel_node_token(sandbox, node_token)
-        self.daemon_store.register_node(sandbox)
         logger.info(
             "Daemon node provisioned",
-            sandbox_id=sandbox_id,
+            sandbox_id=sandbox["id"],
             employee_id=employee_id,
             workspace_path=workspace_path,
+            reused=not created,
         )
-        return sandbox, ui_token, node_token
+        return sandbox, ui_token if created else None, node_token
 
     def _remember_control_panel_node_token(
         self, sandbox: dict[str, Any], token: str | None

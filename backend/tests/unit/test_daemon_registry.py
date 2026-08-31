@@ -353,8 +353,10 @@ def test_concurrent_local_enrollment_is_idempotent_across_registries(
             )
 
         nodes = [enrollment[0] for enrollment in enrollments]
+        ui_tokens = [enrollment[1] for enrollment in enrollments]
         node_tokens = [enrollment[2] for enrollment in enrollments]
         assert len({node["id"] for node in nodes}) == 1
+        assert sum(token is not None for token in ui_tokens) == 1
         assert len(set(node_tokens)) == 1
         assert node_tokens[0]
 

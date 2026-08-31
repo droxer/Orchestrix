@@ -7,6 +7,8 @@ computer identity — do not reimplement this priority order anywhere else.
 
 from __future__ import annotations
 
+import hashlib
+import os
 from collections.abc import Mapping
 from typing import Any
 
@@ -33,3 +35,20 @@ def computer_id(node: Mapping[str, Any]) -> str:
     if employee_id and machine_id:
         return f"device:{employee_id}:{machine_id}"
     return f"node:{node['id']}"
+
+
+def local_enrollment_key(employee_id: Any, workspace_path: Any) -> str | None:
+    """Return the provisional identity used before a device reports machine-id.
+
+    The stable machine identity is unavailable until the daemon starts. During
+    that gap, enrollment retries are the same request when both the employee
+    and normalized workspace path match. Hashing keeps the indexed value fixed
+    length without treating the workspace path as a secret.
+    """
+    employee = _clean(employee_id)
+    workspace = _clean(workspace_path)
+    if not employee or not workspace:
+        return None
+    normalized_workspace = os.path.normcase(os.path.abspath(workspace))
+    digest = hashlib.sha256(f"{employee}\0{normalized_workspace}".encode()).hexdigest()
+    return f"sha256:{digest}"
