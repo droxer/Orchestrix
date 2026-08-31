@@ -232,6 +232,20 @@ provisioning):
 make supervisor
 ```
 
+BoxLite downloads a small guest bootstrap image independently of Docker. If
+the host needs an outbound proxy for OCI registries, put the proxy URL in the
+supervisor's local environment file so only managed daemon children inherit
+it:
+
+```dotenv
+# packages/relay-supervisor/.env.local
+RELAY_BOXLITE_PROXY_URL=http://127.0.0.1:7890
+```
+
+Relay maps this scoped setting to the standard HTTP/HTTPS proxy variables for
+managed daemons and keeps loopback backend traffic in `NO_PROXY`. It does not
+proxy the supervisor's own backend requests.
+
 Stop Relay and BoxLite processes:
 
 ```bash
@@ -317,34 +331,22 @@ curl -b cookies.txt http://127.0.0.1:8790/api/v1/admin/daemon-nodes
 
 ## Data Layout
 
-Relay writes generated state under `.relay/`:
+Session/task events, snapshots, artifacts, links, and token usage live in the
+configured PostgreSQL database. The event log is the source of truth; snapshots
+are materialized views rebuilt from events. Remaining generated operational
+state lives under `.relay/` (repo root, daemon registry) and the daemon host's
+private state directory (never mounted into an agent sandbox):
 
 ```text
-.relay/
-  tasks/
-    <task-id>/
-      events.jsonl
-      snapshot.json
-  sessions/
-    <session-id>/
-      events.jsonl
-      snapshot.json
-      artifacts/
-        <artifact-id>.<ext>
-  daemon/
-    nodes/
-    commands/
-    runs/
-    run-requests/
-    events/
-  daemon-nodes/
-    <employee-id>.token
-    logs/
-      *.jsonl
+.relay/daemon/{nodes,commands,runs,run-requests,events}/         # daemon registry state
+~/.relay/daemon-nodes/<sandbox-id>/credentials/<employee>.token  # daemon auth token
+~/.relay/daemon-nodes/<sandbox-id>/logs/*.jsonl                  # daemon structured logs
 ```
 
-The event log is the source of truth. Snapshots are materialized views rebuilt
-from events.
+Legacy `.relay/sessions/` and `.relay/tasks/` trees are migration inputs only;
+the runtime does not use them as its session/task store. Import them with
+`relay migrate-local-sessions --data-dir <path>` — see
+[`backend/migrations/README.md`](../backend/migrations/README.md).
 
 ## Source Map
 

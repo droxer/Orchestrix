@@ -166,7 +166,7 @@ UV_CACHE_DIR=.uv-cache uv run --project backend --extra dev pytest backend/tests
 
 # Compile TypeScript tests and run selected built tests
 npx tsc -p packages/tsconfig.json
-node --test dist/web/tests/example.test.js
+node --test dist/web/tests/status.test.js
 
 # Production web type/build check
 npm run build -w web

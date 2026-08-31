@@ -144,7 +144,7 @@ This is the better steady state once you have a domain. Requires DNS.
 
    | Variable | Value | Notes |
    | --- | --- | --- |
-   | `RELAY_ADMIN_TOKEN` | a long random string | Bootstraps the first admin — and stays a valid admin bearer token for as long as it is set. Remove it after bootstrap unless a supervisor needs it. |
+   | `RELAY_ADMIN_TOKEN` | a long random string | Seeds the admin bearer token on first boot. The value is then persisted to the data volume (`auth/admin-token`) and the env var no longer changes it; rotate from the admin console (`POST /api/v1/admin/admin-token/reissue`). |
    | `RELAY_CORS_ALLOW_ORIGINS` | `https://app.example.com` | **Option B only.** Exact origins, comma-separated. `*` is rejected. |
    | `RELAY_CORS_ALLOW_ORIGIN_REGEX` | `https://relay-web-[a-z0-9-]+\.vercel\.app` | **Option B only**, if you want Vercel preview deployments to reach the API. |
    | `RELAY_SESSION_COOKIE_DOMAIN` | `.example.com` | **Option B only.** Shares the cookie across `app.` and `api.`. |
@@ -215,16 +215,19 @@ calls the backend origin directly with `credentials: "include"`.
      -d '{"token":"<RELAY_ADMIN_TOKEN>","username":"admin","password":"<password>"}'
    ```
 
-   Then delete `RELAY_ADMIN_TOKEN` from the service variables and redeploy —
-   unless you run a supervisor, which authenticates with it (see
+   Then keep `RELAY_ADMIN_TOKEN` in the service variables only as the
+   first-boot seed. Once the backend has booted, the token is persisted to
+   the data volume (`auth/admin-token`) and that persisted value is
+   authoritative — deleting or changing the env var afterwards has no effect.
+   A supervisor authenticates with the persisted value (see
    [The supervisor](#the-supervisor)).
 
    This token is **not** only a bootstrap credential. `require_admin_session`
-   accepts it as a bearer token on every admin route, so while it is deployed
-   it is a standing admin bypass that no user account, password change, or
-   session revocation affects. Treat it as a break-glass key: remove it once
-   the first admin exists, and if a supervisor needs it, scope that service's
-   variables accordingly and rotate the value if it leaks.
+   accepts it as a bearer token on every admin route, so it is a standing
+   admin bypass that no user account, password change, or session revocation
+   affects. Treat it as a break-glass key: rotate it from the admin console
+   (or `POST /api/v1/admin/admin-token/reissue`) once the first admin exists
+   and whenever it leaks — env var edits alone do not revoke it.
 
 2. **Sign in** at the Vercel URL and confirm the admin dashboard loads.
 
@@ -272,10 +275,12 @@ git-ignored and is a local-development convenience only. Daemon tokens are
 issued per computer by the backend and are never set as service variables.
 
 `RELAY_ADMIN_TOKEN` deserves separate care: `require_admin_session` accepts it
-as a bearer token on every admin route, ahead of any session check. While it is
-set, it grants full admin access that is unaffected by user accounts, password
-changes, or session revocation. Remove it after bootstrap; keep it only if a
-supervisor authenticates with it, and rotate it if it is ever exposed.
+as a bearer token on every admin route, ahead of any session check. The env
+var only seeds the token on first boot; the value persisted to the data volume
+is authoritative afterwards and grants full admin access unaffected by user
+accounts, password changes, or session revocation. Rotate it from the admin
+console (`POST /api/v1/admin/admin-token/reissue`) if it is ever exposed —
+removing the env var does not revoke the persisted token.
 
 ### Local development is unchanged
 

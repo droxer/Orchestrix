@@ -23,12 +23,13 @@ documentation locations, and UI metadata from the backend's shared constants.
 /teams
 /teams/{teamId}
 /channels
+/computer
 /admin
 ```
 
-Agent lists use `q` and `availability`. Agent details use `tab`, `scope`, `path`,
-and `item`; team details use `tab` and `artifact`; project details use `tab`
-plus `path` and `item` on the Workspace tab; create dialogs use
+Agent lists use `q` and `availability`. Agent and team details use
+`tab`; project details use `tab` plus `path` and `item` on the Workspace tab;
+an open thread-space panel writes `space=1` with `artifact`; create dialogs use
 `dialog=create`. IDs are percent-encoded path segments. Navigation to another
 route or entity removes query state owned by the previous destination.
 

@@ -107,8 +107,9 @@ Node.js 22.19 or newer is required.
 - Run one built test file: `node --test dist/packages/relay-core/tests/handoff.test.js`
   after a build.
 - Run the web UI in dev mode (proxies API to the backend): `make web` (serves on `http://127.0.0.1:5000`).
-- Run the read-only API server: `make serve`; default port is `8787`, override
-  with `PORT=9000`.
+- Run the API server on a second port: `make serve`; default port is `8787`, override
+  with `PORT=9000`. Same full application as `make backend`; only the port
+  default differs.
 - Run database migrations: `make backend-migrate` (Alembic; optionally pass `DATABASE_URL=<url>`).
 - Backend task scheduler env: `RELAY_TASK_SCHEDULER_ENABLED` (default on),
   `RELAY_TASK_SCHEDULER_INTERVAL_SECONDS` (default `10`),

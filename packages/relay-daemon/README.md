@@ -60,8 +60,9 @@ Optional:
 - `RELAY_DAEMON_COMMAND_LEASE_SECONDS`: command lease duration requested from
   the backend. Defaults to 90 seconds and is renewed by command polls while the
   daemon still owns the run; values are capped at one hour.
-- `RELAY_DAEMON_MAX_CONCURRENT_ASK_RUNS`: concurrent ask-mode capacity. Work
-  modes (`action` and `review`) stay exclusive.
+- `RELAY_DAEMON_MAX_CONCURRENT_RUNS`: maximum concurrent runs on this node.
+  Defaults to 1; BoxLite mode always serializes runs because the adapter owns
+  one active guest at a time.
 - `RELAY_DAEMON_SHUTDOWN_GRACE_MS`: max time to wait for active runs to report
   cancellation during shutdown.
 
@@ -104,10 +105,8 @@ relay-daemon \
   --use-local-agent-home
 ```
 
-The daemon has two scheduling classes. `action` and `review` are exclusive work
-modes: only one can run on the computer at a time. `ask` mode can run
-concurrently up to the configured ask capacity so lightweight conversations do
-not block each other. New-layout runs receive their thread directory
+The daemon starts a command only while active runs stay below the configured
+concurrency limit. New-layout runs receive their thread directory
 explicitly, so concurrent new threads do not share a working directory.
 
 ## Thread workspace layout

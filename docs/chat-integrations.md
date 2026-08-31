@@ -266,7 +266,8 @@ Support the same logical commands everywhere:
 
 The current shared parser (`packages/relay-chat/src/commands.ts`) supports:
 
-- `run` / `new` — start a session (aliases of each other).
+- `run` — start a session, optionally targeting an existing one with
+  `--session`; `new` — always force a fresh session.
 - `list` — list the conversation's known sessions.
 - `switch <sessionId>` — change which session subsequent messages target.
 - `status <sessionId>`

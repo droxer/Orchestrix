@@ -370,6 +370,10 @@ Content-Type: application/json
 }
 ```
 
+The implemented local-process slice posts only `{"workspacePath": ...}`; the
+remaining fields above are the target contract and are not yet read by the
+backend.
+
 ### Transactional validation
 
 The backend must atomically verify that:
@@ -387,8 +391,8 @@ identity, links it to the managed node and attempt, and marks the attempt
 
 ### Response and runtime credentials
 
-The response contains the daemon-node ID, backend URL, heartbeat settings, and
-a runtime credential. The runtime credential is stored by the daemon in the
+The response contains the daemon-node ID, sandbox mode, heartbeat settings,
+and a runtime credential. The runtime credential is stored by the daemon in the
 provider's secret mechanism or local protected state, not returned by
 control-panel APIs. Credential rotation creates a successor credential and
 revokes the old one after a bounded overlap.

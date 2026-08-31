@@ -86,14 +86,14 @@ Responsibilities:
 
 Suggested implementation:
 
-- API service in TypeScript/Node.js, FastAPI, or Go. The local MVP is already TypeScript; the cloud control plane language remains an explicit decision.
+- API service in FastAPI/Python — the local control plane already runs FastAPI (`backend/relay/app.py`).
 - PostgreSQL as source of truth.
 - Redis for ephemeral coordination, rate limits, and fanout.
 - Object storage for large artifacts.
 
 MVP note:
 
-The current local implementation stores tasks and sessions under `.relay/`. Keep that for local-first development, but design the model so it maps directly to PostgreSQL tables later.
+Tasks and sessions live in the configured database (PostgreSQL); legacy `.relay/` session/task trees are migration inputs only.
 
 ### 2.3 Workflow Runtime
 
@@ -279,7 +279,7 @@ Audit events should cover:
 
 ## 3. Core Data Model
 
-The implementation should preserve an event-sourced task/session model. Local `.relay` files are the developer MVP persistence layer; PostgreSQL becomes the production source of truth without changing the conceptual model.
+The implementation preserves an event-sourced task/session model. PostgreSQL is the source of truth in every environment without changing the conceptual model.
 
 ### 3.1 Primary Entities
 
@@ -586,7 +586,7 @@ Every session should answer:
 ```text
 Relay web app
 Relay local API
-.relay file store
+PostgreSQL (via `RELAY_DATABASE_URL`)
 BoxLite sandbox
 Claude/Codex/Pi CLIs in sandbox
 ```

@@ -434,32 +434,26 @@ through to the system sans by design rather than shipping a second file.
 
 ## Marginalia
 
-Relay keeps one small decorative layer: the **double-chevron doodle** sketched
-in the margin of empty states — hairline-weight ink linework (`--ink-3` /
-`--ink-4` strokes), dashed construction lines, annotation ticks — shipped as
-inline SVG components in `web/src/components/marginalia.tsx`. The rules:
+Relay keeps one small decorative gesture: the **double-chevron mark** bled off
+the lower-left corner of the pinned-dark login cover — hairline-weight ink
+linework at 5% ink, fixed position — shipped as the inline `Chevrons` SVG in
+`web/src/components/LoginScreen.tsx` with the `.login-bleed` rule in
+`login.css`. The rules:
 
-- **Ink only.** Marginalia never takes an accent (action or live), never
-  takes a status tone, never fills — strokes alone.
-- **Never animate them.** They are set dressing in an operator tool;
+- **Ink only.** The mark never takes an accent (action or live), never takes
+  a status tone, never fills — strokes alone.
+- **Never animate it.** It is set dressing in an operator tool;
   `prefers-reduced-motion` is trivially satisfied because there is no motion.
-- **Absolutely positioned**, so a doodle never perturbs the layout it
-  decorates, and hidden below the 820px mobile tier.
-- One doodle per surface. A second one on the same screen is clutter, not
+- **Absolutely positioned**, so it never perturbs the layout it decorates.
+- One mark per surface. A second one on the same screen is clutter, not
   charm.
 
-The same construction-line language grows into the surfaces themselves in two
-places. Every empty state sits inside a **draft plate** — a dashed
-`--line-1` frame with solid `--line-strong` crop ticks straddling its corners,
-and the doodle hugging the top-right tick — defined once as `.relay-plate` in
-`empty-state.css` and shared by the centered `RelayEmptyState` and the
-left-aligned `BoardEmpty`. Illustration tiles (`.relay-empty-avatar`) wear a
-dashed orbit ring from the same vocabulary; the transcript hero is the one
-tile that goes without, because it already carries the tinted halo. And the
-pinned-dark login cover bleeds the double-chevron mark itself — huge, at 5%
-ink, fixed off the lower-left corner (`login-bleed`), so the pre-auth cover
-and the empty states read as the same product. Frame, ticks, ring, and bleed
-obey the marginalia rules: neutral ink only, decorative, never animated.
+Empty states carry no decorative layer — no dashed construction plate, no crop
+ticks, no corner doodles, no bled watermark glyph, no orbit ring. A zero-data
+surface is a moment where the product has nothing to show; dressing it up
+reads as apology. They are composed from type, spacing, and one optional mark
+tile (`.relay-empty-avatar` in `empty-state.css`), shared by the centered
+`RelayEmptyState` and the board and transcript variants.
 
 ## Do's and Don'ts
 
