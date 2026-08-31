@@ -1,5 +1,5 @@
 import { execFile, spawn, type ChildProcess } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import type { EnsureManagedNodeInput, ManagedNodeProvider, ProviderInstance, SupervisorLogger } from "./types.js";
@@ -13,6 +13,7 @@ export interface LocalProcessProviderOptions {
   stopTimeoutMs?: number;
   stopPollIntervalMs?: number;
   stateDirectory?: string;
+  allocationStaleMs?: number;
 }
 
 const execFileAsync = promisify(execFile);
@@ -31,6 +32,7 @@ export class LocalProcessProvider implements ManagedNodeProvider {
   private readonly stopTimeoutMs: number;
   private readonly stopPollIntervalMs: number;
   private readonly stateDirectory: string;
+  private readonly allocationStaleMs: number;
 
   constructor(options: LocalProcessProviderOptions = {}) {
     this.command = options.command ?? "relay-daemon";
@@ -41,6 +43,7 @@ export class LocalProcessProvider implements ManagedNodeProvider {
     this.stopTimeoutMs = options.stopTimeoutMs ?? 5_000;
     this.stopPollIntervalMs = options.stopPollIntervalMs ?? 50;
     this.stateDirectory = options.stateDirectory ?? join(process.cwd(), ".relay", "supervisor", "local-process");
+    this.allocationStaleMs = options.allocationStaleMs ?? 60_000;
   }
 
   async ensure(input: EnsureManagedNodeInput): Promise<ProviderInstance> {
@@ -62,10 +65,16 @@ export class LocalProcessProvider implements ManagedNodeProvider {
       }
       rmSync(statePath, { force: true });
     } else if (durable?.status === "allocating") {
-      throw new Error(`Managed node ${generationKey} has an indeterminate local process allocation; refusing to create a duplicate.`);
+      const createdAt = durable.createdAt ? Date.parse(durable.createdAt) : Number.NaN;
+      const stale = Number.isNaN(createdAt) || Date.now() - createdAt >= this.allocationStaleMs;
+      if (!stale) {
+        throw new Error(`Managed node ${generationKey} has an indeterminate local process allocation; refusing to create a duplicate.`);
+      }
+      rmSync(statePath, { force: true });
+      this.logger?.warn("discarding stale managed local process allocation", { generationKey });
     }
     mkdirSync(this.stateDirectory, { recursive: true });
-    writeProviderState(statePath, { status: "allocating" });
+    writeProviderState(statePath, { status: "allocating", createdAt: new Date().toISOString() });
     const started = this.start(input, generationKey).then((instance) => {
       writeProviderState(statePath, { status: "running", instanceId: instance.id });
       return instance;
@@ -237,6 +246,7 @@ export function managedDaemonEnv(input: EnsureManagedNodeInput): NodeJS.ProcessE
 interface ProviderState {
   status: "allocating" | "running";
   instanceId?: string;
+  createdAt?: string;
 }
 
 function readProviderState(path: string): ProviderState | undefined {
@@ -249,7 +259,9 @@ function readProviderState(path: string): ProviderState | undefined {
 }
 
 function writeProviderState(path: string, state: ProviderState): void {
-  writeFileSync(path, JSON.stringify(state), { mode: 0o600 });
+  const temporaryPath = `${path}.${process.pid}.${Date.now()}.tmp`;
+  writeFileSync(temporaryPath, JSON.stringify(state), { mode: 0o600 });
+  renameSync(temporaryPath, path);
 }
 
 function localProcessIdentity(instanceId: string): { pid: number; workspaceId: string; processStart: string } | undefined {

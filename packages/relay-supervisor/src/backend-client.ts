@@ -5,6 +5,7 @@ export interface SupervisorBackendClientOptions {
   backendUrl: string;
   adminToken?: string;
   fetchFn?: typeof fetch;
+  requestTimeoutMs?: number;
 }
 
 export class SupervisorBackendRequestError extends Error {
@@ -23,11 +24,13 @@ export class SupervisorBackendClient implements SupervisorBackend, ManagedNodeBa
   private readonly backendUrl: string;
   private readonly adminToken?: string;
   private readonly fetchFn: typeof fetch;
+  private readonly requestTimeoutMs: number;
 
   constructor(options: SupervisorBackendClientOptions) {
     this.backendUrl = options.backendUrl.replace(/\/+$/, "");
     this.adminToken = options.adminToken;
     this.fetchFn = options.fetchFn ?? fetch;
+    this.requestTimeoutMs = options.requestTimeoutMs ?? 30_000;
   }
 
   async listEmployees(): Promise<EmployeeRecord[]> {
@@ -84,9 +87,14 @@ export class SupervisorBackendClient implements SupervisorBackend, ManagedNodeBa
     const headers = new Headers(init.headers);
     headers.set("content-type", "application/json");
     if (this.adminToken) headers.set("authorization", `Bearer ${this.adminToken}`);
+    const timeoutSignal = AbortSignal.timeout(this.requestTimeoutMs);
+    const signal = init.signal
+      ? AbortSignal.any([init.signal, timeoutSignal])
+      : timeoutSignal;
     const response = await this.fetchFn(relayApiUrl(this.backendUrl, path), {
       ...init,
       headers,
+      signal,
     });
     if (!response.ok) {
       throw new SupervisorBackendRequestError(

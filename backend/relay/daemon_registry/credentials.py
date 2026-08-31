@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
+from base64 import urlsafe_b64encode
 from typing import Any
 
 
@@ -14,6 +15,18 @@ def hash_daemon_node_token(token: str | None) -> str | None:
 
 def new_daemon_node_token() -> str:
     return "tok_" + secrets.token_urlsafe(24).rstrip("=")
+
+
+def managed_daemon_node_token(
+    enrollment_credential: str, sandbox_id: str
+) -> str:
+    """Derive a replayable runtime token without persisting its plaintext."""
+    digest = hmac.new(
+        enrollment_credential.encode("utf-8"),
+        f"relay-managed-runtime:{sandbox_id}".encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
+    return "tok_" + urlsafe_b64encode(digest).decode("ascii").rstrip("=")
 
 
 def _hash_matches(expected: str | None, token: str | None) -> bool:

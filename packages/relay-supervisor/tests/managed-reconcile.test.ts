@@ -585,6 +585,95 @@ test("managed reconciler replaces a tracked provider instance after the desired 
   assert.equal(provider.calls.at(-1)?.node.generation, 2);
 });
 
+test("supervisor restart adopts a current registering runtime without duplicating it", async () => {
+  const node = {
+    ...managedNode(),
+    phase: "registering" as const,
+    activeDaemonNodeId: "node_alice",
+  };
+  const attempt = {
+    id: "attempt_1",
+    managedNodeId: node.id,
+    generation: node.generation,
+    attemptNumber: 1,
+    status: "succeeded",
+    providerInstanceId: "mnode_alice:1",
+    startedAt: node.createdAt,
+    updatedAt: node.updatedAt,
+  } satisfies ProvisioningAttemptRecord;
+  const daemon = {
+    id: node.activeDaemonNodeId,
+    managedNodeId: node.id,
+    provisioningAttemptId: attempt.id,
+    status: "provisioning",
+    agents: { claude: "unknown", pi: "unknown", codex: "unknown", kimi: "unknown" },
+    createdAt: node.createdAt,
+    updatedAt: node.updatedAt,
+    queuedCommandCount: 0,
+    activeRuns: [],
+    online: false,
+    stale: false,
+  } satisfies ControlPanelDaemonNodeRecord;
+  const backend = new FakeManagedBackend([node], [daemon], [attempt]);
+  const provider = new FakeProvider();
+  const reconciler = new ManagedNodeReconciler({
+    backend,
+    providers: [provider],
+    backendUrl: "http://backend.test",
+    workspacePathForNode: () => "/workspaces/alice",
+  });
+
+  assert.equal((await reconciler.reconcileOnce()).skipped, 1);
+  assert.equal(provider.calls.length, 0);
+  assert.equal(provider.stopCalls, 0);
+  assert.equal(backend.retiredRuntimes, 0);
+});
+
+test("managed reconciler replaces a registering runtime from an older generation", async () => {
+  const node = {
+    ...managedNode(),
+    generation: 2,
+    phase: "registering" as const,
+    activeDaemonNodeId: "node_alice",
+  };
+  const attempt = {
+    id: "attempt_1",
+    managedNodeId: node.id,
+    generation: 1,
+    attemptNumber: 1,
+    status: "succeeded",
+    providerInstanceId: "mnode_alice:1",
+    startedAt: node.createdAt,
+    updatedAt: node.updatedAt,
+  } satisfies ProvisioningAttemptRecord;
+  const daemon = {
+    id: node.activeDaemonNodeId,
+    managedNodeId: node.id,
+    provisioningAttemptId: attempt.id,
+    status: "provisioning",
+    agents: { claude: "unknown", pi: "unknown", codex: "unknown", kimi: "unknown" },
+    createdAt: node.createdAt,
+    updatedAt: node.updatedAt,
+    queuedCommandCount: 0,
+    activeRuns: [],
+    online: false,
+    stale: false,
+  } satisfies ControlPanelDaemonNodeRecord;
+  const backend = new FakeManagedBackend([node], [daemon], [attempt]);
+  const provider = new FakeProvider();
+  const reconciler = new ManagedNodeReconciler({
+    backend,
+    providers: [provider],
+    backendUrl: "http://backend.test",
+    workspacePathForNode: () => "/workspaces/alice",
+  });
+
+  assert.equal((await reconciler.reconcileOnce()).started, 1);
+  assert.equal(backend.retiredRuntimes, 1);
+  assert.equal(provider.stopCalls, 1);
+  assert.equal(provider.calls.at(-1)?.node.generation, 2);
+});
+
 test("one provider inspection failure does not starve later managed nodes", async () => {
   const first = managedNode();
   const second = { ...managedNode(), id: "mnode_bob", employeeId: "bob" };

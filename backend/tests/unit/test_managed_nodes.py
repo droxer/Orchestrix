@@ -16,17 +16,20 @@ def test_managed_nodes_use_uuid_ids(tmp_path: Path) -> None:
     assert str(UUID(node["id"])) == node["id"]
 
 
-def test_managed_node_attempt_uses_single_use_enrollment_grant(tmp_path: Path) -> None:
+def test_managed_node_enrollment_grant_replays_completed_runtime(tmp_path: Path) -> None:
     store = LocalManagedNodeStore(tmp_path)
     node = store.create_node({"employeeId": "alice", "provider": "local-process"})
     attempt, credential = store.create_attempt(node["id"])
 
     enrolled_node, enrolled_attempt = store.consume_enrollment_grant(credential)
+    store.complete_enrollment(node["id"], attempt["id"], "sbx_alice")
+    store.complete_enrollment_grant(credential, "sbx_alice")
 
     assert enrolled_node["id"] == node["id"]
     assert enrolled_attempt["id"] == attempt["id"]
-    with pytest.raises(PermissionError, match="already been consumed"):
-        store.consume_enrollment_grant(credential)
+    replayed_node, replayed_attempt = store.consume_enrollment_grant(credential)
+    assert replayed_node["id"] == node["id"]
+    assert replayed_attempt["id"] == attempt["id"]
 
 
 def test_purge_deleted_node_removes_its_history(tmp_path: Path) -> None:
@@ -248,6 +251,7 @@ def test_successful_enrollment_links_observed_daemon(tmp_path: Path) -> None:
     store.consume_enrollment_grant(credential)
 
     updated, completed = store.complete_enrollment(node["id"], attempt["id"], "sbx_alice")
+    store.complete_enrollment_grant(credential, "sbx_alice")
 
     assert completed["status"] == "succeeded"
     assert updated["activeDaemonNodeId"] == "sbx_alice"
@@ -283,16 +287,17 @@ def test_expired_grants_are_swept_when_new_attempts_are_created(tmp_path: Path) 
         store.consume_enrollment_grant(credential)
 
 
-def test_consumed_grant_still_reports_why_it_was_refused(tmp_path: Path) -> None:
+def test_completed_grant_rejects_replay_after_attempt_is_cancelled(tmp_path: Path) -> None:
     store = LocalManagedNodeStore(tmp_path)
     node = store.create_node({"employeeId": "alice"})
     attempt, credential = store.create_attempt(node["id"])
     store.consume_enrollment_grant(credential)
+    store.complete_enrollment_grant(credential, "sbx_alice")
     store.update_attempt(attempt["id"], {"status": "cancelled"})
 
     store.create_attempt(node["id"])
 
-    with pytest.raises(PermissionError, match="already been consumed"):
+    with pytest.raises(PermissionError, match="not active"):
         store.consume_enrollment_grant(credential)
 
 

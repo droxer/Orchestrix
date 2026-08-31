@@ -82,7 +82,11 @@ export class ManagedNodeReconciler {
   private readonly deletionDeadlineMs: number;
   private readonly now: () => number;
   private readonly logger?: SupervisorLogger;
-  private readonly instances = new Map<string, { provider: ManagedNodeProvider; instance: ProviderInstance }>();
+  private readonly instances = new Map<string, {
+    provider: ManagedNodeProvider;
+    instance: ProviderInstance;
+    generation: number;
+  }>();
 
   constructor(options: ManagedNodeReconcilerOptions) {
     this.backend = options.backend;
@@ -106,7 +110,9 @@ export class ManagedNodeReconciler {
     let healthy = 0;
     let failed = 0;
     for (const node of nodes) {
+      try {
       const provider = this.providers.get(node.provider);
+      let runtimeRetired = false;
       if (!provider) {
         const message = `Managed node provider ${node.provider} is unavailable.`;
         const currentCondition = node.conditions.find((condition) =>
@@ -203,20 +209,48 @@ export class ManagedNodeReconciler {
             skipped += 1;
             continue;
           }
+          runtimeRetired = true;
         }
         if (instanceId && instanceRunning) await provider.stop(instanceId);
         this.instances.delete(node.id);
         await this.backend.updateManagedNode(node.id, { phase: "requested" });
       }
-      const tracked = this.instances.get(node.id);
-      if (tracked) {
-        if (await tracked.provider.inspect(tracked.instance.id) === "running") {
+      const attempts = await this.backend.listProvisioningAttempts(node.id);
+      if (node.phase !== "ready" && node.activeDaemonNodeId && !runtimeRetired) {
+        const daemon = daemonById.get(node.activeDaemonNodeId);
+        const linkedAttempt = attempts.find((attempt) => attempt.id === daemon?.provisioningAttemptId)
+          ?? attempts.find((attempt) => attempt.id === node.activeAttemptId)
+          ?? [...attempts].reverse().find((attempt) => attempt.providerInstanceId);
+        const linkedInstanceId = linkedAttempt?.providerInstanceId;
+        const currentRuntimeRunning = Boolean(
+          linkedAttempt?.generation === node.generation
+          && linkedInstanceId
+          && await provider.inspect(linkedInstanceId) === "running"
+        );
+        if (currentRuntimeRunning) {
           skipped += 1;
           continue;
         }
+        if (!await this.retireRuntimeWhenDrained(node)) {
+          skipped += 1;
+          continue;
+        }
+        if (linkedInstanceId) await provider.stop(linkedInstanceId);
         this.instances.delete(node.id);
       }
-      const attempts = await this.backend.listProvisioningAttempts(node.id);
+      const tracked = this.instances.get(node.id);
+      if (tracked) {
+        const trackedRunning = await tracked.provider.inspect(tracked.instance.id) === "running";
+        if (tracked.generation !== node.generation) {
+          if (trackedRunning) await tracked.provider.stop(tracked.instance.id);
+          this.instances.delete(node.id);
+        } else if (trackedRunning) {
+          skipped += 1;
+          continue;
+        } else {
+          this.instances.delete(node.id);
+        }
+      }
       if (node.activeAttemptId) {
         const active = attempts.find((attempt) => attempt.id === node.activeAttemptId);
         if (active?.providerInstanceId && await provider.inspect(active.providerInstanceId) === "running") {
@@ -266,7 +300,7 @@ export class ManagedNodeReconciler {
           workspacePath: this.workspacePathForNode(node),
           workspaceId: workspaceIdForManagedNode(node),
         });
-        this.instances.set(node.id, { provider, instance });
+        this.instances.set(node.id, { provider, instance, generation: node.generation });
         await this.backend.updateProvisioningAttempt(node.id, created.attempt.id, {
           status: "registering",
           providerInstanceId: instance.id,
@@ -291,6 +325,14 @@ export class ManagedNodeReconciler {
           nodeId: node.id,
           provider: node.provider,
           retryDelayMs,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      } catch (error) {
+        failed += 1;
+        this.logger?.error("managed node reconcile failed", {
+          nodeId: node.id,
+          provider: node.provider,
           error: error instanceof Error ? error.message : String(error),
         });
       }
