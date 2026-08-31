@@ -122,7 +122,11 @@
      tracks and the numerals sized the rows', putting LIMIT ~90px right of the
      value under it. Sharing this declaration is not enough — only tracks that
      resolve without reading content give the two grids the same columns. */
-  grid-template-columns: minmax(220px, 1.2fr) minmax(0, 2fr) 3.5rem 4.5rem 4.5rem 4.5rem;
+  /* The three metric tracks are sized to their own CAPS HEADERS, not to the
+     numerals under them: "LOCAL LIMIT" and "RUNNING" were clipped to "LIM…"
+     and "RUNN…" at 3.5/4.5rem, and a truncated column header names nothing.
+     Repeating the header once per band made it five times as loud. */
+  grid-template-columns: minmax(220px, 1.2fr) minmax(0, 2fr) 5rem 5.5rem 5rem 4.5rem;
   gap: var(--sp-6);
 }
 

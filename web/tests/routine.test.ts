@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { filterRoutineTasks, latestRoutineSession, routineDueTone, routineState, runningRoutineCount, runningRoutineIds, type RoutineFilters } from "../src/lib/routine.js";
+import { filterRoutineTasks, latestRoutineSession, routineDueTone, routinesByState, routineState, ROUTINE_STATE_ORDER, runningRoutineCount, runningRoutineIds, type RoutineFilters } from "../src/lib/routine.js";
 import type { RelaySession, RelayTask } from "../src/types.js";
 
 const baseFilters: RoutineFilters = {
@@ -147,5 +147,41 @@ describe("runningRoutineCount", () => {
     ];
 
     assert.equal(runningRoutineCount(routines, tasks), 1);
+  });
+});
+
+describe("routinesByState", () => {
+  it("bands every routine under the state its own row would render", () => {
+    const routines = [
+      task({ id: "a", title: "A", isRoutine: true, routineEnabled: true, routineNextRunDate: "2026-01-01" }),
+      task({ id: "b", title: "B", isRoutine: true, routineEnabled: true, routineNextRunDate: "2026-05-05" }),
+      task({ id: "c", title: "C", isRoutine: true, routineEnabled: false, routineNextRunDate: "2026-05-05" }),
+      task({ id: "d", title: "D", isRoutine: true, routineEnabled: true }),
+    ];
+
+    const grouped = routinesByState(routines, new Set(), "2026-05-05");
+
+    assert.deepEqual(grouped.overdue.map((routine) => routine.id), ["a"]);
+    assert.deepEqual(grouped.due.map((routine) => routine.id), ["b"]);
+    assert.deepEqual(grouped.paused.map((routine) => routine.id), ["c"]);
+    assert.deepEqual(grouped.unscheduled.map((routine) => routine.id), ["d"]);
+    assert.deepEqual(grouped.running, []);
+    // A band the list can render has to exist even when it is empty, or the
+    // page reads `grouped[state]` as undefined for a state nothing is in.
+    for (const state of ROUTINE_STATE_ORDER) assert.ok(Array.isArray(grouped[state]));
+  });
+
+  it("puts a routine in exactly one band", () => {
+    const routines = [
+      task({ id: "a", title: "A", isRoutine: true, routineEnabled: true, routineNextRunDate: "2026-05-05" }),
+      task({ id: "b", title: "B", isRoutine: true, routineEnabled: false }),
+    ];
+
+    const grouped = routinesByState(routines, new Set(["a"]), "2026-05-05");
+    const total = ROUTINE_STATE_ORDER.reduce((sum, state) => sum + grouped[state].length, 0);
+
+    assert.equal(total, routines.length);
+    // Running outranks the schedule, same as `routineState`.
+    assert.deepEqual(grouped.running.map((routine) => routine.id), ["a"]);
   });
 });

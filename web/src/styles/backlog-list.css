@@ -48,19 +48,31 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  gap: var(--sp-5);
   padding: var(--sp-4) var(--page-gutter) var(--sp-7);
 }
 
+.list-group[data-status="backlog"],
+.backlog-row[data-status="backlog"] { --row-accent: var(--ink-4); }
+.list-group[data-status="assigned"],
+.backlog-row[data-status="assigned"] { --row-accent: var(--info); }
+.list-group[data-status="running"],
+.backlog-row[data-status="running"] { --row-accent: var(--live); }
+.list-group[data-status="waiting_for_human"],
+.backlog-row[data-status="waiting_for_human"] { --row-accent: var(--warn); }
+.list-group[data-status="review"],
+.backlog-row[data-status="review"] { --row-accent: var(--info); }
+.list-group[data-status="blocked"],
+.backlog-row[data-status="blocked"] { --row-accent: var(--err); }
+.list-group[data-status="done"],
+.backlog-row[data-status="done"] { --row-accent: var(--ok); }
+
 .backlog-rows-head {
-  position: sticky;
-  top: 0;
-  z-index: 1;
   display: flex;
   align-items: center;
   gap: var(--sp-4);
-  padding: var(--sp-2) var(--sp-3);
-  border-bottom: 0.5px solid var(--line-1);
-  background: var(--surface-0);
+  padding: var(--sp-1) var(--sp-3);
+  border-bottom: 0.5px solid var(--line-2);
 }
 
 .backlog-rows-head-cell {
@@ -77,8 +89,8 @@
 .backlog-rows-head-dot,
 .backlog-row-dot-cell { flex: none; width: 8px; }
 
-.backlog-rows-head-status,
-.backlog-row-status { flex: none; width: 96px; }
+.backlog-rows-head-ref,
+.backlog-row-ref { flex: none; width: 68px; }
 
 .backlog-rows-head-tags,
 .backlog-row-tags { flex: none; width: 104px; }
@@ -105,8 +117,12 @@
   display: flex;
   align-items: center;
   gap: var(--sp-4);
-  min-height: 68px;
-  padding: var(--sp-2) var(--sp-3);
+  /* 44px, not the 68 this row carried while it was also printing a status
+     word and a second line of meta. A grouped list is read by scanning down
+     one band, so the row's height is what decides how much of a band fits on
+     screen — and every fact left in the row is one line tall. */
+  min-height: 44px;
+  padding: var(--sp-1) var(--sp-3);
   border-bottom: 0.5px solid var(--line-2);
   transition: background var(--t-fast) var(--ease);
 }
@@ -128,14 +144,6 @@
 .backlog-row:hover {
   background: var(--row-hover);
 }
-
-.backlog-row[data-status="backlog"] { --row-accent: var(--ink-4); }
-.backlog-row[data-status="assigned"] { --row-accent: var(--info); }
-.backlog-row[data-status="running"] { --row-accent: var(--live); }
-.backlog-row[data-status="waiting_for_human"] { --row-accent: var(--warn); }
-.backlog-row[data-status="review"] { --row-accent: var(--info); }
-.backlog-row[data-status="blocked"] { --row-accent: var(--err); }
-.backlog-row[data-status="done"] { --row-accent: var(--ok); }
 
 .backlog-row-lead {
   flex: 1 1 auto;
@@ -180,32 +188,34 @@
   text-underline-offset: 2px;
 }
 
-/* The status label takes the row accent so it and the leading rail read as
-   one signal rather than two unrelated marks 150px apart. --err is as bright
-   as --ink-1, so the bad tier is separated by the rail's ring shape, not by
-   making the word louder than the title. */
-.backlog-row-status {
-  color: var(--row-accent);
-  font: var(--type-label);
-  letter-spacing: var(--type-label-track);
-}
-
-/* Calm tiers would otherwise render the label dimmer than plain meta text. */
-.backlog-row[data-status="backlog"] .backlog-row-status,
-.backlog-row[data-status="done"] .backlog-row-status,
-.backlog-row[data-routine-state="scheduled"] .backlog-row-status,
-.backlog-row[data-routine-state="unscheduled"] .backlog-row-status,
-.backlog-row[data-routine-state="paused"] .backlog-row-status {
-  color: var(--ink-3);
+/* The short reference (see lib/taskRef). It is an address, not a fact about
+   the work, so it sits at the dimmest text tier and in the mono face — the
+   reader scans past it until they need it, and then it is exactly where a
+   reference always is. */
+.backlog-row-ref {
+  overflow: hidden;
+  color: var(--ink-4);
+  /* Family, features, and tracking come from the `.code` utility the cell
+     carries; only the size and tier are this column's business. */
+  font-size: var(--fs-1);
+  line-height: var(--leading-snug);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Routine rows — schedule health, not board lifecycle ─────────────────
    Routine definitions never advance through the board, so their rows key off
    data-routine-state. Accents mirror the .routine-state pill. */
+.list-group[data-routine-state="running"],
 .backlog-row[data-routine-state="running"] { --row-accent: var(--live); }
+.list-group[data-routine-state="overdue"],
 .backlog-row[data-routine-state="overdue"] { --row-accent: var(--err); }
+.list-group[data-routine-state="due"],
 .backlog-row[data-routine-state="due"] { --row-accent: var(--warn); }
+.list-group[data-routine-state="scheduled"],
 .backlog-row[data-routine-state="scheduled"] { --row-accent: var(--ink-3); }
+.list-group[data-routine-state="unscheduled"],
+.list-group[data-routine-state="paused"],
 .backlog-row[data-routine-state="unscheduled"],
 .backlog-row[data-routine-state="paused"] { --row-accent: var(--ink-4); }
 
@@ -273,13 +283,45 @@
 .backlog-row-due {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-1);
-  color: var(--ink-3);
-  font: var(--type-label);
+  min-width: 0;
 }
 
-.backlog-row-due.warn { color: var(--warn); }
-.backlog-row-due.bad { color: var(--err); }
+.backlog-due-value {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  color: var(--ink-3);
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
+  white-space: nowrap;
+}
+
+.backlog-due-value.warn { color: var(--warn); }
+.backlog-due-value.bad { color: var(--err); }
+
+/* An unset date is an offer, not a value: it opens the record where the date
+   is set. It stays a ghost until the row is under the pointer so a screenful
+   of undated rows does not read as a screenful of buttons. */
+.backlog-due-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--control-h-xs);
+  margin: 0;
+  padding: 0 var(--sp-1-5) 0 var(--sp-1);
+  border: 0;
+  border-radius: var(--r-2);
+  background: transparent;
+  color: var(--ink-4);
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.backlog-row:hover .backlog-due-empty { color: var(--ink-3); }
+.backlog-due-empty:hover { background: var(--control-fill-hover); color: var(--ink-1); }
 
 /* Quick-action column — always visible, right-aligned icon toolbar so every
    row exposes its actions without a hover reveal. Shorter action sets (no
@@ -330,9 +372,11 @@
    fill comes from the `default` variant the call site selects — see the note
    on .backlog-task-actions .backlog-action-primary above. */
 
+/* The reference is the first thing a narrow viewport can lose: it addresses
+   the row, it does not describe it. */
 @media (max-width: 1100px) {
-  .backlog-row-status,
-  .backlog-rows-head-status { display: none; }
+  .backlog-row-ref,
+  .backlog-rows-head-ref { display: none; }
 }
 
 @media (max-width: 900px) {
@@ -350,7 +394,11 @@
 @media (max-width: 820px) {
   .backlog-rows { padding-inline: var(--sp-4); }
 
+  /* Column headers name cells the stacked card no longer has. The band stays:
+     it is the only thing that still says which group a card is in. */
   .backlog-rows-head { display: none; }
+
+  .backlog-row-ref { display: none; }
 
   .backlog-row {
     display: flex;
@@ -367,8 +415,12 @@
 
   .backlog-row > * { min-width: 0; }
 
-  /* Line 1: dot + title, wrapping to two lines. */
-  .backlog-row-lead { flex: 1 1 100%; align-items: flex-start; }
+  /* Line 1: checkbox + dot + title, wrapping to two lines. `1 1 100%` put
+     the lead on a line of its OWN — the checkbox and the status dot sat
+     alone above it with nothing to read, which is not what the comment
+     above describes. `1 1 0` lets the title take the rest of line 1 and
+     wrap inside it. */
+  .backlog-row-lead { flex: 1 1 0; min-width: 60%; align-items: flex-start; }
 
   .backlog-row-title {
     white-space: normal;
@@ -382,7 +434,6 @@
   /* Line 2: priority · status · due, with the assignee chip pushed right.
      Restored (the ≤1100/≤900 hides above only make sense for the flex table). */
   .backlog-row-tags     { flex: 0 0 auto; width: auto; }
-  .backlog-row-status   { flex: 0 0 auto; display: inline-flex; align-items: center; width: auto; }
   .backlog-row-due      { flex: 0 0 auto; width: auto; }
   /* The agent readiness pip is absolutely positioned 3px past the badge's
      right edge; without clearance it kisses the card boundary. Nudge the whole

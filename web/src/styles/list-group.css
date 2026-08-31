@@ -1,0 +1,122 @@
+/* The grouped list — the one band/columns/rows grammar every list view in the
+   app now shares: the backlog, the routine list, and the admin employee and
+   computer lists. Each groups by the one dimension its reader scans for, and
+   the band is what the per-row status column used to be: said once, at full
+   size, instead of once per row in 96px of small type.
+
+   The band takes its accent from --row-accent, which the host surface sets —
+   from a data-* attribute it maps itself (tasks, routines) or from the shared
+   .tone-* driver (admin, whose statuses are open-ended strings). */
+
+.list-group {
+  --row-accent: var(--ink-4);
+  display: flex;
+  flex-direction: column;
+}
+
+/* The band is tinted by its own accent rather than by a neutral fill: seven
+   bands of one grey would separate the groups without naming them, which is
+   the job a group header exists to do. 10% keeps it a wash — the accent's
+   full strength stays spent on the 8px marks, where it has to carry meaning
+   at a size a tint cannot. */
+.list-group-band {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1-5) var(--sp-3);
+  border-radius: var(--r-2);
+  background: color-mix(in srgb, var(--row-accent) 10%, var(--surface-1));
+}
+
+/* Same contract as the row rail: the mark never picks its own colour, so the
+   band tint and the mark inside it cannot disagree. `live` brings its own. */
+.list-group-band .state-mark:not([data-shape="live"]) { --mark-accent: var(--row-accent); }
+
+.list-group-name {
+  font: var(--type-label-strong);
+  letter-spacing: var(--type-label-strong-track);
+  color: var(--ink-1);
+}
+
+/* The group's WHOLE size, not the page under it — a band that counted only
+   what is on screen would report a different number as the reader pages. */
+.list-group-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 var(--sp-1-5);
+  border-radius: var(--r-2);
+  background: var(--surface-0);
+  color: var(--ink-2);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+}
+
+.list-group-add {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h-xs);
+  height: var(--control-h-xs);
+  padding: 0;
+  border-radius: var(--r-2);
+  color: var(--ink-3);
+}
+
+.list-group-add:hover { color: var(--ink-1); }
+
+.list-group-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The band already carries the group's own bottom edge; the pager sits under
+   the rows it pages, inside the band it belongs to. */
+.list-group-pager {
+  padding-inline: var(--sp-3);
+}
+
+/* The accent mapping is declared for the band and the row together — they are
+   one signal, and two copies of the table drift. */
+/* An open-ended status cannot have a per-value rule, so the tone driver in
+   tokens/base.css carries the accent instead: one rule for every tone the
+   app has, rather than a second copy of the tone → hue mapping here. */
+.list-group[class*="tone-"] { --row-accent: var(--tone); }
+
+/* NOTE: the space BETWEEN groups belongs to the host container's `gap`
+   (.backlog-rows, .adm-grouped-list). A `.list-group + .list-group` margin
+   here would stack on top of that gap and silently double it. */
+
+/* ── Admin variant ───────────────────────────────────────────────────────
+   The admin tables are grid rows on a card-less canvas rather than the task
+   list's flex rows, so the band only has to supply the vertical rhythm the
+   flat `<ul>` used to get from its own margin. Column tracks stay with each
+   table (admin-v2-employees.css / admin-v2-nodes.css) — the band knows
+   nothing about them. */
+
+.adm-grouped-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  min-height: 0;
+}
+
+/* Inside a band, the band is what sticks — not the column header. Both were
+   `top: 0`, so scrolling stacked five identical header rows on one another;
+   and of the two, the group name is what a reader scrolling a long band
+   actually needs to keep. The headers keep their hairline and their
+   background, they just travel with their rows. */
+.adm-grouped-list .adm-emp-cols,
+.adm-grouped-list .adm-node-cols {
+  position: static;
+}
+
+/* The band paints over the rows that scroll under it, so it cannot be
+   translucent — the accent wash is mixed into --surface-1, which is opaque. */
+.adm-grouped-list .list-group-band { z-index: 2; }

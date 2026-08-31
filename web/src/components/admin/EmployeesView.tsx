@@ -4,8 +4,6 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import {
-  ActionEdit,
-  AdminDelete,
   AdminEmployees,
   ICON,
   ICON_STROKE_LARGE,
@@ -16,25 +14,26 @@ import { RelayEmptyState } from "@/components/RelayEmptyState";
 import { SearchInput } from "@/components/ui/search-input";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { applySort } from "../../lib/listSort";
-import { paginate } from "../../lib/pagination";
-import { usePagination } from "../../hooks/usePagination";
+import { LANE_PAGE_SIZE, paginate } from "../../lib/pagination";
+import { useLanePagination, usePagination } from "../../hooks/usePagination";
 import { Pagination } from "@/components/ui/Pagination";
 import { useListSort } from "../../hooks/useListSort";
-import { SortableColumnHeader } from "@/components/ui/SortableColumnHeader";
 import { SortMenu } from "@/components/ui/SortMenu";
+import { ListGroup } from "../ListGroup";
 import { employeeSortColumns } from "../../lib/adminHelpers";
+import { EmployeeCols, EmployeeRow } from "./EmployeeRow";
 import {
   buildEmployeeSummaries,
   employeeEmptyStateTranslationKey,
-  isOverLocalComputerLimit,
-  localComputerUsageLabel,
+  employeesByStatus,
+  EMPLOYEE_SUMMARY_STATUS_ORDER,
+  type EmployeeSummaryStatusKey,
   employeeSummaryStatus,
   matchesEmployeeQuickFilter,
   type EmployeeQuickFilter,
 } from "./helpers";
 import { EmployeeCard } from "./EmployeeCard";
-import { EmployeeComputers } from "./EmployeeComputers";
-import { TonePill } from "../StatusPill";
+import type { StateTone } from "../StateMark";
 import { AdminLayoutToggle, type AdminLayout } from "./AdminLayoutToggle";
 
 interface EmployeesViewProps {
@@ -49,6 +48,18 @@ interface EmployeesViewProps {
 }
 
 const FILTERS: EmployeeQuickFilter[] = ["all", "running", "ready", "idle", "failed", "unassigned"];
+
+/* The band's tone. `running` takes `live` rather than `info`: a band saying
+   work is in flight right now is exactly what --live is scoped to, and it is
+   the same reading the row's old pill carried through `live={tone==="info"}`.
+   Everything else is `employeeSummaryStatus`'s own tone. */
+const EMPLOYEE_STATUS_BAND_TONE: Record<EmployeeSummaryStatusKey, StateTone> = {
+  failed: "bad",
+  running: "live",
+  ready: "good",
+  idle: "neutral",
+  no_nodes: "neutral",
+};
 
 // Employee activity slices mirror the Nodes status chips (and the card status
 // pill). running/ready/failed overlap by design — an employee can own one
@@ -125,6 +136,7 @@ export function EmployeesView({
   // so a bare `sort` would have the two tables fighting over one key.
   const { sort, toggleSort, setSort } = useListSort(sortColumns, "employeeSort");
   const { page, setPage } = usePagination("employeePage");
+  const { lanePages: groupPages, setLanePage: setGroupPage } = useLanePagination(EMPLOYEE_SUMMARY_STATUS_ORDER, "employeeLanes");
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -151,6 +163,14 @@ export function EmployeesView({
   // One cursor for both layouts: switching card/list keeps the reader on the
   // same people rather than resetting them to the top of the roster.
   const paged = paginate(filtered, page);
+  const grouped = useMemo(() => employeesByStatus(filtered), [filtered]);
+  const pagedGroups = useMemo(
+    () => Object.fromEntries(EMPLOYEE_SUMMARY_STATUS_ORDER.map((key) => [
+      key,
+      paginate(grouped[key], groupPages[key] ?? 1, LANE_PAGE_SIZE),
+    ])) as Record<EmployeeSummaryStatusKey, ReturnType<typeof paginate<ReturnType<typeof buildEmployeeSummaries>[number]>>>,
+    [grouped, groupPages],
+  );
 
   if (summaries.length === 0) {
     return (
@@ -245,166 +265,61 @@ export function EmployeesView({
           ))}
         </div>
       ) : (
-        <div role="table" data-density="compact" aria-label={t("admin.v2.nav_employees", { defaultValue: "Employees" })}>
-          <div className="adm-emp-cols" role="row">
-            <SortableColumnHeader
-              className="adm-col-label"
-              label={t("admin.col_employee")}
-              sortKey="employee"
-              sort={sort}
-              onSort={toggleSort}
-            />
-            <SortableColumnHeader
-              className="adm-col-label"
-              label={t("admin.v2.col_computers")}
-              sortKey="computers"
-              sort={sort}
-              onSort={toggleSort}
-              defaultDirection="desc"
-            />
-            {/* The metric columns are flush right, so their carets are too —
-                a left-aligned control under a right-aligned number reads as a
-                different column. */}
-            <SortableColumnHeader
-              className="adm-col-label adm-col-label--metrics"
-              label={t("admin.v2.col_local_limit")}
-              sortKey="localLimit"
-              sort={sort}
-              onSort={toggleSort}
-              align="end"
-              defaultDirection="desc"
-            />
-            <SortableColumnHeader
-              className="adm-col-label adm-col-label--metrics"
-              label={t("admin.v2.col_running")}
-              sortKey="running"
-              sort={sort}
-              onSort={toggleSort}
-              align="end"
-              defaultDirection="desc"
-            />
-            <SortableColumnHeader
-              className="adm-col-label adm-col-label--metrics"
-              label={t("admin.v2.col_ready")}
-              sortKey="ready"
-              sort={sort}
-              onSort={toggleSort}
-              align="end"
-              defaultDirection="desc"
-            />
-            {/* Actions is not a column of data — there is nothing to order by. */}
-            <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_actions")}</span>
-          </div>
-          <ul className="adm-emp-list" role="rowgroup">
-            {paged.items.map((member) => {
-              const highlight = highlightedEmployeeId === member.id;
-              const { tone, key } = employeeSummaryStatus(member);
-              return (
-                <li
-                  key={member.id}
-                  className={`adm-emp-row ${highlight ? "is-pulse" : ""}`}
-                  data-employee={member.id}
-                  role="row"
-                >
-                  <div className="adm-emp-id" role="cell">
-                    <div className="adm-emp-id-line">
-                      <p className="adm-emp-name" translate="no">{member.displayName}</p>
-                      {/* Same rule as EmployeeCard: "ready" is the default
-                          healthy state and goes unnamed. The list used to pill
-                          it, so one employee read as Ready on this view and as
-                          nothing at all on the card view. */}
-                      {key !== "ready" ? (
-                        <TonePill
-                          tone={tone}
-                          label={t(`admin.v2.emp_state_${key}`, { defaultValue: key })}
-                          live={tone === "info"}
-                        />
-                      ) : null}
-                    </div>
-                    <p className="adm-emp-meta code">
-                      <span translate="no">@{member.id}</span>
-                      {member.email ? <span translate="no">{member.email}</span> : null}
-                      {member.departmentName ? <span>{member.departmentName}</span> : null}
-                    </p>
-                  </div>
-                  <div className="adm-emp-nodes" role="cell">
-                    <EmployeeComputers nodes={member.nodes} t={t} />
-                  </div>
-                  <div className="adm-emp-metrics" role="cell">
-                    <div className="adm-emp-metric">
-                      <span className={`adm-emp-ratio tnum ${isOverLocalComputerLimit(member) ? "" : "ink-dim"}`}>
-                        {localComputerUsageLabel(member)}
-                      </span>
-                      {isOverLocalComputerLimit(member) ? (
-                        <TonePill
-                          tone="bad"
-                          label={t("admin.v2.emp_limit_over_short")}
-                          title={t("admin.v2.emp_limit_over")}
-                        />
-                      ) : null}
-                    </div>
-                  </div>
-                  {/* Two columns, not one cell carrying its own caps
-                      sub-headers: those labels sat in the same micro-caps
-                      register as the column header above them, so the table
-                      appeared to have a second header row inside every row. */}
-                  <div className="adm-emp-metrics" role="cell">
-                    <div className="adm-emp-metric">
-                      <span className={`adm-emp-running tnum ${member.runningCount > 0 ? "ink-strong" : "ink-dim"}`}>
-                        {member.runningCount}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="adm-emp-metrics" role="cell">
-                    <div className="adm-emp-metric">
-                      <span className="adm-emp-ratio tnum ink-dim">
-                        {member.readyCount}/{member.nodeCount}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="adm-emp-actions" role="cell">
-                    {onEditEmployee ? (
-                      <Button variant="icon"
-                        size="icon-sm"
-                        tinted
-                        type="button"
-                        className="adm-node-card-icon-btn"
-                        onClick={() => {
-                          const employee = employeesById.get(member.id);
+        /* Grouped by fleet health — the reason an admin opens this list. The
+           per-row status pill went with it: the band is that pill, said once
+           for the whole group instead of once per employee. */
+        <div className="adm-grouped-list">
+          {EMPLOYEE_SUMMARY_STATUS_ORDER.map((key) => {
+            const group = grouped[key];
+            if (group.length === 0) return null;
+            const label = t(`admin.v2.emp_state_${key}`, { defaultValue: key });
+            const groupPage = pagedGroups[key];
+            return (
+              <ListGroup
+                key={key}
+                label={label}
+                count={group.length}
+                tone={EMPLOYEE_STATUS_BAND_TONE[key]}
+              >
+                <div className="list-group-rows" role="table" data-density="compact" aria-label={label}>
+                  <EmployeeCols sort={sort} onSort={toggleSort} t={t} />
+                  <ul className="adm-emp-list" role="rowgroup">
+                    {groupPage.items.map((member) => (
+                      <EmployeeRow
+                        key={member.id}
+                        member={member}
+                        highlight={highlightedEmployeeId === member.id}
+                        deletePending={pendingDelete !== null}
+                        onEdit={onEditEmployee ? (id) => {
+                          const employee = employeesById.get(id);
                           if (employee) onEditEmployee(employee);
-                        }}
-                        aria-label={t("admin.v2.edit_employee_action")}
-                        title={t("admin.v2.edit_employee_action")}
-                      >
-                        <ActionEdit size={ICON.sm} aria-hidden="true" />
-                      </Button>
-                    ) : null}
-                    {onDeleteEmployee ? (
-                      <Button variant="icon"
-                        size="icon-sm"
-                        tinted
-                        type="button"
-                        danger
-                        className="adm-node-card-icon-btn"
-                        onClick={() => void handleDeleteEmployee(member.id)}
-                        disabled={pendingDelete !== null}
-                        aria-label={t("admin.v2.delete_employee_action")}
-                        title={t("admin.v2.delete_employee_action")}
-                      >
-                        <AdminDelete size={ICON.sm} aria-hidden="true" />
-                      </Button>
-                    ) : null}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                        } : undefined}
+                        onDelete={onDeleteEmployee ? (id) => void handleDeleteEmployee(id) : undefined}
+                        t={t}
+                      />
+                    ))}
+                  </ul>
+                </div>
+                <Pagination
+                  compact
+                  className="list-group-pager"
+                  page={groupPage}
+                  onPageChange={(next) => setGroupPage(key, next)}
+                  label={label}
+                />
+              </ListGroup>
+            );
+          })}
         </div>
       )}
 
-      {/* One pager under both layouts — it is the collection that is paged,
-          not the way the collection happens to be drawn. */}
-      <Pagination page={paged} onPageChange={setPage} label={t("admin.v2.nav_employees", { defaultValue: "Employees" })} />
+      {/* The CARD layout is a flat grid and pages off one cursor. The list
+          groups, so it pages per band — one cursor over the whole list would
+          empty a band because of the cursor rather than because nobody is in
+          that state. */}
+      {layout === "card" ? (
+        <Pagination page={paged} onPageChange={setPage} label={t("admin.v2.nav_employees", { defaultValue: "Employees" })} />
+      ) : null}
     </div>
   );
 }

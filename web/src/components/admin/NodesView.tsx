@@ -15,13 +15,16 @@ import { SearchInput } from "@/components/ui/search-input";
 import { canUseLocalControlPanel } from "../../lib/controlPanel";
 import {
   matchesNodeQuickFilter,
+  nodesByStatus,
   nodeSortColumns,
   stableNodeOrder,
+  statusTone,
   type NodeQuickFilter,
+  type NodeSortKey,
 } from "../../lib/adminHelpers";
-import { applySort } from "../../lib/listSort";
-import { paginate } from "../../lib/pagination";
-import { usePagination } from "../../hooks/usePagination";
+import { applySort, type SortState } from "../../lib/listSort";
+import { LANE_PAGE_SIZE, paginate } from "../../lib/pagination";
+import { useLanePagination, usePagination } from "../../hooks/usePagination";
 import { Pagination } from "@/components/ui/Pagination";
 import { useListSort } from "../../hooks/useListSort";
 import { SortableColumnHeader } from "@/components/ui/SortableColumnHeader";
@@ -30,6 +33,8 @@ import type { StoredNodeTokenMap } from "./helpers";
 import { NodeCard } from "./NodeCard";
 import { NodeRow } from "./NodeRow";
 import { AdminLayoutToggle, type AdminLayout } from "./AdminLayoutToggle";
+import { ListGroup } from "../ListGroup";
+import type { StateTone } from "../StateMark";
 
 interface NodesViewProps {
   nodes: ControlPanelDaemonNodeRecord[];
@@ -58,6 +63,54 @@ function filterLabel(filter: NodeQuickFilter, t: TFunction): string {
   // right now. The predicate is deliberate and tested; the word was wrong.
   if (filter === "running") return t("admin.v2.filter_running");
   return t(`status.${filter}`, { defaultValue: filter });
+}
+
+/* Work in flight takes `live`, which is what --live is scoped to; everything
+   else defers to `statusTone`, so the band cannot disagree with the pill the
+   same status wears on a card. */
+function nodeBandTone(status: string): StateTone {
+  if (status === "running" || status === "busy") return "live";
+  return statusTone(status);
+}
+
+/** The column header row, repeated once per band — see `EmployeeCols`. */
+function NodeCols({
+  sort,
+  onSort,
+  t,
+}: {
+  sort: SortState<NodeSortKey> | null;
+  onSort: (key: NodeSortKey) => void;
+  t: TFunction;
+}) {
+  return (
+    <div className="adm-node-cols" role="row">
+      <SortableColumnHeader
+        className="adm-col-label"
+        label={t("admin.v2.col_node")}
+        sortKey="node"
+        sort={sort}
+        onSort={onSort}
+      />
+      <SortableColumnHeader
+        className="adm-col-label"
+        label={t("admin.v2.col_employee")}
+        sortKey="employee"
+        sort={sort}
+        onSort={onSort}
+      />
+      <SortableColumnHeader
+        className="adm-col-label"
+        label={t("admin.v2.node_runtimes")}
+        sortKey="runtimes"
+        sort={sort}
+        onSort={onSort}
+        defaultDirection="desc"
+      />
+      {/* Actions is not a column of data — there is nothing to order by. */}
+      <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_actions")}</span>
+    </div>
+  );
 }
 
 export function NodesView({ nodes, employees, storedTokens, layout, onLayoutChange, onRevealCredentials, onRenameNode, onManageExecutors, onDeleteNode, onAddNode }: NodesViewProps) {
@@ -125,6 +178,23 @@ export function NodesView({ nodes, employees, storedTokens, layout, onLayoutChan
   // One cursor for both layouts: switching card/list keeps the reader on the
   // same machines rather than resetting them to the top of the fleet.
   const paged = paginate(filtered, page);
+  const groups = useMemo(() => nodesByStatus(filtered), [filtered]);
+  /* The lane order is the statuses actually ON SCREEN, not NODE_STATUS_ORDER:
+     a status this build has never heard of still gets a band, and a band
+     whose name the hook does not recognise cannot persist its cursor —
+     `serializeLanePages` filters to the order it was given. */
+  const groupStatuses = useMemo(() => groups.map((group) => group.status), [groups]);
+  const { lanePages: groupPages, setLanePage: setGroupPage } = useLanePagination(groupStatuses, "nodeLanes");
+  /* Keyed by status STRING rather than a fixed record: the backend can name
+     a status this build has never heard of, and `nodesByStatus` still bands
+     it. A cursor for a band that is not on screen is simply never read. */
+  const pagedGroups = useMemo(
+    () => Object.fromEntries(groups.map(({ status, nodes: groupNodes }) => [
+      status,
+      paginate(groupNodes, groupPages[status] ?? 1, LANE_PAGE_SIZE),
+    ])),
+    [groups, groupPages],
+  );
 
   return (
     <div className="adm-view">
@@ -206,59 +276,61 @@ export function NodesView({ nodes, employees, storedTokens, layout, onLayoutChan
           })}
         </div>
       ) : (
-        <div role="table" data-density="compact" aria-label={t("admin.v2.nav_nodes")}>
-          <div className="adm-node-cols" role="row">
-            <SortableColumnHeader
-              className="adm-col-label"
-              label={t("admin.v2.col_node")}
-              sortKey="node"
-              sort={sort}
-              onSort={toggleSort}
-            />
-            <SortableColumnHeader
-              className="adm-col-label"
-              label={t("admin.v2.col_employee")}
-              sortKey="employee"
-              sort={sort}
-              onSort={toggleSort}
-            />
-            <SortableColumnHeader
-              className="adm-col-label"
-              label={t("admin.v2.node_runtimes")}
-              sortKey="runtimes"
-              sort={sort}
-              onSort={toggleSort}
-              defaultDirection="desc"
-            />
-            {/* Actions is not a column of data — there is nothing to order by. */}
-            <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_actions")}</span>
-          </div>
-          <ul className="adm-node-list" role="rowgroup">
-            {paged.items.map((node) => {
-              const employee = node.employeeId ? employeeById.get(node.employeeId) : undefined;
-              const employeeName = employee?.displayName;
-              return (
-                <NodeRow
-                  key={node.id}
-                  node={node}
-                  employeeName={employeeName}
-                  storedTokens={storedTokens}
-                  colocated={colocated}
-                  onReveal={onRevealCredentials}
-                  onRename={onRenameNode}
-                  onManageExecutors={onManageExecutors}
-                  onDelete={onDeleteNode}
-                  t={t}
+        /* Grouped by fleet lifecycle. NOT by the quick-filter chips above:
+           those slices overlap on purpose (`running` is a superset of
+           `ready`), so they cannot partition a list — `visualStatus` can,
+           and that is what `nodesByStatus` bands on. */
+        <div className="adm-grouped-list">
+          {groups.map(({ status, nodes: groupNodes }) => {
+            const label = t(`status.${status}`, { defaultValue: status });
+            const groupPage = pagedGroups[status];
+            return (
+              <ListGroup
+                key={status}
+                label={label}
+                count={groupNodes.length}
+                tone={nodeBandTone(status)}
+              >
+                <div className="list-group-rows" role="table" data-density="compact" aria-label={label}>
+                  <NodeCols sort={sort} onSort={toggleSort} t={t} />
+                  <ul className="adm-node-list" role="rowgroup">
+                    {groupPage.items.map((node) => {
+                      const employee = node.employeeId ? employeeById.get(node.employeeId) : undefined;
+                      return (
+                        <NodeRow
+                          key={node.id}
+                          node={node}
+                          employeeName={employee?.displayName}
+                          storedTokens={storedTokens}
+                          colocated={colocated}
+                          onReveal={onRevealCredentials}
+                          onRename={onRenameNode}
+                          onManageExecutors={onManageExecutors}
+                          onDelete={onDeleteNode}
+                          t={t}
+                        />
+                      );
+                    })}
+                  </ul>
+                </div>
+                <Pagination
+                  compact
+                  className="list-group-pager"
+                  page={groupPage}
+                  onPageChange={(next) => setGroupPage(status, next)}
+                  label={label}
                 />
-              );
-            })}
-          </ul>
+              </ListGroup>
+            );
+          })}
         </div>
       )}
 
-      {/* One pager under both layouts — it is the collection that is paged,
-          not the way the collection happens to be drawn. */}
-      <Pagination page={paged} onPageChange={setPage} label={t("admin.v2.nav_nodes")} />
+      {/* The CARD layout is a flat grid and pages off one cursor; the list
+          groups, so it pages per band. Same split as the employee list. */}
+      {layout === "card" ? (
+        <Pagination page={paged} onPageChange={setPage} label={t("admin.v2.nav_nodes")} />
+      ) : null}
     </div>
   );
 }
