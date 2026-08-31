@@ -824,6 +824,50 @@ test("managed daemon env drops ambient identity that would bypass enrollment", (
   }
 });
 
+test("managed daemon maps the BoxLite proxy without proxying the supervisor", () => {
+  const previous = {
+    RELAY_BOXLITE_PROXY_URL: process.env.RELAY_BOXLITE_PROXY_URL,
+    HTTP_PROXY: process.env.HTTP_PROXY,
+    HTTPS_PROXY: process.env.HTTPS_PROXY,
+    ALL_PROXY: process.env.ALL_PROXY,
+    NO_PROXY: process.env.NO_PROXY,
+  };
+  process.env.RELAY_BOXLITE_PROXY_URL = "http://127.0.0.1:7890";
+  delete process.env.HTTP_PROXY;
+  delete process.env.HTTPS_PROXY;
+  delete process.env.ALL_PROXY;
+  process.env.NO_PROXY = "internal.example";
+  try {
+    const env = managedDaemonEnv({
+      node: managedNode(),
+      attempt: {
+        id: "attempt_1",
+        managedNodeId: "mnode_alice",
+        generation: 1,
+        attemptNumber: 1,
+        status: "pending",
+        startedAt: "2026-07-10T00:00:00Z",
+        updatedAt: "2026-07-10T00:00:00Z",
+      },
+      backendUrl: "http://127.0.0.1:8790",
+      enrollmentCredential: "grant.secret",
+      workspacePath: "/tmp/ws",
+      workspaceId: "employee:alice:home",
+    });
+
+    assert.equal(process.env.HTTP_PROXY, undefined);
+    assert.equal(env.HTTP_PROXY, "http://127.0.0.1:7890");
+    assert.equal(env.HTTPS_PROXY, "http://127.0.0.1:7890");
+    assert.equal(env.ALL_PROXY, "http://127.0.0.1:7890");
+    assert.equal(env.NO_PROXY, "internal.example,localhost,127.0.0.1,::1");
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
 test("provisioning retry delay grows exponentially and is capped", () => {
   assert.equal(provisioningRetryDelayMs(1, 1_000, 60_000), 1_000);
   assert.equal(provisioningRetryDelayMs(2, 1_000, 60_000), 2_000);

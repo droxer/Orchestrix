@@ -44,4 +44,3 @@ daemon.log
 # Docs and assets the backend image does not serve.
 docs/
 assets/
-devbox/

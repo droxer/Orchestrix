@@ -329,6 +329,13 @@ def test_managed_node_provisioning_replays_the_same_runtime_after_lost_response(
         assert control_panel_node["displayName"] == managed_node["displayName"]
         assert "nodeToken" not in control_panel_node
 
+        alice_client = TestClient(app)
+        _login(alice_client, "alice", "userpass")
+        assert [
+            node["id"]
+            for node in alice_client.get("/api/v1/daemon-nodes").json()["nodes"]
+        ] == [runtime["sandboxId"]]
+
         deleted = client.delete(f"/api/v1/admin/managed-nodes/{managed_node['id']}")
         assert deleted.status_code == 202
         assert deleted.json()["node"]["desiredState"] == "deleted"
@@ -351,6 +358,7 @@ def test_managed_node_provisioning_replays_the_same_runtime_after_lost_response(
         assert heartbeat.status_code == 200
         assert heartbeat.json()["status"] == "stopped"
         assert client.get("/api/v1/admin/daemon-nodes").json()["nodes"] == []
+        assert alice_client.get("/api/v1/daemon-nodes").json()["nodes"] == []
 
 
 def test_legacy_managed_node_with_retired_policy_can_be_deleted(monkeypatch) -> None:
@@ -832,6 +840,10 @@ def test_stopped_managed_runtime_preserves_agent_for_restart(monkeypatch) -> Non
         response = client.delete(f"/api/v1/admin/managed-nodes/{managed['id']}/runtime")
 
         assert response.status_code == 204, response.text
+        assert [
+            node["id"]
+            for node in client.get("/api/v1/daemon-nodes").json()["nodes"]
+        ] == [runtime["id"]]
         assert not app.state.agent_store.get_agent(agent["id"]).get("deletedAt")
         [preserved] = app.state.agent_placement_store.list_placements(
             agent_id=agent["id"]

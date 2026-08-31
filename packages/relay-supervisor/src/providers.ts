@@ -233,6 +233,18 @@ const MANAGED_DAEMON_ENV_DENY = [
 export function managedDaemonEnv(input: EnsureManagedNodeInput): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
   for (const key of MANAGED_DAEMON_ENV_DENY) delete env[key];
+  const boxliteProxy = env.RELAY_BOXLITE_PROXY_URL?.trim();
+  if (boxliteProxy) {
+    env.HTTP_PROXY = boxliteProxy;
+    env.HTTPS_PROXY = boxliteProxy;
+    env.ALL_PROXY = boxliteProxy;
+    env.http_proxy = boxliteProxy;
+    env.https_proxy = boxliteProxy;
+    env.all_proxy = boxliteProxy;
+    const noProxy = mergeNoProxy(env.NO_PROXY ?? env.no_proxy, ["localhost", "127.0.0.1", "::1"]);
+    env.NO_PROXY = noProxy;
+    env.no_proxy = noProxy;
+  }
   return {
     ...env,
     RELAY_BACKEND_URL: input.backendUrl,
@@ -241,6 +253,17 @@ export function managedDaemonEnv(input: EnsureManagedNodeInput): NodeJS.ProcessE
     RELAY_WORKSPACE_ID: input.workspaceId,
     RELAY_SANDBOX_MODE: input.node.sandboxMode,
   };
+}
+
+function mergeNoProxy(current: string | undefined, required: string[]): string {
+  const entries = (current ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  for (const entry of required) {
+    if (!entries.includes(entry)) entries.push(entry);
+  }
+  return entries.join(",");
 }
 
 interface ProviderState {

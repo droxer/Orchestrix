@@ -1721,6 +1721,7 @@ export {
   ensureAgentReady,
   resetAgentReadiness,
   resolveBoxliteHome,
+  shutdownBoxliteRuntime,
   startOrchestratorSession,
   withOrchestratorSession,
   type ActiveOrchestratorSession,

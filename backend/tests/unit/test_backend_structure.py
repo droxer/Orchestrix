@@ -34,6 +34,20 @@ def test_backend_container_runs_as_non_root_runtime_user() -> None:
     assert "useradd" in dockerfile
 
 
+def test_devbox_dockerfile_inputs_are_available_in_build_context() -> None:
+    dockerfile = Path("dockerfile").read_text(encoding="utf-8")
+    dockerignore_patterns = {
+        line.strip()
+        for line in Path(".dockerignore").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+
+    for source in ("devbox/claude-settings.json", "devbox/codex-config.toml"):
+        assert f"COPY {source} " in dockerfile
+        assert Path(source).is_file()
+    assert "devbox/" not in dockerignore_patterns
+
+
 def test_app_factory_wires_backend_state_and_routes() -> None:
     with TemporaryDirectory() as root:
         app = create_app(root)

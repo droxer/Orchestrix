@@ -50,6 +50,11 @@ export interface ActiveOrchestratorSession {
   close(): Promise<void>;
 }
 
+interface BoxliteRuntimeLifecycle {
+  shutdown?(timeout?: number | null): Promise<void>;
+  close?(): void;
+}
+
 const readyAgents = new Set<AgentName>();
 
 export function resolveBoxliteHome(hostWorkspace: string, override = process.env.RELAY_BOXLITE_HOME): string {
@@ -62,6 +67,14 @@ export function resolveBoxliteHome(hostWorkspace: string, override = process.env
 
 export function resetAgentReadiness(): void {
   readyAgents.clear();
+}
+
+export async function shutdownBoxliteRuntime(runtime: BoxliteRuntimeLifecycle): Promise<void> {
+  try {
+    await runtime.shutdown?.();
+  } finally {
+    runtime.close?.();
+  }
 }
 
 export async function ensureAgentReady(
@@ -119,8 +132,11 @@ export async function startOrchestratorSession(
         await executionManager.removeSandbox(runtime, boxName);
       }
     } finally {
-      runtime?.close?.();
-      homeLock?.release();
+      try {
+        if (runtime) await shutdownBoxliteRuntime(runtime);
+      } finally {
+        homeLock?.release();
+      }
     }
   };
   try {

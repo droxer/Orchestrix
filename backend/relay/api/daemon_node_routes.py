@@ -151,18 +151,37 @@ def heartbeat_command_leases(body: dict[str, Any]) -> list[tuple[str, str | None
 
 @router.get("/daemon-nodes")
 def list_daemon_nodes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    deleted_managed_node_ids = {
+        node["id"]
+        for node in ctx.managed_node_store.list_nodes(include_deleted=True)
+        if node.get("desiredState") == "deleted"
+    }
+
+    def visible_computers(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [
+            node
+            for node in nodes
+            if node.get("managedNodeId") not in deleted_managed_node_ids
+        ]
+
     token = bearer_token(request)
     if token:
         nodes = ctx.registry.monitor_nodes_for_token(token)
         if nodes is not None:
-            return {"nodes": [present_computer(ctx, node) for node in nodes]}
+            return {
+                "nodes": [
+                    present_computer(ctx, node) for node in visible_computers(nodes)
+                ]
+            }
     actor = request_actor_or_none(request, ctx.auth_store)
     if actor:
-        nodes = [
-            node
-            for node in ctx.registry.monitor_nodes()
-            if actor_can_access_sandbox(actor, node)
-        ]
+        nodes = visible_computers(
+            [
+                node
+                for node in ctx.registry.monitor_nodes()
+                if actor_can_access_sandbox(actor, node)
+            ]
+        )
         return {"nodes": [present_computer(ctx, node) for node in nodes]}
     raise HTTPException(401, "Authentication required.")
 

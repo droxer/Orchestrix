@@ -17,6 +17,7 @@ import {
   resolveSandboxMode,
   runRelayDaemon,
   runRelayDaemonDoctor,
+  shutdownBoxliteRuntime,
   type DaemonExecutionEnvironment,
   type DaemonLogger,
 } from "../src/index.js";
@@ -213,6 +214,38 @@ test("BoxLite home lock reclaims stale owners", async (t: TestContext) => {
   t.after(() => lock.release());
 
   assert.equal(lock.lockDir, lockDir);
+});
+
+test("BoxLite runtime shutdown releases native state before closing", async () => {
+  const calls: string[] = [];
+  await shutdownBoxliteRuntime({
+    async shutdown() {
+      calls.push("shutdown");
+    },
+    close() {
+      calls.push("close");
+    },
+  });
+
+  assert.deepEqual(calls, ["shutdown", "close"]);
+});
+
+test("BoxLite runtime still closes when graceful shutdown fails", async () => {
+  const calls: string[] = [];
+  await assert.rejects(
+    shutdownBoxliteRuntime({
+      async shutdown() {
+        calls.push("shutdown");
+        throw new Error("shutdown failed");
+      },
+      close() {
+        calls.push("close");
+      },
+    }),
+    /shutdown failed/,
+  );
+
+  assert.deepEqual(calls, ["shutdown", "close"]);
 });
 
 test("BoxLite mode clears local agent process flags", async () => {
@@ -810,6 +843,7 @@ test("capability refresh never probes agents while a run is active", async () =>
   let served = false;
   let polls = 0;
   let readinessChecks = 0;
+  let checksWhenRunStarted = 0;
   let checksBeforeRelease = 0;
   let released = false;
   let releaseRun!: () => void;
@@ -830,6 +864,7 @@ test("capability refresh never probes agents while a run is active", async () =>
       ensure: async () => { readinessChecks += 1; },
       exec: async (_cmd, args, options) => {
         if (isInventoryProbe(args)) return { exit_code: 0, stdout: "", stderr: "" };
+        checksWhenRunStarted = readinessChecks;
         await runGate;
         options?.stdoutRenderer?.("done\n");
         return { exit_code: 0, stdout: "done\n", stderr: "" };
@@ -845,11 +880,10 @@ test("capability refresh never probes agents while a run is active", async () =>
           return jsonResponse({ commands: [command] });
         }
         polls += 1;
-        // The run's own readiness check races the poll loop, so wait for it to
-        // land rather than sampling at a fixed poll number. Any capability
-        // refresh during the active run would push the count past the expected
-        // five, which the assertion below still catches.
-        if (!released && polls >= 10 && readinessChecks >= 5) {
+        // Wait until execution has entered the held-open run. Capability
+        // refreshes before the command is fetched are valid; only probes after
+        // this point would contend with the active local agent process.
+        if (!released && polls >= 10 && checksWhenRunStarted > 0) {
           released = true;
           checksBeforeRelease = readinessChecks;
           releaseRun();
@@ -865,8 +899,7 @@ test("capability refresh never probes agents while a run is active", async () =>
     },
   });
 
-  // Four startup probes plus the run's own readiness check.
-  assert.equal(checksBeforeRelease, 5);
+  assert.equal(checksBeforeRelease, checksWhenRunStarted);
 });
 
 test("daemon renews liveness while an idle command poll is in flight", async () => {
