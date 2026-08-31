@@ -146,6 +146,35 @@ def test_managed_capacity_ensure_is_idempotent_across_store_instances(
     assert sorted(requested for _node_id, requested in results) == [False, True]
 
 
+def test_store_startup_reconciles_legacy_duplicate_active_policy_slots(
+    tmp_path: Path,
+) -> None:
+    store = LocalManagedNodeStore(tmp_path)
+    original = store.create_node(
+        {"employeeId": "alice", "displayName": "Alice cloud computer"}
+    )
+    duplicate = {
+        **original,
+        "id": "00000000-0000-4000-8000-000000000002",
+        "createdAt": "9999-01-01T00:00:01Z",
+        "updatedAt": "9999-01-01T00:00:01Z",
+    }
+    store._write_node(duplicate)
+
+    restarted = LocalManagedNodeStore(tmp_path)
+
+    active = [
+        node
+        for node in restarted.list_nodes()
+        if node["employeeId"] == "alice" and node["desiredState"] == "running"
+    ]
+    assert [node["id"] for node in active] == [original["id"]]
+    reconciled = restarted.get_node(duplicate["id"])
+    assert reconciled is not None
+    assert reconciled["desiredState"] == "deleted"
+    assert reconciled["phase"] == "deleting"
+
+
 def test_managed_nodes_require_boxlite(tmp_path: Path) -> None:
     store = LocalManagedNodeStore(tmp_path)
 
