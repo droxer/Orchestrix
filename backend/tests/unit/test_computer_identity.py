@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from relay.core.computer_identity import computer_id
+from relay.core.computer_identity import computer_id, local_enrollment_key
 
 
 def test_managed_node_wins_over_every_other_field() -> None:
@@ -64,3 +64,15 @@ def test_falls_back_to_node_id_when_machine_id_is_missing() -> None:
 def test_blank_values_do_not_produce_a_partial_identity() -> None:
     node = {"id": "node-1", "employeeId": "alice", "workspaceId": "   "}
     assert computer_id(node) == "node:node-1"
+
+
+def test_local_enrollment_key_normalizes_the_workspace_path() -> None:
+    assert local_enrollment_key("alice", "/Users/alice/tmp/../project") == (
+        local_enrollment_key("alice", "/Users/alice/project")
+    )
+
+
+def test_local_enrollment_key_is_scoped_to_the_employee() -> None:
+    assert local_enrollment_key("alice", "/workspace") != local_enrollment_key(
+        "bob", "/workspace"
+    )

@@ -313,6 +313,69 @@ def test_provisioned_daemon_nodes_use_uuid_ids(daemon_store_factory) -> None:
         assert str(UUID(node["id"])) == node["id"]
 
 
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_concurrent_local_enrollment_is_idempotent_across_registries(
+    daemon_store_factory,
+) -> None:
+    """Two backend replicas must issue one launchable pending computer."""
+    with TemporaryDirectory() as root:
+        registries = [
+            DaemonNodeRegistry(LocalSessionStore(root), daemon_store_factory(root))
+            for _ in range(2)
+        ]
+        both_checked_for_an_existing_node = Barrier(2)
+        for registry in registries:
+            original_find = registry.find_by_employee
+
+            def synchronized_find(
+                employee_id: str,
+                workspace_path: str | None = None,
+                *,
+                _find=original_find,
+            ) -> dict[str, Any] | None:
+                result = _find(employee_id, workspace_path)
+                both_checked_for_an_existing_node.wait(timeout=5)
+                return result
+
+            registry.find_by_employee = synchronized_find  # type: ignore[method-assign]
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            enrollments = list(
+                executor.map(
+                    lambda registry: registry.provision_pending(
+                        "alice",
+                        "/Users/alice/project",
+                        "none",
+                        "employee-device",
+                    ),
+                    registries,
+                )
+            )
+
+        nodes = [enrollment[0] for enrollment in enrollments]
+        ui_tokens = [enrollment[1] for enrollment in enrollments]
+        node_tokens = [enrollment[2] for enrollment in enrollments]
+        assert len({node["id"] for node in nodes}) == 1
+        assert sum(token is not None for token in ui_tokens) == 1
+        assert len(set(node_tokens)) == 1
+        assert node_tokens[0]
+
+        restarted = DaemonNodeRegistry(
+            LocalSessionStore(root), daemon_store_factory(root)
+        )
+        matches = [
+            node
+            for node in restarted.sandboxes.values()
+            if node.get("employeeId") == "alice"
+            and workspace_paths_match(
+                node.get("workspacePath"), "/Users/alice/project"
+            )
+            and not node.get("retiredAt")
+            and node.get("status") != "deleted"
+        ]
+        assert len(matches) == 1
+
+
 def store_node_payload() -> dict[str, object]:
     return {
         "id": "sbx_alice",

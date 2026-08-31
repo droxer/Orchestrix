@@ -32,6 +32,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError
 
+from ..core.computer_identity import local_enrollment_key
 from ..core.ids import new_relay_id
 from .store_common import (
     DEFAULT_RELAY_DATA_DIR,
@@ -303,6 +304,9 @@ class LocalDaemonStore:
         self.runs_dir = root / "daemon" / "runs"
         self.run_requests_dir = root / "daemon" / "run-requests"
         self.run_request_claim_lock_path = root / "daemon" / ".run-request-claims.lock"
+        self.pending_node_claim_lock_path = (
+            root / "daemon" / ".pending-node-claims.lock"
+        )
         self.events_dir = root / "daemon" / "events"
         for path in (
             self.nodes_dir,
@@ -356,6 +360,44 @@ class LocalDaemonStore:
                     )
                 )
             return node
+
+    def claim_pending_node(
+        self, sandbox: dict[str, Any]
+    ) -> tuple[dict[str, Any], bool]:
+        """Atomically create or adopt one provisional employee device."""
+        node = _node_for_storage(sandbox)
+        enrollment_key = node.get("enrollmentKey")
+        if not enrollment_key:
+            raise ValueError("Pending local nodes require an enrollment key.")
+        with self._lock, self._pending_node_claim_lock():
+            for existing in self.list_nodes():
+                if (
+                    existing.get("managedNodeId")
+                    or existing.get("retiredAt")
+                    or existing.get("status") == "deleted"
+                ):
+                    continue
+                existing_key = existing.get("enrollmentKey") or local_enrollment_key(
+                    existing.get("employeeId"), existing.get("workspacePath")
+                )
+                if existing_key != enrollment_key:
+                    continue
+                if not existing.get("enrollmentKey"):
+                    existing = {**existing, "enrollmentKey": enrollment_key}
+                    self.register_node(existing)
+                return existing, False
+            return self.register_node(node), True
+
+    @contextmanager
+    def _pending_node_claim_lock(self) -> Iterator[None]:
+        with self.pending_node_claim_lock_path.open(
+            "a+", encoding="utf-8"
+        ) as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
     def mark_node_seen(
         self, node_id: str, patch: dict[str, Any] | None = None
@@ -1355,6 +1397,7 @@ class DatabaseDaemonStore:
         Column("display_name", Text, nullable=True),
         Column("workspace_path", Text, nullable=True),
         Column("workspace_id", Text, nullable=True),
+        Column("enrollment_key", Text, nullable=True),
         Column("sandbox_mode", Text, nullable=True),
         Column("node_location", Text, nullable=True),
         Column("managed_node_id", entity_uuid_type(), nullable=True),
@@ -1378,6 +1421,19 @@ class DatabaseDaemonStore:
         Index("ix_daemon_nodes_managed_node_id", "managed_node_id"),
         Index("ix_daemon_nodes_workspace_id", "workspace_id"),
         Index("ix_daemon_nodes_retired_at", "retired_at"),
+        Index(
+            "uq_daemon_nodes_local_enrollment",
+            "enrollment_key",
+            unique=True,
+            postgresql_where=text(
+                "enrollment_key IS NOT NULL AND managed_node_id IS NULL "
+                "AND retired_at IS NULL"
+            ),
+            sqlite_where=text(
+                "enrollment_key IS NOT NULL AND managed_node_id IS NULL "
+                "AND retired_at IS NULL"
+            ),
+        ),
         # A Computer is (employee_id, workspace_id) for an employee device and
         # managed_node_id for a managed one -- never the daemon's own id, which
         # changes every time the daemon process is replaced.
@@ -1671,6 +1727,45 @@ class DatabaseDaemonStore:
                     ),
                 )
         return node
+
+    def claim_pending_node(
+        self, sandbox: dict[str, Any]
+    ) -> tuple[dict[str, Any], bool]:
+        """Insert one provisional device or return the concurrent winner."""
+        node = _node_for_storage(sandbox)
+        enrollment_key = node.get("enrollmentKey")
+        if not enrollment_key:
+            raise ValueError("Pending local nodes require an enrollment key.")
+        try:
+            with store_transaction(self.engine) as conn:
+                self._save_node(conn, node)
+                self._append_daemon_event(
+                    conn,
+                    daemon_event(
+                        "daemon.node.registered", {"node": _node_for_event(node)}
+                    ),
+                )
+            return node, True
+        except IntegrityError:
+            with store_transaction(self.engine) as conn:
+                row = (
+                    conn.execute(
+                        select(self.nodes).where(
+                            self.nodes.c.enrollment_key == enrollment_key,
+                            self.nodes.c.managed_node_id.is_(None),
+                            self.nodes.c.retired_at.is_(None),
+                        )
+                    )
+                    .mappings()
+                    .first()
+                )
+                if row is None:
+                    raise
+                agents = self._node_agents_by_node(conn, [str(row["id"])])
+            existing = apply_node_agents(
+                row_to_node(row), agents.get(str(row["id"]), [])
+            )
+            return existing, False
 
     def mark_node_seen(
         self, node_id: str, patch: dict[str, Any] | None = None
@@ -3122,6 +3217,7 @@ def node_to_row(
         "display_name": node.get("displayName"),
         "workspace_path": node.get("workspacePath"),
         "workspace_id": node.get("workspaceId"),
+        "enrollment_key": node.get("enrollmentKey"),
         "sandbox_mode": node.get("sandboxMode"),
         "node_location": node.get("nodeLocation"),
         "managed_node_id": node.get("managedNodeId"),
@@ -3232,6 +3328,11 @@ def row_to_node(row: Any) -> dict[str, Any]:
             else {}
         ),
         **({"workspaceId": row["workspace_id"]} if row.get("workspace_id") else {}),
+        **(
+            {"enrollmentKey": row["enrollment_key"]}
+            if row.get("enrollment_key")
+            else {}
+        ),
         **({"sandboxMode": row["sandbox_mode"]} if row.get("sandbox_mode") else {}),
         **({"nodeLocation": row["node_location"]} if row.get("node_location") else {}),
         **(

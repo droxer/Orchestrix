@@ -272,6 +272,10 @@ async def create_local_device_enrollment(
                 "nodeLocation": "employee-device",
             }
         )
+        # A concurrent backend replica may have won the durable claim after
+        # this process's initial probe. Only a newly created node receives the
+        # one-time UI token, so derive the response from the atomic outcome.
+        reused = not bool(node.get("sandboxToken"))
     # The launch token is persisted for control-panel computers, so adopting
     # an already-registered computer returns the same token again — matching
     # what the reveal endpoint would answer. The start command still prompts

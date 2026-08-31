@@ -2234,6 +2234,7 @@ def test_employee_can_create_own_device_enrollment(monkeypatch) -> None:
         assert body["node"]["nodeLocation"] == "employee-device"
         assert body["node"]["displayName"] == "Travel Laptop"
         assert body["node"]["workspacePath"] == "/Users/alice/project"
+        assert "enrollmentKey" not in body["node"]
         assert body["nodeToken"] not in body["daemonCommand"]
         assert body["reused"] is False
 
