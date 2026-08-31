@@ -24,11 +24,13 @@ interface ManageExecutorsDrawerProps {
   open: boolean;
   onClose: () => void;
   node: ControlPanelDaemonNodeRecord | null;
+  /** The assigned employee's @handle; the node carries only an id. */
+  employeeHandle?: string;
   onUpdated: (node: ControlPanelDaemonNodeRecord) => void;
   onSave: (nodeId: string, disabledAgents: AgentName[]) => Promise<{ node: ControlPanelDaemonNodeRecord }>;
 }
 
-export function ManageExecutorsDrawer({ open, onClose, node, onUpdated, onSave }: ManageExecutorsDrawerProps) {
+export function ManageExecutorsDrawer({ open, onClose, node, employeeHandle, onUpdated, onSave }: ManageExecutorsDrawerProps) {
   const { t } = useTranslation();
   const { confirm } = useDialogs();
   const [initialDisabled, setInitialDisabled] = useState<Set<AgentName>>(() => new Set());
@@ -129,7 +131,7 @@ export function ManageExecutorsDrawer({ open, onClose, node, onUpdated, onSave }
       open={open}
       onClose={() => { void requestClose(); }}
       title={t("admin.v2.manage_executors_title")}
-      subtitle={`${node.employeeId ? `@${node.employeeId}` : t("admin.unassigned")} · ${node.id}`}
+      subtitle={`${node.employeeId ? `@${employeeHandle || node.employeeId}` : t("admin.unassigned")} · ${node.id}`}
       subtitleMono
       closeLabel={t("drawer.close")}
       layer={1}

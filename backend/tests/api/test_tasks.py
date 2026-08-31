@@ -18,7 +18,7 @@ def _bootstrap_admin(client: TestClient) -> None:
         json={
             "token": "admin_token",
             "username": "admin",
-            "password": "secret123",
+            "password": "kestrel-vault-7719",
         },
     )
     assert response.status_code == 200

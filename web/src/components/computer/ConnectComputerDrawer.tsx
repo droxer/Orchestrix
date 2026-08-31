@@ -151,7 +151,7 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
       ) : (
         <form className="adm-form" onSubmit={(event) => void handleSubmit(event)} noValidate>
           <fieldset className="adm-form-section">
-            <Field label={t("computer.connect_name_label")}>
+            <Field label={t("computer.connect_name_label")} optional={t("admin.v2.optional")}>
               <Input
                 name="connect-computer-display-name"
                 autoComplete="off"
@@ -164,6 +164,7 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
             </Field>
             <Field
               label={t("nav.workspace_label")}
+              hint={t("admin.v2.workspace_path_hint_self")}
               error={fieldError ?? undefined}
               errorId="connect-computer-workspace-path-error"
             >

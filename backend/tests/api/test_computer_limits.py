@@ -6,6 +6,7 @@ can bring a personal computer into existence.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -15,13 +16,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from relay.app import create_app
+from relay.daemon_registry import DaemonNodeRegistry
 from relay.security.auth import DatabaseUserAuthStore
 
 
 def _bootstrap_admin(client: TestClient) -> None:
     response = client.post(
         "/api/v1/auth/bootstrap",
-        json={"token": "admin_token", "username": "admin", "password": "secret123"},
+        json={"token": "admin_token", "username": "admin", "password": "kestrel-vault-7719"},
     )
     assert response.status_code == 200
 
@@ -34,7 +36,7 @@ def _login(client: TestClient, username: str, password: str = "userpass") -> Non
 
 
 def _login_admin(client: TestClient) -> None:
-    _login(client, "admin", "secret123")
+    _login(client, "admin", "kestrel-vault-7719")
 
 
 def _create_employee(client: TestClient, employee_id: str, **extra: object) -> dict:
@@ -142,13 +144,13 @@ def test_admin_token_is_generated_on_first_boot_and_persisted(
 
         response = client.post(
             "/api/v1/auth/bootstrap",
-            json={"token": token, "username": "admin", "password": "secret123"},
+            json={"token": token, "username": "admin", "password": "kestrel-vault-7719"},
         )
         assert response.status_code == 200
         assert client.get("/api/v1/admin/settings").json()["adminToken"] == token
 
         restarted = TestClient(create_app(root))
-        _login(restarted, "admin", "secret123")
+        _login(restarted, "admin", "kestrel-vault-7719")
         body = restarted.get("/api/v1/admin/settings").json()
         assert body["adminToken"] == token
         assert token_path.read_text(encoding="utf-8").strip() == token
@@ -165,7 +167,7 @@ def test_admin_token_reissue_rotates_and_invalidates_the_old_token(
         ).strip()
         client.post(
             "/api/v1/auth/bootstrap",
-            json={"token": old_token, "username": "admin", "password": "secret123"},
+            json={"token": old_token, "username": "admin", "password": "kestrel-vault-7719"},
         )
 
         assert client.post("/api/v1/admin/admin-token/reissue").status_code == 200
@@ -602,3 +604,217 @@ def test_login_response_carries_the_limit_fields(
         )
         assert response.status_code == 200
         assert response.json()["user"]["effectiveMaxLocalComputers"] == 4
+
+
+def test_employee_id_collision_is_rejected_not_merged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A second "alice" is a collision, not a second employee.
+
+    The stores' ensure_employee reuses a matching row and patches the profile
+    onto it, so without a check the create route silently rewrote the live
+    employee's display name, email, and computer limit and attached a second
+    login to them.
+    """
+    with _client(monkeypatch, database_auth=True) as client:
+        _login_admin(client)
+        first = _create_employee(
+            client, "alice", displayName="Alice Chen", maxLocalComputers=2
+        )
+
+        clash = client.post(
+            "/api/v1/admin/employees",
+            json={
+                "employeeId": "alice",
+                "username": "alice2",
+                "password": "userpass",
+                "displayName": "Someone Else",
+                "maxLocalComputers": 9,
+            },
+        )
+        assert clash.status_code == 409, clash.text
+
+        employees = {
+            employee["id"]: employee
+            for employee in client.get("/api/v1/admin/employees").json()["employees"]
+        }
+        untouched = employees[first["id"]]
+        assert untouched["displayName"] == "Alice Chen"
+        assert untouched["maxLocalComputers"] == 2
+
+
+def test_employee_id_is_normalized_and_validated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _client(monkeypatch, database_auth=True) as client:
+        _login_admin(client)
+
+        for bad in ("a b", "Alice/Bob", "a", "@@", "-"):
+            response = client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": bad,
+                    "username": f"user-{abs(hash(bad))}",
+                    "password": "userpass",
+                },
+            )
+            assert response.status_code == 400, f"{bad}: {response.text}"
+
+        # A decorated, upper-cased handle is accepted and canonicalized, so the
+        # form's "@alice" preview matches what is actually created.
+        created = client.post(
+            "/api/v1/admin/employees",
+            json={
+                "employeeId": "  @Alice  ",
+                "username": "alice",
+                "password": "userpass",
+            },
+        )
+        assert created.status_code == 201, created.text
+        # ...and the canonical form now collides with the decorated one.
+        again = client.post(
+            "/api/v1/admin/employees",
+            json={"employeeId": "alice", "username": "alice3", "password": "userpass"},
+        )
+        assert again.status_code == 409, again.text
+
+
+def test_employee_survives_a_computer_claimed_mid_create(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The employee is committed before assignment, so a lost race is a warning.
+
+    Raising here left a created employee behind an error message, and the retry
+    then failed on "username already exists" with no way forward.
+    """
+    with _client(monkeypatch, database_auth=True) as client:
+        _login_admin(client)
+        # An unassigned computer for the new employee to be given.
+        created_node = client.post(
+            "/api/v1/admin/daemon-nodes",
+            json={
+                "sandboxMode": "none",
+                "nodeLocation": "employee-device",
+                "workspacePath": "/Users/bob/one",
+            },
+        )
+        assert created_node.status_code == 201, created_node.text
+        node_id = created_node.json()["node"]["id"]
+
+        # Someone else claims it between the route's pre-check and the assign.
+        def _claimed(*_args: object, **_kwargs: object) -> dict:
+            raise ValueError("Daemon node is already assigned.")
+
+        monkeypatch.setattr(DaemonNodeRegistry, "assign_employee", _claimed)
+
+        response = client.post(
+            "/api/v1/admin/employees",
+            json={
+                "employeeId": "bob",
+                "username": "bob",
+                "password": "userpass",
+                "nodeId": node_id,
+            },
+        )
+        assert response.status_code == 201, response.text
+        body = response.json()
+        assert body["assignmentError"] == "Daemon node is already assigned."
+        assert "node" not in body
+
+        # The employee is real, and is not a half-created ghost the admin has to
+        # fight past on a retry.
+        monkeypatch.undo()
+        handles = {
+            employee["displayName"]
+            for employee in client.get("/api/v1/admin/employees").json()["employees"]
+        }
+        assert "bob" in handles
+
+
+def test_unknown_computer_is_still_refused_before_the_employee_exists(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The pre-check stays: a node id that never existed is a bad request, and
+    nothing is created for it."""
+    with _client(monkeypatch, database_auth=True) as client:
+        _login_admin(client)
+        response = client.post(
+            "/api/v1/admin/employees",
+            json={
+                "employeeId": "carol",
+                "username": "carol",
+                "password": "userpass",
+                "nodeId": "computer-that-does-not-exist",
+            },
+        )
+        assert response.status_code == 404, response.text
+        names = {
+            employee["displayName"]
+            for employee in client.get("/api/v1/admin/employees").json()["employees"]
+        }
+        assert "carol" not in names
+
+
+def test_password_policy_is_enforced_wherever_a_password_is_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _client(monkeypatch, database_auth=True) as client:
+        _login_admin(client)
+        short = client.post(
+            "/api/v1/admin/employees",
+            json={"employeeId": "dave", "username": "dave", "password": "short"},
+        )
+        assert short.status_code == 400, short.text
+        assert "8 characters" in short.json()["detail"]
+
+        long = client.post(
+            "/api/v1/admin/employees",
+            json={"employeeId": "erin", "username": "erin", "password": "x" * 257},
+        )
+        assert long.status_code == 400, long.text
+
+        ok = client.post(
+            "/api/v1/admin/employees",
+            json={"employeeId": "dave", "username": "dave", "password": "userpass"},
+        )
+        assert ok.status_code == 201, ok.text
+
+
+def test_employee_carries_a_handle_not_a_uuid(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`id` is a UUID under the database store; the handle is what admins read."""
+    with _client(monkeypatch, database_auth=True) as client:
+        _login_admin(client)
+        created = _create_employee(client, "alice", displayName="Alice Chen")
+        assert created["handle"] == "alice"
+        assert created["id"] != "alice"
+
+        listed = {
+            employee["id"]: employee
+            for employee in client.get("/api/v1/admin/employees").json()["employees"]
+        }
+        assert listed[created["id"]]["handle"] == "alice"
+
+
+def test_handle_lookup_catches_a_collision_the_uuid_mapping_would_miss(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A row whose handle was backfilled has an id that is NOT uuid5 of it, so
+    resolution consults the handle column before falling back to the mapping."""
+    with _client(monkeypatch, database_auth=True) as client:
+        _login_admin(client)
+        alice = _create_employee(client, "alice")
+
+        store = DatabaseUserAuthStore(os.environ["RELAY_DATABASE_URL"])
+        with store.engine.begin() as connection:
+            connection.execute(
+                store.employees.update()
+                .where(store.employees.c.id == alice["id"])
+                .values(handle="ally")
+            )
+
+        assert store.resolve_employee_id("ally") == alice["id"]
+        clash = client.post(
+            "/api/v1/admin/employees",
+            json={"employeeId": "ally", "username": "ally", "password": "userpass"},
+        )
+        assert clash.status_code == 409, clash.text

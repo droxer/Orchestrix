@@ -318,6 +318,10 @@ export interface ControlPanelDaemonNodesResponse {
 
 export interface EmployeeRecord {
   id: string;
+  /** The @handle. `id` is a UUID under the database auth store, so this — not
+      the id — is what the admin surfaces render. Optional only for records
+      from a backend that predates the column. */
+  handle?: string;
   displayName: string;
   email?: string;
   departmentId?: string;
@@ -375,6 +379,10 @@ export interface CreateControlPanelEmployeeResponse {
   employee: EmployeeRecord;
   user: CurrentUser;
   node?: ControlPanelDaemonNodeRecord;
+  /** Set when the employee was created but the requested computer could not be
+      attached (someone else claimed it first). The employee is still real — the
+      admin resolves the computer from the assign flow. */
+  assignmentError?: string;
 }
 
 export interface AssignControlPanelDaemonNodeResponse {

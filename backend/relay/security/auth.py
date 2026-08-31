@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import secrets
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,6 +29,12 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError
 
+from .passwords import (  # noqa: F401  (re-exported: one policy, one module)
+    MAX_PASSWORD_LENGTH,
+    MIN_PASSWORD_LENGTH,
+    PasswordRejected,
+    validate_password,
+)
 from ..core import deploy_config
 from ..core.ids import new_database_id, now_iso
 from ..core.storage_config import database_url_from_env, use_postgres_storage
@@ -82,6 +89,19 @@ def database_id_for_reference(value: str, entity_kind: str) -> str:
     if normalized:
         return normalized
     return str(uuid5(_RELAY_ENTITY_ID_NAMESPACE, f"{entity_kind}:{value.strip()}"))
+
+
+def slugify_handle(value: str | None) -> str:
+    """Best-effort handle from free text, matching the admin form's grammar.
+
+    Used only for rows that predate the handle column or were created outside
+    the admin form; a real handle is stored verbatim."""
+    lowered = (value or "").strip().lower()
+    slug = re.sub(r"[^a-z0-9._-]+", "-", lowered).strip("-.")
+    slug = re.sub(r"-{2,}", "-", slug)
+    if len(slug) < 2:
+        return ""
+    return slug[:64]
 
 
 def hash_password(password: str) -> str:
@@ -184,6 +204,15 @@ class UserAuthStore:
         self.session_ttl_seconds = session_ttl_seconds
         self._lock = _shared_auth_lock(f"local:{self.auth_dir.resolve()}")
 
+    def resolve_employee_id(self, employee_id: str) -> str:
+        """The id an `employee_id` will actually land on in this store.
+
+        The file store keeps the handle verbatim, so resolution is a trim. The
+        database store maps handles onto UUIDs, and callers that need to ask
+        "does this employee already exist?" before creating one have to compare
+        the resolved form or the check silently passes on a live collision."""
+        return (employee_id or "").strip()
+
     def deleted_employee_ids(self) -> set[str]:
         if not self.deleted_employees_path.exists():
             return set()
@@ -226,8 +255,9 @@ class UserAuthStore:
         username = username.strip().lower()
         if not username:
             raise ValueError("username is required.")
-        if not password:
-            raise ValueError("password is required.")
+        validate_password(
+            password, identifiers=(username, employee_id, display_name, email)
+        )
         if role not in ("admin", "user"):
             raise ValueError("role must be admin or user.")
         if any(user["username"] == username for user in users):
@@ -442,6 +472,11 @@ class DatabaseUserAuthStore:
         "employees",
         metadata,
         database_id_column(),
+        # The @handle. `id` is a UUID (uuid5 of the handle for anything created
+        # through the admin form), which made the admin lists render `@<uuid>`
+        # and left the handle grammar with nothing behind it. The handle is the
+        # display and lookup identity; `id` stays the foreign key everywhere.
+        Column("handle", Text, nullable=True),
         Column("display_name", Text, nullable=False),
         Column("email", Text, nullable=True),
         Column(
@@ -458,6 +493,7 @@ class DatabaseUserAuthStore:
         Column("updated_at", DateTime(timezone=True), nullable=False),
         Column("deleted_at", DateTime(timezone=True), nullable=True),
         Index("ix_employees_department_id", "department_id"),
+        Index("uq_employees_handle", "handle", unique=True),
     )
     users = Table(
         "auth_users",
@@ -530,10 +566,16 @@ class DatabaseUserAuthStore:
         username = username.strip().lower()
         if not username:
             raise ValueError("username is required.")
-        if not password:
-            raise ValueError("password is required.")
+        validate_password(
+            password, identifiers=(username, employee_id, display_name, email)
+        )
         if role not in ("admin", "user"):
             raise ValueError("role must be admin or user.")
+        requested_handle = (
+            None
+            if not employee_id or normalize_database_id(employee_id)
+            else employee_id.strip()
+        )
         employee_id = (
             database_id_for_reference(employee_id, "employee")
             if employee_id
@@ -562,6 +604,7 @@ class DatabaseUserAuthStore:
                 employee = self._ensure_employee(
                     conn,
                     employee_id,
+                    handle=requested_handle,
                     display_name=display_name,
                     email=email,
                     department_id=department_id,
@@ -632,6 +675,30 @@ class DatabaseUserAuthStore:
             )
         return [row_to_department(row) for row in rows]
 
+    def resolve_employee_id(self, employee_id: str) -> str:
+        """See UserAuthStore.resolve_employee_id — here a handle becomes a UUID.
+
+        The handle column is consulted first: rows backfilled by the migration
+        carry a handle whose uuid5 is not their id, so the deterministic mapping
+        alone would miss a real collision."""
+        requested = (employee_id or "").strip()
+        if not requested:
+            return ""
+        if not normalize_database_id(requested):
+            with store_transaction(self.engine) as conn:
+                row = (
+                    conn.execute(
+                        select(self.employees.c.id).where(
+                            self.employees.c.handle == requested.lower()
+                        )
+                    )
+                    .mappings()
+                    .first()
+                )
+            if row:
+                return str(row["id"])
+        return database_id_for_reference(requested, "employee")
+
     def ensure_employee(
         self,
         employee_id: str,
@@ -649,6 +716,11 @@ class DatabaseUserAuthStore:
             return self._ensure_employee(
                 conn,
                 database_id_for_reference(requested_employee_id, "employee"),
+                # The caller's employee_id IS the handle when it is not already
+                # a UUID — that is the only place the spelling survives.
+                handle=None
+                if normalize_database_id(requested_employee_id)
+                else requested_employee_id,
                 display_name=display_name or requested_employee_id,
                 email=email,
                 department_id=department_id,
@@ -986,6 +1058,7 @@ class DatabaseUserAuthStore:
         conn: Any,
         employee_id: str | None,
         *,
+        handle: str | None = None,
         display_name: str | None = None,
         email: str | None = None,
         department_id: str | None = None,
@@ -1015,6 +1088,12 @@ class DatabaseUserAuthStore:
             patch: dict[str, Any] = {"updated_at": now}
             if row.get("deleted_at"):
                 patch["deleted_at"] = None
+            # Only ever fills a blank — an existing handle is the employee's
+            # identity and is not rewritten by a later ensure — and only when
+            # the handle is still free, since the column is unique and an
+            # ensure has no business failing the whole request over a name.
+            if handle and not row.get("handle") and self._handle_is_free(conn, handle):
+                patch["handle"] = handle
             if display_name:
                 patch["display_name"] = display_name
             if email:
@@ -1031,6 +1110,7 @@ class DatabaseUserAuthStore:
                 )
                 return {
                     **row_to_employee(row),
+                    **({"handle": patch["handle"]} if "handle" in patch else {}),
                     **({"displayName": display_name} if display_name else {}),
                     **({"email": email} if email else {}),
                     **({"departmentId": department_pk} if department_pk else {}),
@@ -1043,8 +1123,10 @@ class DatabaseUserAuthStore:
                 }
             return row_to_employee(row)
 
+        candidate = handle or slugify_handle(display_name) or None
         employee = {
             "id": employee_id or new_database_id(),
+            "handle": candidate if candidate and self._handle_is_free(conn, candidate) else None,
             "displayName": display_name or employee_id,
             "email": email,
             "departmentId": department_pk,
@@ -1058,6 +1140,16 @@ class DatabaseUserAuthStore:
             )
         )
         return employee
+
+    def _handle_is_free(self, conn: Any, handle: str) -> bool:
+        return (
+            conn.execute(
+                select(self.employees.c.id).where(self.employees.c.handle == handle)
+            )
+            .mappings()
+            .first()
+            is None
+        )
 
     def _user_pk(self, conn: Any, user_id: str) -> str:
         user_pk = conn.scalar(select(self.users.c.id).where(self.users.c.id == user_id))
@@ -1107,6 +1199,7 @@ def employee_to_row(
 ) -> dict[str, Any]:
     return {
         "id": database_id or employee["id"],
+        "handle": employee.get("handle"),
         "display_name": employee["displayName"],
         "email": employee.get("email"),
         "department_id": department_pk,
@@ -1145,8 +1238,13 @@ def row_to_department(row: Any) -> dict[str, Any]:
 
 def row_to_employee(row: Any) -> dict[str, Any]:
     limit = row["max_local_computers"]
+    handle = row["handle"]
     return {
         "id": str(row["id"]),
+        # Never fall back to the raw UUID: that is the string the @handle
+        # grammar exists to keep off the screen. A row with no handle yet
+        # (created outside the admin form) borrows its display name.
+        "handle": handle or slugify_handle(row["display_name"]) or str(row["id"])[:8],
         "displayName": row["display_name"],
         "email": row["email"],
         "departmentId": str(row["department_id"]) if row["department_id"] else None,

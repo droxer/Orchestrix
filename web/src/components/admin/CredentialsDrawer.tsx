@@ -17,11 +17,14 @@ interface CredentialsDrawerProps {
   onClose: () => void;
   node: ControlPanelDaemonNodeRecord | null;
   storedToken?: StoredNodeToken;
+  /** The assigned employee's @handle. The node only carries an id, which is a
+      UUID under the database auth store. */
+  employeeHandle?: string;
   onUnassign?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
   onDelete?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
 }
 
-export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign, onDelete }: CredentialsDrawerProps) {
+export function CredentialsDrawer({ open, onClose, node, storedToken, employeeHandle, onUnassign, onDelete }: CredentialsDrawerProps) {
   const { t } = useTranslation();
   const { confirm } = useDialogs();
   const { copiedField, copy } = useCopyFeedback();
@@ -42,7 +45,7 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
 
   async function handleUnassign() {
     if (!node || !onUnassign) return;
-    const employee = node.employeeId ?? "";
+    const employee = employeeHandle || node.employeeId || "";
     const ok = await confirm({
       title: t("admin.v2.unassign_confirm", { employee, id: node.id }),
       message: t("admin.v2.unassign_message"),
@@ -80,7 +83,9 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
     );
   }
 
-  const employeeLabel = node.employeeId ? `@${node.employeeId}` : t("admin.unassigned");
+  const employeeLabel = node.employeeId
+    ? `@${employeeHandle || node.employeeId}`
+    : t("admin.unassigned");
   const credentials = resolveNodeCredentials(node, storedToken);
   const { sandboxToken, nodeToken, daemonCommand, source } = credentials;
   const token = nodeToken ?? sandboxToken;

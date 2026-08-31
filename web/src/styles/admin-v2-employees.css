@@ -154,7 +154,8 @@
   transition: background var(--t-fast) var(--ease);
 }
 
-.adm-emp-row.is-pulse::after {
+.adm-emp-row.is-pulse::after,
+.adm-node-row.is-pulse::after {
   /* A one-shot 'recently updated' marker, not live work — ink, drawn once on
      the --t-draw cadence (--live purple + the pulse cadences are reserved for
      live work). */

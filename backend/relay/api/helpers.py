@@ -4,6 +4,7 @@ import json
 import math
 import mimetypes
 import os
+import re
 import secrets
 import shlex
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -136,6 +137,38 @@ def token_count_field(value: dict[str, Any], key: str) -> int:
     return int(raw)
 
 
+EMPLOYEE_HANDLE_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{1,63}$")
+
+
+def normalize_employee_handle(value: str) -> str:
+    """Canonicalize an admin-entered employee handle, or raise 400.
+
+    The handle is rendered as `@alice` and threaded through node paths and
+    credential filenames, so it cannot carry whitespace, slashes, or case that
+    would make two spellings look like one identity. Lowercasing here rather
+    than rejecting keeps the form forgiving; the web form applies the same
+    normalization as you type, so the preview never promises a handle the
+    backend will not create."""
+    handle = (value or "").strip().lstrip("@").strip().lower()
+    if not handle:
+        raise HTTPException(400, "employeeId is required.")
+    if not EMPLOYEE_HANDLE_PATTERN.match(handle):
+        raise HTTPException(
+            400,
+            "employeeId must be 2-64 characters of lowercase letters, digits, "
+            "dot, dash, or underscore, and start with a letter or digit.",
+        )
+    return handle
+
+
+def resolve_employee_id(auth_store: Any, employee_id: str) -> str:
+    """The id `employee_id` resolves to in this store (a UUID under the
+    database store, the handle itself under the file store)."""
+    if hasattr(auth_store, "resolve_employee_id"):
+        return auth_store.resolve_employee_id(employee_id)
+    return (employee_id or "").strip()
+
+
 def employee_record(auth_store: Any, employee_id: str) -> dict[str, Any] | None:
     if hasattr(auth_store, "list_employees"):
         for employee in auth_store.list_employees():
@@ -144,7 +177,9 @@ def employee_record(auth_store: Any, employee_id: str) -> dict[str, Any] | None:
     for user in auth_store.list_users():
         if user.get("employeeId") == employee_id:
             return {
+                # The file store keeps the handle as the id, so the two agree.
                 "id": employee_id,
+                "handle": employee_id,
                 "displayName": user.get("displayName")
                 or user.get("username")
                 or employee_id,

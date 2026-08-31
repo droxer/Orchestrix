@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { employeeHandleOf } from "../../lib/employeeHandle";
 import type { TFunction } from "i18next";
 import {
   ActionEdit,
@@ -322,7 +323,7 @@ export function EmployeesView({
                       ) : null}
                     </div>
                     <p className="adm-emp-meta code">
-                      <span translate="no">@{member.id}</span>
+                      <span translate="no">@{employeeHandleOf(member)}</span>
                       {member.email ? <span translate="no">{member.email}</span> : null}
                       {member.departmentName ? <span>{member.departmentName}</span> : null}
                     </p>

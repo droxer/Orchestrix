@@ -12,10 +12,40 @@ from .core import deploy_config
 from .core.environment import load_backend_env
 from .core.logging_config import setup_logging
 from .core.storage_config import database_url_from_env
+from .persistence.employee_handle_backfill import plan_handles, summarize
 from .persistence.session_import import migrate_local_sessions
 from .persistence.session_store import DatabaseSessionStore
 
 load_backend_env()
+
+
+def rehearse_employee_handles(database_url: str) -> dict:
+    """The employee-handle backfill plan for a live database, without writing."""
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine(database_url)
+    with engine.connect() as connection:
+        employees = [
+            dict(row)
+            for row in connection.execute(
+                text(
+                    "SELECT id, display_name FROM employees "
+                    "ORDER BY created_at, id"
+                )
+            ).mappings()
+        ]
+        usernames = {
+            str(row["employee_id"]): row["username"]
+            for row in connection.execute(
+                text(
+                    "SELECT employee_id, username FROM auth_users "
+                    "WHERE employee_id IS NOT NULL"
+                )
+            ).mappings()
+            if row["username"]
+        }
+    plan = plan_handles(employees, usernames)
+    return {"plan": plan, **summarize(plan)}
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -24,7 +54,12 @@ def main(argv: list[str] | None = None) -> None:
         "command",
         nargs="?",
         default="relay",
-        choices=["relay", "serve", "migrate-local-sessions"],
+        choices=[
+            "relay",
+            "serve",
+            "migrate-local-sessions",
+            "rehearse-employee-handles",
+        ],
     )
     parser.add_argument("--host", default=deploy_config.bind_host())
     parser.add_argument("--port", type=int, default=deploy_config.bind_port())
@@ -43,6 +78,16 @@ def main(argv: list[str] | None = None) -> None:
         print(json.dumps(report, indent=2))
         if report["failures"]:
             raise SystemExit(1)
+        return
+    if args.command == "rehearse-employee-handles":
+        # Reads only. Point it at a copy of production before running migration
+        # 20260831_0065 for real: it prints the handle every employee would be
+        # given, which source it came from, and every collision that had to be
+        # suffixed — the questions a backfill can only answer against real data.
+        report = rehearse_employee_handles(
+            database_url_from_env(setting="rehearse-employee-handles")
+        )
+        print(json.dumps(report, indent=2))
         return
     app = create_app(args.data_dir) if args.data_dir else create_app()
     auth_store = app.state.auth_store
