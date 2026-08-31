@@ -175,6 +175,38 @@ def test_store_startup_reconciles_legacy_duplicate_active_policy_slots(
     assert reconciled["phase"] == "deleting"
 
 
+def test_store_startup_preserves_runtime_backed_duplicate_as_canonical(
+    tmp_path: Path,
+) -> None:
+    store = LocalManagedNodeStore(tmp_path)
+    pending = store.create_node({"employeeId": "alice"})
+    runtime_backed = {
+        **pending,
+        "id": "00000000-0000-4000-8000-000000000003",
+        "activeDaemonNodeId": "daemon-alice",
+        "phase": "ready",
+        "createdAt": "9999-01-01T00:00:01Z",
+        "updatedAt": "9999-01-01T00:00:01Z",
+    }
+    store._write_node(runtime_backed)
+
+    restarted = LocalManagedNodeStore(tmp_path)
+
+    assert restarted.get_node(runtime_backed["id"])["desiredState"] == "running"
+    assert restarted.get_node(pending["id"])["desiredState"] == "deleted"
+
+
+def test_managed_node_employee_ids_are_normalized_before_slot_comparison(
+    tmp_path: Path,
+) -> None:
+    store = LocalManagedNodeStore(tmp_path)
+    node = store.create_node({"employeeId": " alice "})
+
+    assert node["employeeId"] == "alice"
+    with pytest.raises(ValueError, match="active managed node"):
+        store.create_node({"employeeId": "alice"})
+
+
 def test_managed_nodes_require_boxlite(tmp_path: Path) -> None:
     store = LocalManagedNodeStore(tmp_path)
 

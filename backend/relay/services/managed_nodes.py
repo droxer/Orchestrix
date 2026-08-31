@@ -95,6 +95,12 @@ def _validate_provider(payload: dict[str, Any]) -> None:
         raise ValueError("provider must be a non-empty string.")
 
 
+def _normalize_employee_id(value: Any) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("employeeId is required for a dedicated managed node.")
+    return value.strip()
+
+
 def _managed_node_policy_slot(node: dict[str, Any]) -> tuple[Any, ...]:
     return (
         node.get("assignmentMode") or "dedicated",
@@ -110,6 +116,15 @@ def _managed_node_policy_slot(node: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
+def _canonical_node_rank(node: dict[str, Any]) -> tuple[int, int, str, str]:
+    return (
+        0 if node.get("activeDaemonNodeId") else 1,
+        0 if node.get("phase") == "ready" else 1,
+        node.get("createdAt") or "",
+        node["id"],
+    )
+
+
 class LocalManagedNodeStore:
     """Durable local-first store for managed-node desired state and attempts."""
 
@@ -122,6 +137,7 @@ class LocalManagedNodeStore:
         self._lock = RLock()
         for path in (self.nodes_dir, self.attempts_dir, self.grants_dir):
             path.mkdir(parents=True, exist_ok=True)
+        self._reconcile_legacy_duplicate_policy_slots()
 
     def create_node(
         self, payload: dict[str, Any], *, _policy_slot_locked: bool = False
@@ -129,15 +145,13 @@ class LocalManagedNodeStore:
         assignment_mode = payload.get("assignmentMode") or "dedicated"
         desired_state = payload.get("desiredState") or "running"
         sandbox_mode = payload.get("sandboxMode") or "boxlite"
-        employee_id = payload.get("employeeId")
         if assignment_mode not in MANAGED_NODE_ASSIGNMENT_MODES:
             raise ValueError("assignmentMode must be dedicated.")
         if desired_state not in MANAGED_NODE_DESIRED_STATES:
             raise ValueError("desiredState must be running, stopped, or deleted.")
         _validate_managed_sandbox_mode(sandbox_mode)
         _validate_provider(payload)
-        if not employee_id:
-            raise ValueError("employeeId is required for a dedicated managed node.")
+        employee_id = _normalize_employee_id(payload.get("employeeId"))
         slot_lock = nullcontext() if _policy_slot_locked else self._policy_slot_lock()
         with self._lock, slot_lock:
             now = now_iso()
@@ -170,6 +184,39 @@ class LocalManagedNodeStore:
                 yield
             finally:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+    def _reconcile_legacy_duplicate_policy_slots(self) -> None:
+        """Retire duplicate active records written before slot uniqueness.
+
+        Creation has enforced one running record per employee/policy slot since
+        the invariant was introduced, but existing JSON records predate that
+        guard. Leaving those records active makes every backend restart expose
+        and provision all of them again. Prefer an already-enrolled runtime;
+        otherwise retain the oldest desired record and route the extras through
+        the normal managed-node deletion lifecycle.
+        """
+        with self._lock, self._policy_slot_lock():
+            groups: dict[tuple[str, tuple[Any, ...]], list[dict[str, Any]]] = {}
+            for node in self.list_nodes():
+                if node.get("desiredState") != "running":
+                    continue
+                raw_employee_id = node.get("employeeId")
+                if not isinstance(raw_employee_id, str) or not raw_employee_id.strip():
+                    continue
+                key = (raw_employee_id.strip(), _managed_node_policy_slot(node))
+                groups.setdefault(key, []).append(node)
+            for candidates in groups.values():
+                if len(candidates) < 2:
+                    continue
+                canonical = min(candidates, key=_canonical_node_rank)
+                for duplicate in candidates:
+                    if duplicate["id"] == canonical["id"]:
+                        continue
+                    self.update_node(
+                        duplicate["id"],
+                        {"desiredState": "deleted"},
+                        _policy_slot_locked=True,
+                    )
 
     def _assert_active_policy_slot_available(
         self, candidate: dict[str, Any], *, exclude_node_id: str | None = None
@@ -323,8 +370,9 @@ class LocalManagedNodeStore:
                 "employeeId" in patch
                 or "assignmentMode" in patch
                 or desired_state == "running"
-            ) and assignment_mode == "dedicated" and not employee_id:
-                raise ValueError("employeeId is required for a dedicated managed node.")
+            ) and assignment_mode == "dedicated":
+                employee_id = _normalize_employee_id(employee_id)
+                patch = {**patch, "employeeId": employee_id}
             if "phase" in patch and patch["phase"] not in MANAGED_NODE_PHASES:
                 raise ValueError("Invalid managed node phase.")
             if "conditions" in patch and not isinstance(patch["conditions"], list):
