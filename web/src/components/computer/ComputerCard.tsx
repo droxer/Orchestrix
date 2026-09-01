@@ -131,13 +131,14 @@ export function ComputerCard({
             <ActionKey size={ICON.sm} aria-hidden="true" />
             {t("computer.token_button")}
           </Button>
-          {/* Removal is the counterpart to self-service enrollment, but it is
-              not the action the reader came for — ghost keeps it reachable
-              without competing with rename. */}
-          <Button type="button" variant="ghost" size="sm" onClick={() => onDisconnect(node)}>
-            <ActionRemove size={ICON.sm} aria-hidden="true" />
-            {t("computer.disconnect")}
-          </Button>
+          {/* Removal is the counterpart to self-service enrollment, but
+              managed-computer lifecycle belongs to the admin control plane. */}
+          {node.managedNodeId ? null : (
+            <Button type="button" variant="ghost" size="sm" onClick={() => onDisconnect(node)}>
+              <ActionRemove size={ICON.sm} aria-hidden="true" />
+              {t("computer.disconnect")}
+            </Button>
+          )}
         </div>
       </header>
 

@@ -2,7 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { disconnectComputer, updateComputerDisplayName, updateDaemonNodeDisabledAgents } from "../api";
+import {
+  disconnectComputer,
+  RelayApiError,
+  updateComputerDisplayName,
+  updateDaemonNodeDisabledAgents,
+} from "../api";
 import type {
   ControlPanelDaemonNodeRecord,
   CreateLocalDeviceEnrollmentResponse,
@@ -152,7 +157,10 @@ export function ComputerPage({
         return rest;
       });
     } catch (error) {
-      reportMutationError("Failed to disconnect computer", error, t("errors.disconnect_computer"));
+      const message = error instanceof RelayApiError && error.status === 409
+        ? t("errors.disconnect_computer_active")
+        : t("errors.disconnect_computer");
+      reportMutationError("Failed to disconnect computer", error, message);
     }
   }
 

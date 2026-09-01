@@ -93,6 +93,40 @@ describe("My Computer record card", () => {
     assert.match(page, /tone: "danger"/, "removal is confirmed destructively");
   });
 
+  it("does not offer self-service disconnect for an admin-managed computer", async () => {
+    // The owner-scoped DELETE endpoint deliberately rejects managed computers:
+    // their lifecycle belongs to the admin-managed-node control plane. Showing
+    // this action only leads through confirmation to the generic disconnect
+    // error toast reported by the user.
+    const card = await read("web/src/components/computer/ComputerCard.tsx");
+    const actions = card.match(/<div className="computer-card-actions">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    assert.notEqual(actions.trim(), "", "the actions regex stopped matching — refresh it");
+    assert.match(
+      actions,
+      /node\.managedNodeId\s*\?\s*null\s*:\s*\([\s\S]*?onDisconnect\(node\)/,
+      "managed computers must not offer an action their owner-scoped API forbids",
+    );
+  });
+
+  it("explains active work instead of blaming the connection", async () => {
+    // The disconnect endpoint returns 409 while this computer owns active
+    // agent work. That is an actionable server refusal, not a network error.
+    const [page, ...localeSources] = await Promise.all([
+      read("web/src/components/ComputerPage.tsx"),
+      read("web/src/i18n/locales/en/translation.json"),
+      read("web/src/i18n/locales/zh-CN/translation.json"),
+      read("web/src/i18n/locales/zh-TW/translation.json"),
+    ]);
+    const disconnect = page.match(/async function handleDisconnectNode[\s\S]*?\n  }/)?.[0] ?? "";
+    assert.notEqual(disconnect.trim(), "", "the disconnect-handler regex stopped matching — refresh it");
+    assert.match(disconnect, /error instanceof RelayApiError && error\.status === 409/);
+    assert.match(disconnect, /t\("errors\.disconnect_computer_active"\)/);
+    for (const source of localeSources) {
+      const locale = JSON.parse(source);
+      assert.equal(typeof locale.errors.disconnect_computer_active, "string");
+    }
+  });
+
   it("lets the owner see the token again for reconnecting", async () => {
     // Enrollment shows the token once; the card carries a labelled Token
     // action that opens the reveal/reissue drawer against the owner-scoped

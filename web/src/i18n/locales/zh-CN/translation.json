@@ -16,6 +16,7 @@
     "rename_thread": "无法重命名对话。请刷新对话列表后重试。",
     "rename_computer": "无法重命名电脑。请检查连接后重试。",
     "disconnect_computer": "无法断开该电脑的连接。请检查连接后重试。",
+    "disconnect_computer_active": "这台电脑仍有正在进行的工作。请等待工作完成或先取消，再断开连接。",
     "save_preferences": "无法保存偏好设置。请检查连接后重试。",
     "delete_thread": "无法删除对话。请检查连接后重试。",
     "send_message": "无法发送消息。请检查 daemon 连接后重试。",

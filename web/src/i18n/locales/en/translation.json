@@ -16,6 +16,7 @@
     "rename_thread": "Couldn't rename the thread. Refresh the thread list and try again.",
     "rename_computer": "Couldn't rename the computer. Check the connection and try again.",
     "disconnect_computer": "Couldn't disconnect that computer. Check your connection and try again.",
+    "disconnect_computer_active": "This computer has active work. Wait for it to finish or cancel it before disconnecting.",
     "save_preferences": "Couldn't save your preferences. Check the connection and try again.",
     "delete_thread": "Couldn't delete the thread. Check the connection and try again.",
     "send_message": "Couldn't send the message. Check the daemon connection and try again.",
