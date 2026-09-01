@@ -131,6 +131,12 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   const formDirty = Boolean(form && formBaseline && !taskBoardFormsEqual(form, formBaseline));
   const confirmDiscardChanges = useUnsavedChangesGuard(formDirty && !saving && !deleting);
   const backlogTasks = useMemo(() => tasks.filter((task) => !task.isRoutine), [tasks]);
+  /* Routine definitions travel in the same list as their occurrences, so the
+     board can name a task's parent routine without another request. */
+  const routineTitles = useMemo(
+    () => new Map(tasks.filter((task) => task.isRoutine).map((task) => [task.id, task.title])),
+    [tasks],
+  );
   /* Sort is applied AFTER filtering, over the one list both views read — the
      board keeps its lanes and reorders WITHIN them, which is the only degree
      of freedom a grouped view has. With no column chosen `applySort` is the
@@ -569,6 +575,8 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
                       <BacklogTaskRow
                         key={task.id}
                         task={task}
+                        session={linkedSession(task)}
+                        routineTitle={task.sourceRoutineId ? routineTitles.get(task.sourceRoutineId) : undefined}
                         selected={visibleSelection.has(task.id)}
                         onToggleSelect={() => setSelection((current) => toggleSelected(current, task.id))}
                         assigneeDisplayName={taskAssigneeDisplayName(task, currentUser, employeeNames)}
@@ -631,6 +639,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
                       selected={visibleSelection.has(task.id)}
                       onToggleSelect={() => setSelection((current) => toggleSelected(current, task.id))}
                       session={session}
+                      routineTitle={task.sourceRoutineId ? routineTitles.get(task.sourceRoutineId) : undefined}
                       assigneeDisplayName={taskAssigneeDisplayName(task, currentUser, employeeNames)}
                       assigneeIsSelf={isTaskAssigneeCurrentUser(task, currentUser)}
                       agentDisplayName={assignment.name}

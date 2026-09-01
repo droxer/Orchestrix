@@ -169,3 +169,120 @@ def test_task_events_include_occurrences_merges_by_timestamp(monkeypatch) -> Non
             event["taskId"] == occurrence["id"] and event["type"] == "task.activity"
             for event in events
         )
+
+
+def _runs(client: TestClient, task_id: str, **params: Any) -> list[dict[str, Any]]:
+    response = client.get(f"/api/v1/tasks/{task_id}/runs", params=params)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["taskId"] == task_id
+    return body["runs"]
+
+
+def test_routine_runs_list_occurrences_newest_first(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root, TemporaryDirectory() as ws:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        agent = _create_agent(app)
+        routine = _create_routine(client, agent["id"])
+        first = _promote(app, routine["id"])
+        second = app.state.task_store.promote_due_routine(
+            routine["id"], "2026-07-02", "2026-07-09", agent_override="claude"
+        )
+        assert second is not None
+        session_id = _session_for(app, second["id"], ws, agent["id"])
+        deck = _workspace_artifact(ws, "deck.pptx", artifact_id="30000000-0000-4000-8000-000000000011", created_at="2026-07-02T09:00:00.000Z")
+        app.state.session_store.append_event(
+            session_id, relay_event("artifact.created", session_id, {"artifact": deck})
+        )
+
+        runs = _runs(client, routine["id"])
+        # The ledger reads newest run first, dated by the day it was scheduled for.
+        assert [run["taskId"] for run in runs] == [second["id"], first["id"]]
+        assert [run["scheduledFor"] for run in runs] == ["2026-07-02", "2026-06-25"]
+        assert runs[0]["sessionIds"] == [session_id]
+        assert runs[0]["latestSessionId"] == session_id
+        assert runs[0]["artifactCount"] == 1
+        assert runs[1]["sessionIds"] == []
+        assert runs[1]["latestSessionId"] is None
+        assert runs[1]["artifactCount"] == 0
+
+
+def test_routine_run_reports_timing_and_failure(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        agent = _create_agent(app)
+        routine = _create_routine(client, agent["id"])
+        occurrence = _promote(app, routine["id"])
+        assert client.patch(f"/api/v1/tasks/{occurrence['id']}", json={"status": "running"}).status_code == 200
+        assert client.patch(f"/api/v1/tasks/{occurrence['id']}", json={"status": "blocked"}).status_code == 200
+
+        run = _runs(client, routine["id"])[0]
+        assert run["status"] == "blocked"
+        assert run["startedAt"] is not None
+        assert run["endedAt"] is not None
+        assert run["endedAt"] >= run["startedAt"]
+
+
+def test_routine_run_without_terminal_status_has_no_end(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        agent = _create_agent(app)
+        routine = _create_routine(client, agent["id"])
+        occurrence = _promote(app, routine["id"])
+        assert client.patch(f"/api/v1/tasks/{occurrence['id']}", json={"status": "running"}).status_code == 200
+
+        run = _runs(client, routine["id"])[0]
+        assert run["status"] == "running"
+        assert run["startedAt"] is not None
+        assert run["endedAt"] is None
+        assert run["failureMessage"] is None
+
+
+def test_runs_limit_caps_the_ledger(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        agent = _create_agent(app)
+        routine = _create_routine(client, agent["id"])
+        _promote(app, routine["id"])
+        second = app.state.task_store.promote_due_routine(
+            routine["id"], "2026-07-02", "2026-07-09", agent_override="claude"
+        )
+        assert second is not None
+
+        runs = _runs(client, routine["id"], limit=1)
+        assert [run["taskId"] for run in runs] == [second["id"]]
+
+
+def test_plain_task_runs_is_its_own_single_row(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root, TemporaryDirectory() as ws:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        agent = _create_agent(app)
+        created = client.post("/api/v1/tasks", json={
+            "title": "One-off audit",
+            "assignedAgentId": agent["id"],
+        })
+        assert created.status_code == 201, created.text
+        task = created.json()
+        session_id = _session_for(app, task["id"], ws, agent["id"])
+
+        runs = _runs(client, task["id"])
+        # A plain task never has occurrences, but it still had a run — the
+        # ledger stays one component rather than two.
+        assert len(runs) == 1
+        assert runs[0]["taskId"] == task["id"]
+        assert runs[0]["sessionIds"] == [session_id]

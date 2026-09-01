@@ -53,6 +53,7 @@ import type {
   TaskArtifactsResponse,
   TaskDeletionResponse,
   TaskEventsResponse,
+  TaskRunsResponse,
   TaskMutationInput,
   TaskRunAssignment,
   ThreadMessageInput,
@@ -658,6 +659,21 @@ export function listTaskEvents(
 ): Promise<TaskEventsResponse> {
   const query = options.includeOccurrences ? "?include=occurrences" : "";
   return apiJson<TaskEventsResponse>(`/tasks/${encodeURIComponent(taskId)}/events${query}`, { signal });
+}
+
+/**
+ * The task's run ledger — one row per run, newest first.
+ *
+ * A routine's rows are its promoted occurrences; a plain task answers with a
+ * single row for its own run.
+ */
+export function listTaskRuns(
+  taskId: string,
+  options: { limit?: number } = {},
+  signal?: AbortSignal,
+): Promise<TaskRunsResponse> {
+  const query = options.limit ? `?limit=${encodeURIComponent(String(options.limit))}` : "";
+  return apiJson<TaskRunsResponse>(`/tasks/${encodeURIComponent(taskId)}/runs${query}`, { signal });
 }
 
 export async function readArtifactText(

@@ -34,6 +34,8 @@ import {
 import { Drawer } from "@/components/ui/Drawer";
 import { TaskDrawerArtifacts } from "./TaskDrawerArtifacts";
 import { TaskDrawerHistory } from "./TaskDrawerHistory";
+import { RoutineRunLedger } from "./RoutineRunLedger";
+import { TaskResultSummary } from "./TaskResultSummary";
 import { AgentMark } from "../AgentMark";
 import { AgentStateBadge } from "../AgentStateBadge";
 import { IdentityMark } from "../IdentityMark";
@@ -652,12 +654,19 @@ export function TaskDrawer({
           <>
             {/* Both variants roll artifacts up the same way: a routine's files
                 come from its occurrences' sessions, resolved by the backend. */}
+            {/* The outcome leads: a person opening a finished task wants to
+                know how it came out before what it left behind. */}
+            {form.variant === "routine" ? null : (
+              <TaskResultSummary taskId={form.id} onOpenThread={onOpenThread} />
+            )}
             <TaskDrawerArtifacts taskId={form.id} />
-            <TaskDrawerHistory
-              taskId={form.id}
-              isRoutine={form.variant === "routine"}
-              onOpenThread={onOpenThread}
-            />
+            {/* A routine's runs happen in its occurrences, so it reads as a
+                ledger of runs; a plain task ran once and reads as a timeline. */}
+            {form.variant === "routine" ? (
+              <RoutineRunLedger taskId={form.id} onOpenThread={onOpenThread} />
+            ) : (
+              <TaskDrawerHistory taskId={form.id} onOpenThread={onOpenThread} />
+            )}
           </>
         ) : null}
         <div className="adm-form-actions">

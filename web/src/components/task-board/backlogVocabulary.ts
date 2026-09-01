@@ -36,6 +36,7 @@ export const initialFilters: BacklogFilters = {
   agent: "all",
   assignee: "",
   due: "all",
+  source: "all",
 };
 
 export type BacklogView = "board" | "list";
@@ -56,5 +57,6 @@ export function activeFilterCount(filters: BacklogFilters): number {
   if (filters.agent !== "all") count += 1;
   if (filters.assignee.trim()) count += 1;
   if (filters.due !== "all") count += 1;
+  if (filters.source !== "all") count += 1;
   return count;
 }

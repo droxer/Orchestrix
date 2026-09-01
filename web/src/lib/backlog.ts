@@ -11,6 +11,15 @@ export interface BacklogFilters {
   agent: string;
   assignee: string;
   due: "all" | "overdue" | "today" | "unscheduled";
+  /**
+   * Where the task came from: anything (`all`), tasks a person wrote
+   * (`direct`), or runs a routine generated (`routine`).
+   *
+   * A promoted occurrence is an ordinary task in every other respect, so
+   * without this the board mixes work someone asked for with work a schedule
+   * produced, and a daily routine can bury the former in the latter.
+   */
+  source: "all" | "direct" | "routine";
 }
 
 export function filterTasks(tasks: RelayTaskListItem[], filters: BacklogFilters, today = isoToday()): RelayTaskListItem[] {
@@ -18,6 +27,8 @@ export function filterTasks(tasks: RelayTaskListItem[], filters: BacklogFilters,
   const assignee = filters.assignee.trim().toLowerCase();
   return tasks.filter((task) => {
     if (task.isRoutine) return false;
+    if (filters.source === "direct" && task.sourceRoutineId) return false;
+    if (filters.source === "routine" && !task.sourceRoutineId) return false;
     if (filters.status !== "all" && task.status !== filters.status) return false;
     if (filters.priority !== "all" && task.priority !== filters.priority) return false;
     if (filters.agent !== "all" && task.assignedAgentId !== filters.agent) return false;

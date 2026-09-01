@@ -115,6 +115,35 @@ export interface TaskEventsResponse {
   events: RelayTaskEvent[];
 }
 
+/**
+ * One run of a task, as the run ledger reads it.
+ *
+ * For a routine this is one promoted occurrence — a routine never runs itself.
+ * For a plain task there is exactly one row, the task's own run.
+ */
+export interface TaskRun {
+  /** The task that carried the run: an occurrence, or the task itself. */
+  taskId: string;
+  /** The day the run was scheduled for; the ledger's date column. */
+  scheduledFor?: string | null;
+  status: TaskStatus;
+  createdAt: string;
+  /** When the run went `running`; null while it is still only assigned. */
+  startedAt: string | null;
+  /** When the run reached a terminal status; null while it is still going. */
+  endedAt: string | null;
+  /** Why the run ended blocked, when it did. */
+  failureMessage: string | null;
+  sessionIds: string[];
+  latestSessionId: string | null;
+  artifactCount: number;
+}
+
+export interface TaskRunsResponse {
+  taskId: string;
+  runs: TaskRun[];
+}
+
 export interface TaskDeletionResponse {
   task: RelayTask;
   outcome: "deleted" | "already_deleted";

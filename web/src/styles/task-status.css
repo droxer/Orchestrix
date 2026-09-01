@@ -296,6 +296,48 @@
 .backlog-due.warn { color: var(--warn); }
 .backlog-due.bad { color: var(--err); }
 
+/* ── Routine provenance ────────────────────────────────────────────── */
+
+/* A quiet chip: it explains where a record came from, it does not rank it, so
+   it must never out-weigh the priority badge sitting beside it. */
+.backlog-routine-origin {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  max-width: 160px;
+  padding: 0 var(--sp-2);
+  border: 0.5px solid var(--line-2);
+  border-radius: var(--r-2);
+  color: var(--ink-3);
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
+  line-height: 20px;
+}
+
+.backlog-routine-origin-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── The card's run result ─────────────────────────────────────────── */
+
+.backlog-result {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+/* The mark carries the outcome's tone; the label stays in the meta line's own
+   colour so a board of finished cards does not read as a wall of green. */
+.backlog-task[data-status="blocked"] .backlog-result { color: var(--err); }
+
+.backlog-result-files {
+  color: var(--ink-3);
+}
+
 /* Actions overlay the card's bottom on hover — absolutely positioned, so the
    resting card carries no reserved (invisible) footer. The overlay reads
    --surface-1 to match the card, plus a hairline and the card's inner bottom

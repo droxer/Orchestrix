@@ -3,11 +3,14 @@ import type { RelaySession, SessionSummary } from "../types.js";
 type RelayEvent = RelaySession["events"][number];
 
 function inflateSessionSummary(summary: SessionSummary): RelaySession {
-  const { artifactCount: _artifactCount, eventCount: _eventCount, runCount: _runCount, ...fields } = summary;
+  const { artifactCount, eventCount: _eventCount, runCount: _runCount, ...fields } = summary;
   return {
     ...fields,
     participants: ["human"],
     agentRuns: [],
+    // A summary carries the count but not the records — see the field's note
+    // on RelaySession. The backlog's result line needs only the number.
+    workspaceArtifactCount: artifactCount,
     artifacts: [],
     decisions: [],
     collaborationRounds: [],
@@ -26,8 +29,8 @@ export function mergeSessionSummaries(
     // A summary request can start before an SSE frame is committed and return
     // afterward. Never roll event-derived state backward in that race.
     if (summary.eventCount < existing.events.length) return existing;
-    const { artifactCount: _artifactCount, eventCount: _eventCount, runCount: _runCount, ...fields } = summary;
-    return { ...existing, ...fields } as RelaySession;
+    const { artifactCount, eventCount: _eventCount, runCount: _runCount, ...fields } = summary;
+    return { ...existing, ...fields, workspaceArtifactCount: artifactCount } as RelaySession;
   });
 }
 

@@ -101,6 +101,10 @@
 .backlog-rows-head-due,
 .backlog-row-due { flex: none; width: 116px; }
 
+/* Narrow: it carries a count, and often nothing at all. */
+.backlog-rows-head-result,
+.backlog-row-result { flex: none; width: 76px; }
+
 .backlog-rows-head-actions,
 .backlog-row-actions { flex: none; width: 176px; }
 
@@ -145,6 +149,8 @@
   background: var(--row-hover);
 }
 
+/* Title, then the routine-provenance chip when the task came from one. The
+   chip caps its own width, so a long routine name cannot crowd out the title. */
 .backlog-row-lead {
   flex: 1 1 auto;
   min-width: 0;
@@ -379,9 +385,14 @@
   .backlog-rows-head-ref { display: none; }
 }
 
+
 @media (max-width: 900px) {
   .backlog-row-assignee,
   .backlog-rows-head-assignee { display: none; }
+  /* The row's dot still carries the outcome, so the file count is the losable
+     half of the result — it goes with the assignee on the backlog's own tier. */
+  .backlog-row-result,
+  .backlog-rows-head-result { display: none; }
 }
 
 /* ── Mobile: rebuild the flex table row (≈640px of fixed cells, can't fit a
@@ -435,6 +446,7 @@
      Restored (the ≤1100/≤900 hides above only make sense for the flex table). */
   .backlog-row-tags     { flex: 0 0 auto; width: auto; }
   .backlog-row-due      { flex: 0 0 auto; width: auto; }
+  .backlog-row-result   { flex: 0 0 auto; display: inline-flex; width: auto; }
   /* The agent readiness pip is absolutely positioned 3px past the badge's
      right edge; without clearance it kisses the card boundary. Nudge the whole
      assignee cell in so the pip has room to breathe. */

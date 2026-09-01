@@ -11,6 +11,7 @@ const baseFilters: BacklogFilters = {
   agent: "all",
   assignee: "",
   due: "all",
+  source: "all",
 };
 
 function task(input: Partial<RelayTask> & { id: string; title: string }): RelayTask {
@@ -28,6 +29,8 @@ function task(input: Partial<RelayTask> & { id: string; title: string }): RelayT
     routineCadence: input.routineCadence,
     routineNextRunDate: input.routineNextRunDate,
     routineEnabled: input.routineEnabled ?? false,
+    sourceRoutineId: input.sourceRoutineId,
+    scheduledFor: input.scheduledFor,
     assignedAgent: input.assignedAgent,
     assignedAgentId: input.assignedAgentId,
     assignedTeamId: input.assignedTeamId,
@@ -55,6 +58,37 @@ function node(input: Partial<DaemonNodeMonitorRecord> & { id: string }): DaemonN
     updatedAt: input.updatedAt ?? "2026-06-01T00:00:00.000Z",
   } as DaemonNodeMonitorRecord;
 }
+
+describe("filterTasks source", () => {
+  const direct = task({ id: "own", title: "Migrate the auth store" });
+  const occurrence = task({ id: "occ", title: "Weekly status deck", sourceRoutineId: "routine_1" });
+
+  it("shows both a person's tasks and routine occurrences by default", () => {
+    // An occurrence is real work someone may have to act on, so the board does
+    // not hide it — the badge on the record is what supplies the provenance.
+    const result = filterTasks([direct, occurrence], baseFilters);
+    assert.deepEqual(result.map((item) => item.id).sort(), ["occ", "own"]);
+  });
+
+  it("narrows to tasks nobody's routine generated", () => {
+    const result = filterTasks([direct, occurrence], { ...baseFilters, source: "direct" });
+    assert.deepEqual(result.map((item) => item.id), ["own"]);
+  });
+
+  it("narrows to routine occurrences", () => {
+    const result = filterTasks([direct, occurrence], { ...baseFilters, source: "routine" });
+    assert.deepEqual(result.map((item) => item.id), ["occ"]);
+  });
+
+  it("never lets a routine definition through, whatever the source filter says", () => {
+    // The routines page owns definitions; the board only ever shows runs.
+    const routine = task({ id: "def", title: "Weekly status deck", isRoutine: true });
+    for (const source of ["all", "direct", "routine"] as const) {
+      const result = filterTasks([routine], { ...baseFilters, source });
+      assert.deepEqual(result, []);
+    }
+  });
+});
 
 describe("filterTasks", () => {
   it("filters by status priority agent assignee and due state", () => {

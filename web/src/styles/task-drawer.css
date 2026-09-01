@@ -294,6 +294,48 @@
    hint one step larger than every other field hint in the app. Field hints now
    come through <Field hint> at the shared 13px. */
 
+/* ── Task drawer result summary ───────────────────────────────────── */
+
+.task-result-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+  padding: var(--sp-2) var(--sp-3);
+  border: 0.5px solid var(--line-2);
+  /* 6px control rung, matching the list rows it sits above. */
+  border-radius: var(--r-2);
+  color: var(--ink-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+}
+
+.task-result-outcome {
+  color: var(--ink-1);
+}
+
+.task-result-summary[data-outcome="failed"] .task-result-outcome {
+  color: var(--err);
+}
+
+.task-result-when,
+.task-result-duration,
+.task-result-files {
+  color: var(--ink-3);
+}
+
+.task-result-reason {
+  flex: 1 1 100%;
+  min-width: 0;
+  color: var(--ink-3);
+}
+
+/* Pushed to the row's end; wraps with the reason when both are present. */
+.task-result-thread {
+  margin-left: auto;
+}
+
 /* ── Task drawer generated artifacts ──────────────────────────────── */
 
 .task-drawer-artifacts {
@@ -391,6 +433,102 @@
 
 .task-drawer-artifact-download:hover {
   color: var(--ink-1);
+}
+
+/* ── Task drawer run ledger ───────────────────────────────────────── */
+
+.task-drawer-runs {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: 0.5px solid var(--line-2);
+}
+
+.task-drawer-run-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.task-drawer-run-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.task-drawer-run-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: var(--sp-1) var(--sp-2);
+  border: 0.5px solid transparent;
+  /* Same 6px control rung as the artifact row above it — both are list rows
+     in the same drawer, so they must be the same shape. */
+  border-radius: var(--r-2);
+  background: none;
+  color: var(--ink-2);
+  font: var(--type-body-sm);
+  letter-spacing: var(--type-body-sm-track);
+  text-align: left;
+  cursor: pointer;
+}
+
+.task-drawer-run-main:hover,
+.task-drawer-run[data-expanded] .task-drawer-run-main {
+  border-color: var(--line-1);
+  background: var(--control-fill-hover);
+}
+
+/* The mark carries the outcome's tone; the row's own text stays neutral so a
+   ledger of thirty runs does not read as thirty coloured lines. */
+.task-drawer-run[data-outcome="failed"] .task-drawer-run-outcome {
+  color: var(--err);
+}
+
+.task-drawer-run-date {
+  flex: none;
+  min-width: 4.5rem;
+  color: var(--ink-1);
+}
+
+.task-drawer-run-outcome {
+  flex: none;
+}
+
+.task-drawer-run-reason {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-drawer-run-meta,
+.task-drawer-run-files {
+  flex: none;
+  margin-left: auto;
+  color: var(--ink-3);
+}
+
+/* Two trailing columns; only the first claims the free space. */
+.task-drawer-run-meta ~ .task-drawer-run-files {
+  margin-left: 0;
+}
+
+.task-drawer-run-events {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin: var(--sp-1) 0 var(--sp-2);
+  /* Indent past the mark + date so the detail reads as nested under its run. */
+  padding: 0 0 0 var(--sp-6);
+  list-style: none;
 }
 
 /* ── Task drawer run history ──────────────────────────────────────── */
