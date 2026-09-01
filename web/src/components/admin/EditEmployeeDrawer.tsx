@@ -108,7 +108,7 @@ export function EditEmployeeDrawer({
       });
       onSuccess(result.employee);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(t("admin.v2.edit_employee_error", { message: err instanceof Error ? err.message : String(err) }));
     } finally {
       setIsBusy(false);
     }

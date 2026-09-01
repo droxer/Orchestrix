@@ -84,7 +84,12 @@ export function ProjectMemberEditor({
   const { confirm } = useDialogs();
   const { updateProjectMutation } = useRelayMutations();
   const [draft, setDraft] = useState<MemberDraft>(EMPTY_DRAFT);
-  const [briefError, setBriefError] = useState<string | null>(null);
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [functionTitleError, setFunctionTitleError] = useState<string | null>(null);
+  const [responsibilitiesError, setResponsibilitiesError] = useState<string | null>(null);
+  const agentTriggerRef = useRef<HTMLButtonElement>(null);
+  const functionTitleRef = useRef<HTMLInputElement>(null);
+  const responsibilitiesRef = useRef<HTMLTextAreaElement>(null);
   const initializedKeyRef = useRef<string | null>(null);
   const initialDraftKeyRef = useRef(draftKey(EMPTY_DRAFT));
   const agentLabelId = useId();
@@ -129,7 +134,9 @@ export function ProjectMemberEditor({
         }
       : EMPTY_DRAFT;
     setDraft(initial);
-    setBriefError(null);
+    setAgentError(null);
+    setFunctionTitleError(null);
+    setResponsibilitiesError(null);
     initialDraftKeyRef.current = draftKey(initial);
   }, [open, member, project.id, project.version, project.leadAgentId]);
 
@@ -138,7 +145,9 @@ export function ProjectMemberEditor({
 
   function patch(patchDraft: Partial<MemberDraft>) {
     setDraft((current) => ({ ...current, ...patchDraft }));
-    setBriefError(null);
+    setAgentError(null);
+    setFunctionTitleError(null);
+    setResponsibilitiesError(null);
   }
 
   function pickAgent(agentId: string | null) {
@@ -157,11 +166,18 @@ export function ProjectMemberEditor({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!member && !draft.agentId) {
-      setBriefError(t("project.member_choose_required"));
+      setAgentError(t("project.member_choose_required"));
+      agentTriggerRef.current?.focus();
       return;
     }
-    if (!draft.functionTitle.trim() || !draft.responsibilities.trim()) {
-      setBriefError(t("project.member_fields_required"));
+    if (!draft.functionTitle.trim()) {
+      setFunctionTitleError(t("project.member_fields_required"));
+      functionTitleRef.current?.focus();
+      return;
+    }
+    if (!draft.responsibilities.trim()) {
+      setResponsibilitiesError(t("project.member_fields_required"));
+      responsibilitiesRef.current?.focus();
       return;
     }
     const payload = {
@@ -231,9 +247,16 @@ export function ProjectMemberEditor({
       <form className="project-member-form" onSubmit={(event) => void submit(event)} noValidate>
         {!member ? (
           candidates.length ? (
-            <Field label={t("project.member_agent")} labelId={agentLabelId} wrapper="div">
+            <Field label={t("project.member_agent")} labelId={agentLabelId} wrapper="div" error={agentError ?? undefined} errorId="project-member-agent-error">
               <Select value={draft.agentId} onValueChange={pickAgent}>
-                <SelectTrigger className="w-full" aria-labelledby={agentLabelId} data-modal-initial-focus>
+                <SelectTrigger
+                  ref={agentTriggerRef}
+                  className="w-full"
+                  aria-labelledby={agentLabelId}
+                  data-modal-initial-focus
+                  aria-invalid={Boolean(agentError) || undefined}
+                  aria-describedby={agentError ? "project-member-agent-error" : undefined}
+                >
                   <SelectValue placeholder={t("project.member_choose_agent")}>
                     {(value: string | null) => agents.find((candidate) => candidate.id === value)?.displayName ?? t("project.member_choose_agent")}
                   </SelectValue>
@@ -264,23 +287,35 @@ export function ProjectMemberEditor({
                 </SelectContent>
               </Select>
             </Field>
-            <Field label={t("project.function_title")}>
+            <Field label={t("project.function_title")} error={functionTitleError ?? undefined} errorId="project-member-function-title-error">
               <Input
+                ref={functionTitleRef}
+                name="function-title"
+                autoComplete="off"
                 maxLength={120}
                 value={draft.functionTitle}
                 onChange={(event) => patch({ functionTitle: event.target.value })}
+                aria-invalid={Boolean(functionTitleError) || undefined}
+                aria-describedby={functionTitleError ? "project-member-function-title-error" : undefined}
               />
             </Field>
-            <Field label={t("project.responsibilities")}>
+            <Field label={t("project.responsibilities")} error={responsibilitiesError ?? undefined} errorId="project-member-responsibilities-error">
               <Textarea
+                ref={responsibilitiesRef}
+                name="responsibilities"
+                autoComplete="off"
                 maxLength={4000}
                 rows={3}
                 value={draft.responsibilities}
                 onChange={(event) => patch({ responsibilities: event.target.value })}
+                aria-invalid={Boolean(responsibilitiesError) || undefined}
+                aria-describedby={responsibilitiesError ? "project-member-responsibilities-error" : undefined}
               />
             </Field>
             <Field label={t("project.instructions")}>
               <Textarea
+                name="instructions"
+                autoComplete="off"
                 maxLength={8000}
                 rows={5}
                 value={draft.instructions}
@@ -309,11 +344,9 @@ export function ProjectMemberEditor({
           </>
         ) : null}
 
-        {briefError ? <p className="text-sm text-danger" role="alert">{briefError}</p> : null}
-
         {member ? (
           <div className="adm-drawer-section">
-            <p className="adm-drawer-section-title">{t("admin.v2.danger_zone")}</p>
+            <h3 className="adm-drawer-section-title">{t("admin.v2.danger_zone")}</h3>
             <div className="adm-drawer-section-actions">
               <Button
                 type="button"
@@ -336,7 +369,6 @@ export function ProjectMemberEditor({
             size="cta"
             type="submit"
             loading={busy}
-            disabled={!member && !draft.agentId}
           >
             {t("project.member_save")}
           </Button>

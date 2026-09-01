@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createAgent, listSandboxes } from "../../api";
@@ -100,6 +100,7 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
   const identityHeadingId = useId();
   const computerTriggerRef = useRef<HTMLButtonElement>(null);
   const runtimeTriggerRef = useRef<HTMLButtonElement>(null);
+  const runtimeGroupRef = useRef<HTMLDivElement>(null);
   const roleTriggerRef = useRef<HTMLButtonElement>(null);
 
   const sandboxesQuery = useQuery({
@@ -145,6 +146,34 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
     });
   }
 
+  function selectRuntime(kind: AgentName) {
+    setExecutorKind(kind);
+    clearFieldError("executorKind");
+  }
+
+  // Radio keyboard pattern: Arrow keys and Home/End move selection and focus
+  // together; Space/Enter select through the native button activation.
+  function handleRuntimeKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    if (runtimeOptions.length === 0) return;
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = (index + 1) % runtimeOptions.length;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex = (index - 1 + runtimeOptions.length) % runtimeOptions.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = runtimeOptions.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    selectRuntime(runtimeOptions[nextIndex]);
+    runtimeGroupRef.current
+      ?.querySelectorAll<HTMLButtonElement>('[role="radio"]')
+      [nextIndex]?.focus();
+  }
+
   const runtimeOptions = useMemo(
     (): AgentName[] =>
       computerId
@@ -183,6 +212,12 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
     computerId || executorKind || defaultRole || displayName.trim(),
   );
   const confirmDiscardChanges = useUnsavedChangesGuard(open && hasUnsavedChanges && !isBusy);
+
+  // While the computer list is still loading the select is disabled; say so
+  // instead of showing the same placeholder as the empty selection state.
+  const computerPlaceholder = sandboxesQuery.isLoading
+    ? t("admin.loading")
+    : t("agents_page.create_computer_placeholder");
 
   async function requestClose() {
     if (isBusy) return;
@@ -265,10 +300,10 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
                 aria-invalid={Boolean(fieldErrors.computerId) || undefined}
                 aria-describedby={fieldErrors.computerId ? "create-agent-computer-error" : undefined}
               >
-                <SelectValue placeholder={t("agents_page.create_computer_placeholder")}>
+                <SelectValue placeholder={computerPlaceholder}>
                   {(value: string | null) => {
                     const selected = computerOptions.find((option) => option.computerId === value);
-                    if (!selected) return t("agents_page.create_computer_placeholder");
+                    if (!selected) return computerPlaceholder;
                     return (
                       <ComputerOptionLabel
                         kindLabel={t(`admin.v2.node_ownership_${selected.ownership}`)}
@@ -304,23 +339,32 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
             errorId="create-agent-runtime-error"
           >
             <div
+              ref={runtimeGroupRef}
               className="create-agent-runtime-picker"
               role="radiogroup"
               aria-labelledby={runtimeLabelId}
               aria-disabled={isBusy || !computerId || runtimeOptions.length === 0}
+              aria-invalid={Boolean(fieldErrors.executorKind) || undefined}
+              aria-describedby={fieldErrors.executorKind ? "create-agent-runtime-error" : undefined}
             >
-              {runtimeOptions.map((kind) => {
+              {runtimeOptions.map((kind, index) => {
                 const selected = executorKind === kind;
+                // Roving tabindex: the checked option is the single Tab stop,
+                // or the first option while nothing is checked yet.
+                const isTabStop = selected || (!executorKind && index === 0);
                 return (
                   <button
                     key={kind}
+                    ref={isTabStop ? runtimeTriggerRef : undefined}
                     type="button"
                     className={`create-agent-runtime-option${selected ? " is-selected" : ""}`}
                     role="radio"
                     aria-checked={selected}
                     aria-label={agentLabel(kind)}
+                    tabIndex={isTabStop ? 0 : -1}
                     disabled={isBusy}
-                    onClick={() => setExecutorKind(kind)}
+                    onClick={() => selectRuntime(kind)}
+                    onKeyDown={(event) => handleRuntimeKeyDown(event, index)}
                   >
                     <span className="create-agent-runtime-mark" aria-hidden="true">
                       <AgentMark agent={kind} size={ICON.xl} />
@@ -388,6 +432,7 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
             <Input
               name="create-agent-display-name"
               autoComplete="off"
+              spellCheck={false}
               value={displayName}
               onChange={(event) => setDisplayName(event.target.value)}
               placeholder={t("agents_page.create_name_placeholder")}

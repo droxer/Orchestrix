@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RelayApiError, reissueComputerToken, revealComputerToken } from "../../api";
 import type { ComputerTokenResponse, ControlPanelDaemonNodeRecord } from "../../types";
@@ -33,6 +33,7 @@ export function ComputerTokenDrawer({ open, onClose, node }: ComputerTokenDrawer
   const [reissued, setReissued] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"reveal" | "reissue" | null>(null);
+  const credentialsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -43,6 +44,12 @@ export function ComputerTokenDrawer({ open, onClose, node }: ComputerTokenDrawer
       setBusy(null);
     }
   }, [open]);
+
+  // The Reveal button unmounts once credentials arrive; move focus onto the
+  // revealed block instead of letting it drop to document.body.
+  useEffect(() => {
+    if (credentials) credentialsRef.current?.focus();
+  }, [credentials]);
 
   if (!node) return null;
 
@@ -100,7 +107,7 @@ export function ComputerTokenDrawer({ open, onClose, node }: ComputerTokenDrawer
       closeLabel={t("drawer.close")}
       bodyClassName="adm-drawer-body--column"
     >
-      <div className="adm-form">
+      <div className="adm-form" ref={credentialsRef} tabIndex={-1}>
         {credentials ? (
           <>
             {reissued ? (

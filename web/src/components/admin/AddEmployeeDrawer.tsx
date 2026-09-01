@@ -146,12 +146,12 @@ export function AddEmployeeDrawer({
     // returned early with focus parked on Submit and the message off-screen.
     const firstInvalid = nextFieldErrors.employeeId
       ? employeeIdRef
-      : nextFieldErrors.maxLocalComputers
-        ? limitRef
-        : nextFieldErrors.username
-          ? usernameRef
-          : nextFieldErrors.password
-            ? passwordRef
+      : nextFieldErrors.username
+        ? usernameRef
+        : nextFieldErrors.password
+          ? passwordRef
+          : nextFieldErrors.maxLocalComputers
+            ? limitRef
             : null;
     if (firstInvalid) {
       firstInvalid.current?.focus();
@@ -210,7 +210,7 @@ export function AddEmployeeDrawer({
               {handlePreview ? initialsOf(handlePreview) : "?"}
             </span>
             <div className="adm-provision-preview-text">
-              <span className="adm-provision-preview-handle code">
+              <span className="adm-provision-preview-handle code" translate="no">
                 {handlePreview ? `@${handlePreview}` : t("admin.v2.provision_preview_placeholder")}
               </span>
               <span className="adm-provision-preview-name">
