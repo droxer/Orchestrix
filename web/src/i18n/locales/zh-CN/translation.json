@@ -332,7 +332,6 @@
     "view_board": "看板视图",
     "view_list": "列表视图",
     "col_task": "任务",
-    "linked": "已关联",
     "drop_moved": "已将“{{title}}”移至{{status}}。",
     "drop_needs_assignment": "移至“已分配”前，请先指定智能体或团队。",
     "no_tasks_title": "暂无任务",
@@ -382,7 +381,6 @@
     "history_loading": "正在加载运行记录…",
     "history_empty": "尚未运行。",
     "history_error": "无法加载运行记录。",
-    "history_occurrence_origin": "（实例）",
     "history": {
       "created": "已创建",
       "assigned": "已指派",
@@ -397,7 +395,30 @@
       "activity": "活动"
     },
     "col_ref": "编号",
-    "add_due": "添加日期"
+    "add_due": "添加日期",
+    "runs": {
+      "title": "运行",
+      "loading": "正在加载运行…",
+      "empty": "该例程尚未运行。",
+      "error": "无法加载运行。",
+      "files_other": "{{count}} 个文件",
+      "outcome": {
+        "done": "已完成",
+        "failed": "失败",
+        "running": "运行中",
+        "pending": "未开始"
+      }
+    },
+    "col_result": "结果",
+    "result_title": "结果",
+    "result_files_other": "{{count}} 个文件",
+    "linked": "已关联",
+    "source": "来源",
+    "all_sources": "任意来源",
+    "source_direct": "任务",
+    "source_routine": "例程运行",
+    "routine_origin_unknown": "例程",
+    "routine_origin_of": "由例程“{{title}}”生成"
   },
   "workspace": {
     "title": "工作区",

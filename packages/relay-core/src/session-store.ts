@@ -162,6 +162,16 @@ export interface RelaySession {
   pendingDecision?: "feedback";
   agentRuns: AgentRun[];
   artifacts: RelayArtifact[];
+  /**
+   * How many workspace files this session produced.
+   *
+   * Summary-derived: the thread list reports the count without the artifact
+   * records, and a session the client has only seen as a summary carries
+   * `artifacts: []`. Surfaces that only need the number (the backlog's result
+   * line) read this; anything that needs the files themselves reads
+   * `artifacts` from the full session.
+   */
+  workspaceArtifactCount?: number;
   decisions: HumanDecision[];
   collaborationRounds: CollaborationRoundManifest[];
   /** Monotonic count of authoritative collaboration rounds. */

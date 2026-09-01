@@ -4,34 +4,26 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listTaskEvents } from "../../api";
 import { hrefForRoute } from "../../lib/appRoute";
-import { taskHistoryEntries, type TaskHistoryEntry } from "../../lib/taskHistory";
+import { taskHistoryEntries } from "../../lib/taskHistory";
+import { historyEntryLabel, historyTime } from "./taskHistoryLabel";
 import type { RelayTaskEvent } from "../../types";
 
-function historyTime(value: string, locale: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(locale || undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
 /**
- * Run history for one task or routine.
+ * Run history for one plain task.
  *
  * The task event log is the authoritative record of what a dispatch actually
  * did; without this the drawer showed a single "last activity" line and the
  * rest was reachable only through the API.
+ *
+ * A routine does not come here — its runs happen in occurrences, and one flat
+ * timeline across all of them says nothing about any single run. `RoutineRunLedger`
+ * is that surface.
  */
 export function TaskDrawerHistory({
   taskId,
-  isRoutine,
   onOpenThread,
 }: {
   taskId: string;
-  isRoutine: boolean;
   onOpenThread?: (sessionId: string) => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -42,27 +34,15 @@ export function TaskDrawerHistory({
     const controller = new AbortController();
     setEvents(null);
     setFailed(false);
-    // A routine never runs itself — ask for its occurrences' events too.
-    listTaskEvents(taskId, { includeOccurrences: isRoutine }, controller.signal)
+    listTaskEvents(taskId, {}, controller.signal)
       .then((response) => setEvents(response.events))
       .catch(() => {
         if (!controller.signal.aborted) setFailed(true);
       });
     return () => controller.abort();
-  }, [taskId, isRoutine]);
+  }, [taskId]);
 
   const entries = events ? taskHistoryEntries(events, taskId) : [];
-
-  function entryLabel(entry: TaskHistoryEntry): string {
-    if (entry.kind === "activity") return entry.message ?? t("backlog.history.activity");
-    if (entry.kind === "status") {
-      return t("backlog.history.status", {
-        status: entry.status ? t(`backlog.statuses.${entry.status}`) : "",
-      });
-    }
-    const label = t(`backlog.history.${entry.kind}`);
-    return entry.message ? `${label} — ${entry.message}` : label;
-  }
 
   return (
     <section className="task-drawer-history" aria-label={t("backlog.history_title")}>
@@ -86,10 +66,7 @@ export function TaskDrawerHistory({
             <li key={entry.id} className="task-drawer-history-entry">
               <span className="task-drawer-history-time tnum">{historyTime(entry.timestamp, i18n.language)}</span>
               <span className="task-drawer-history-label">
-                {entryLabel(entry)}
-                {entry.fromOccurrence ? (
-                  <span className="task-drawer-history-origin">{t("backlog.history_occurrence_origin")}</span>
-                ) : null}
+                {historyEntryLabel(entry, t)}
               </span>
               {sessionId ? (
                 <a

@@ -332,7 +332,6 @@
     "view_board": "看板檢視",
     "view_list": "清單檢視",
     "col_task": "任務",
-    "linked": "已關聯",
     "drop_moved": "已將「{{title}}」移至{{status}}。",
     "drop_needs_assignment": "移至「已分派」前，請先指定智能體或團隊。",
     "no_tasks_title": "尚無任務",
@@ -382,7 +381,6 @@
     "history_loading": "正在載入執行紀錄…",
     "history_empty": "尚未執行。",
     "history_error": "無法載入執行紀錄。",
-    "history_occurrence_origin": "（實例）",
     "history": {
       "created": "已建立",
       "assigned": "已指派",
@@ -397,7 +395,30 @@
       "activity": "活動"
     },
     "col_ref": "編號",
-    "add_due": "新增日期"
+    "add_due": "新增日期",
+    "runs": {
+      "title": "執行",
+      "loading": "正在載入執行…",
+      "empty": "此例程尚未執行。",
+      "error": "無法載入執行。",
+      "files_other": "{{count}} 個檔案",
+      "outcome": {
+        "done": "已完成",
+        "failed": "失敗",
+        "running": "執行中",
+        "pending": "未開始"
+      }
+    },
+    "col_result": "結果",
+    "result_title": "結果",
+    "result_files_other": "{{count}} 個檔案",
+    "linked": "已關聯",
+    "source": "來源",
+    "all_sources": "任意來源",
+    "source_direct": "任務",
+    "source_routine": "例程執行",
+    "routine_origin_unknown": "例程",
+    "routine_origin_of": "由例程「{{title}}」產生"
   },
   "workspace": {
     "title": "工作區",

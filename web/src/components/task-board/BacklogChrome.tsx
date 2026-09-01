@@ -142,6 +142,17 @@ export function BacklogFiltersBar({
         onChange={(event) => onChange({ ...filters, assignee: event.target.value })}
       />
       <FilterSelect
+        name="backlog-source-filter"
+        label={t("backlog.source")}
+        value={filters.source}
+        onValueChange={(source) => onChange({ ...filters, source })}
+        options={[
+          { value: "all", label: t("backlog.all_sources") },
+          { value: "direct", label: t("backlog.source_direct") },
+          { value: "routine", label: t("backlog.source_routine") },
+        ]}
+      />
+      <FilterSelect
         name="backlog-due-filter"
         label={t("backlog.due")}
         value={filters.due}

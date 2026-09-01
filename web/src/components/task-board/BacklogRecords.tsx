@@ -15,6 +15,8 @@ import {
   NavRefresh,
 } from "../icons";
 import { dueTone } from "../../lib/backlog";
+import { taskResultLine } from "../../lib/taskResult";
+import { RoutineOriginBadge } from "./RoutineOriginBadge";
 import { taskRef } from "../../lib/taskRef";
 import { TaskAssignee, TaskExecutionBadge } from "../TaskAssignee";
 import { Button } from "@/components/ui/button";
@@ -43,6 +45,7 @@ import { TaskDueCell } from "./TaskDueCell";
 export function BacklogTaskCard({
   task,
   session,
+  routineTitle,
   ready,
   assigneeDisplayName,
   assigneeIsSelf,
@@ -62,6 +65,8 @@ export function BacklogTaskCard({
 }: {
   task: RelayTaskListItem;
   session?: RelaySession;
+  /** Title of the routine this task was promoted from, when it was. */
+  routineTitle?: string;
   ready: boolean;
   assigneeDisplayName?: string;
   assigneeIsSelf?: boolean;
@@ -85,6 +90,7 @@ export function BacklogTaskCard({
     (!task.assignedAgentId && !task.assignedTeamId && !canDiscuss) ||
     task.status === "running" ||
     task.status === "done";
+  const result = taskResultLine(task, session);
 
   return (
     <article
@@ -106,6 +112,7 @@ export function BacklogTaskCard({
         />
         <PriorityBadge priority={task.priority} />
         <TaskExecutionBadge task={task} ready={ready} displayName={agentDisplayName} />
+        <RoutineOriginBadge task={task} routineTitle={routineTitle} />
       </div>
       <Button variant="ghost" type="button" className="backlog-task-title" onClick={onEdit}>{task.title}</Button>
       {task.description ? <p className="backlog-description">{task.description}</p> : null}
@@ -120,10 +127,23 @@ export function BacklogTaskCard({
           <ActionCalendar size={ICON.sm} />
           {task.dueDate ? formatDueDate(task.dueDate) : t("backlog.no_due")}
         </span>
-        {session ? (
+        {result ? (
           <>
             <span className="backlog-meta-sep" aria-hidden="true">·</span>
-            <span>{t("backlog.linked")}</span>
+            {/* The card carries no status text of its own, so the result names
+                the outcome. The list row's dot already does, and so does not. */}
+            <span className="backlog-result">
+              <StateMark shape={TASK_STATUS_SHAPE[result.status]} />
+              {t(`backlog.statuses.${result.status}`)}
+            </span>
+            {result.hasFiles ? (
+              <>
+                <span className="backlog-meta-sep" aria-hidden="true">·</span>
+                <span className="backlog-result-files tnum">
+                  {t("backlog.result_files", { count: result.fileCount })}
+                </span>
+              </>
+            ) : null}
           </>
         ) : null}
       </div>
@@ -216,6 +236,9 @@ export function BacklogRowsHead({
         sort={sort}
         onSort={onSort}
       />
+      {/* Files come from the linked session, not the task record, so there is
+          no task field to order rows by. */}
+      <span className="backlog-rows-head-cell backlog-rows-head-result" role="columnheader">{t("backlog.col_result")}</span>
       {/* Actions is not a column of data — there is nothing to order by. */}
       <span className="backlog-rows-head-cell backlog-rows-head-actions" role="columnheader">{t("backlog.actions")}</span>
     </div>
@@ -224,6 +247,8 @@ export function BacklogRowsHead({
 
 export function BacklogTaskRow({
   task,
+  session,
+  routineTitle,
   ready,
   assigneeDisplayName,
   assigneeIsSelf,
@@ -238,6 +263,9 @@ export function BacklogTaskRow({
   onDone,
 }: {
   task: RelayTaskListItem;
+  session?: RelaySession;
+  /** Title of the routine this task was promoted from, when it was. */
+  routineTitle?: string;
   ready: boolean;
   assigneeDisplayName?: string;
   assigneeIsSelf?: boolean;
@@ -253,6 +281,7 @@ export function BacklogTaskRow({
 }) {
   const { t } = useTranslation();
   const tone = dueTone(task);
+  const result = taskResultLine(task, session);
   const startDisabled =
     (!task.assignedAgentId && !task.assignedTeamId && !canDiscuss) ||
     task.status === "running" ||
@@ -274,6 +303,7 @@ export function BacklogTaskRow({
       <span className="backlog-row-ref code" role="cell">{taskRef(task.id)}</span>
       <div className="backlog-row-lead" role="cell">
         <Button variant="ghost" type="button" className="backlog-row-title" onClick={onEdit}>{task.title}</Button>
+        <RoutineOriginBadge task={task} routineTitle={routineTitle} />
       </div>
       <div className="backlog-row-tags" role="cell">
         <PriorityBadge priority={task.priority} />
@@ -289,6 +319,15 @@ export function BacklogTaskRow({
       </span>
       <span className="backlog-row-assignee" role="cell">
         <TaskAssignee task={task} ready={ready} assigneeDisplayName={assigneeDisplayName} assigneeIsSelf={assigneeIsSelf} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} />
+      </span>
+      <span className="backlog-row-result" role="cell">
+        {/* The row's status dot already names the outcome; restating it here
+            would spend a column on a fact the row has made twice. */}
+        {result?.hasFiles ? (
+          <span className="backlog-result-files tnum">
+            {t("backlog.result_files", { count: result.fileCount })}
+          </span>
+        ) : null}
       </span>
       <div className="backlog-row-actions" role="cell" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
