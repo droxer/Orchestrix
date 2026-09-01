@@ -38,8 +38,12 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [result, setResult] = useState<CreateLocalDeviceEnrollmentResponse | null>(null);
+  // Stable POSIX default for SSR/first render; the platform-specific value is
+  // resolved after mount so the placeholder never hydration-mismatches.
+  const [pathPlaceholder, setPathPlaceholder] = useState("/Users/alice/project");
   const { copiedField, copy } = useCopyFeedback();
   const workspacePathRef = useRef<HTMLInputElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
   const hasUnsavedChanges = !result && (Boolean(workspacePath.trim()) || Boolean(displayName.trim()));
   const confirmDiscardChanges = useUnsavedChangesGuard(open && hasUnsavedChanges && !isBusy);
 
@@ -53,6 +57,14 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
       setResult(null);
     }
   }, [open]);
+
+  useEffect(() => {
+    setPathPlaceholder(workspacePathPlaceholder());
+  }, []);
+
+  useEffect(() => {
+    if (result) resultRef.current?.focus();
+  }, [result]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -98,7 +110,7 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
       bodyClassName="adm-drawer-body--column"
     >
       {result ? (
-        <div className="adm-form">
+        <div className="adm-form" ref={resultRef} tabIndex={-1}>
           {/* Two different questions, two different answers. Whether this was a
               new computer or an adopted one is `reused` — token presence does
               not answer it, because adopting a computer whose enrollment never
@@ -172,12 +184,13 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
                 ref={workspacePathRef}
                 name="connect-computer-workspace-path"
                 autoComplete="off"
+                spellCheck={false}
                 value={workspacePath}
                 onChange={(event) => {
                   setWorkspacePath(event.target.value);
                   if (fieldError) setFieldError(null);
                 }}
-                placeholder={workspacePathPlaceholder()}
+                placeholder={pathPlaceholder}
                 disabled={isBusy}
                 aria-invalid={Boolean(fieldError) || undefined}
                 aria-describedby={fieldError ? "connect-computer-workspace-path-error" : undefined}

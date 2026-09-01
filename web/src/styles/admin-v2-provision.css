@@ -202,6 +202,7 @@
   font: var(--type-body-sm);
   letter-spacing: var(--type-body-sm-track);
   color: var(--ink-3);
+  word-break: break-all;
 }
 
 .adm-provision-outcome {

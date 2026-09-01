@@ -24,7 +24,7 @@ export function CredCopyRow({ label, value, copyLabel, copied, onCopy, hint }: C
       <span className="adm-cred-label">{label}</span>
       {hint ? <span className="adm-cred-hint">{hint}</span> : null}
       <div className="adm-cred-value-line">
-        <code className="adm-cred-value code">{value}</code>
+        <code className="adm-cred-value code" translate="no">{value}</code>
         {/* Filled cobalt pill — `default`, not ghost: the class paints the
             plate, so the variant prop names what is actually rendered. */}
         <Button variant="default"

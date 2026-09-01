@@ -44,13 +44,16 @@
     gap: var(--sp-3);
     padding:
       max(env(safe-area-inset-top), var(--sp-4))
+      max(env(safe-area-inset-right), var(--sp-4))
       var(--sp-4)
-      var(--sp-4);
+      max(env(safe-area-inset-left), var(--sp-4));
   }
 
   .adm-drawer-body {
     padding: var(--sp-4);
+    padding-right: max(env(safe-area-inset-right), var(--sp-4));
     padding-bottom: max(env(safe-area-inset-bottom), var(--sp-4));
+    padding-left: max(env(safe-area-inset-left), var(--sp-4));
     -webkit-overflow-scrolling: touch;
   }
 
@@ -63,13 +66,16 @@
     justify-content: stretch;
     gap: var(--sp-3);
     bottom: calc(-1 * var(--sp-4));
-    margin-right: calc(-1 * var(--sp-4));
+    /* Full-bleed + inner padding track the body's safe-area inline padding so
+       landscape notches neither clip the buttons nor break the bar's bleed. */
+    margin-right: calc(-1 * max(env(safe-area-inset-right), var(--sp-4)));
     margin-bottom: calc(-1 * var(--sp-4));
-    margin-left: calc(-1 * var(--sp-4));
+    margin-left: calc(-1 * max(env(safe-area-inset-left), var(--sp-4)));
     padding:
       var(--sp-4)
-      var(--sp-4)
-      max(env(safe-area-inset-bottom), var(--sp-4));
+      max(env(safe-area-inset-right), var(--sp-4))
+      max(env(safe-area-inset-bottom), var(--sp-4))
+      max(env(safe-area-inset-left), var(--sp-4));
   }
 
   .adm-form-actions [data-slot="button"],

@@ -213,6 +213,7 @@ export function AddNodeDrawer({
                 data-modal-initial-focus
                 name="add-node-workspace-path"
                 autoComplete="off"
+                spellCheck={false}
                 value={workspacePath}
                 onChange={(event) => {
                   setWorkspacePath(event.target.value);

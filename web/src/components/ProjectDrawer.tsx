@@ -44,6 +44,7 @@ export function ProjectDrawer({
   const [nameError, setNameError] = useState<string | null>(null);
   const [computerError, setComputerError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
+  const computerTriggerRef = useRef<HTMLButtonElement>(null);
   const computerLabelId = useId();
   const initializedKeyRef = useRef<string | null>(null);
   const initialDraftKeyRef = useRef(projectDraftKey("", ""));
@@ -110,6 +111,7 @@ export function ProjectDrawer({
     }
     if (!selectedComputerId) {
       setComputerError(t("project.computer_required"));
+      computerTriggerRef.current?.focus();
       return;
     }
     try {
@@ -171,6 +173,8 @@ export function ProjectDrawer({
               ref={nameRef}
               data-modal-initial-focus
               className="project-name-input"
+              name="project-name"
+              autoComplete="off"
               maxLength={120}
               placeholder={t("project.setup_name_placeholder")}
               value={name}
@@ -195,6 +199,7 @@ export function ProjectDrawer({
             ) : (
               <Select value={computerId} onValueChange={(value) => { setComputerId(value ?? ""); setComputerError(null); }}>
                 <SelectTrigger
+                  ref={computerTriggerRef}
                   className="w-full project-computer-select"
                   disabled={projectComputers.length === 0}
                   aria-labelledby={computerLabelId}

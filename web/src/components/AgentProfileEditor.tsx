@@ -9,8 +9,10 @@ import {
 import { Markdown } from "./Markdown";
 import { TonePill } from "./StatusPill";
 import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 
 interface AgentProfileEditorProps {
   name: string;
@@ -48,10 +50,14 @@ export function AgentProfileEditor({
   const personalityChanged = draftPersonality !== savedPersonality;
   const dirty = nameChanged || personalityChanged;
   const canSave = dirty && nameDraft.trim().length > 0;
+  const nameError = nameDraft.trim().length === 0
+    ? t("admin.v2.edit_employee_name_required")
+    : null;
   const hasCustomPersonality = savedPersonality.length > 0;
   const titleId = useId();
   const helpId = useId();
   const nameFieldId = useId();
+  const nameErrorId = useId();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -62,6 +68,15 @@ export function AgentProfileEditor({
 
   function useStarter() {
     onPersonalityDraftChange(t("agents_page.personality_starter"));
+  }
+
+  // Same discard guard as CreateAgentDialog: confirm before throwing away a
+  // dirty draft, stay instant when there is nothing to lose.
+  const confirmDiscardChanges = useUnsavedChangesGuard(editing && dirty && !saving);
+
+  async function requestCancel() {
+    if (saving) return;
+    if (await confirmDiscardChanges()) onCancel();
   }
 
   return (
@@ -113,14 +128,18 @@ export function AgentProfileEditor({
               name="agent-profile-name"
               type="text"
               autoComplete="off"
+              spellCheck={false}
               maxLength={64}
               value={nameDraft}
               onChange={(event) => onNameDraftChange(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Escape") onCancel();
+                if (event.key === "Escape") void requestCancel();
               }}
+              aria-invalid={Boolean(nameError) || undefined}
+              aria-describedby={nameError ? nameErrorId : undefined}
               disabled={saving}
             />
+            {nameError ? <FieldError id={nameErrorId}>{nameError}</FieldError> : null}
           </div>
           <div className="agent-personality-editor-guide">
             <p>{t("agents_page.personality_editor_intro")}</p>
@@ -155,7 +174,7 @@ export function AgentProfileEditor({
                 event.preventDefault();
                 onSave();
               }
-              if (event.key === "Escape") onCancel();
+              if (event.key === "Escape") void requestCancel();
             }}
             disabled={saving}
             placeholder={t("agents_page.personality_placeholder")}
@@ -166,7 +185,7 @@ export function AgentProfileEditor({
             </span>
             <span className="agent-personality-save-hint">{t("agents_page.personality_save_hint")}</span>
             <div className="agent-personality-actions">
-              <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={saving}>
+              <Button type="button" variant="ghost" size="sm" onClick={() => { void requestCancel(); }} disabled={saving}>
                 {t("admin.v2.cancel")}
               </Button>
               <Button type="button" size="sm" onClick={onSave} disabled={!canSave} loading={saving} loadingLabel={t("admin.v2.saving")}>

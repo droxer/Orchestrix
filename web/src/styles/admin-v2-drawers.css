@@ -104,6 +104,11 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: var(--sp-7);
+  /* Keep a tab-focused field clear of the sticky .adm-form-actions footer —
+     opaque + z-indexed, it would otherwise cover the focused control. The
+     value approximates the footer height: its vertical padding plus one
+     button row. */
+  scroll-padding-bottom: calc(var(--sp-4) * 2 + var(--touch-target));
   container: drawer-body / inline-size;
 }
 
