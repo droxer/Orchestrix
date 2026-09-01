@@ -358,6 +358,54 @@ def test_managed_node_provisioning_replays_the_same_runtime_after_lost_response(
         assert heartbeat.status_code == 200
         assert heartbeat.json()["status"] == "stopped"
         assert client.get("/api/v1/admin/daemon-nodes").json()["nodes"] == []
+
+
+def test_employee_daemon_list_replaces_retired_managed_runtime_with_one_placeholder(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        managed = app.state.managed_node_store.create_node(
+            {"employeeId": "alice", "displayName": "Alice cloud"}
+        )
+        attempt, _credential = app.state.managed_node_store.create_attempt(
+            managed["id"]
+        )
+        runtime, runtime_token = app.state.registry.enroll_managed_node(
+            managed,
+            attempt,
+            {"workspacePath": "/workspace/alice"},
+        )
+        app.state.managed_node_store.complete_enrollment(
+            managed["id"], attempt["id"], runtime["id"]
+        )
+        runtime = app.state.registry.register(
+            {
+                "sandboxId": runtime["id"],
+                "token": runtime_token,
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces"],
+                "status": "ready",
+            }
+        )
+        app.state.registry.fence_managed_node(runtime["id"])
+        _login(client, "alice", "userpass")
+
+        response = client.get("/api/v1/daemon-nodes")
+
+        assert response.status_code == 200
+        [visible] = response.json()["nodes"]
+        assert visible["id"] == managed["id"]
+        assert visible["managedNodeId"] == managed["id"]
+        assert visible["displayName"] == "Alice cloud"
+        assert visible["provisioningPlaceholder"] is True
+        assert visible["status"] == "provisioning"
+        assert visible["online"] is False
         assert alice_client.get("/api/v1/daemon-nodes").json()["nodes"] == []
 
 

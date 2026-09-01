@@ -209,6 +209,13 @@ describe("My Computer record card", () => {
 });
 
 describe("My Computer: connect CTA respects the local-computer limit", () => {
+  it("counts only employee-device computers, not managed cloud capacity", async () => {
+    const page = await read("web/src/components/ComputerPage.tsx");
+
+    assert.match(page, /const computersUsed = countEmployeeDeviceComputers\(myNodes\)/);
+    assert.doesNotMatch(page, /const computersUsed = myNodes\.length/);
+  });
+
   it("gates the connect button on the resolved limit from the session user", async () => {
     // The backend refuses a new enrollment at the limit (409), but a button
     // that only fails after a drawer of form-filling reads as broken, not

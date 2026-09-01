@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { abbreviateNodeId, formatRunElapsed, nodesAssignedToEmployee } from "../src/lib/computerNodes.js";
+import {
+  abbreviateNodeId,
+  countEmployeeDeviceComputers,
+  formatRunElapsed,
+  nodesAssignedToEmployee,
+} from "../src/lib/computerNodes.js";
 import type { DaemonNodeMonitorRecord } from "../src/types.js";
 
 function node(overrides: Partial<DaemonNodeMonitorRecord> & { id: string }): DaemonNodeMonitorRecord {
@@ -46,6 +51,70 @@ describe("nodesAssignedToEmployee", () => {
     const nodes = [node({ id: "sbx_unassigned" })];
     assert.deepEqual(nodesAssignedToEmployee(nodes, "alice"), []);
   });
+
+  it("shows one cloud computer across managed runtime replacements", () => {
+    const nodes = [
+      node({
+        id: "runtime_old",
+        employeeId: "alice",
+        managedNodeId: "cloud_1",
+        status: "stopped",
+        online: false,
+        stale: true,
+        retiredAt: "2026-01-02T00:00:00Z",
+        lastSeenAt: "2026-01-02T00:00:00Z",
+      }),
+      node({
+        id: "runtime_current",
+        employeeId: "alice",
+        managedNodeId: "cloud_1",
+        lastSeenAt: "2026-01-03T00:00:00Z",
+      }),
+    ];
+
+    const visible = nodesAssignedToEmployee(nodes, "alice");
+
+    assert.deepEqual(visible.map((item) => item.id), ["runtime_current"]);
+  });
+
+  it("shows one local computer across daemon restarts", () => {
+    const nodes = [
+      node({
+        id: "runtime_old",
+        employeeId: "alice",
+        workspaceId: "machine_1",
+        nodeLocation: "employee-device",
+        status: "stopped",
+        online: false,
+        stale: true,
+        retiredAt: "2026-01-02T00:00:00Z",
+      }),
+      node({
+        id: "runtime_current",
+        employeeId: "alice",
+        workspaceId: "machine_1",
+        nodeLocation: "employee-device",
+      }),
+    ];
+
+    assert.deepEqual(
+      nodesAssignedToEmployee(nodes, "alice").map((item) => item.id),
+      ["runtime_current"],
+    );
+  });
+
+  it("preserves genuinely distinct computers owned by one employee", () => {
+    const nodes = [
+      node({ id: "local_1", employeeId: "alice", workspaceId: "machine_1" }),
+      node({ id: "local_2", employeeId: "alice", workspaceId: "machine_2" }),
+      node({ id: "cloud_1", employeeId: "alice", managedNodeId: "managed_1" }),
+    ];
+
+    assert.deepEqual(
+      nodesAssignedToEmployee(nodes, "alice").map((item) => item.id),
+      ["local_1", "local_2", "cloud_1"],
+    );
+  });
 });
 
 describe("formatRunElapsed", () => {
@@ -76,6 +145,27 @@ describe("formatRunElapsed", () => {
 
   it("degrades to a dash on an unparseable timestamp", () => {
     assert.equal(formatRunElapsed("not-a-date", at(0)), "—");
+  });
+});
+
+describe("countEmployeeDeviceComputers", () => {
+  it("counts local computers without charging managed capacity against the limit", () => {
+    const computers = [
+      node({
+        id: "local_1",
+        employeeId: "alice",
+        workspaceId: "machine_1",
+        nodeLocation: "employee-device",
+      }),
+      node({
+        id: "cloud_1",
+        employeeId: "alice",
+        managedNodeId: "managed_1",
+        nodeLocation: "managed",
+      }),
+    ];
+
+    assert.equal(countEmployeeDeviceComputers(computers), 1);
   });
 });
 
