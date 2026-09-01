@@ -93,6 +93,21 @@ describe("My Computer record card", () => {
     assert.match(page, /tone: "danger"/, "removal is confirmed destructively");
   });
 
+  it("does not offer self-service disconnect for an admin-managed computer", async () => {
+    // The owner-scoped DELETE endpoint deliberately rejects managed computers:
+    // their lifecycle belongs to the admin-managed-node control plane. Showing
+    // this action only leads through confirmation to the generic disconnect
+    // error toast reported by the user.
+    const card = await read("web/src/components/computer/ComputerCard.tsx");
+    const actions = card.match(/<div className="computer-card-actions">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    assert.notEqual(actions.trim(), "", "the actions regex stopped matching — refresh it");
+    assert.match(
+      actions,
+      /node\.managedNodeId\s*\?\s*null\s*:\s*\([\s\S]*?onDisconnect\(node\)/,
+      "managed computers must not offer an action their owner-scoped API forbids",
+    );
+  });
+
   it("lets the owner see the token again for reconnecting", async () => {
     // Enrollment shows the token once; the card carries a labelled Token
     // action that opens the reveal/reissue drawer against the owner-scoped
