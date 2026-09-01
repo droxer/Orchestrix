@@ -15,6 +15,8 @@ export interface SandboxRecord {
   displayName?: string;
   employeeId?: string;
   workspacePath?: string;
+  /** Stable host machine identity reported by the daemon; not a workspace path. */
+  workspaceId?: string;
   sandboxMode?: DaemonNodeSandboxMode;
   capabilities?: DaemonNodeCapability[];
   nodeLocation?: DaemonNodeLocation;

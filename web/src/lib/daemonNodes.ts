@@ -25,7 +25,7 @@ function mergedDisplayName(
     : undefined;
 }
 
-function preferDaemonNode(a: DaemonNodeMonitorRecord, b: DaemonNodeMonitorRecord): DaemonNodeMonitorRecord {
+export function preferDaemonNode(a: DaemonNodeMonitorRecord, b: DaemonNodeMonitorRecord): DaemonNodeMonitorRecord {
   const rankDelta = nodeRank(b) - nodeRank(a);
   const winner = rankDelta > 0
     ? b

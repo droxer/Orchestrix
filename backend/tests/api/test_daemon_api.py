@@ -358,6 +358,7 @@ def test_managed_node_provisioning_replays_the_same_runtime_after_lost_response(
         assert heartbeat.status_code == 200
         assert heartbeat.json()["status"] == "stopped"
         assert client.get("/api/v1/admin/daemon-nodes").json()["nodes"] == []
+        assert alice_client.get("/api/v1/daemon-nodes").json()["nodes"] == []
 
 
 def test_employee_daemon_list_replaces_retired_managed_runtime_with_one_placeholder(
@@ -371,6 +372,9 @@ def test_employee_daemon_list_replaces_retired_managed_runtime_with_one_placehol
         _create_user(client, "alice", employee_id="alice")
         managed = app.state.managed_node_store.create_node(
             {"employeeId": "alice", "displayName": "Alice cloud"}
+        )
+        app.state.managed_node_store.create_node(
+            {"employeeId": "bob", "displayName": "Bob cloud"}
         )
         attempt, _credential = app.state.managed_node_store.create_attempt(
             managed["id"]
@@ -406,7 +410,38 @@ def test_employee_daemon_list_replaces_retired_managed_runtime_with_one_placehol
         assert visible["provisioningPlaceholder"] is True
         assert visible["status"] == "provisioning"
         assert visible["online"] is False
-        assert alice_client.get("/api/v1/daemon-nodes").json()["nodes"] == []
+
+
+def test_employee_daemon_list_hides_superseded_local_runtime(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        common = {
+            "employeeId": "alice",
+            "workspaceId": "alice-machine",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "capabilities": ["thread-workspaces"],
+            "status": "ready",
+        }
+        app.state.registry.register(
+            {**common, "sandboxId": "local_old", "token": "old-token"},
+            authorized_node_location="employee-device",
+        )
+        app.state.registry.register(
+            {**common, "sandboxId": "local_current", "token": "current-token"},
+            authorized_node_location="employee-device",
+        )
+        _login(client, "alice", "userpass")
+
+        response = client.get("/api/v1/daemon-nodes")
+
+        assert response.status_code == 200
+        assert [node["id"] for node in response.json()["nodes"]] == ["local_current"]
 
 
 def test_legacy_managed_node_with_retired_policy_can_be_deleted(monkeypatch) -> None:
@@ -888,10 +923,11 @@ def test_stopped_managed_runtime_preserves_agent_for_restart(monkeypatch) -> Non
         response = client.delete(f"/api/v1/admin/managed-nodes/{managed['id']}/runtime")
 
         assert response.status_code == 204, response.text
-        assert [
-            node["id"]
-            for node in client.get("/api/v1/daemon-nodes").json()["nodes"]
-        ] == [runtime["id"]]
+        [visible] = client.get("/api/v1/daemon-nodes").json()["nodes"]
+        assert visible["id"] == managed["id"]
+        assert visible["managedNodeId"] == managed["id"]
+        assert visible["provisioningPlaceholder"] is True
+        assert visible["status"] == "stopped"
         assert not app.state.agent_store.get_agent(agent["id"]).get("deletedAt")
         [preserved] = app.state.agent_placement_store.list_placements(
             agent_id=agent["id"]

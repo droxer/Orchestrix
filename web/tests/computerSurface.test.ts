@@ -231,7 +231,7 @@ describe("My Computer: connect CTA respects the local-computer limit", () => {
     // so a connect or disconnect this session moves it immediately.
     const page = await read("web/src/components/ComputerPage.tsx");
     assert.match(page, /\{computersUsed\}\/\{computerLimit\}/);
-    assert.match(page, /const computersUsed = myNodes\.length/);
+    assert.match(page, /const computersUsed = countEmployeeDeviceComputers\(myNodes\)/);
   });
 
   it("ships the limit copy and the session fields it depends on", async () => {
