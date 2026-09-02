@@ -1412,6 +1412,7 @@
     "runtime": "Runtime",
     "computers": "Computers",
     "no_placements": "Not placed",
+    "group_unplaced": "No computer",
     "placements_ready": "{{ready}} / {{total}} ready",
     "enabled": "Enabled",
     "disabled": "Disabled",
