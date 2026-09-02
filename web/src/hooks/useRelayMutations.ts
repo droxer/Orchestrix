@@ -24,7 +24,7 @@ import {
   updateProject,
   updateTeam,
 } from "../api";
-import type { AgentRunInput, CreateProjectInput, CreateTaskInput, RelaySession, RelayTask, RelayTaskSummary, RunInput, TaskMutationInput, TaskRunAssignment, TeamMutationInput, ThreadMessageInput, ThreadRecoveryInput, UpdateProjectInput } from "../types";
+import type { AgentRunInput, CreateProjectInput, CreateTaskInput, ProjectRecord, RelaySession, RelayTask, RelayTaskSummary, RunInput, TaskMutationInput, TaskRunAssignment, TeamMutationInput, ThreadMessageInput, ThreadRecoveryInput, UpdateProjectInput } from "../types";
 import { NODES_QUERY_KEY, PROJECTS_QUERY_KEY, RELAY_QUERY_KEY, SESSIONS_QUERY_KEY, TASKS_QUERY_KEY } from "./useRelayData";
 import { useMutationError } from "./useMutationError";
 import { useDialogs } from "../components/ui/DialogProvider";
@@ -33,6 +33,7 @@ import { mergeSessionSnapshotIntoSessions } from "../lib/sessionPollMerge";
 import { applySessionEventUnchecked } from "../lib/sessionEvents";
 import { mergeTaskSummaryIntoTasks, taskSummaryFromTask } from "../lib/taskSummary";
 import { batchOutcome, type BatchOutcome } from "../lib/taskSelection";
+import { mergeProjectIntoProjects } from "../lib/projectDirectory";
 
 type TokenArg = { token?: string };
 
@@ -60,6 +61,10 @@ export function useRelayMutations() {
     const summary = taskSummaryFromTask(task);
     queryClient.setQueryData<RelayTaskSummary[]>(TASKS_QUERY_KEY, (current) =>
       mergeTaskSummaryIntoTasks(current ?? [], summary));
+  };
+  const cacheProject = (project: ProjectRecord) => {
+    queryClient.setQueryData<ProjectRecord[]>(PROJECTS_QUERY_KEY, (current) =>
+      mergeProjectIntoProjects(current ?? [], project));
   };
 
   const onRelayError = (context: string, messageKey: string) => (error: unknown) => {
@@ -275,7 +280,8 @@ export function useRelayMutations() {
 
   const createProjectMutation = useMutation({
     mutationFn: (input: CreateProjectInput) => createProject(input),
-    onSuccess: () => {
+    onSuccess: ({ project }) => {
+      cacheProject(project);
       void invalidateProjects();
     },
     onError: onRelayError("Failed to create project", "errors.save_project"),
@@ -284,7 +290,8 @@ export function useRelayMutations() {
   const updateProjectMutation = useMutation({
     mutationFn: ({ projectId, input }: { projectId: string; input: UpdateProjectInput }) =>
       updateProject(projectId, input),
-    onSuccess: () => {
+    onSuccess: ({ project }) => {
+      cacheProject(project);
       void invalidateProjects();
     },
     onError: onRelayError("Failed to update project", "errors.save_project"),
@@ -293,7 +300,8 @@ export function useRelayMutations() {
   const archiveProjectMutation = useMutation({
     mutationFn: ({ projectId, expectedVersion }: { projectId: string; expectedVersion: number }) =>
       archiveProject(projectId, expectedVersion),
-    onSuccess: () => {
+    onSuccess: ({ project }) => {
+      cacheProject(project);
       void invalidateProjects();
       void invalidateSessions();
       void invalidateTasks();

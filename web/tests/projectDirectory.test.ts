@@ -12,6 +12,7 @@ import {
   toggleProjectExpansion,
   writeProjectExpansion,
   projectExpansionKey,
+  mergeProjectIntoProjects,
 } from "../src/lib/projectDirectory.js";
 import type { ProjectRecord } from "../src/types.js";
 
@@ -34,6 +35,14 @@ function project(id: string, archivedAt?: string): ProjectRecord {
 }
 
 describe("project directory expansion", () => {
+  it("inserts a newly created project before the next background refetch", () => {
+    const existing = project("existing");
+    const created = project("created");
+    created.name = "Created";
+
+    assert.deepEqual(mergeProjectIntoProjects([existing], created), [created, existing]);
+  });
+
   it("expands an active project by default", () => {
     assert.equal(isProjectExpanded(project("p1"), {}), true);
   });

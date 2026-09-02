@@ -212,7 +212,7 @@ export function TeamsPage({
       </div>
 
       <TeamDrawer
-        open={!teamId && addTeam}
+        open={addTeam}
         employeeId={currentUser.employeeId}
         onClose={() => setAddTeam(false)}
       />

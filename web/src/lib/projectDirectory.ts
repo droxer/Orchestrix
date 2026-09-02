@@ -11,6 +11,16 @@
 import type { ProjectRecord } from "../types.js";
 import type { ProjectCollectionStatus } from "./projectPage.js";
 
+/** Apply a project mutation result before its background collection refetch. */
+export function mergeProjectIntoProjects(
+  projects: ProjectRecord[],
+  project: ProjectRecord,
+): ProjectRecord[] {
+  return [...projects.filter((entry) => entry.id !== project.id), project].sort(
+    (left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id),
+  );
+}
+
 export const projectExpansionKey = "relay-web.projectExpansion";
 
 /** Explicit per-project choices only. An id absent from the record has never

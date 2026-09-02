@@ -80,7 +80,7 @@ describe("app pathname routes", () => {
     );
     assert.equal(
       canonicalBrowserUrl("/teams/team-1", "?tab=profile&artifact=art-1&dialog=create"),
-      "/teams/team-1",
+      "/teams/team-1?dialog=create",
     );
     assert.equal(
       canonicalBrowserUrl("/teams/team-1", "?tab=workspace&scope=shared&path=src&item=file%3Aa.ts"),

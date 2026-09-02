@@ -37,7 +37,9 @@ describe("Agent team management", () => {
     assert.doesNotMatch(agentDetailSource, /nav\.refresh|NavRefresh/);
     assert.doesNotMatch(teamWorkspaceSource, /nav\.refresh|NavRefresh/);
     assert.match(teamsSource, /className="page-header-icon-action"[\s\S]*?onClick=\{\(\) => setAddTeam\(true\)\}/);
-    assert.match(teamsSource, /open=\{!teamId && addTeam\}/);
+    // Creating a team must remain available from a selected team's detail
+    // view; the dialog state itself is the sole authority for its visibility.
+    assert.match(teamsSource, /open=\{addTeam\}/);
     assert.match(agentsSource, /<RosterFilterBar/);
     assert.doesNotMatch(agentsSource, /isDetailRoute/);
     assert.doesNotMatch(teamsSource, /editTeam/);

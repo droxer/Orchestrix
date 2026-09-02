@@ -246,6 +246,9 @@ export function canonicalSearchForPath(pathname: string, search = ""): string {
     const requestedTab = source.get("tab");
     const tab = requestedTab && TEAM_TABS.has(requestedTab) ? requestedTab : "profile";
     if (tab !== "profile") target.set("tab", tab);
+    // The add-team drawer can open over a selected team's profile. Retain its
+    // URL-backed state instead of immediately canonicalizing the click away.
+    if (source.get("dialog") === "create") target.set("dialog", "create");
   } else if (!entityId) {
     copySortParams(head, source, target);
     copyPageParams(head, source, target);
