@@ -17,6 +17,47 @@ from ..core.computer_identity import computer_id
 DEFAULT_ROLE = "implementer"
 
 
+def migrate_agent_placement_computer_ids(
+    placement_store: Any, registry: Any
+) -> int:
+    """Persist stable Computer identities onto active legacy placements.
+
+    Older placement snapshots predate ``computerId``. Leaving them keyed by
+    daemon node id splits one Computer into multiple UI bands and prevents the
+    placement from following that Computer through runtime reprovisioning.
+    Rebinding through the store preserves the placement id and appends the
+    repair through the event-sourced write path.
+    """
+    nodes = {node["id"]: node for node in registry.monitor_nodes()}
+    migrated = 0
+    for placement in placement_store.list_placements():
+        if placement.get("computerId"):
+            continue
+        node = nodes.get(placement.get("daemonNodeId"))
+        if not node:
+            logger.warning(
+                "Skipping placement computer-id migration: daemon node not found",
+                placement_id=placement.get("id"),
+                daemon_node_id=placement.get("daemonNodeId"),
+            )
+            continue
+        try:
+            placement_store.rebind_placement(
+                placement["id"],
+                node["id"],
+                managed_node_id=node.get("managedNodeId"),
+                computer_id_value=computer_id(node),
+            )
+            migrated += 1
+        except Exception as error:  # noqa: BLE001 - one bad legacy placement
+            logger.warning(
+                "Skipping placement computer-id migration after unexpected error",
+                placement_id=placement.get("id"),
+                error=str(error),
+            )
+    return migrated
+
+
 def migrate_agent_computer_ids(
     agent_store: Any, placement_store: Any, registry: Any | None = None
 ) -> int:

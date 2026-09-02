@@ -42,7 +42,12 @@ export function groupAgentsByComputer(
     }
     for (const description of descriptions) {
       const { placement } = description;
-      const key = placement.computerId || placementRuntimeNodeId(placement);
+      // Agent birth certificates were backfilled before legacy placement
+      // snapshots. Prefer that same stable identity before falling all the way
+      // back to a replaceable daemon id.
+      const key = placement.computerId
+        || agent.computerId
+        || placementRuntimeNodeId(placement);
       const existing = groups.get(key);
       if (existing) {
         existing.agents.push(agent);

@@ -189,7 +189,12 @@ class AgentPlacementStore(Protocol):
         self, placement_id: str, patch: dict[str, Any]
     ) -> dict[str, Any]: ...
     def rebind_placement(
-        self, placement_id: str, daemon_node_id: str, **kwargs: Any
+        self,
+        placement_id: str,
+        daemon_node_id: str,
+        *,
+        managed_node_id: str | None = None,
+        computer_id_value: str | None = None,
     ) -> dict[str, Any]: ...
     def realize_agent_version(
         self, placement_id: str, agent_version: int

@@ -52,7 +52,10 @@ from .core import deploy_config
 from .core.environment import load_backend_env
 from .core.storage_config import database_url_from_env, use_postgres_storage
 from .daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
-from .migrations_runtime.agent_computer_id import migrate_agent_computer_ids
+from .migrations_runtime.agent_computer_id import (
+    migrate_agent_computer_ids,
+    migrate_agent_placement_computer_ids,
+)
 from .persistence.agent_placement_store import (
     DatabaseAgentPlacementStore,
     LocalAgentPlacementStore,
@@ -260,6 +263,14 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
         agent_placement_store=agent_placement_store,
     )
     try:
+        migrated_placements = migrate_agent_placement_computer_ids(
+            agent_placement_store, registry
+        )
+        if migrated_placements:
+            logger.info(
+                "Migrated legacy agent placement computer ids",
+                count=migrated_placements,
+            )
         migrated = migrate_agent_computer_ids(
             agent_store, agent_placement_store, registry
         )

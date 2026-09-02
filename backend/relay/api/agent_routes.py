@@ -7,6 +7,7 @@ from loguru import logger
 
 from ..collaboration.models import RunIntent
 from ..collaboration.service import CollaborationConductor, CollaborationError
+from ..core.computer_identity import computer_id
 from ..persistence.agent_placement_store import create_node_placement, placement_status
 from ..security.auth import require_admin_session
 from ..services.agent_binding import binding_status
@@ -421,11 +422,18 @@ def _agent_skills(
 def _placement_view(ctx: AppContextDep, placement: dict[str, Any]) -> dict[str, Any]:
     nodes = {item["id"]: item for item in ctx.registry.monitor_nodes()}
     node = placement_node(placement, nodes)
+    agent = ctx.agent_store.get_agent(placement["agentId"])
     view = placement_status(
-        placement, ctx.agent_store.get_agent(placement["agentId"]), node
+        placement, agent, node
+    )
+    resolved_computer_id = (
+        placement.get("computerId")
+        or (agent or {}).get("computerId")
+        or (computer_id(node) if node else None)
     )
     view = {
         **view,
+        **({"computerId": resolved_computer_id} if resolved_computer_id else {}),
         **({"runtimeNodeId": node["id"]} if node else {}),
     }
     if not node:

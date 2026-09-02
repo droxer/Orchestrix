@@ -132,11 +132,12 @@ class LocalAgentPlacementStore:
         daemon_node_id: str,
         *,
         managed_node_id: str | None = None,
+        computer_id_value: str | None = None,
     ) -> dict[str, Any]:
         daemon_node_id = _required_daemon_node_id(daemon_node_id)
         managed_node_id = _optional_managed_node_id(managed_node_id)
-        target_computer_id = (
-            f"managed:{managed_node_id}" if managed_node_id is not None else None
+        target_computer_id = _rebind_computer_id(
+            managed_node_id, computer_id_value
         )
         with self._lock:
             current = self.get_placement(placement_id)
@@ -159,7 +160,9 @@ class LocalAgentPlacementStore:
                 raise ValueError(
                     "Agent already has an active placement on this daemon node."
                 )
-            updated = _rebound_placement(current, daemon_node_id, managed_node_id)
+            updated = _rebound_placement(
+                current, daemon_node_id, managed_node_id, target_computer_id
+            )
             self._append(placement_id, "placement.rebound", updated)
             return updated
 
@@ -507,11 +510,12 @@ class DatabaseAgentPlacementStore:
         daemon_node_id: str,
         *,
         managed_node_id: str | None = None,
+        computer_id_value: str | None = None,
     ) -> dict[str, Any]:
         daemon_node_id = _required_daemon_node_id(daemon_node_id)
         managed_node_id = _optional_managed_node_id(managed_node_id)
-        target_computer_id = (
-            f"managed:{managed_node_id}" if managed_node_id is not None else None
+        target_computer_id = _rebind_computer_id(
+            managed_node_id, computer_id_value
         )
         with self._lock, store_transaction(self.engine) as conn:
             row = (
@@ -552,7 +556,9 @@ class DatabaseAgentPlacementStore:
                 raise ValueError(
                     "Agent already has an active placement on this daemon node."
                 )
-            updated = _rebound_placement(current, daemon_node_id, managed_node_id)
+            updated = _rebound_placement(
+                current, daemon_node_id, managed_node_id, target_computer_id
+            )
             sequence = int(row["event_version"] or 0)
             event = _placement_event(placement_id, "placement.rebound", updated)
             conn.execute(
@@ -854,18 +860,35 @@ def _optional_managed_node_id(value: Any) -> str | None:
     return value.strip()
 
 
+def _rebind_computer_id(
+    managed_node_id: str | None, computer_id_value: Any
+) -> str | None:
+    if computer_id_value is not None and (
+        not isinstance(computer_id_value, str) or not computer_id_value.strip()
+    ):
+        raise ValueError("computerId must be a non-empty string.")
+    requested = computer_id_value.strip() if computer_id_value is not None else None
+    if managed_node_id is None:
+        return requested
+    managed_identity = f"managed:{managed_node_id}"
+    if requested is not None and requested != managed_identity:
+        raise ValueError("computerId must match managedNodeId.")
+    return managed_identity
+
+
 def _rebound_placement(
     current: dict[str, Any],
     daemon_node_id: str,
     managed_node_id: str | None,
+    computer_id_value: str | None,
 ) -> dict[str, Any]:
     """Bind a placement to a node, adopting that node's Computer identity.
 
-    ``managedNodeId`` records which Computer the placement's node belongs to,
-    so it is always rewritten from the target — including cleared when the
-    target is not managed. Leaving a stale value behind lets a managed node's
-    sync keep reclaiming a placement that now lives on an employee device,
-    which rebinds the placement back and forth between the two indefinitely.
+    ``managedNodeId`` records managed ownership while ``computerId`` carries
+    the stable identity for both managed and employee-device Computers. Both
+    are always rewritten from the target. Leaving stale values behind lets a
+    managed node's sync reclaim a placement that now lives on an employee
+    device, which rebinds the placement back and forth indefinitely.
     """
     updated = {
         **current,
@@ -873,12 +896,14 @@ def _rebound_placement(
         "desiredState": "active",
         "updatedAt": now_iso(),
     }
-    if managed_node_id is None:
-        updated.pop("managedNodeId", None)
-        updated.pop("computerId", None)
-    else:
+    if managed_node_id is not None:
         updated["managedNodeId"] = managed_node_id
-        updated["computerId"] = f"managed:{managed_node_id}"
+    else:
+        updated.pop("managedNodeId", None)
+    if computer_id_value is not None:
+        updated["computerId"] = computer_id_value
+    else:
+        updated.pop("computerId", None)
     return updated
 
 
