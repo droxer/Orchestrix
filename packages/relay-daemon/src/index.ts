@@ -517,12 +517,33 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
             } satisfies DaemonNodeEvent, token, runtimeSignal);
             continue;
           }
+          // A malformed or escaping workspaceSubpath throws out of resolveSubpath;
+          // catch it here the same way the workspace.list/read branch does, so one
+          // bad run.start command fails that command instead of crashing the daemon
+          // and taking down every other run on this node.
+          let sharedWorkspaceKey: string | undefined;
+          try {
+            sharedWorkspaceKey = durableWorkspaceLayout(command.workspaceLayout)
+              ? threadWorkspaces.resolveSubpath(command.sessionId, requiredWorkspaceSubpath(command)).hostPath
+              : undefined;
+          } catch (error) {
+            const detail = error instanceof Error ? error.message : String(error);
+            logger.warn("command rejected for invalid workspace subpath", { ...commandLogFields(sandboxId, command), error: detail });
+            await postJsonWithRetry(fetchFn, relayApiUrl(backendUrl, `/daemon-nodes/${encodeURIComponent(sandboxId)}/events`), {
+              type: "run.failed",
+              commandId: command.id,
+              ...commandLeaseEventFields(command),
+              sessionId: command.sessionId,
+              runId: command.runId,
+              agent: command.agent,
+              error: detail,
+              exitCode: 1,
+            } satisfies DaemonNodeEvent, token, runtimeSignal);
+            continue;
+          }
           logger.info("command received", commandLogFields(sandboxId, command));
           setHealth("busy", commandLogFields(sandboxId, command));
           const controller = new AbortController();
-          const sharedWorkspaceKey = durableWorkspaceLayout(command.workspaceLayout)
-            ? threadWorkspaces.resolveSubpath(command.sessionId, requiredWorkspaceSubpath(command)).hostPath
-            : undefined;
           const promise = Promise.resolve().then(() =>
             workspaceRunGate.run(sharedWorkspaceKey, controller.signal, () => executeCommand(
               backendUrl,

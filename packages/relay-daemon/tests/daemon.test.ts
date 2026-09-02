@@ -2715,6 +2715,46 @@ test("relay daemon rejects a task workspace path that escapes the node root", as
   assert.equal((events[0] as { code?: string }).code, "invalid-path");
 });
 
+test("relay daemon fails a run.start command with an escaping workspaceSubpath instead of crashing", async () => {
+  const root = mkdtempSync(join(tmpdir(), "relay-ws-"));
+  const stop = new AbortController();
+  const events: DaemonNodeEvent[] = [];
+  let served = false;
+  const badCommand: DaemonNodeRunCommand = {
+    ...runCommand("cmd_bad_run"),
+    workspacePath: root,
+    workspaceLayout: "task",
+    workspaceSubpath: "tasks/../../escape",
+  };
+  await runRelayDaemon({
+    backendUrl: "http://relay.test", sandboxId: "sbx_test", employeeId: "alice", workspacePath: root, token: "node_token",
+    pollIntervalMs: 5, shutdownGraceMs: 50, logger: testLogger(), signal: stop.signal,
+    environment: fakeEnvironment({ exec: async () => ({ exit_code: 0, stdout: "", stderr: "" }) }),
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        if (!served) { served = true; return jsonResponse({ commands: [badCommand] }); }
+        // Polling keeps working after the bad command is rejected — the daemon
+        // process must not have crashed out of runRelayDaemon.
+        stop.abort();
+        return jsonResponse({ commands: [] });
+      }
+      if (path.endsWith("/events")) {
+        events.push(await jsonBody<DaemonNodeEvent>(init));
+        return jsonResponse({ ok: true }, 202);
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    },
+  });
+  rmSync(root, { recursive: true, force: true });
+
+  const failed = events.find((event) => event.type === "run.failed");
+  assert.ok(failed && failed.type === "run.failed", "expected a run.failed event for the bad workspaceSubpath");
+  assert.equal(failed.commandId, "cmd_bad_run");
+});
+
 test("relay daemon serializes two runs that share one task workspace", async () => {
   const root = mkdtempSync(join(tmpdir(), "relay-ws-"));
   const stop = new AbortController();
