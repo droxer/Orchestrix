@@ -64,15 +64,15 @@ export class ThreadWorkspaceManager {
     return this.resolve(sessionId);
   }
 
-  resolveProject(sessionId: string, workspaceSubpath: string): ThreadWorkspace {
+  resolveSubpath(sessionId: string, workspaceSubpath: string): ThreadWorkspace {
     validateThreadId(sessionId);
-    const segments = validateProjectSubpath(workspaceSubpath);
+    const segments = validateWorkspaceSubpath(workspaceSubpath);
     const hostPath = resolve(this.rootPath, ...segments);
     if (!hostPath.startsWith(this.rootPath + sep)) {
-      throw new Error(`Invalid project workspace path ${JSON.stringify(workspaceSubpath)}.`);
+      throw new Error(`Invalid durable workspace path ${JSON.stringify(workspaceSubpath)}.`);
     }
     rejectSymlinkComponents(this.rootPath, segments);
-    assertContainedRealPath(this.rootPath, hostPath, "Project workspace");
+    assertContainedRealPath(this.rootPath, hostPath, "Durable workspace");
     return {
       sessionId,
       hostPath,
@@ -80,10 +80,10 @@ export class ThreadWorkspaceManager {
     };
   }
 
-  ensureProject(sessionId: string, workspaceSubpath: string): ThreadWorkspace {
-    const workspace = this.resolveProject(sessionId, workspaceSubpath);
+  ensureSubpath(sessionId: string, workspaceSubpath: string): ThreadWorkspace {
+    const workspace = this.resolveSubpath(sessionId, workspaceSubpath);
     mkdirSync(workspace.hostPath, { recursive: true });
-    return this.resolveProject(sessionId, workspaceSubpath);
+    return this.resolveSubpath(sessionId, workspaceSubpath);
   }
 
   /** Existing sessions created before thread directories keep their node-root cwd. */
@@ -108,14 +108,14 @@ function validateThreadId(sessionId: string): void {
   }
 }
 
-function validateProjectSubpath(workspaceSubpath: string): string[] {
+function validateWorkspaceSubpath(workspaceSubpath: string): string[] {
   if (
     typeof workspaceSubpath !== "string"
     || workspaceSubpath.length === 0
     || workspaceSubpath.includes("\\")
     || isAbsolute(workspaceSubpath)
   ) {
-    throw new Error(`Invalid project workspace path ${JSON.stringify(workspaceSubpath)}.`);
+    throw new Error(`Invalid durable workspace path ${JSON.stringify(workspaceSubpath)}.`);
   }
   const segments = workspaceSubpath.split("/");
   if (
@@ -127,7 +127,7 @@ function validateProjectSubpath(workspaceSubpath: string): string[] {
       || WINDOWS_RESERVED_NAME.test(segment)
     )
   ) {
-    throw new Error(`Invalid project workspace path ${JSON.stringify(workspaceSubpath)}.`);
+    throw new Error(`Invalid durable workspace path ${JSON.stringify(workspaceSubpath)}.`);
   }
   return segments;
 }
@@ -156,7 +156,7 @@ function rejectSymlinkComponents(rootPath: string, segments: string[]): void {
     current = resolve(current, segment);
     try {
       if (lstatSync(current).isSymbolicLink()) {
-        throw new Error(`Project workspace must not contain a symbolic link: ${current}.`);
+        throw new Error(`Durable workspace must not contain a symbolic link: ${current}.`);
       }
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return;

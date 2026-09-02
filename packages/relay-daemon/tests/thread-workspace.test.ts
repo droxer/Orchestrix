@@ -80,8 +80,8 @@ test("project workspaces are shared by threads and remain below the configured r
   const root = mkdtempSync(join(tmpdir(), "relay-project-workspaces-"));
   try {
     const manager = new ThreadWorkspaceManager(root, "none");
-    const first = manager.ensureProject("ses_first", "projects/prj_one");
-    const second = manager.ensureProject("ses_second", "projects/prj_one");
+    const first = manager.ensureSubpath("ses_first", "projects/prj_one");
+    const second = manager.ensureSubpath("ses_second", "projects/prj_one");
 
     assert.equal(first.hostPath, join(root, "projects", "prj_one"));
     assert.equal(second.hostPath, first.hostPath);
@@ -99,12 +99,12 @@ test("project workspace paths cannot traverse or escape through a symlink", () =
   try {
     const manager = new ThreadWorkspaceManager(root, "none");
     for (const invalid of ["", ".", "..", "../escape", "/absolute", "projects/../../escape", "projects\\escape"] as const) {
-      assert.throws(() => manager.ensureProject("ses_one", invalid), /Invalid project workspace path/);
+      assert.throws(() => manager.ensureSubpath("ses_one", invalid), /Invalid durable workspace path/);
     }
     mkdirSync(join(root, "projects"));
     symlinkSync(outside, join(root, "projects", "linked"));
     assert.throws(
-      () => manager.ensureProject("ses_one", "projects/linked"),
+      () => manager.ensureSubpath("ses_one", "projects/linked"),
       /symbolic link|escapes the configured root/,
     );
   } finally {

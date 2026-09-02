@@ -2640,6 +2640,155 @@ test("relay daemon serves project workspace commands", async () => {
   assert.equal(error.code, "invalid-path");
 });
 
+test("relay daemon resolves a task workspace under the node root", async () => {
+  const root = mkdtempSync(join(tmpdir(), "relay-ws-"));
+  const taskId = "tsk_workspace_read";
+  const workspaceSubpath = "tasks/tsk_one";
+  const taskRoot = join(root, workspaceSubpath);
+  mkdirSync(taskRoot, { recursive: true });
+  writeFileSync(join(taskRoot, "report.md"), "hello");
+  const stop = new AbortController();
+  const events: DaemonNodeEvent[] = [];
+  let registration: DaemonNodeRegistration | undefined;
+  let served = false;
+  await runRelayDaemon({
+    backendUrl: "http://relay.test", sandboxId: "sbx_test", employeeId: "alice", workspacePath: root, token: "node_token",
+    pollIntervalMs: 5, shutdownGraceMs: 50, logger: testLogger(), signal: stop.signal,
+    environment: fakeEnvironment({ exec: async () => ({ exit_code: 0, stdout: "", stderr: "" }) }),
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api/v1/daemon-node-registrations") { registration = await jsonBody<DaemonNodeRegistration>(init); return jsonResponse({ ok: true }); }
+      if (path.endsWith("/commands")) {
+        if (!served) { served = true; return jsonResponse({ commands: [
+          { id: "cmd_ls", type: "workspace.list", sessionId: taskId, workspaceLayout: "task", workspaceSubpath, path: "" },
+        ] }); }
+        return jsonResponse({ commands: [] });
+      }
+      if (path.endsWith("/events")) {
+        events.push(await jsonBody<DaemonNodeEvent>(init));
+        if (events.length === 1) stop.abort();
+        return jsonResponse({ ok: true }, 202);
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    },
+  });
+  rmSync(root, { recursive: true, force: true });
+
+  assert.equal(registration?.capabilities?.includes("task-workspaces"), true);
+  const listing = events.find((event) => event.type === "workspace.listing");
+  assert.ok(listing && listing.type === "workspace.listing");
+  assert.deepEqual(listing.entries.map((entry) => entry.name), ["report.md"]);
+});
+
+test("relay daemon rejects a task workspace path that escapes the node root", async () => {
+  const root = mkdtempSync(join(tmpdir(), "relay-ws-"));
+  const stop = new AbortController();
+  const events: DaemonNodeEvent[] = [];
+  let served = false;
+  await runRelayDaemon({
+    backendUrl: "http://relay.test", sandboxId: "sbx_test", employeeId: "alice", workspacePath: root, token: "node_token",
+    pollIntervalMs: 5, shutdownGraceMs: 50, logger: testLogger(), signal: stop.signal,
+    environment: fakeEnvironment({ exec: async () => ({ exit_code: 0, stdout: "", stderr: "" }) }),
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        if (!served) { served = true; return jsonResponse({ commands: [
+          { id: "cmd_bad", type: "workspace.read", sessionId: "ses_one", workspaceLayout: "task", workspaceSubpath: "tasks/../../escape", path: "report.md" },
+        ] }); }
+        return jsonResponse({ commands: [] });
+      }
+      if (path.endsWith("/events")) {
+        events.push(await jsonBody<DaemonNodeEvent>(init));
+        if (events.length === 1) stop.abort();
+        return jsonResponse({ ok: true }, 202);
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    },
+  });
+  rmSync(root, { recursive: true, force: true });
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0].type, "workspace.error");
+  assert.equal((events[0] as { code?: string }).code, "invalid-path");
+});
+
+test("relay daemon serializes two runs that share one task workspace", async () => {
+  const root = mkdtempSync(join(tmpdir(), "relay-ws-"));
+  const stop = new AbortController();
+  const events: DaemonNodeEvent[] = [];
+  const order: string[] = [];
+  let commandServed = false;
+  const commandA: DaemonNodeRunCommand = {
+    ...runCommand("cmd_a"),
+    sessionId: "ses_a",
+    runId: "run_a",
+    taskGoal: "shared-task-goal-a",
+    workspacePath: root,
+    workspaceLayout: "task",
+    workspaceSubpath: "tasks/tsk_one",
+  };
+  const commandB: DaemonNodeRunCommand = {
+    ...runCommand("cmd_b"),
+    sessionId: "ses_b",
+    runId: "run_b",
+    taskGoal: "shared-task-goal-b",
+    workspacePath: root,
+    workspaceLayout: "task",
+    workspaceSubpath: "tasks/tsk_one",
+  };
+  await runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: root,
+    token: "node_token",
+    pollIntervalMs: 5,
+    shutdownGraceMs: 100,
+    maxConcurrentRuns: 2,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: fakeEnvironment({
+      exec: async (_cmd, args) => {
+        if (isInventoryProbe(args)) return { exit_code: 0, stdout: "", stderr: "" };
+        const runId = args?.[1]?.includes("shared-task-goal-a") ? "run_a" : "run_b";
+        order.push(runId);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        order.push(`${runId}:done`);
+        return { exit_code: 0, stdout: "done\n", stderr: "" };
+      },
+    }),
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        if (!commandServed) {
+          commandServed = true;
+          return jsonResponse({ commands: [commandA, commandB] });
+        }
+        return jsonResponse({ commands: [] });
+      }
+      if (path.endsWith("/events")) {
+        const event = await jsonBody<DaemonNodeEvent>(init);
+        events.push(event);
+        if (events.filter((item) => item.type === "run.completed").length === 2) stop.abort();
+        return jsonResponse({ ok: true }, 202);
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+  rmSync(root, { recursive: true, force: true });
+
+  // Two run.start commands that share one task directory must not execute
+  // concurrently: they share a directory, so an unserialized pair lets a
+  // reviewer overwrite an implementer's files mid-run.
+  assert.deepEqual(order, ["run_a", "run_a:done", "run_b", "run_b:done"]);
+  assert.equal(events.some((event) => event.type === "run.failed"), false);
+});
+
 test("daemon stops instead of retrying when the backend reports the node was deleted", async () => {
   const registrations: string[] = [];
   await runRelayDaemon({

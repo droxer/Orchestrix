@@ -59,7 +59,7 @@ export const DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS: readonly number[] = [2, 1]
  * in its run.completed event, so the backend never has to walk the workspace
  * itself (which only works when they share a filesystem).
  */
-export type DaemonNodeCapability = "generated-files" | "workspace-read-shared" | "structured-agent-events" | "thread-workspaces" | "project-workspaces" | "round-result";
+export type DaemonNodeCapability = "generated-files" | "workspace-read-shared" | "structured-agent-events" | "thread-workspaces" | "project-workspaces" | "task-workspaces" | "round-result";
 export const DAEMON_CAPABILITY_GENERATED_FILES: DaemonNodeCapability = "generated-files";
 /** The daemon can serve live file listings and reads from the workspace root it exposes. */
 export const DAEMON_CAPABILITY_WORKSPACE_READ_SHARED: DaemonNodeCapability = "workspace-read-shared";
@@ -69,6 +69,8 @@ export const DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS: DaemonNodeCapability = "
 export const DAEMON_CAPABILITY_THREAD_WORKSPACES: DaemonNodeCapability = "thread-workspaces";
 /** The daemon can map multiple threads onto one validated project directory. */
 export const DAEMON_CAPABILITY_PROJECT_WORKSPACES: DaemonNodeCapability = "project-workspaces";
+/** The daemon can map every round of one task onto a single validated task directory. */
+export const DAEMON_CAPABILITY_TASK_WORKSPACES: DaemonNodeCapability = "task-workspaces";
 /**
  * The daemon reads the control file a run leaves at `.relay/round-result.json`
  * and reports it as `roundResult`, so the control plane learns whether the work

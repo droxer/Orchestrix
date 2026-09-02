@@ -6,7 +6,7 @@ export type AgentRole = "implementer" | "reviewer" | "planner" | "tester" | "fix
 export type SessionStatus = "running" | "waiting_for_human" | "completed" | "failed" | "cancelled";
 export type RelayArtifactKind = "plan" | "diff" | "review" | "test_output" | "command_log" | "summary" | "agent_output" | "workspace_file";
 export type HumanDecisionKind = "approve" | "reject" | "cancel" | "rerun" | "handoff" | "mark_done";
-export type WorkspaceLayout = "node-root" | "thread" | "project";
+export type WorkspaceLayout = "node-root" | "thread" | "project" | "task";
 
 export interface AgentRun {
   id: string;
