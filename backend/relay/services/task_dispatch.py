@@ -36,6 +36,7 @@ from .agent_routing import (
     resolve_agent_assignments,
 )
 from .project_runtime import ProjectDispatchError, resolve_project_task_assignments
+from .task_workspace import resolve_task_workspace
 from .team_dispatch import (
     TEAM_UNAVAILABLE_MESSAGE,
     TeamDispatchError,
@@ -548,14 +549,16 @@ class TaskDispatcher:
             request["agentFirst"] = True
         if self.task.get("assignedTeamId"):
             request["teamId"] = self.task["assignedTeamId"]
+        layout, subpath = resolve_task_workspace(
+            self.task,
+            node=self.ctx.registry.get(self.run_assignments[0]["daemonNodeId"]),
+            project_snapshot=self.project_snapshot,
+        )
+        request["workspaceLayout"] = layout
+        if subpath:
+            request["workspaceSubpath"] = subpath
         if self.project_snapshot:
-            request.update(
-                {
-                    "projectId": self.project_snapshot["projectId"],
-                    "workspaceLayout": "project",
-                    "workspaceSubpath": self.project_snapshot["workspaceSubpath"],
-                }
-            )
+            request["projectId"] = self.project_snapshot["projectId"]
         if self.claim_id:
             request["idempotencyKey"] = self.claim_id
         if not self.actor["isAdmin"]:
