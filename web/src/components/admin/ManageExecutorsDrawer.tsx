@@ -13,12 +13,15 @@ import type { AgentName, ControlPanelDaemonNodeRecord } from "../../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { StateMark } from "../StateMark";
 import { AgentMark } from "../AgentMark";
 import { Drawer } from "@/components/ui/Drawer";
 import { agentStatusTone, nodeAgentPresence } from "./helpers";
 import { NodeProfileBadges } from "./NodeProfileBadges";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { ICON } from "../icons";
+import { Alert } from "@/components/ui/alert";
 
 interface ManageExecutorsDrawerProps {
   open: boolean;
@@ -169,12 +172,25 @@ export function ManageExecutorsDrawer({ open, onClose, node, employeeHandle, onU
                     <AgentMark agent={agent} size={ICON.sm} className="adm-agent-toggle-mark" />
                     {agent}
                   </span>
-                  <span className={`adm-agent-chip tone-${tone}`} data-presence={presence}>
-                    <i className="adm-agent-dot" aria-hidden="true" />
+                  {/* Shared Badge chrome + the shared status mark. The dot was
+                      an `<i class="adm-agent-dot">` with its own ring rules —
+                      the last surface still drawing its own 8px status circle
+                      instead of going through StateMark, which is where the
+                      tone → shape grammar (ring for bad, hollow for a dark
+                      computer) is written down. */}
+                  <Badge
+                    variant="state"
+                    className={`adm-agent-chip tone-${tone}`}
+                    data-presence={presence}
+                  >
+                    <StateMark
+                      tone={tone}
+                      shape={presence === "offline" ? "ring" : undefined}
+                    />
                     {presence === "offline" && agentStatus === "ready"
                       ? t("nodes.presence_offline")
                       : t(`status.${agentStatus}`, { defaultValue: agentStatus })}
-                  </span>
+                  </Badge>
                 </div>
                 <label className="adm-agent-toggle-switch">
                   <Switch
@@ -230,7 +246,7 @@ export function ManageExecutorsDrawer({ open, onClose, node, employeeHandle, onU
         })}
         </ul>
         {error ? (
-          <p className="adm-form-error" role="alert">{t("admin.v2.action_failed", { message: error })}</p>
+          <Alert variant="boxed">{t("admin.v2.action_failed", { message: error })}</Alert>
         ) : null}
         <div className="adm-form-actions">
           <Button size="cta" type="button" variant="ghost" onClick={() => void requestClose()} disabled={saving}>

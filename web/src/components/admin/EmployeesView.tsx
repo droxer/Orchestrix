@@ -35,6 +35,8 @@ import {
 import { EmployeeCard } from "./EmployeeCard";
 import type { StateTone } from "../StateMark";
 import { AdminLayoutToggle, type AdminLayout } from "./AdminLayoutToggle";
+import { Table, TableRowGroup } from "@/components/ui/table";
+import { Alert } from "@/components/ui/alert";
 
 interface EmployeesViewProps {
   employees: import("../../types").EmployeeRecord[];
@@ -238,7 +240,7 @@ export function EmployeesView({
       />
 
       {deleteError ? (
-        <p className="adm-view-error" role="alert">{t("admin.v2.action_failed", { message: deleteError })}</p>
+        <Alert className="mb-4">{t("admin.v2.action_failed", { message: deleteError })}</Alert>
       ) : null}
 
       {filtered.length === 0 ? (
@@ -281,9 +283,9 @@ export function EmployeesView({
                 count={group.length}
                 tone={EMPLOYEE_STATUS_BAND_TONE[key]}
               >
-                <div className="list-group-rows" role="table" data-density="compact" aria-label={label}>
+                <Table className="list-group-rows" data-density="compact" aria-label={label}>
                   <EmployeeCols sort={sort} onSort={toggleSort} t={t} />
-                  <ul className="adm-emp-list" role="rowgroup">
+                  <TableRowGroup className="adm-emp-list" render={<ul />}>
                     {groupPage.items.map((member) => (
                       <EmployeeRow
                         key={member.id}
@@ -298,8 +300,8 @@ export function EmployeesView({
                         t={t}
                       />
                     ))}
-                  </ul>
-                </div>
+                  </TableRowGroup>
+                </Table>
                 <Pagination
                   compact
                   className="list-group-pager"

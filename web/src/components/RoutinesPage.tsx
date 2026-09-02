@@ -51,6 +51,7 @@ import {
 import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
 import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
+import { Table } from "@/components/ui/table";
 
 interface RoutinesPageProps {
   tasks: RelayTaskListItem[];
@@ -359,7 +360,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
                 count={group.length}
                 shape={ROUTINE_STATE_SHAPE[state]}
               >
-                <div className="list-group-rows" role="table" aria-label={label}>
+                <Table className="list-group-rows" aria-label={label}>
                   <RoutineRowsHead
                     sort={sort}
                     onSort={toggleSort}
@@ -390,7 +391,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
                       />
                     );
                   })}
-                </div>
+                </Table>
                 <Pagination
                   compact
                   className="list-group-pager"

@@ -467,8 +467,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
           variant="ghost"
           className="sidenav-btn"
           data-nav="command"
-          aria-label={commandMenuHint}
-          title={commandMenuHint}
+          tooltip={commandMenuHint}
           onClick={() => {
             hideNavTooltip();
             onOpenCommandMenu();
@@ -484,11 +483,10 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, width, onResize, 
         <Button
           type="button"
           variant="ghost"
-          aria-label={sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar")}
+          tooltip={sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar")}
           className="sidenav-btn sidenav-toggle"
           data-nav="collapse"
           onClick={() => setSidenavExpanded(!sidenavExpanded)}
-          title={sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar")}
           onMouseEnter={(e) => showNavTooltip(sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar"), e.currentTarget)}
           onMouseLeave={hideNavTooltip}
           onFocus={(e) => showNavTooltip(sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar"), e.currentTarget)}

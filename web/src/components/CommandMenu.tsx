@@ -1,14 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { acquireBodyScrollLock } from "@/lib/bodyScrollLock";
 import { filterCommands, type CommandGroup, type CommandId, type CommandItem } from "@/lib/commandMenu";
 import {
   ActionSearch,
   ICON,
 } from "./icons";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogBackdrop,
+  DialogContent,
+  DialogPortal,
+  DialogViewport,
+} from "@/components/ui/dialog";
 
 /* ⌘K command palette — Linear-style. A thin renderer over lib/commandMenu.ts:
    the catalogue and ranking live there; this owns focus, key handling, and
@@ -36,23 +42,16 @@ export function CommandMenu({
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-  const previouslyFocused = useRef<HTMLElement | null>(null);
 
   const visible = useMemo(() => filterCommands(commands, query), [commands, query]);
 
-  // Open/close lifecycle: reset state, take focus, lock scroll, restore on exit.
+  // Only the query state is ours now: focus, the scroll lock, and focus
+  // restore on close come from the Dialog primitive, which also gives the
+  // palette the Tab trap it never had.
   useEffect(() => {
     if (!open) return;
-    previouslyFocused.current = document.activeElement as HTMLElement | null;
     setQuery("");
     setActiveIndex(0);
-    const releaseScrollLock = acquireBodyScrollLock();
-    inputRef.current?.focus();
-    return () => {
-      releaseScrollLock();
-      previouslyFocused.current?.focus?.();
-      previouslyFocused.current = null;
-    };
   }, [open]);
 
   useEffect(() => {
@@ -67,7 +66,8 @@ export function CommandMenu({
       ?.scrollIntoView({ block: "nearest" });
   }, [activeIndex, open]);
 
-  if (!open) return null;
+  /* No early return on `!open`: the Dialog renders nothing while closed and,
+     more importantly, keeps the panel mounted through its exit animation. */
 
   function runAt(index: number) {
     const command = visible[index];
@@ -117,74 +117,76 @@ export function CommandMenu({
     rows.push({ kind: "item", command, index });
   });
 
-  return createPortal(
-    <div
-      className="overlay-backdrop command-backdrop"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
       }}
     >
-      <div
-        className="command-menu"
-        role="dialog"
-        aria-modal="true"
-        aria-label={t("command.title")}
-      >
-        <div className="command-input-row">
-          <ActionSearch size={ICON.sm} aria-hidden="true" />
-          <input
-            ref={inputRef}
-            className="command-input"
-            name="command-query"
-            autoComplete="off"
-            spellCheck={false}
-            role="combobox"
-            aria-expanded="true"
-            aria-controls="command-list"
-            aria-activedescendant={visible[activeIndex] ? `command-option-${visible[activeIndex].id}` : undefined}
+      <DialogPortal>
+        <DialogBackdrop className="command-backdrop" />
+        <DialogViewport className="command-viewport">
+          <DialogContent
+            className="command-menu"
+            initialFocus={inputRef}
             aria-label={t("command.title")}
-            placeholder={t("command.placeholder")}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-        {visible.length === 0 ? (
-          <p className="command-empty" role="status">{t("command.empty")}</p>
-        ) : (
-          <ul className="command-list" id="command-list" role="listbox" ref={listRef} aria-label={t("command.title")}>
-            {rows.map((row, i) => row.kind === "header" ? (
-              <li key={`header-${row.group}-${i}`} className="command-group-label" role="presentation">
-                {t(GROUP_LABEL_KEYS[row.group])}
-              </li>
+          >
+            <div className="command-input-row">
+              <ActionSearch size={ICON.sm} aria-hidden="true" />
+              <Input
+                ref={inputRef}
+                className="command-input"
+                name="command-query"
+                autoComplete="off"
+                spellCheck={false}
+                role="combobox"
+                aria-expanded="true"
+                aria-controls="command-list"
+                aria-activedescendant={visible[activeIndex] ? `command-option-${visible[activeIndex].id}` : undefined}
+                aria-label={t("command.title")}
+                placeholder={t("command.placeholder")}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={handleKeyDown}
+              />
+            </div>
+            {visible.length === 0 ? (
+              <p className="command-empty" role="status">{t("command.empty")}</p>
             ) : (
-              <li
-                key={row.command.id}
-                id={`command-option-${row.command.id}`}
-                className="command-item"
-                role="option"
-                aria-selected={row.index === activeIndex}
-                data-active={row.index === activeIndex ? "true" : undefined}
-                data-command-index={row.index}
-                onMouseMove={() => setActiveIndex(row.index)}
-                onClick={() => runAt(row.index)}
-              >
-                <span className="command-item-label">{row.command.label}</span>
-                {row.command.hint ? (
-                  <kbd className="command-kbd" aria-hidden="true">{row.command.hint}</kbd>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="command-footer" aria-hidden="true">
-          <span className="command-footer-hint"><kbd className="command-kbd">↑↓</kbd> {t("command.hint_navigate")}</span>
-          <span className="command-footer-hint"><kbd className="command-kbd">↵</kbd> {t("command.hint_run")}</span>
-          <span className="command-footer-hint"><kbd className="command-kbd">esc</kbd> {t("command.hint_close")}</span>
-        </div>
-      </div>
-    </div>,
-    document.body,
+              <ul className="command-list" id="command-list" role="listbox" ref={listRef} aria-label={t("command.title")}>
+                {rows.map((row, i) => row.kind === "header" ? (
+                  <li key={`header-${row.group}-${i}`} className="command-group-label" role="presentation">
+                    {t(GROUP_LABEL_KEYS[row.group])}
+                  </li>
+                ) : (
+                  <li
+                    key={row.command.id}
+                    id={`command-option-${row.command.id}`}
+                    className="command-item"
+                    role="option"
+                    aria-selected={row.index === activeIndex}
+                    data-active={row.index === activeIndex ? "true" : undefined}
+                    data-command-index={row.index}
+                    onMouseMove={() => setActiveIndex(row.index)}
+                    onClick={() => runAt(row.index)}
+                  >
+                    <span className="command-item-label">{row.command.label}</span>
+                    {row.command.hint ? (
+                      <kbd className="command-kbd" aria-hidden="true">{row.command.hint}</kbd>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="command-footer" aria-hidden="true">
+              <span className="command-footer-hint"><kbd className="command-kbd">↑↓</kbd> {t("command.hint_navigate")}</span>
+              <span className="command-footer-hint"><kbd className="command-kbd">↵</kbd> {t("command.hint_run")}</span>
+              <span className="command-footer-hint"><kbd className="command-kbd">esc</kbd> {t("command.hint_close")}</span>
+            </div>
+          </DialogContent>
+        </DialogViewport>
+      </DialogPortal>
+    </Dialog>
   );
 }

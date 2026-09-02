@@ -3,6 +3,7 @@ import { RelayEmptyState } from "./RelayEmptyState";
 import { RelayMark } from "./RelayMark";
 import { ActionPrompt, ICON } from "./icons";
 import { sendShortcutLabel } from "../lib/sendShortcut";
+import { Button } from "@/components/ui/button";
 
 type TranscriptEmptyProps = {
   selectedEmployee: string;
@@ -44,15 +45,16 @@ export function TranscriptEmpty({
           {SUGGESTION_KEYS.map((key) => {
             const text = t(`transcript.suggestion_${key}`);
             return (
-              <button
+              <Button
                 key={key}
+                variant="ghost"
                 type="button"
                 className="transcript-empty-suggestion"
                 onClick={() => onSuggestion(text)}
               >
                 <span>{text}</span>
                 <ActionPrompt size={ICON.xs} />
-              </button>
+              </Button>
             );
           })}
         </div>

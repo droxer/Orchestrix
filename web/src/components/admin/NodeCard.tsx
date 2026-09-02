@@ -148,7 +148,7 @@ export function NodeCard({
             className="adm-node-card-icon-btn adm-node-action--copy"
             onClick={() => void handleCopyId()}
             aria-label={copied ? t("admin.copied") : t("admin.copy_node_id")}
-            title={node.id}
+            tooltip={node.id}
           >
             {copied ? <ActionApprove size={ICON.sm} aria-hidden="true" /> : <ActionCopy size={ICON.sm} aria-hidden="true" />}
           </Button>

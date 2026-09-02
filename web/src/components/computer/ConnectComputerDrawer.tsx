@@ -11,6 +11,7 @@ import { Drawer } from "@/components/ui/Drawer";
 import { CredCopyRow } from "../admin/CredCopyRow";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { Alert } from "@/components/ui/alert";
 
 interface ConnectComputerDrawerProps {
   open: boolean;
@@ -202,7 +203,7 @@ export function ConnectComputerDrawer({ open, onClose, onConnected }: ConnectCom
             <p className="adm-form-hint">{t("computer.connect_run_hint")}</p>
           </fieldset>
 
-          {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
+          {error ? <Alert variant="boxed" render={<div />}>{error}</Alert> : null}
 
           <div className="adm-form-actions">
             <Button size="cta" type="button" variant="ghost" onClick={() => { void requestClose(); }} disabled={isBusy}>

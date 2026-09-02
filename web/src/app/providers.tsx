@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DialogProvider } from "@/components/ui/DialogProvider";
 import { ArtifactViewerProvider } from "@/components/ArtifactViewerProvider";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import "../i18n";
 
 // Single QueryClient for the SPA. Created in state so it survives re-renders
@@ -27,9 +28,14 @@ export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(makeQueryClient);
   return (
     <QueryClientProvider client={queryClient}>
-      <DialogProvider>
-        <ArtifactViewerProvider>{children}</ArtifactViewerProvider>
-      </DialogProvider>
+      {/* One tooltip provider for the app, so the delay before the FIRST
+          tooltip opens is paid once and moving between neighbouring icon
+          buttons swaps the popup instead of re-waiting per control. */}
+      <TooltipProvider>
+        <DialogProvider>
+          <ArtifactViewerProvider>{children}</ArtifactViewerProvider>
+        </DialogProvider>
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }

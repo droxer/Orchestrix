@@ -2,6 +2,8 @@
 
 import { useTranslation } from "react-i18next";
 
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
 /** Which reading of an artifact body is on screen: the rendered presentation
  *  (Markdown, HTML document, diff, terminal) or its raw source text. */
 export type ArtifactView = "preview" | "source";
@@ -21,27 +23,32 @@ export function ArtifactViewToggle({
   const { t } = useTranslation();
   const isPreview = view === "preview";
   return (
-    <div
+    /* A toggle group, not tabs and not radios: this switches which reading of
+       one body is on screen, and nothing is submitted. `value` is an array
+       because a toggle group can be multi-select; this one is not, so it holds
+       exactly the active view, and an attempt to unpress the active item is
+       ignored rather than leaving no view at all. */
+    <ToggleGroup
       className={`code-view-toolbar${className ? ` ${className}` : ""}`}
-      role="group"
       aria-label={t("artifact.view_mode")}
+      value={[view]}
+      onValueChange={(next) => {
+        const picked = next[0];
+        if (picked) onChange(picked as ArtifactView);
+      }}
     >
-      <button
-        type="button"
+      <ToggleGroupItem
+        value="preview"
         className={`code-view-toggle${isPreview ? " is-active" : ""}`}
-        aria-pressed={isPreview}
-        onClick={() => onChange("preview")}
       >
         {t("artifact.view_preview")}
-      </button>
-      <button
-        type="button"
+      </ToggleGroupItem>
+      <ToggleGroupItem
+        value="source"
         className={`code-view-toggle${isPreview ? "" : " is-active"}`}
-        aria-pressed={!isPreview}
-        onClick={() => onChange("source")}
       >
         {t("artifact.view_source")}
-      </button>
-    </div>
+      </ToggleGroupItem>
+    </ToggleGroup>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { artifactRenderMode } from "../../lib/artifactPreview";
 import {
@@ -21,6 +21,8 @@ import { ArtifactPreviewHeader } from "../artifact/ArtifactPreviewHeader";
 import { ArtifactViewToggle, type ArtifactView } from "../artifact/ArtifactViewToggle";
 import { ThreadSpaceFiles } from "./ThreadSpaceFiles";
 import { ThreadSpaceList } from "./ThreadSpaceList";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   ICON,
   NavBack,
@@ -29,7 +31,6 @@ import {
 } from "../icons";
 import { Button } from "@/components/ui/button";
 import { OverlayCloseButton } from "@/components/ui/OverlayCloseButton";
-import { useModalDrawer } from "@/hooks/useModalDrawer";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useChatColumnResize } from "@/hooks/useChatColumnResize";
 import { OVERLAY_TAKEOVER_QUERY } from "@/lib/breakpoints";
@@ -76,7 +77,11 @@ export function ThreadSpacePanel({
   const { t } = useTranslation();
   const selected = resolveSelectedSpaceItem(items, selectedArtifactId);
   const isOverlay = useMediaQuery(OVERLAY_TAKEOVER_QUERY);
-  const panelRef = useModalDrawer<HTMLElement>(onClose, isOverlay);
+  /* Modal only at the takeover width. Below it the panel is a real sibling
+     in the chat grid — no scrim, no portal — so the primitive is asked for
+     `trap-focus` rather than a full modal, and the popup renders in place
+     instead of through a Portal. Above that width it is just a panel, and
+     wrapping it in a dialog would announce one that is not there. */
 
   // Each artifact opens on its rendered reading; the choice is per-artifact,
   // so selecting another one starts from preview again rather than carrying a
@@ -158,15 +163,8 @@ export function ThreadSpacePanel({
     if (width > max) onResize(max, false);
   }, [onResize, width]), !isOverlay);
 
-  return (
-    <aside
-      ref={panelRef}
-      className="thread-space-panel"
-      aria-label={t("space.panel_label")}
-      role={isOverlay ? "dialog" : undefined}
-      aria-modal={isOverlay || undefined}
-      tabIndex={isOverlay ? -1 : undefined}
-    >
+  const panel = (
+    <>
       <div
         className="thread-space-resize"
         role="separator"
@@ -179,7 +177,17 @@ export function ThreadSpacePanel({
         onPointerDown={startResize}
         onKeyDown={resizeByKeyboard}
       />
-      <div className="thread-space-inner">
+      {/* The Tabs root IS `.thread-space-inner`: that element owns the grid
+          rows the header, tab strip, and body sit in, so a wrapper of its own
+          would break the layout. The tab strip only exists on a project thread
+          with nothing selected, which is why the body below falls back to a
+          plain div — a lone `role="tabpanel"` with no tablist owning it is
+          worse than no tab semantics at all. */}
+      <Tabs
+        className="thread-space-inner"
+        value={activeTab}
+        onValueChange={(value) => setTab(value as SpaceTab)}
+      >
         <header className="thread-space-header">
           {selected ? (
             <Button
@@ -200,33 +208,22 @@ export function ThreadSpacePanel({
           <OverlayCloseButton label={t("sheet.close")} onClick={onClose} />
         </header>
         {showTabs ? (
-          <div className="thread-space-tabs" role="tablist" aria-label={t("space.tabs_label")}>
+          <TabsList className="thread-space-tabs" aria-label={t("space.tabs_label")}>
             {SPACE_TABS.map((name) => (
-              <button
+              <TabsTrigger
                 key={name}
-                type="button"
-                role="tab"
-                id={`thread-space-tab-${name}`}
-                aria-selected={activeTab === name}
-                aria-controls="thread-space-tabpanel"
-                tabIndex={activeTab === name ? 0 : -1}
+                value={name}
                 className={`thread-space-tab${activeTab === name ? " is-active" : ""}`}
-                onClick={() => setTab(name)}
               >
                 {name === "project" ? t("space.tab_project") : t("space.tab_thread")}
                 {name === "thread" && items.length ? (
                   <span className="thread-space-tab-count tnum">{items.length}</span>
                 ) : null}
-              </button>
+              </TabsTrigger>
             ))}
-          </div>
+          </TabsList>
         ) : null}
-        <div
-          className="thread-space-body"
-          id={showTabs ? "thread-space-tabpanel" : undefined}
-          role={showTabs ? "tabpanel" : undefined}
-          aria-labelledby={showTabs ? `thread-space-tab-${activeTab}` : undefined}
-        >
+        <SpaceBody className="thread-space-body" showTabs={showTabs} value={activeTab}>
           {activeTab === "project" && projectId ? (
             <ThreadSpaceFiles projectId={projectId} />
           ) : selected ? (
@@ -264,8 +261,54 @@ export function ThreadSpacePanel({
               onSelect={(artifactId) => onSelectArtifact(artifactId)}
             />
           )}
-        </div>
-      </div>
-    </aside>
+        </SpaceBody>
+      </Tabs>
+    </>
+  );
+
+  if (!isOverlay) {
+    return (
+      <aside className="thread-space-panel" aria-label={t("space.panel_label")}>
+        {panel}
+      </aside>
+    );
+  }
+
+  return (
+    <Dialog
+      open
+      modal="trap-focus"
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <DialogContent
+        render={<aside />}
+        className="thread-space-panel"
+        aria-label={t("space.panel_label")}
+      >
+        {panel}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** The body is a real tab panel only while the tab strip is on screen. */
+function SpaceBody({
+  showTabs,
+  value,
+  className,
+  children,
+}: {
+  showTabs: boolean;
+  value: SpaceTab;
+  className: string;
+  children: ReactNode;
+}) {
+  if (!showTabs) return <div className={className}>{children}</div>;
+  return (
+    <TabsContent value={value} className={className} keepMounted>
+      {children}
+    </TabsContent>
   );
 }

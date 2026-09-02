@@ -57,8 +57,7 @@ export function ListGroup({
             type="button"
             className="list-group-add"
             onClick={onAdd}
-            aria-label={addLabel}
-            title={addLabel}
+            tooltip={addLabel}
           >
             <ActionAdd size={ICON.sm} />
           </Button>

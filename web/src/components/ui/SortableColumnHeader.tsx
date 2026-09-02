@@ -4,11 +4,13 @@ import { useTranslation } from "react-i18next";
 
 import { sortIndicator, type SortDirection, type SortState } from "../../lib/listSort";
 import { ICON, SortAscending, SortDescending, SortInactive } from "../icons";
+import { TableHead } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 
 /**
  * A sortable column header for the app's ruled list surfaces.
  *
- * It renders the `role="columnheader"` element itself and takes the surface's
+ * It renders the column-header element itself (a `TableHead`) and takes the surface's
  * own head-cell class through `className`, because the column WIDTHS live in
  * each list's stylesheet — `.backlog-rows-head-due` is 116px there and
  * nowhere else, and duplicating the track here is exactly the head/row drift
@@ -46,8 +48,9 @@ export function SortableColumnHeader<K extends string>({
   const { active, direction, ariaSort } = sortIndicator(sort, sortKey);
 
   return (
-    <span className={className} role="columnheader" aria-sort={ariaSort}>
-      <button
+    <TableHead className={className} aria-sort={ariaSort}>
+      <Button
+        variant="ghost"
         type="button"
         className="list-sort-button"
         data-active={active ? "true" : "false"}
@@ -57,8 +60,8 @@ export function SortableColumnHeader<K extends string>({
       >
         <span className="list-sort-label">{label}</span>
         <SortCaret direction={direction} />
-      </button>
-    </span>
+      </Button>
+    </TableHead>
   );
 }
 

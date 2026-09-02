@@ -176,8 +176,7 @@ export function BacklogViewToggle({ view, onChange }: { view: BacklogView; onCha
         className="backlog-view-btn"
         data-active={view === "board" ? "true" : "false"}
         aria-pressed={view === "board"}
-        aria-label={t("backlog.view_board")}
-        title={t("backlog.view_board")}
+        tooltip={t("backlog.view_board")}
         onClick={() => onChange("board")}
       >
         <ViewBoard size={ICON.sm} />
@@ -187,8 +186,7 @@ export function BacklogViewToggle({ view, onChange }: { view: BacklogView; onCha
         className="backlog-view-btn"
         data-active={view === "list" ? "true" : "false"}
         aria-pressed={view === "list"}
-        aria-label={t("backlog.view_list")}
-        title={t("backlog.view_list")}
+        tooltip={t("backlog.view_list")}
         onClick={() => onChange("list")}
       >
         <ViewList size={ICON.sm} />

@@ -4,11 +4,14 @@
    Backdrop + panel motion from overlay.css.
    ===================================================================== */
 
+/* Scrim and positioner are separate elements under the Dialog primitive; the
+   layout half of this rule lives on `.pref-viewport`. */
 .pref-backdrop {
-  position: fixed;
-  inset: 0;
   z-index: var(--z-dialog);
-  display: flex;
+}
+
+.pref-viewport {
+  z-index: var(--z-dialog);
   align-items: center;
   justify-content: center;
   padding: var(--sp-6);
@@ -30,7 +33,7 @@
   outline: none;
 }
 
-.pref-modal.is-closing {
+.pref-modal[data-ending-style] {
   animation: overlay-panel-out var(--t-fast) var(--ease) forwards;
 }
 

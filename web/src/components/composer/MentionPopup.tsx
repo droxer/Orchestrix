@@ -37,6 +37,11 @@ export function MentionPopup({ matches, activeIndex, onHover, onPick }: {
       role="listbox"
       aria-label={t("composer.mention_list")}
     >
+      {/* A listbox OPTION, not a button — `role="option"` is what the
+          textarea's `aria-activedescendant` points at, and the shared Button
+          would bring a button role with it. The composer's mention popup is
+          driven from the textarea rather than owning focus itself, which is
+          also why it is not a base-ui Combobox. */}
       {matches.map((candidate, index) => (
         <button
           key={candidate.id}

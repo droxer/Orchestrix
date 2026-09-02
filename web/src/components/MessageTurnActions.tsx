@@ -81,8 +81,7 @@ export function MessageTurnActions({
           type="button"
           className={`msg-turn-action ${copied ? "is-copied" : ""}`}
           onClick={() => void handleCopy()}
-          aria-label={copied ? t("message.copied") : t("message.copy")}
-          title={copied ? t("message.copied") : t("message.copy")}
+          tooltip={copied ? t("message.copied") : t("message.copy")}
         >
           {copied ? <CheckIcon size={ICON.sm} /> : <ActionCopy size={ICON.sm} />}
           <span className="msg-turn-action-label">{copied ? t("message.copied") : t("message.copy")}</span>
@@ -94,8 +93,7 @@ export function MessageTurnActions({
           className="msg-turn-action"
           onClick={handleRetry}
           disabled={retryDisabled}
-          aria-label={t("message.retry")}
-          title={t("message.retry")}
+          tooltip={t("message.retry")}
         >
           <ActionRetry size={ICON.sm} />
           <span className="msg-turn-action-label">{t("message.retry")}</span>

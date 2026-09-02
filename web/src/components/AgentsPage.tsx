@@ -278,8 +278,7 @@ export function AgentsPage({
                 variant="ghost"
                 type="button"
                 className="page-header-icon-action"
-                aria-label={t("agents_page.create_action")}
-                title={t("agents_page.create_action")}
+                tooltip={t("agents_page.create_action")}
                 onClick={() => setCreateOpen(true)}
               >
                 <ActionAdd size={ICON.md} aria-hidden="true" />

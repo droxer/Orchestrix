@@ -1,11 +1,16 @@
 "use client";
 
-import { useEffect, useId, useRef, useSyncExternalStore, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useId, useRef, type ReactNode } from "react";
 import { OverlayCloseButton } from "@/components/ui/OverlayCloseButton";
-import { useModalDrawer } from "@/hooks/useModalDrawer";
-import { useOverlayVisibility } from "@/hooks/useOverlayVisibility";
-import { isDrawerTop, isDrawerUnderlay, registerDrawer, subscribeDrawerStack } from "@/lib/drawerStack";
+import {
+  Dialog,
+  DialogBackdrop,
+  DialogContent,
+  DialogDescription,
+  DialogPortal,
+  DialogTitle,
+  DialogViewport,
+} from "@/components/ui/dialog";
 
 /** Named panel widths — call sites pick a role, not a pixel count, so drawer
  *  sizing stays consistent across the app. `form` for single-column edit
@@ -46,6 +51,21 @@ export interface DrawerProps {
   onClosed?: () => void;
 }
 
+/**
+ * The app's side panel, on the shared Dialog primitive.
+ *
+ * Everything this component used to do by hand — Escape, the Tab trap,
+ * autofocus, focus restore, the body scroll lock, holding the panel in the
+ * DOM for its exit animation, and tracking which of several open drawers owns
+ * the keyboard — now comes from base-ui. What is left here is the drawer's
+ * own shape: a named width, a header with kicker/title/subtitle, and a
+ * scrolling body.
+ *
+ * Stacking still takes a `layer`, because the z-index has to beat the sibling
+ * backdrops, but the UNDERLAY treatment is no longer computed: base-ui marks
+ * a popup with `data-nested-dialog-open` when a drawer opens above it, and
+ * admin-v2-drawers.css recesses it from there.
+ */
 export function Drawer({
   open,
   onClose,
@@ -61,99 +81,80 @@ export function Drawer({
   layer = 0,
   onClosed,
 }: DrawerProps) {
-  const drawerId = useRef(Symbol("drawer")).current;
   const titleId = useId();
   const subtitleId = useId();
-
-  // Only the top of the drawer stack owns the keyboard; everything below is
-  // an underlay — visually recessed and inert to Escape/Tab/AT.
-  const top = useSyncExternalStore(subscribeDrawerStack, () => isDrawerTop(drawerId), () => true);
-  const underlay = useSyncExternalStore(
-    subscribeDrawerStack,
-    () => isDrawerUnderlay(drawerId),
-    () => false,
-  );
-
-  const panelRef = useRef<HTMLElement>(null);
-  const { visible, closing } = useOverlayVisibility(open, panelRef, onClosed);
-  useModalDrawer<HTMLElement>(onClose, visible, top && !closing, panelRef);
-
-  useEffect(() => {
-    registerDrawer(drawerId, layer, visible);
-    return () => registerDrawer(drawerId, layer, false);
-  }, [drawerId, layer, visible]);
-
-  // When a higher drawer opens, this panel becomes inert to AT — focus must
-  // not stay inside it. The new top drawer's useModalDrawer autofocus runs in
-  // the same commit, so release focus here only if it still points inside.
-  useEffect(() => {
-    if (!underlay) return;
-    const panel = panelRef.current;
-    const active = document.activeElement as HTMLElement | null;
-    if (panel && active && panel.contains(active)) active.blur();
-  }, [underlay, panelRef]);
-
-  if (!visible || typeof document === "undefined") return null;
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const resolvedWidth = typeof width === "number" ? width : DRAWER_WIDTHS[width];
   const resolvedAriaLabel = ariaLabel ?? (typeof title === "string" ? title : undefined);
 
-  const backdropClass = [
-    "overlay-backdrop",
-    "adm-drawer-backdrop",
-    closing ? "is-closing" : "",
-    underlay ? "is-underlay" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  const panelClass = ["adm-drawer", closing ? "is-closing" : ""].filter(Boolean).join(" ");
-
-  return createPortal(
-    <div
-      className={backdropClass}
-      style={{ zIndex: `calc(var(--z-drawer) + ${layer})` }}
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !closing && !underlay) onClose();
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      onOpenChangeComplete={(next) => {
+        if (!next) onClosed?.();
       }}
     >
-      <aside
-        ref={panelRef}
-        role="dialog"
-        aria-modal={underlay || closing ? undefined : true}
-        aria-hidden={underlay || closing || undefined}
-        inert={underlay || closing || undefined}
-        aria-label={resolvedAriaLabel}
-        aria-labelledby={resolvedAriaLabel ? undefined : titleId}
-        aria-describedby={subtitle ? subtitleId : undefined}
-        tabIndex={-1}
-        className={panelClass}
-        style={{ "--adm-drawer-w": `${resolvedWidth}px` } as React.CSSProperties}
-      >
-        <header className="adm-drawer-head">
-          <div className="adm-drawer-head-text">
-            {kicker ? <p className="adm-drawer-kicker">{kicker}</p> : null}
-            <h2 id={titleId} className="adm-drawer-title">{title}</h2>
-            {subtitle ? (
-              <p
-                id={subtitleId}
-                className={`adm-drawer-sub${subtitleMono ? " adm-drawer-sub--mono" : ""}`}
-                translate={subtitleMono ? "no" : undefined}
-              >
-                {subtitle}
-              </p>
-            ) : null}
-          </div>
-          <OverlayCloseButton
-            label={closeLabel}
-            onClick={onClose}
-            className="overlay-close"
-          />
-        </header>
-        <div className={`adm-drawer-body${bodyClassName ? ` ${bodyClassName}` : ""}`}>{children}</div>
-      </aside>
-    </div>,
-    document.body,
+      <DialogPortal>
+        <DialogBackdrop
+          className="adm-drawer-backdrop"
+          style={{ zIndex: `calc(var(--z-drawer) + ${layer})` }}
+        />
+        <DialogViewport
+          className="adm-drawer-viewport"
+          style={{ zIndex: `calc(var(--z-drawer) + ${layer})` }}
+        >
+          <DialogContent
+            ref={panelRef}
+            render={<aside />}
+            className="adm-drawer"
+            aria-label={resolvedAriaLabel}
+            aria-labelledby={resolvedAriaLabel ? undefined : titleId}
+            aria-describedby={subtitle ? subtitleId : undefined}
+            style={{ "--adm-drawer-w": `${resolvedWidth}px` } as React.CSSProperties}
+            /* `[data-modal-initial-focus]` stays the call-site convention —
+               eight drawers mark their first meaningful field with it. What
+               changed is who reads it: the primitive, through this prop,
+               instead of a hand-rolled trap.
+               A coarse pointer keeps focus on the panel, because focusing a
+               field there throws up the on-screen keyboard over the drawer
+               the moment it opens. */
+            initialFocus={(openType) =>
+              openType === "touch"
+                ? true
+                : panelRef.current?.querySelector<HTMLElement>("[data-modal-initial-focus]") ?? true
+            }
+          >
+            <header className="adm-drawer-head">
+              <div className="adm-drawer-head-text">
+                {kicker ? <p className="adm-drawer-kicker">{kicker}</p> : null}
+                <DialogTitle id={titleId} className="adm-drawer-title" render={<h2 />}>
+                  {title}
+                </DialogTitle>
+                {subtitle ? (
+                  <DialogDescription
+                    id={subtitleId}
+                    className={`adm-drawer-sub${subtitleMono ? " adm-drawer-sub--mono" : ""}`}
+                    translate={subtitleMono ? "no" : undefined}
+                    render={<p />}
+                  >
+                    {subtitle}
+                  </DialogDescription>
+                ) : null}
+              </div>
+              <OverlayCloseButton
+                label={closeLabel}
+                onClick={onClose}
+                className="overlay-close"
+              />
+            </header>
+            <div className={`adm-drawer-body${bodyClassName ? ` ${bodyClassName}` : ""}`}>{children}</div>
+          </DialogContent>
+        </DialogViewport>
+      </DialogPortal>
+    </Dialog>
   );
 }

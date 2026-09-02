@@ -54,8 +54,7 @@ export function ThreadHeader({ activeSession, participants, artifactCount, space
             size="icon"
             type="button"
             className="chat-threadlist-button"
-            aria-label={t("space.toggle_threads")}
-            title={t("space.toggle_threads")}
+            tooltip={t("space.toggle_threads")}
             aria-expanded={!threadListHidden}
             onClick={onToggleThreadList}
           >

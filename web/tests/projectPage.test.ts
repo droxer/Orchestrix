@@ -8,7 +8,6 @@ import {
   scopeProjectActivities,
   projectMemberState,
   projectPageActions,
-  projectPageTabForKey,
   resolveProjectOverviewState,
   showThreadChrome,
   agentsEligibleForProject,
@@ -63,15 +62,13 @@ const agent = (overrides: Partial<EmployeeAgent> = {}): EmployeeAgent => ({
 });
 
 describe("project page behavior", () => {
-  it("canonicalizes tabs and implements roving keyboard navigation", () => {
+  /* Roving keyboard navigation is no longer tested here: the page's tablist
+     is a base-ui Tabs now, which owns arrow/Home/End itself. What stays ours
+     is canonicalizing the tab named in the URL. */
+  it("canonicalizes the tab named in the URL", () => {
     assert.equal(parseProjectPageTab(null), "profile");
     assert.equal(parseProjectPageTab("unknown"), "profile");
     assert.equal(parseProjectPageTab("workspace"), "workspace");
-    assert.equal(projectPageTabForKey("profile", "ArrowLeft"), "activities");
-    assert.equal(projectPageTabForKey("activities", "ArrowRight"), "profile");
-    assert.equal(projectPageTabForKey("workspace", "Home"), "profile");
-    assert.equal(projectPageTabForKey("workspace", "End"), "activities");
-    assert.equal(projectPageTabForKey("workspace", "Enter"), null);
   });
 
   it("anchors the lead while preserving the remaining stored roster order", () => {

@@ -66,6 +66,7 @@ import {
   toggleSelected,
   type TaskSelection,
 } from "../lib/taskSelection";
+import { Table, TableRow } from "@/components/ui/table";
 
 
 
@@ -548,7 +549,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
                 addLabel={t("backlog.new_task")}
                 onAdd={() => setInlineCreateStatus(status)}
               >
-                <div className="list-group-rows" role="table" aria-label={label}>
+                <Table className="list-group-rows" aria-label={label}>
                   <BacklogRowsHead
                     sort={sort}
                     onSort={toggleSort}
@@ -561,12 +562,12 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
                     }
                   />
                   {opening ? (
-                    <div className="backlog-inline-create-row" role="row">
+                    <TableRow className="backlog-inline-create-row">
                       <InlineTaskCreate
                         onSubmit={submitInlineCreate}
                         onClose={() => setInlineCreateStatus(null)}
                       />
-                    </div>
+                    </TableRow>
                   ) : null}
                   {groupPage.items.map((task) => {
                     const discussionAgents = discussionAgentsForTask(task, nodes, logicalAgents);
@@ -588,7 +589,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
                       />
                     );
                   })}
-                </div>
+                </Table>
                 {/* The band's own cursor, under its own rows — the same
                     control the lane carries on the board. */}
                 <Pagination

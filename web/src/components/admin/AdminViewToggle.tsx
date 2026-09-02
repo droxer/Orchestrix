@@ -41,8 +41,7 @@ export function AdminViewToggle({ view, onChange }: AdminViewToggleProps) {
             className="adm-view-toggle-btn"
             data-active={active ? "true" : "false"}
             aria-pressed={active}
-            aria-label={item.label}
-            title={item.label}
+            tooltip={item.label}
             onClick={() => onChange(item.id)}
           >
             <Icon size={ICON.sm} aria-hidden="true" />

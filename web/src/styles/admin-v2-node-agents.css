@@ -89,18 +89,11 @@
   background: var(--surface-1);
 }
 
+/* Height, fill, and the identity ink. The rest — gap, inline pad, hairline,
+   radius, label type — comes from Badge (variant="state"), which this rule
+   used to restate in full. */
 .adm-agent-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-1);
   height: var(--control-h-2xs);
-  padding: 0 var(--sp-2);
-  font: var(--type-label-strong);
-  letter-spacing: var(--type-label-strong-track);
-  text-transform: none;
-  border: 0.5px solid var(--line-2);
-  border-radius: var(--r-2);
   background: var(--surface-1);
   color: var(--ink-3);
   flex: none;
@@ -111,33 +104,23 @@
 }
 
 /* The agent name is identity, not status — it stays the chip's neutral
-   ink/muted color regardless of tone. Only the dot carries the status hue,
+   ink/muted color regardless of tone. Only the mark carries the status hue,
    matching "agents are differentiated by shape, never by status/brand
-   color" everywhere else in the app. */
-/* The in-chip tier. This note used to name its own two-tier scale in raw
-   px; that taxonomy is now the --dot-* scale in palette.css, which took
-   these tiers and backlog.css's "8px dot cell" and made them one thing. */
-.adm-agent-dot {
-  width: var(--dot-sm);
-  height: var(--dot-sm);
-  flex: none;
-  border-radius: var(--r-full);
-  background: var(--ink-4);
+   color" everywhere else in the app.
+
+   The mark is a StateMark now, so the shapes this block used to draw by hand
+   come from the shared grammar instead: `bad` is a ring because StateMark
+   makes every bad state a ring, and an agent whose computer is dark asks for
+   `shape="ring"` at the call site. All that is left here is pointing the
+   mark's accent at the chip's tone. */
+.adm-agent-chip .state-mark {
+  --mark-accent: var(--tone);
 }
 
-/* Drawer status-word chips carry an explicit label, so ready keeps its calm
-   --ok fill here; failed still switches to the shared hollow-ring shape so the
-   "problem" language stays consistent with the fleet cards. */
-.adm-agent-chip.tone-bad .adm-agent-dot {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--tone);
-}
-
-/* ...and an agent whose computer is dark reads hollow for the same reason,
-   even though its last report said ready. */
-.adm-agent-chip[data-presence="offline"].tone-good .adm-agent-dot {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--ink-4);
+/* A dark computer reads hollow even though its last report said ready, and
+   in the muted ink rather than the calm --ok green. */
+.adm-agent-chip[data-presence="offline"].tone-good .state-mark {
+  --mark-accent: var(--ink-4);
 }
 
 /* Official vendor glyph — identity, alongside the name label. Same

@@ -1,12 +1,18 @@
 "use client";
 
 import { useRef } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { OverlayCloseButton } from "@/components/ui/OverlayCloseButton";
 import { PreferencesPanel, type PreferencesPanelProps } from "./PreferencesPanel";
-import { useModalDrawer } from "../hooks/useModalDrawer";
-import { useOverlayVisibility } from "../hooks/useOverlayVisibility";
+import {
+  Dialog,
+  DialogBackdrop,
+  DialogContent,
+  DialogDescription,
+  DialogPortal,
+  DialogTitle,
+  DialogViewport,
+} from "@/components/ui/dialog";
 
 export type PreferencesDialogProps = {
   open: boolean;
@@ -14,45 +20,62 @@ export type PreferencesDialogProps = {
   preferences: PreferencesPanelProps;
 };
 
+/**
+ * Preferences, on the shared Dialog primitive. The panel inside is a Tabs
+ * root; the modal contract around it — Escape, the focus trap, autofocus on
+ * the active category, focus restore, and holding the panel in the DOM for
+ * its exit animation — comes from the primitive.
+ */
 export function PreferencesDialog({ open, onClose, preferences }: PreferencesDialogProps) {
   const { t } = useTranslation();
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const { visible, closing } = useOverlayVisibility(open, dialogRef);
-  useModalDrawer<HTMLDivElement>(onClose, visible, !closing, dialogRef);
+  const panelRef = useRef<HTMLDivElement>(null);
 
-  if (!visible || typeof document === "undefined") return null;
-
-  return createPortal(
-    <div
-      className={`overlay-backdrop pref-backdrop${closing ? " is-closing" : ""}`}
-      role="presentation"
-      onMouseDown={(event) => {
-        if (!closing && event.target === event.currentTarget) onClose();
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
       }}
     >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="pref-dialog-title"
-        aria-describedby="pref-dialog-sub"
-        tabIndex={-1}
-        className={`pref-modal${closing ? " is-closing" : ""}`}
-        inert={closing || undefined}
-      >
-        <header className="pref-header">
-          <div className="pref-header-text">
-            <h2 id="pref-dialog-title">{t("pref.title")}</h2>
-            <span id="pref-dialog-sub" className="pref-header-sub">
-              {t("pref.sub")}
-            </span>
-          </div>
-          <OverlayCloseButton label={t("pref.close")} onClick={onClose} className="overlay-close pref-close" />
-        </header>
+      <DialogPortal>
+        <DialogBackdrop className="pref-backdrop" />
+        <DialogViewport className="pref-viewport">
+          <DialogContent
+            ref={panelRef}
+            className="pref-modal"
+            aria-labelledby="pref-dialog-title"
+            aria-describedby="pref-dialog-sub"
+            /* Opens on the active category, the same `[data-modal-initial-focus]`
+               convention the drawers use — otherwise focus lands on the close
+               button, which is the one control nobody opened this to reach. */
+            initialFocus={() =>
+              panelRef.current?.querySelector<HTMLElement>("[data-modal-initial-focus]") ?? true
+            }
+          >
+            <header className="pref-header">
+              <div className="pref-header-text">
+                <DialogTitle id="pref-dialog-title" render={<h2 />}>
+                  {t("pref.title")}
+                </DialogTitle>
+                <DialogDescription
+                  id="pref-dialog-sub"
+                  className="pref-header-sub"
+                  render={<span />}
+                >
+                  {t("pref.sub")}
+                </DialogDescription>
+              </div>
+              <OverlayCloseButton
+                label={t("pref.close")}
+                onClick={onClose}
+                className="overlay-close pref-close"
+              />
+            </header>
 
-        <PreferencesPanel {...preferences} />
-      </div>
-    </div>,
-    document.body,
+            <PreferencesPanel {...preferences} />
+          </DialogContent>
+        </DialogViewport>
+      </DialogPortal>
+    </Dialog>
   );
 }

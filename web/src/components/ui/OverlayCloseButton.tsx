@@ -26,8 +26,7 @@ export function OverlayCloseButton({ label, onClick, className = "overlay-close"
       size="icon"
       type="button"
       className={cn(className)}
-      aria-label={label}
-      title={label}
+      tooltip={label}
       onClick={onClick}
     >
       <ActionRemove size={ICON.md} aria-hidden="true" />

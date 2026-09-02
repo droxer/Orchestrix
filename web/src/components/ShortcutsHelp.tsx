@@ -1,9 +1,15 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { acquireBodyScrollLock } from "@/lib/bodyScrollLock";
+import {
+  Dialog,
+  DialogBackdrop,
+  DialogContent,
+  DialogPortal,
+  DialogTitle,
+  DialogViewport,
+} from "@/components/ui/dialog";
 import { commandShortcutLabel } from "@/lib/shortcuts";
 import { sendShortcutLabel } from "@/lib/sendShortcut";
 
@@ -51,79 +57,71 @@ export function ShortcutsHelp({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const panelRef = useRef<HTMLDivElement>(null);
-  const previouslyFocused = useRef<HTMLElement | null>(null);
 
+  /* `?` closes this the way it opened it. Escape, the focus trap, focus
+     restore, and the scroll lock come from the Dialog primitive — this panel
+     used to do all four by hand and only ever managed three: it focused the
+     panel but never trapped Tab, so a keyboard user could walk out of an
+     open modal into the page behind it. */
   useEffect(() => {
     if (!open) return;
-    previouslyFocused.current = document.activeElement as HTMLElement | null;
-    const releaseScrollLock = acquireBodyScrollLock();
-    panelRef.current?.focus();
-
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" || event.key === "?") {
-        event.preventDefault();
-        onClose();
-      }
+      if (event.key !== "?") return;
+      event.preventDefault();
+      onClose();
     }
     document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      releaseScrollLock();
-      previouslyFocused.current?.focus?.();
-      previouslyFocused.current = null;
-    };
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose, open]);
 
-  if (!open) return null;
-
-  return createPortal(
-    <div
-      className="overlay-backdrop command-backdrop"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
       }}
     >
-      <div
-        ref={panelRef}
-        className="command-menu shortcuts-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-label={t("shortcuts.title")}
-        tabIndex={-1}
-      >
-        <h2 className="shortcuts-title">{t("shortcuts.title")}</h2>
-        <div className="shortcuts-columns">
-          <section className="shortcuts-group" aria-label={t("shortcuts.group_global")}>
-            <h3 className="command-group-label">{t("shortcuts.group_global")}</h3>
-            <ul className="shortcuts-list">
-              {GLOBAL_ROWS.map((row) => (
-                <ShortcutRowView
-                  key={row.labelKey}
-                  keys={row.keys === "command" ? commandShortcutLabel() : row.keys}
-                  label={t(row.labelKey)}
-                />
-              ))}
-            </ul>
-          </section>
-          <section className="shortcuts-group" aria-label={t("shortcuts.group_navigate")}>
-            <h3 className="command-group-label">{t("shortcuts.group_navigate")}</h3>
-            <ul className="shortcuts-list">
-              {NAVIGATE_ROWS.filter((row) => !row.adminOnly || isAdmin).map((row) => (
-                <ShortcutRowView key={row.labelKey} keys={row.keys} label={t(row.labelKey)} />
-              ))}
-            </ul>
-          </section>
-          <section className="shortcuts-group" aria-label={t("shortcuts.group_composer")}>
-            <h3 className="command-group-label">{t("shortcuts.group_composer")}</h3>
-            <ul className="shortcuts-list">
-              <ShortcutRowView keys={sendShortcutLabel()} label={t("shortcuts.send_message")} />
-            </ul>
-          </section>
-        </div>
-      </div>
-    </div>,
-    document.body,
+      <DialogPortal>
+        <DialogBackdrop className="command-backdrop" />
+        <DialogViewport className="command-viewport">
+          <DialogContent
+            className="command-menu shortcuts-panel"
+            aria-label={t("shortcuts.title")}
+          >
+            <DialogTitle className="shortcuts-title" render={<h2 />}>
+              {t("shortcuts.title")}
+            </DialogTitle>
+            <div className="shortcuts-columns">
+              <section className="shortcuts-group" aria-label={t("shortcuts.group_global")}>
+                <h3 className="command-group-label">{t("shortcuts.group_global")}</h3>
+                <ul className="shortcuts-list">
+                  {GLOBAL_ROWS.map((row) => (
+                    <ShortcutRowView
+                      key={row.labelKey}
+                      keys={row.keys === "command" ? commandShortcutLabel() : row.keys}
+                      label={t(row.labelKey)}
+                    />
+                  ))}
+                </ul>
+              </section>
+              <section className="shortcuts-group" aria-label={t("shortcuts.group_navigate")}>
+                <h3 className="command-group-label">{t("shortcuts.group_navigate")}</h3>
+                <ul className="shortcuts-list">
+                  {NAVIGATE_ROWS.filter((row) => !row.adminOnly || isAdmin).map((row) => (
+                    <ShortcutRowView key={row.labelKey} keys={row.keys} label={t(row.labelKey)} />
+                  ))}
+                </ul>
+              </section>
+              <section className="shortcuts-group" aria-label={t("shortcuts.group_composer")}>
+                <h3 className="command-group-label">{t("shortcuts.group_composer")}</h3>
+                <ul className="shortcuts-list">
+                  <ShortcutRowView keys={sendShortcutLabel()} label={t("shortcuts.send_message")} />
+                </ul>
+              </section>
+            </div>
+          </DialogContent>
+        </DialogViewport>
+      </DialogPortal>
+    </Dialog>
   );
 }

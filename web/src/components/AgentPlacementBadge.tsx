@@ -2,6 +2,7 @@
 
 import { useTranslation } from "react-i18next";
 import { StateMark } from "./StateMark";
+import { Tooltip } from "@/components/ui/tooltip";
 import {
   placementBadgeDetailLabels,
   placementBadgeShowsSandbox,
@@ -32,21 +33,22 @@ export function AgentPlacementBadge({
   }, showsSandbox).join(" · ");
 
   return (
-    <span
-      className="agent-placement-badge code"
-      data-ownership={description.ownership}
-      title={detailTitle}
-    >
-      <StateMark tone={placementStatusTone(status)} />
-      <OwnershipIcon size={ICON.sm} aria-hidden="true" />
-      <span className="agent-placement-badge-name code" translate="no">
-        {description.nodeName}
+    <Tooltip content={detailTitle}>
+      <span
+        className="agent-placement-badge code"
+        data-ownership={description.ownership}
+      >
+        <StateMark tone={placementStatusTone(status)} />
+        <OwnershipIcon size={ICON.sm} aria-hidden="true" />
+        <span className="agent-placement-badge-name code" translate="no">
+          {description.nodeName}
+        </span>
+        <span className="sr-only">{statusLabel}</span>
+        <span className="agent-placement-badge-kind code">{ownershipLabel}</span>
+        {showsSandbox ? (
+          <span className="agent-placement-badge-sandbox code">{sandboxLabel}</span>
+        ) : null}
       </span>
-      <span className="sr-only">{statusLabel}</span>
-      <span className="agent-placement-badge-kind code">{ownershipLabel}</span>
-      {showsSandbox ? (
-        <span className="agent-placement-badge-sandbox code">{sandboxLabel}</span>
-      ) : null}
-    </span>
+    </Tooltip>
   );
 }

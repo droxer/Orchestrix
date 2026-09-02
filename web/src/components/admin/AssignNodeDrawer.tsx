@@ -22,6 +22,7 @@ import { initialsOf, statusTone, visualStatus } from "./helpers";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import { NodeProfileBadges } from "./NodeProfileBadges";
 import { NodePresence } from "./NodePresence";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
@@ -32,6 +33,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Alert } from "@/components/ui/alert";
+
+/** Sentinel value for the "create a new node instead" choice, which shares
+ *  the node picker's radio group but has no node id of its own. */
+const NEW_NODE_VALUE = "__new__";
 
 interface AssignNodeDrawerProps {
   open: boolean;
@@ -288,13 +294,18 @@ export function AssignNodeDrawer({
           </header>
 
           {hasNodes ? (
-            <ul
-              ref={nodeListRef}
+            <RadioGroup
+              render={<ul ref={nodeListRef} tabIndex={-1} />}
               className="adm-assign-node-list"
-              role="radiogroup"
+              name="assign-node-id"
               aria-label={t("admin.assign_node")}
-              tabIndex={-1}
               aria-describedby={fieldErrors.nodeId ? "assign-node-node-error" : undefined}
+              value={createNew ? NEW_NODE_VALUE : nodeId}
+              onValueChange={(value) => {
+                setCreateNew(value === NEW_NODE_VALUE);
+                setNodeId(value === NEW_NODE_VALUE ? "" : String(value));
+                clearFieldError("nodeId");
+              }}
             >
               {unassignedNodes.map((node) => {
                 const status = visualStatus(node);
@@ -302,20 +313,11 @@ export function AssignNodeDrawer({
                 const isSelected = node.id === nodeId;
                 return (
                   <li key={node.id}>
-                    <label className="adm-assign-node-choice">
-                      <input
-                        className="adm-assign-node-input"
-                        type="radio"
-                        name="assign-node-id"
-                        value={node.id}
-                        checked={isSelected}
-                        aria-invalid={Boolean(fieldErrors.nodeId) || undefined}
-                        onChange={() => {
-                          setNodeId(node.id);
-                          setCreateNew(false);
-                          clearFieldError("nodeId");
-                        }}
-                      />
+                    <RadioGroupChoice
+                      className="adm-assign-node-choice"
+                      value={node.id}
+                      aria-invalid={Boolean(fieldErrors.nodeId) || undefined}
+                    >
                       <span className={`adm-assign-node ${isSelected ? "selected" : ""}`}>
                         <NodePresence node={node} t={t} withLabel />
                         <span className="adm-assign-node-body">
@@ -349,25 +351,16 @@ export function AssignNodeDrawer({
                           {isSelected ? <ActionApprove size={ICON.sm} /> : null}
                         </span>
                       </span>
-                    </label>
+                    </RadioGroupChoice>
                   </li>
                 );
               })}
               <li>
-                <label className="adm-assign-node-choice">
-                  <input
-                    className="adm-assign-node-input"
-                    type="radio"
-                    name="assign-node-id"
-                    value="__new__"
-                    checked={createNew}
-                    aria-invalid={Boolean(fieldErrors.nodeId) || undefined}
-                    onChange={() => {
-                      setCreateNew(true);
-                      setNodeId("");
-                      clearFieldError("nodeId");
-                    }}
-                  />
+                <RadioGroupChoice
+                  className="adm-assign-node-choice"
+                  value={NEW_NODE_VALUE}
+                  aria-invalid={Boolean(fieldErrors.nodeId) || undefined}
+                >
                   <span className={`adm-assign-node ${createNew ? "selected" : ""}`}>
                     <span className="adm-assign-node-dot tone-neutral" aria-hidden="true" />
                     <span className="adm-assign-node-body">
@@ -382,9 +375,9 @@ export function AssignNodeDrawer({
                       {createNew ? <ActionApprove size={ICON.sm} /> : null}
                     </span>
                   </span>
-                </label>
+                </RadioGroupChoice>
               </li>
-            </ul>
+            </RadioGroup>
           ) : (
             <div className="adm-assign-empty" role="status">
               <AdminInbox size={ICON.lg} aria-hidden="true" />
@@ -462,7 +455,7 @@ export function AssignNodeDrawer({
           </fieldset>
         ) : null}
 
-        {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
+        {error ? <Alert variant="boxed" render={<div />}>{error}</Alert> : null}
 
         <div className="adm-form-actions">
           <Button size="cta"

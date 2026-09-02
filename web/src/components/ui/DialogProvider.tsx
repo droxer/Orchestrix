@@ -9,7 +9,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
 import {
   ICON,
   StatusWarn,
@@ -17,8 +16,15 @@ import {
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { readAnimationDurationMs } from "@/lib/animationDuration";
-import { useModalDrawer } from "@/hooks/useModalDrawer";
+import {
+  Dialog,
+  DialogBackdrop,
+  DialogContent,
+  DialogDescription,
+  DialogPortal,
+  DialogTitle,
+  DialogViewport,
+} from "@/components/ui/dialog";
 import { ActionRemove } from "../icons";
 
 // Promise-based confirm/prompt that replaces the native window.confirm /
@@ -90,7 +96,11 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   const requestRef = useRef<Request | null>(null);
   const requestQueue = useRef<Request[]>([]);
   const dialogClosingRef = useRef(false);
-  const dialogCloseTimer = useRef<number | null>(null);
+  /* Where focus lands when the modal opens: the prompt's field, the cancel
+     button on a destructive confirm, the confirm button otherwise. This used
+     to be a `[data-modal-initial-focus]` attribute the modal hook went
+     looking for; the primitive takes the element directly. */
+  const initialFocusRef = useRef<HTMLElement | null>(null);
 
   const enqueueRequest = useCallback((next: Request) => {
     if (requestRef.current) {
@@ -134,48 +144,40 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     if (current.kind === "confirm") current.resolve(result === true);
     else current.resolve(typeof result === "string" ? result : null);
 
+    // Start the exit; `handleClosed` below picks up the next queued request
+    // once the animation has actually finished. This used to be a setTimeout
+    // measured off the panel's computed animation duration.
     dialogClosingRef.current = true;
     setDialogClosing(true);
-    dialogCloseTimer.current = window.setTimeout(() => {
-      const next = requestQueue.current.shift() ?? null;
-      requestRef.current = next;
-      setRequest(next);
-      dialogClosingRef.current = false;
-      setDialogClosing(false);
-      dialogCloseTimer.current = null;
-    }, readAnimationDurationMs(dialogRef.current));
+  }, []);
+
+  const handleClosed = useCallback(() => {
+    const next = requestQueue.current.shift() ?? null;
+    requestRef.current = next;
+    setRequest(next);
+    dialogClosingRef.current = false;
+    setDialogClosing(false);
   }, []);
 
   const cancelValue = (req: Request): boolean | null => (req.kind === "confirm" ? false : null);
 
   const dialogOpen = Boolean(request);
 
-  // Modal contract — Escape, Tab trap, autofocus, focus restore, scroll lock —
-  // comes from the shared hook. Escape settles with the request's cancel value
-  // (false / null, same as the cancel button); `active` drops during the exit
-  // animation so the trap detaches while the modal is inert.
-  const dialogRef = useModalDrawer<HTMLDivElement>(
-    useCallback(() => {
-      const current = requestRef.current;
-      if (current) settle(cancelValue(current));
-    }, [settle]),
-    dialogOpen,
-    !dialogClosing,
-  );
+  // Escape settles with the request's cancel value (false / null, the same as
+  // the cancel button); everything else about the modal contract — the focus
+  // trap, focus restore, the scroll lock, holding the panel for its exit
+  // animation — comes from the Dialog primitive.
+  const dismissDialog = useCallback(() => {
+    const current = requestRef.current;
+    if (current) settle(cancelValue(current));
+  }, [settle]);
 
-  // Prompt-only extras the hook doesn't cover: seed the input from
-  // defaultValue and pre-select it (window.prompt parity — typing replaces
-  // the default). Declared after the hook, so its autofocus has already run.
+  // Seed the prompt field from `defaultValue` when a request arrives, so the
+  // controlled input starts where the caller asked.
   useEffect(() => {
     if (!request || dialogClosing || request.kind !== "prompt") return;
     setInputValue(request.opts.defaultValue ?? "");
-    const target = dialogRef.current?.querySelector("[data-modal-initial-focus]");
-    if (target instanceof HTMLInputElement) target.select();
-  }, [dialogClosing, request, dialogRef]);
-
-  useEffect(() => () => {
-    if (dialogCloseTimer.current !== null) window.clearTimeout(dialogCloseTimer.current);
-  }, []);
+  }, [dialogClosing, request]);
 
   const dismissAnnouncement = useCallback(() => {
     setToastExiting(false);
@@ -210,49 +212,50 @@ export function DialogProvider({ children }: { children: ReactNode }) {
           aria-atomic="true"
         >
           <span className="dialog-toast-message">{announcement.message}</span>
-          <button
+          <Button
+            variant="ghost"
             type="button"
             className="dialog-toast-close"
-            aria-label={t("toast.dismiss")}
-            title={t("toast.dismiss")}
+            tooltip={t("toast.dismiss")}
             onClick={dismissAnnouncement}
           >
             <ActionRemove size={ICON.sm} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       ) : null}
-      {request && typeof document !== "undefined"
-        ? createPortal(
-            <div
-              className={`overlay-backdrop dialog-backdrop${dialogClosing ? " is-closing" : ""}`}
-              role="presentation"
-              onMouseDown={(event) => {
-                if (!dialogClosing && event.target === event.currentTarget) settle(cancelValue(request));
-              }}
-            >
-              <div
-                ref={dialogRef}
+      <Dialog
+        open={dialogOpen && !dialogClosing}
+        onOpenChange={(next) => {
+          if (!next) dismissDialog();
+        }}
+        onOpenChangeComplete={(next) => {
+          if (!next) handleClosed();
+        }}
+      >
+        {request ? (
+          <DialogPortal>
+            <DialogBackdrop className="dialog-backdrop" />
+            <DialogViewport className="dialog-viewport">
+              <DialogContent
                 role={request.kind === "prompt" ? "dialog" : "alertdialog"}
-                aria-modal="true"
                 aria-labelledby="dialog-title"
                 aria-describedby={request.opts.message ? "dialog-desc" : undefined}
-                tabIndex={-1}
-                className={`dialog-modal${dialogClosing ? " is-closing" : ""}`}
+                className="dialog-modal"
                 data-tone={isDangerConfirm ? "danger" : undefined}
-                inert={dialogClosing || undefined}
+                initialFocus={initialFocusRef}
               >
                 <div className="dialog-title-row">
                   {isDangerConfirm ? (
                     <StatusWarn size={ICON.lg} className="dialog-danger-icon" aria-hidden="true" />
                   ) : null}
-                  <h2 id="dialog-title" className="dialog-title" translate="no">
+                  <DialogTitle id="dialog-title" className="dialog-title" translate="no" render={<h2 />}>
                     {request.opts.title}
-                  </h2>
+                  </DialogTitle>
                 </div>
                 {request.opts.message ? (
-                  <p id="dialog-desc" className="dialog-message">
+                  <DialogDescription id="dialog-desc" className="dialog-message" render={<p />}>
                     {request.opts.message}
-                  </p>
+                  </DialogDescription>
                 ) : null}
 
                 {request.kind === "prompt" ? (
@@ -264,7 +267,12 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                     }}
                   >
                     <Input
-                      data-modal-initial-focus
+                      /* window.prompt parity: the default arrives selected, so
+                         typing replaces it rather than appending to it. */
+                      ref={(node) => {
+                        initialFocusRef.current = node;
+                        node?.select();
+                      }}
                       className="dialog-input"
                       name="dialog-prompt"
                       autoComplete="off"
@@ -285,7 +293,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                     type="button"
                     variant="ghost"
                     size="cta"
-                    data-modal-initial-focus={request.kind === "confirm" && request.opts.tone === "danger" ? "" : undefined}
+                    ref={isDangerConfirm ? (node) => { initialFocusRef.current = node; } : undefined}
                     disabled={dialogClosing}
                     onClick={() => settle(cancelValue(request))}
                   >
@@ -296,7 +304,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                       type="button"
                       size="cta"
                       variant={request.opts.tone === "danger" ? "destructive" : "default"}
-                      data-modal-initial-focus={request.opts.tone === "danger" ? undefined : ""}
+                      ref={isDangerConfirm ? undefined : (node) => { initialFocusRef.current = node; }}
                       disabled={dialogClosing}
                       onClick={() => settle(true)}
                     >
@@ -308,11 +316,11 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                     </Button>
                   )}
                 </div>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+              </DialogContent>
+            </DialogViewport>
+          </DialogPortal>
+        ) : null}
+      </Dialog>
     </DialogContext.Provider>
   );
 }

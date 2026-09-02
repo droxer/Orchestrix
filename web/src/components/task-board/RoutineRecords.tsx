@@ -21,6 +21,7 @@ import type { ReactNode } from "react";
 /** The columns the routine list can order by. Mirrors `routineSortColumns`. */
 export type RoutineSortKey = "title" | "state" | "priority" | "assignee" | "nextRun";
 import type { RelaySession, RelayTaskListItem } from "../../types";
+import { TableCell, TableHead, TableRow } from "@/components/ui/table";
 
 /* One routine, drawn three ways: the board card, the list row, and the meta
    header inside its drawer. Card and row are deliberately the same record in
@@ -164,10 +165,10 @@ export function RoutineRowsHead({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="backlog-rows-head" role="row">
-      <span className="backlog-rows-head-cell backlog-rows-head-select" role="columnheader">{selectAll}</span>
-      <span className="backlog-rows-head-cell backlog-rows-head-dot" role="columnheader" />
-      <span className="backlog-rows-head-cell backlog-rows-head-ref" role="columnheader">{t("backlog.col_ref")}</span>
+    <TableRow className="backlog-rows-head">
+      <TableHead className="backlog-rows-head-cell backlog-rows-head-select">{selectAll}</TableHead>
+      <TableHead className="backlog-rows-head-cell backlog-rows-head-dot" />
+      <TableHead className="backlog-rows-head-cell backlog-rows-head-ref">{t("backlog.col_ref")}</TableHead>
       <SortableColumnHeader
         className="backlog-rows-head-cell backlog-rows-head-lead"
         label={t("backlog.col_task")}
@@ -196,8 +197,8 @@ export function RoutineRowsHead({
         sort={sort}
         onSort={onSort}
       />
-      <span className="backlog-rows-head-cell backlog-rows-head-actions" role="columnheader">{t("backlog.actions")}</span>
-    </div>
+      <TableHead className="backlog-rows-head-cell backlog-rows-head-actions">{t("backlog.actions")}</TableHead>
+    </TableRow>
   );
 }
 
@@ -233,26 +234,26 @@ export function RoutineRow({
   const startDisabled = (!task.assignedAgentId && !task.assignedTeamId) || !task.routineEnabled;
 
   return (
-    <article className="backlog-row group list-virtual" role="row" data-routine-state={state} data-priority={task.priority} data-selected={selected ? "true" : undefined}>
-      <span className="backlog-row-select-cell" role="cell">
+    <TableRow render={<article />} className="backlog-row group list-virtual" data-routine-state={state} data-priority={task.priority} data-selected={selected ? "true" : undefined}>
+      <TableCell className="backlog-row-select-cell">
         <TaskSelectCheckbox
           className="backlog-select-box"
           checked={selected}
           label={t("routine.select_routine", { title: task.title })}
           onCheckedChange={onToggleSelect}
         />
-      </span>
+      </TableCell>
       <span className="backlog-row-dot-cell" aria-hidden="true">
         <StateMark shape={ROUTINE_STATE_SHAPE[state]} />
       </span>
-      <span className="backlog-row-ref code" role="cell">{taskRef(task.id)}</span>
-      <div className="backlog-row-lead" role="cell">
+      <TableCell className="backlog-row-ref code">{taskRef(task.id)}</TableCell>
+      <TableCell render={<div />} className="backlog-row-lead">
         <Button variant="ghost" type="button" className="backlog-row-title" onClick={onEdit}>{task.title}</Button>
-      </div>
-      <div className="backlog-row-tags" role="cell">
+      </TableCell>
+      <TableCell render={<div />} className="backlog-row-tags">
         <PriorityBadge priority={task.priority} />
-      </div>
-      <span className="backlog-row-due" role="cell">
+      </TableCell>
+      <TableCell className="backlog-row-due">
         <TaskDueCell
           date={task.routineNextRunDate}
           tone={tone}
@@ -260,17 +261,17 @@ export function RoutineRow({
           emptyLabel={t("routine.set_next_run")}
           onEdit={onEdit}
         />
-      </span>
-      <span className="backlog-row-assignee" role="cell">
+      </TableCell>
+      <TableCell className="backlog-row-assignee">
         <TaskAssignee task={task} ready={ready} assigneeDisplayName={assigneeDisplayName} assigneeIsSelf={assigneeIsSelf} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} />
-      </span>
-      <div className="backlog-row-actions" role="cell" aria-label={t("backlog.actions")}>
+      </TableCell>
+      <TableCell render={<div />} className="backlog-row-actions" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
           <RoutineAssignButton onAssign={onAssign} />
           <RoutineStartButton disabled={startDisabled} onStart={onStart} />
         </div>
-      </div>
-    </article>
+      </TableCell>
+    </TableRow>
   );
 }
 

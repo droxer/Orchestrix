@@ -12,6 +12,7 @@ import {
 } from "../icons";
 import { useMarkdownMode } from "./context";
 import { MermaidDiagram } from "./MermaidDiagram";
+import { Button } from "@/components/ui/button";
 
 function CopyFenceButton({ text }: { text: string }) {
   const { t } = useTranslation();
@@ -45,10 +46,10 @@ function CopyFenceButton({ text }: { text: string }) {
       : t("message.copy_code");
 
   return (
-    <button type="button" className="md-fence-copy" onClick={handleCopy} aria-label={label}>
+    <Button variant="ghost" type="button" className="md-fence-copy" onClick={handleCopy} aria-label={label}>
       {copied ? <CheckIcon size={ICON.sm} aria-hidden="true" /> : <ActionCopy size={ICON.sm} aria-hidden="true" />}
       <span className="md-fence-copy-label">{label}</span>
-    </button>
+    </Button>
   );
 }
 

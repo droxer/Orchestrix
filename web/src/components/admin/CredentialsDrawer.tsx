@@ -11,6 +11,7 @@ import { NodeProfileBadges } from "./NodeProfileBadges";
 import { resolveNodeCredentials, type StoredNodeToken } from "./helpers";
 import { canUseLocalControlPanel } from "../../lib/controlPanel";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
+import { Alert } from "@/components/ui/alert";
 
 interface CredentialsDrawerProps {
   open: boolean;
@@ -192,7 +193,7 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, employeeHa
                 ) : null}
               </div>
               {actionError ? (
-                <p className="adm-form-error" role="alert">{t("admin.v2.action_failed", { message: actionError })}</p>
+                <Alert variant="boxed">{t("admin.v2.action_failed", { message: actionError })}</Alert>
               ) : null}
             </div>
             <div className="adm-form-actions">

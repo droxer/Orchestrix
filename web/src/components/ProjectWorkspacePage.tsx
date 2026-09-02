@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { getWorkspaceBrief } from "../api";
@@ -13,7 +13,6 @@ import {
   projectActivitiesState,
   projectMemberState,
   projectPageActions,
-  projectPageTabForKey,
   scopeProjectActivities,
   MAX_PROJECT_MEMBERS,
   PROJECT_PAGE_TABS,
@@ -30,6 +29,7 @@ import {
   WorkspaceFolder,
 } from "./icons";
 import { PageHeader } from "./PageHeader";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectMemberEditor } from "./ProjectMemberEditor";
 import { ProjectWorkspaceFiles } from "./ProjectWorkspaceFiles";
 import {
@@ -123,8 +123,7 @@ function ProjectMemberLane({
         <Button variant="ghost"
           type="button"
           className="project-member-tile-edit"
-          aria-label={t("project.member_edit_name", { name })}
-          title={t("project.member_edit_name", { name })}
+          tooltip={t("project.member_edit_name", { name })}
           onClick={onEdit}
         >
           <ActionEdit size={ICON.sm} aria-hidden="true" />
@@ -150,12 +149,7 @@ function ProjectProfile({
   const members = useMemo(() => orderedProjectMembers(project), [project]);
 
   return (
-    <div
-      className="workspace-profile project-profile"
-      role="tabpanel"
-      id="project-page-panel-profile"
-      aria-labelledby="project-page-tab-profile"
-    >
+    <div className="workspace-profile project-profile">
       {members.length ? (
         <div className="project-member-tiles">
           {members.map((member, index) => (
@@ -169,10 +163,10 @@ function ProjectProfile({
             />
           ))}
           {onAddMember && members.length < MAX_PROJECT_MEMBERS ? (
-            <button type="button" className="project-member-tile-add" onClick={onAddMember}>
+            <Button variant="ghost" type="button" className="project-member-tile-add" onClick={onAddMember}>
               <ActionAdd size={ICON.md} aria-hidden="true" />
               <span>{t("project.member_add")}</span>
-            </button>
+            </Button>
           ) : null}
         </div>
       ) : (
@@ -263,14 +257,6 @@ export function ProjectWorkspacePage({
     },
   ];
 
-  function movePageTab(event: KeyboardEvent<HTMLButtonElement>) {
-    const target = projectPageTabForKey(pageTab, event.key);
-    if (!target) return;
-    event.preventDefault();
-    setPageTab(target);
-    requestAnimationFrame(() => document.getElementById(`project-page-tab-${target}`)?.focus());
-  }
-
   const error = briefQuery.error instanceof Error
     ? briefQuery.error.message
     : briefQuery.error
@@ -289,7 +275,13 @@ export function ProjectWorkspacePage({
   const membersReadOnly = Boolean(project.archivedAt || !project.enabled);
 
   return (
-    <section id="project-detail-panel" className="workspace-page project-workspace-page" aria-label={t("project.page_label", { project: project.name })} tabIndex={-1}>
+    <Tabs
+      render={<section id="project-detail-panel" tabIndex={-1} />}
+      className="workspace-page project-workspace-page"
+      aria-label={t("project.page_label", { project: project.name })}
+      value={pageTab}
+      onValueChange={(value) => setPageTab(value as ProjectPageTab)}
+    >
       <PageHeader
         kicker={t("project.page_kicker")}
         title={(
@@ -322,7 +314,7 @@ export function ProjectWorkspacePage({
                 className="page-header-icon-action"
                 onClick={onNewThread}
                 aria-label={t("project.new_thread", { project: project.name })}
-                title={t("project.new_thread_short")}
+                tooltip={t("project.new_thread_short")}
               >
                 <ActionAdd size={ICON.md} aria-hidden="true" />
               </Button>
@@ -330,19 +322,12 @@ export function ProjectWorkspacePage({
           </>
         )}
         toolbar={(
-          <div className="workspace-page-tabs" role="tablist" aria-label={t("project.sections")}>
+          <TabsList className="workspace-page-tabs" aria-label={t("project.sections")}>
             {PROJECT_PAGE_TABS.map((tab) => (
-              <button
+              <TabsTrigger
                 key={tab}
-                type="button"
-                role="tab"
-                id={`project-page-tab-${tab}`}
-                aria-selected={pageTab === tab}
-                aria-controls={pageTab === tab ? `project-page-panel-${tab}` : undefined}
-                tabIndex={pageTab === tab ? 0 : -1}
+                value={tab}
                 className={`workspace-page-tab${pageTab === tab ? " is-active" : ""}`}
-                onClick={() => setPageTab(tab)}
-                onKeyDown={movePageTab}
               >
                 {tab === "profile"
                   ? t("workspace.tab_profile")
@@ -352,43 +337,41 @@ export function ProjectWorkspacePage({
                 {tab === "activities" && scopedBrief?.sessions.length ? (
                   <span className="workspace-page-tab-count tnum">{scopedBrief.sessions.length}</span>
                 ) : null}
-              </button>
+              </TabsTrigger>
             ))}
-          </div>
+          </TabsList>
         )}
       />
       <RecordBand facts={bandFacts} label={t("project.band_label")} />
 
       <div className="workspace-body">
-        {pageTab === "profile" ? (
+        <TabsContent value="profile">
           <ProjectProfile
             project={project}
             agents={agents}
             onAddMember={membersReadOnly ? undefined : () => setMemberEditor({ member: null })}
             onEditMember={membersReadOnly ? undefined : (member) => setMemberEditor({ member })}
           />
-        ) : pageTab === "workspace" ? (
-          <div className="workspace-inspect" role="tabpanel" id="project-page-panel-workspace" aria-labelledby="project-page-tab-workspace">
-            <ProjectWorkspaceFiles projectId={project.id} />
-          </div>
-        ) : activitiesState === "loading" ? (
-          <ActivitiesSkeleton panelId="project-page-panel-activities" labelledBy="project-page-tab-activities" />
-        ) : activitiesState === "error" || !scopedBrief ? (
-          <WorkspaceError
-            message={error || t("workspace.load_failed")}
-            onRetry={() => void briefQuery.refetch()}
-            panelId="project-page-panel-activities"
-            labelledBy="project-page-tab-activities"
-          />
-        ) : (
-          <WorkspaceActivities
-            brief={scopedBrief}
-            panelId="project-page-panel-activities"
-            labelledBy="project-page-tab-activities"
-            emptyMark={<ProjectMark />}
-            onOpenThread={onOpenThread}
-          />
-        )}
+        </TabsContent>
+        <TabsContent value="workspace" className="workspace-inspect">
+          <ProjectWorkspaceFiles projectId={project.id} />
+        </TabsContent>
+        <TabsContent value="activities">
+          {activitiesState === "loading" ? (
+            <ActivitiesSkeleton />
+          ) : activitiesState === "error" || !scopedBrief ? (
+            <WorkspaceError
+              message={error || t("workspace.load_failed")}
+              onRetry={() => void briefQuery.refetch()}
+            />
+          ) : (
+            <WorkspaceActivities
+              brief={scopedBrief}
+              emptyMark={<ProjectMark />}
+              onOpenThread={onOpenThread}
+            />
+          )}
+        </TabsContent>
       </div>
 
       <ProjectMemberEditor
@@ -399,6 +382,6 @@ export function ProjectWorkspacePage({
         computers={computers}
         onClose={() => setMemberEditor(null)}
       />
-    </section>
+    </Tabs>
   );
 }

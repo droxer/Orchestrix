@@ -42,8 +42,11 @@ export function useGlobalShortcuts({
         }
         return;
       }
-      // A dialog, drawer, or the preferences sheet owns the keyboard.
-      if (document.querySelector('[aria-modal="true"]')) return;
+      // A dialog, drawer, or the preferences sheet owns the keyboard. Both
+      // spellings are needed: base-ui sets `aria-modal` on a true modal, but
+      // a focus-trapping non-modal popup (the thread space panel at its
+      // takeover width) is marked only by the primitive's own slot.
+      if (document.querySelector('[aria-modal="true"], [data-slot="dialog-content"]')) return;
       const action = resolverRef.current?.(event) ?? null;
       if (!action) return;
       if (action.kind === "command-menu") event.preventDefault();

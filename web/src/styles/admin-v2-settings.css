@@ -16,7 +16,11 @@
   gap: var(--sp-4);
 }
 
-.adm-settings > .adm-view-error {
+/* The settings grid spans its own error across all columns. Selected by the
+   alert ROLE rather than a marker class — the message is an `Alert` now, and
+   `role="alert"` is the one thing every alert on this grid is guaranteed to
+   have. */
+.adm-settings > [role="alert"] {
   grid-column: 1 / -1;
   margin: 0 0 var(--sp-4);
 }

@@ -4,6 +4,7 @@ import type { ReactNode } from "react"
 
 import { cn } from "@/lib/utils"
 import { NavRefresh } from "@/components/icons"
+import { Tooltip } from "@/components/ui/tooltip"
 
 const buttonVariants = cva(
   "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-xs font-bold whitespace-nowrap transition-[color,background-color,border-color,box-shadow,transform] duration-(--t-fast) ease-(--ease) outline-none select-none focus-visible:border-ring focus-visible:[outline:var(--focus-outline)] focus-visible:[outline-offset:var(--focus-offset)] active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:[outline:var(--focus-outline-danger)] aria-invalid:[outline-offset:var(--focus-offset)] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
@@ -128,6 +129,16 @@ type ButtonProps = ButtonPrimitive.Props &
     loading?: boolean
     /** Optional replacement copy while loading; existing children stay visible by default. */
     loadingLabel?: ReactNode
+    /** Hover/focus label for an icon-only action, and — unless `aria-label`
+     *  says otherwise — the button's accessible name.
+     *
+     *  This replaces the `aria-label={x} title={x}` pair that 45 icon buttons
+     *  were carrying. `title` is unreachable on touch, never fires on keyboard
+     *  focus, and cannot be styled, so on a button whose only label it was, the
+     *  label was effectively mouse-only. Pass a separate `aria-label` where the
+     *  spoken name should be longer than the tooltip — naming the row a delete
+     *  button acts on, say, which a visible tooltip would only repeat back. */
+    tooltip?: ReactNode
   }
 
 function Button({
@@ -138,17 +149,21 @@ function Button({
   danger = false,
   loading = false,
   loadingLabel,
+  tooltip,
   disabled,
   children,
   ...props
 }: ButtonProps) {
-  return (
+  const button = (
     <ButtonPrimitive
       data-slot="button"
       data-variant={variant}
       data-danger={danger || undefined}
       className={cn(buttonVariants({ variant, size, tinted, danger, className }))}
       aria-busy={loading || undefined}
+      /* Before the spread, so an explicit `aria-label` at the call site
+         still wins when the spoken name differs from the tooltip. */
+      aria-label={typeof tooltip === "string" ? tooltip : undefined}
       disabled={disabled || loading}
       {...props}
     >
@@ -156,6 +171,8 @@ function Button({
       {loading && loadingLabel !== undefined ? loadingLabel : children}
     </ButtonPrimitive>
   )
+  if (!tooltip) return button
+  return <Tooltip content={tooltip}>{button}</Tooltip>
 }
 
 export { Button, buttonVariants, type ButtonProps }

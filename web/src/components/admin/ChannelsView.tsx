@@ -34,6 +34,7 @@ import {
   TELEGRAM_CREDENTIAL_FIELDS,
 } from "./ChannelPrimitives";
 import { ChannelDetail } from "./ChannelDetail";
+import { Alert } from "@/components/ui/alert";
 
 const CHAT_INTEGRATIONS_KEY = ["admin", "chat-integrations"] as const;
 
@@ -249,9 +250,9 @@ export function ChannelsView({
   const alerts = (
     <>
       {error ? (
-        <p className="adm-view-error" role="alert" aria-live="polite">
+        <Alert className="mb-4" aria-live="polite">
           {t("admin.v2.action_failed", { message: error })}
-        </p>
+        </Alert>
       ) : null}
       {notice ? (
         <p className="adm-view-notice" role="status" aria-live="polite">
@@ -259,12 +260,12 @@ export function ChannelsView({
         </p>
       ) : null}
       {query.error ? (
-        <div className="adm-view-error" role="alert">
+        <Alert className="mb-4" render={<div />}>
           <span>{t("admin.v2.chat_load_error")}</span>{" "}
           <Button type="button" size="xs" variant="outline" onClick={() => void query.refetch()}>
             {t("admin.v2.retry")}
           </Button>
-        </div>
+        </Alert>
       ) : null}
     </>
   );
@@ -342,8 +343,7 @@ export function ChannelsView({
             type="button"
             variant="ghost"
             className="page-header-icon-action"
-            aria-label={t("admin.v2.chat_create")}
-            title={t("admin.v2.chat_create")}
+            tooltip={t("admin.v2.chat_create")}
             onClick={() => setCreateOpen(true)}
             disabled={busy !== null}
           >

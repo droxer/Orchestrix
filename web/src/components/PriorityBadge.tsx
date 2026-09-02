@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { TaskPriority } from "../types";
+import { Tooltip } from "@/components/ui/tooltip";
 
 /**
  * Priority is a rank, not a status — so it gets its own visual language:
@@ -13,13 +14,15 @@ export function PriorityBadge({ priority }: { priority: TaskPriority }) {
   const { t } = useTranslation();
   const label = t(`backlog.priorities.${priority}`);
   return (
-    <span className="priority-badge" data-priority={priority} title={label}>
-      <span className="priority-bars" aria-hidden="true">
-        <i />
-        <i />
-        <i />
+    <Tooltip content={label}>
+      <span className="priority-badge" data-priority={priority}>
+        <span className="priority-bars" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </span>
+        <span className="priority-badge-label">{label}</span>
       </span>
-      <span className="priority-badge-label">{label}</span>
-    </span>
+    </Tooltip>
   );
 }

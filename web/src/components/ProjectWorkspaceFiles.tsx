@@ -140,8 +140,7 @@ function WorkspaceFileBrowser({
                   type="button"
                   size="icon"
                   className="workspace-preview-close"
-                  aria-label={t("workspace.close_preview")}
-                  title={t("workspace.close_preview")}
+                  tooltip={t("workspace.close_preview")}
                   onClick={() => setSelectedKey("")}
                 >
                   <ActionRemove size={ICON.sm} aria-hidden="true" />

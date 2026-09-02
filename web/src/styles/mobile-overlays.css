@@ -7,7 +7,7 @@
 
 @media (max-width: 820px) {
   /* ── Admin / task drawers (full-viewport takeover) ───────────────── */
-  .adm-drawer-backdrop {
+  .adm-drawer-viewport {
     justify-content: stretch;
     align-items: stretch;
   }
@@ -29,14 +29,14 @@
     to { transform: translateY(8px); opacity: 0; }
   }
 
-  .adm-drawer.is-closing {
+  .adm-drawer[data-ending-style] {
     animation: adm-drawer-mobile-out var(--t-slow) var(--ease) forwards;
   }
 
   /* Full-viewport drawers cover their underlay entirely, so the recess only
      reads during the top layer's slide — a downward peek + shrink keeps the
      stack legible in that beat. Opacity 0.92 carries over from the base rule. */
-  .adm-drawer-backdrop.is-underlay .adm-drawer {
+  .adm-drawer[data-nested-dialog-open] {
     transform: translateY(6px) scale(0.98);
   }
 
@@ -95,7 +95,7 @@
   }
 
   /* ── Preferences modal ─────────────────────────────────────────── */
-  .pref-backdrop {
+  .pref-viewport {
     align-items: flex-end;
     padding:
       max(env(safe-area-inset-top), var(--sp-3))
@@ -111,7 +111,7 @@
     animation: rise var(--t-fast) var(--ease) both;
   }
 
-  .pref-modal.is-closing {
+  .pref-modal[data-ending-style] {
     animation: overlay-sheet-out var(--t-fast) var(--ease) forwards;
   }
 
@@ -130,7 +130,7 @@
   }
 
   /* ── Confirm / prompt dialogs (bottom sheet, matches preferences) ── */
-  .dialog-backdrop {
+  .dialog-viewport {
     align-items: flex-end;
     padding:
       max(env(safe-area-inset-top), var(--sp-3))
@@ -147,7 +147,7 @@
     animation: rise var(--t-fast) var(--ease) both;
   }
 
-  .dialog-modal.is-closing {
+  .dialog-modal[data-ending-style] {
     animation: overlay-sheet-out var(--t-fast) var(--ease) forwards;
   }
 

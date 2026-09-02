@@ -31,6 +31,7 @@ import { TaskSelectCheckbox } from "./TaskSelection";
 import { TASK_STATUS_SHAPE } from "./backlogVocabulary";
 import { formatDueDate } from "./BacklogChrome";
 import { TaskDueCell } from "./TaskDueCell";
+import { TableCell, TableHead, TableRow } from "@/components/ui/table";
 
 /**
  * The two ways a task renders: as a card on the board and as a row in the
@@ -204,10 +205,10 @@ export function BacklogRowsHead({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="backlog-rows-head" role="row">
-      <span className="backlog-rows-head-cell backlog-rows-head-select" role="columnheader">{selectAll}</span>
-      <span className="backlog-rows-head-cell backlog-rows-head-dot" role="columnheader" />
-      <span className="backlog-rows-head-cell backlog-rows-head-ref" role="columnheader">{t("backlog.col_ref")}</span>
+    <TableRow className="backlog-rows-head">
+      <TableHead className="backlog-rows-head-cell backlog-rows-head-select">{selectAll}</TableHead>
+      <TableHead className="backlog-rows-head-cell backlog-rows-head-dot" />
+      <TableHead className="backlog-rows-head-cell backlog-rows-head-ref">{t("backlog.col_ref")}</TableHead>
       <SortableColumnHeader
         className="backlog-rows-head-cell backlog-rows-head-lead"
         label={t("backlog.col_task")}
@@ -238,10 +239,10 @@ export function BacklogRowsHead({
       />
       {/* Files come from the linked session, not the task record, so there is
           no task field to order rows by. */}
-      <span className="backlog-rows-head-cell backlog-rows-head-result" role="columnheader">{t("backlog.col_result")}</span>
+      <TableHead className="backlog-rows-head-cell backlog-rows-head-result">{t("backlog.col_result")}</TableHead>
       {/* Actions is not a column of data — there is nothing to order by. */}
-      <span className="backlog-rows-head-cell backlog-rows-head-actions" role="columnheader">{t("backlog.actions")}</span>
-    </div>
+      <TableHead className="backlog-rows-head-cell backlog-rows-head-actions">{t("backlog.actions")}</TableHead>
+    </TableRow>
   );
 }
 
@@ -288,27 +289,27 @@ export function BacklogTaskRow({
     task.status === "done";
 
   return (
-    <article className="backlog-row group list-virtual" role="row" data-status={task.status} data-priority={task.priority} data-selected={selected ? "true" : undefined}>
-      <span className="backlog-row-select-cell" role="cell">
+    <TableRow render={<article />} className="backlog-row group list-virtual" data-status={task.status} data-priority={task.priority} data-selected={selected ? "true" : undefined}>
+      <TableCell className="backlog-row-select-cell">
         <TaskSelectCheckbox
           className="backlog-select-box"
           checked={selected}
           label={t("backlog.select_task", { title: task.title })}
           onCheckedChange={onToggleSelect}
         />
-      </span>
+      </TableCell>
       <span className="backlog-row-dot-cell" aria-hidden="true">
         <StateMark shape={TASK_STATUS_SHAPE[task.status]} />
       </span>
-      <span className="backlog-row-ref code" role="cell">{taskRef(task.id)}</span>
-      <div className="backlog-row-lead" role="cell">
+      <TableCell className="backlog-row-ref code">{taskRef(task.id)}</TableCell>
+      <TableCell render={<div />} className="backlog-row-lead">
         <Button variant="ghost" type="button" className="backlog-row-title" onClick={onEdit}>{task.title}</Button>
         <RoutineOriginBadge task={task} routineTitle={routineTitle} />
-      </div>
-      <div className="backlog-row-tags" role="cell">
+      </TableCell>
+      <TableCell render={<div />} className="backlog-row-tags">
         <PriorityBadge priority={task.priority} />
-      </div>
-      <span className="backlog-row-due" role="cell">
+      </TableCell>
+      <TableCell className="backlog-row-due">
         <TaskDueCell
           date={task.dueDate}
           tone={tone}
@@ -316,11 +317,11 @@ export function BacklogTaskRow({
           emptyLabel={t("backlog.add_due")}
           onEdit={onEdit}
         />
-      </span>
-      <span className="backlog-row-assignee" role="cell">
+      </TableCell>
+      <TableCell className="backlog-row-assignee">
         <TaskAssignee task={task} ready={ready} assigneeDisplayName={assigneeDisplayName} assigneeIsSelf={assigneeIsSelf} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} />
-      </span>
-      <span className="backlog-row-result" role="cell">
+      </TableCell>
+      <TableCell className="backlog-row-result">
         {/* The row's status dot already names the outcome; restating it here
             would spend a column on a fact the row has made twice. */}
         {result?.hasFiles ? (
@@ -328,8 +329,8 @@ export function BacklogTaskRow({
             {t("backlog.result_files", { count: result.fileCount })}
           </span>
         ) : null}
-      </span>
-      <div className="backlog-row-actions" role="cell" aria-label={t("backlog.actions")}>
+      </TableCell>
+      <TableCell render={<div />} className="backlog-row-actions" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
           <Button variant="outline"
             type="button"
@@ -373,7 +374,7 @@ export function BacklogTaskRow({
             <ActionApprove size={ICON.sm} />
           </Button>
         </div>
-      </div>
-    </article>
+      </TableCell>
+    </TableRow>
   );
 }

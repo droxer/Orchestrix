@@ -1,6 +1,5 @@
 "use client";
 
-import type { KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { getWorkspaceBrief } from "../api";
@@ -22,6 +21,7 @@ import {
   WorkspaceError,
 } from "./workspace/WorkspacePrimitives";
 import { RecordBand, type RecordFact } from "./workspace/RecordBand";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ICON } from "./icons";
 
 export type AgentDetailTab = "profile" | "activities";
@@ -66,18 +66,6 @@ export function AgentDetailPage({
     ? activityQuery.error instanceof Error ? activityQuery.error.message : String(activityQuery.error)
     : "";
 
-  function movePageTab(event: KeyboardEvent<HTMLButtonElement>, next: AgentDetailTab): void {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-    event.preventDefault();
-    const target = event.key === "Home"
-      ? DETAIL_TABS[0]
-      : event.key === "End"
-        ? DETAIL_TABS[DETAIL_TABS.length - 1]
-        : next;
-    setPageTab(target);
-    requestAnimationFrame(() => document.getElementById(`agent-detail-tab-${target}`)?.focus());
-  }
-
   const placementDescriptions = describeAgentPlacements(agent.placements);
   const primaryPlacement = placementDescriptions.find(
     ({ placement }) => placement.desiredState === "active",
@@ -118,11 +106,12 @@ export function AgentDetailPage({
   ];
 
   return (
-    <section
-      id="agent-detail-panel"
+    <Tabs
+      render={<section id="agent-detail-panel" tabIndex={-1} />}
       className="workspace-page"
       aria-label={t("agents_page.detail_label", { name: agent.displayName })}
-      tabIndex={-1}
+      value={pageTab}
+      onValueChange={(value) => setPageTab(value as AgentDetailTab)}
     >
       <PageHeader
         kicker={t("nav.workforce")}
@@ -142,69 +131,52 @@ export function AgentDetailPage({
         titleAs="h2"
         layout="stacked"
         toolbar={(
-          <div className="workspace-page-tabs" role="tablist" aria-label={t("agents_page.detail_sections")}>
-            {DETAIL_TABS.map((tab, index) => {
-              const previous = DETAIL_TABS[index - 1] ?? DETAIL_TABS[DETAIL_TABS.length - 1];
-              const next = DETAIL_TABS[index + 1] ?? DETAIL_TABS[0];
+          <TabsList className="workspace-page-tabs" aria-label={t("agents_page.detail_sections")}>
+            {DETAIL_TABS.map((tab) => {
               const count = tab === "activities" && brief ? brief.metrics.sessionCount || undefined : undefined;
               return (
-                <button
+                <TabsTrigger
                   key={tab}
-                  type="button"
-                  role="tab"
-                  id={`agent-detail-tab-${tab}`}
-                  aria-selected={pageTab === tab}
-                  aria-controls={pageTab === tab ? `agent-detail-panel-${tab}` : undefined}
-                  tabIndex={pageTab === tab ? 0 : -1}
+                  value={tab}
                   className={`workspace-page-tab${pageTab === tab ? " is-active" : ""}`}
-                  onClick={() => setPageTab(tab)}
-                  onKeyDown={(event) => movePageTab(event, event.key === "ArrowLeft" ? previous : next)}
                 >
                   {t(`agents_page.tab_${tab}`)}
                   {count !== undefined ? <span className="workspace-page-tab-count tnum">{count}</span> : null}
-                </button>
+                </TabsTrigger>
               );
             })}
-          </div>
+          </TabsList>
         )}
       />
 
       <RecordBand facts={bandFacts} label={t("agents_page.record_label")} />
 
       <div className="workspace-body">
-        {pageTab === "profile" ? (
-          <div
-            className="workspace-profile"
-            role="tabpanel"
-            id="agent-detail-panel-profile"
-            aria-labelledby="agent-detail-tab-profile"
-          >
-            <AgentProfilePanel
-              agent={agent}
-              canEditMeta={canEditMeta}
-              onDirtyChange={onProfileDirtyChange}
+        <TabsContent value="profile" className="workspace-profile">
+          <AgentProfilePanel
+            agent={agent}
+            canEditMeta={canEditMeta}
+            onDirtyChange={onProfileDirtyChange}
+          />
+        </TabsContent>
+        <TabsContent value="activities">
+          {activitiesLoading ? (
+            <ActivitiesSkeleton />
+          ) : activitiesError ? (
+            <WorkspaceError
+              message={activitiesError}
+              eyebrow={t("agents_page.activities_load_failed")}
+              onRetry={() => void activityQuery.refetch()}
             />
-          </div>
-        ) : activitiesLoading ? (
-          <ActivitiesSkeleton panelId="agent-detail-panel-activities" labelledBy="agent-detail-tab-activities" />
-        ) : activitiesError ? (
-          <WorkspaceError
-            message={activitiesError}
-            eyebrow={t("agents_page.activities_load_failed")}
-            onRetry={() => void activityQuery.refetch()}
-            panelId="agent-detail-panel-activities"
-            labelledBy="agent-detail-tab-activities"
-          />
-        ) : (
-          <WorkspaceActivities
-            brief={brief}
-            panelId="agent-detail-panel-activities"
-            labelledBy="agent-detail-tab-activities"
-            emptyPulse
-            onOpenThread={onOpenThread}
-          />
-        )}
+          ) : (
+            <WorkspaceActivities
+              brief={brief}
+              emptyPulse
+              onOpenThread={onOpenThread}
+            />
+          )}
+        </TabsContent>
       </div>
-    </section>
+    </Tabs>
   );
 }

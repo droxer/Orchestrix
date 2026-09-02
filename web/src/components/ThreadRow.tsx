@@ -191,8 +191,7 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose, tone, l
             size="icon-xs"
             className="conversation-rename-btn"
             type="button"
-            aria-label={t("thread.rename")}
-            title={t("thread.rename")}
+            tooltip={t("thread.rename")}
             onClick={() => onRename(session)}
           >
             <ActionEdit size={ICON.xs} />
@@ -204,8 +203,7 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose, tone, l
             danger
             className="conversation-remove-btn"
             type="button"
-            aria-label={deleteEnabled ? t("thread.delete") : t("thread.delete_blocked")}
-            title={deleteEnabled ? t("thread.delete") : t("thread.delete_blocked")}
+            tooltip={deleteEnabled ? t("thread.delete") : t("thread.delete_blocked")}
             disabled={!deleteEnabled}
             onClick={handleClose}
           >

@@ -20,6 +20,7 @@ import {
   MIN_LOCAL_COMPUTERS,
   MIN_TASK_ROUNDS,
 } from "../../lib/computerLimits";
+import { Alert } from "@/components/ui/alert";
 
 /** Org-wide defaults: how many personal computers an employee may enroll, and
     how many extra rounds a task may run when it keeps reporting itself
@@ -41,9 +42,9 @@ export function SettingsView() {
   return (
     <div className="adm-view adm-settings">
       {loadError ? (
-        <p className="adm-view-error" role="alert">
+        <Alert>
           {loadError}
-        </p>
+        </Alert>
       ) : null}
       <NumberSettingCard
         name="max-local-computers"
@@ -138,9 +139,9 @@ function AdminTokenCard({
         <p className="adm-settings-sub">{t("admin.v2.settings_admin_token_sub")}</p>
       </div>
       {error ? (
-        <p className="adm-view-error" role="alert">
+        <Alert>
           {error}
-        </p>
+        </Alert>
       ) : null}
       {isLoading ? null : token ? (
         <>

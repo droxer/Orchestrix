@@ -34,7 +34,7 @@ export function NodeActions({ node, onReveal, onRename, onManageExecutors, onDel
         className="adm-node-card-icon-btn adm-node-action--rename"
         onClick={() => onRename(node)}
         aria-label={t("admin.v2.rename_computer_for", { id: node.id })}
-        title={t("thread.rename_computer")}
+        tooltip={t("thread.rename_computer")}
       >
         <ActionEdit size={ICON.sm} aria-hidden="true" />
       </Button>
@@ -47,7 +47,7 @@ export function NodeActions({ node, onReveal, onRename, onManageExecutors, onDel
           className="adm-node-card-icon-btn adm-node-action--credentials"
           onClick={() => onReveal(node)}
           aria-label={t("admin.v2.reveal_credentials_for", { id: node.id })}
-          title={t("admin.v2.reveal_credentials")}
+          tooltip={t("admin.v2.reveal_credentials")}
         >
           <ActionKey size={ICON.sm} aria-hidden="true" />
         </Button>
@@ -61,7 +61,7 @@ export function NodeActions({ node, onReveal, onRename, onManageExecutors, onDel
           className="adm-node-card-icon-btn adm-node-action--agents"
           onClick={() => onManageExecutors(node)}
           aria-label={t("admin.v2.manage_executors_for", { id: node.id })}
-          title={t("admin.v2.manage_executors")}
+          tooltip={t("admin.v2.manage_executors")}
         >
           <AdminManageExecutors size={ICON.sm} aria-hidden="true" />
         </Button>
@@ -77,7 +77,7 @@ export function NodeActions({ node, onReveal, onRename, onManageExecutors, onDel
           onClick={onDeleteRequest}
           disabled={deletePending}
           aria-label={t("admin.v2.delete_node_for", { id: node.id })}
-          title={t("admin.v2.delete_action")}
+          tooltip={t("admin.v2.delete_action")}
         >
           <AdminDelete size={ICON.sm} aria-hidden="true" />
         </Button>
