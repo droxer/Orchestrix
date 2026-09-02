@@ -643,7 +643,7 @@ class ServerDaemonNodeBackend:
         if not isinstance(project_id, str) or not project_id:
             project_id = None
         workspace_layout = request.get("workspaceLayout")
-        if workspace_layout not in ("thread", "project"):
+        if workspace_layout not in ("thread", "project", "task"):
             workspace_layout = None
         workspace_subpath = request.get("workspaceSubpath")
         if not isinstance(workspace_subpath, str) or not workspace_subpath:

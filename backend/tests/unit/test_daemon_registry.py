@@ -771,6 +771,85 @@ def test_project_dispatch_carries_shared_workspace_subpath() -> None:
     asyncio.run(run_flow())
 
 
+def test_task_dispatch_carries_shared_workspace_subpath() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            registry = DaemonNodeRegistry(session_store, LocalDaemonStore(root))
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register(
+                {
+                    "sandboxId": "sbx_alice",
+                    "employeeId": "alice",
+                    "token": "node_token",
+                    "workspacePath": "/workspace/alice",
+                    "workspaceId": "machine-a",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "capabilities": [
+                        "thread-workspaces",
+                        "task-workspaces",
+                        "generated-files",
+                    ],
+                    "status": "ready",
+                },
+                "ui_token",
+            )
+            session = session_store.create_session(
+                {
+                    "workspacePath": "/workspace/alice",
+                    "workspaceLayout": "task",
+                    "workspaceSubpath": "tasks/tsk_one",
+                    "computerId": "device:alice:machine-a",
+                    "ownerEmployeeId": "alice",
+                    "taskGoal": "share task state",
+                }
+            )
+
+            await backend.run(
+                "sbx_alice",
+                {
+                    "sessionId": session["id"],
+                    "taskGoal": "share task state",
+                    "assignments": [{"agent": "codex"}],
+                },
+            )
+
+            [command] = registry.take_commands("sbx_alice", "node_token")
+            assert command["workspaceLayout"] == "task"
+            assert command["workspaceSubpath"] == "tasks/tsk_one"
+            registry.handle_event(
+                "sbx_alice",
+                {
+                    "type": "run.completed",
+                    "commandId": command["id"],
+                    "sessionId": command["sessionId"],
+                    "runId": command["runId"],
+                    "agent": "codex",
+                    "exitCode": 0,
+                    "agentLog": "created report.md",
+                    "generatedFiles": [
+                        {
+                            "relativePath": "report.md",
+                            "title": "report.md",
+                            "bytes": 17,
+                            "contentType": "text/markdown",
+                        }
+                    ],
+                },
+                "node_token",
+            )
+            updated = session_store.get_session(session["id"])
+            [artifact] = [
+                item
+                for item in updated["artifacts"]
+                if item["kind"] == "workspace_file"
+            ]
+            assert artifact["path"] == "/workspace/alice/tasks/tsk_one/report.md"
+
+    asyncio.run(run_flow())
+
+
 def test_command_poll_cannot_observe_run_before_request_links_command() -> None:
     class PausingDaemonStore(DatabaseDaemonStore):
         def __init__(self, database_url: str):
