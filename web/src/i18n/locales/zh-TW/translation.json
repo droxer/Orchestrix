@@ -1407,6 +1407,7 @@
     "runtime": "執行環境",
     "computers": "電腦",
     "no_placements": "未部署",
+    "group_unplaced": "未指派電腦",
     "placements_ready": "{{ready}} / {{total}} 就緒",
     "enabled": "已啟用",
     "disabled": "已停用",

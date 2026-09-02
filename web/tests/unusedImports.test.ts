@@ -67,4 +67,33 @@ describe("import hygiene", () => {
     }
     assert.deepEqual(offenders, [], "these imports are never used — drop them from the import block");
   });
+
+  /**
+   * A VALUE import of a sibling module must not spell the target `.js`.
+   * Turbopack resolves the web app with bundler resolution and looks for the
+   * literal file — `./agentPlacements.js` does not exist, so the route 500s
+   * with "Module not found" while `tsc -p packages/tsconfig.json` (NodeNext,
+   * which rewrites `.js` → `.ts`) compiles the same line happily and every
+   * node:test passes. Type-only imports are exempt: they are erased before a
+   * bundler ever sees them, which is why `import type … from "../types.js"`
+   * is all over this tree without breaking anything.
+   */
+  it("imports sibling modules by a path the bundler can resolve", async () => {
+    const files = await sourceFiles(SRC);
+    const offenders: string[] = [];
+    for (const file of files) {
+      const source = await readFile(file, "utf8");
+      for (const match of source.matchAll(/^import\s+(type\s+)?([^;]*?)from\s*"(\.[^"]*\.js)";/gm)) {
+        // `import type …` is erased; only a value binding reaches the bundler.
+        if (match[1]) continue;
+        const clause = match[2];
+        const named = clause.match(/\{([\s\S]*)\}/);
+        const bindsValue = named
+          ? named[1].split(",").some((specifier) => specifier.trim() && !/^type\s/.test(specifier.trim()))
+          : clause.trim().length > 0;
+        if (bindsValue) offenders.push(`${file.slice(file.indexOf("web/src"))}: ${match[3]}`);
+      }
+    }
+    assert.deepEqual(offenders, [], "value imports must end in .ts (or no extension) — .js resolves in tsc but not in Turbopack");
+  });
 });

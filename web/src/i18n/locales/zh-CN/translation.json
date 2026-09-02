@@ -1407,6 +1407,7 @@
     "runtime": "运行时",
     "computers": "电脑",
     "no_placements": "未部署",
+    "group_unplaced": "未分配电脑",
     "placements_ready": "{{ready}} / {{total}} 就绪",
     "enabled": "已启用",
     "disabled": "已禁用",

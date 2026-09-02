@@ -33,10 +33,15 @@ export function AgentMetaLine({
   executorKind,
   placements,
   className,
+  showComputers = true,
 }: {
   executorKind: AgentName;
   placements: readonly AgentPlacement[];
   className?: string;
+  /** Pass `false` where the surface already bands rows by computer — the
+      band names it, so the row would only restate it. The tooltip keeps the
+      full placement list either way. */
+  showComputers?: boolean;
 }) {
   const { t } = useTranslation();
   const descriptions = describeAgentPlacements(activePlacements(placements));
@@ -59,26 +64,30 @@ export function AgentMetaLine({
         </span>
         <span className="agent-meta-runtime-label" translate="no">{runtime}</span>
       </span>
-      <span className="agent-meta-separator" aria-hidden="true">·</span>
-      {descriptions.length ? (
-        <span className="agent-meta-computers">
-          <span className="sr-only">{t("agents_page.computers")}: </span>
-          {descriptions.map((description, index) => {
-            const ComputerIcon = nodeOwnershipIcon(description.ownership);
-            return (
-              <span key={description.placement.id} className="agent-meta-computer">
-                {index > 0 ? (
-                  <span className="agent-meta-computer-separator" aria-hidden="true">,</span>
-                ) : null}
-                <ComputerIcon size={ICON.xs} aria-hidden="true" />
-                <span translate="no">{description.nodeName}</span>
-              </span>
-            );
-          })}
-        </span>
-      ) : (
-        <span>{t("agents_page.no_placements")}</span>
-      )}
+      {showComputers ? (
+        <>
+          <span className="agent-meta-separator" aria-hidden="true">·</span>
+          {descriptions.length ? (
+            <span className="agent-meta-computers">
+              <span className="sr-only">{t("agents_page.computers")}: </span>
+              {descriptions.map((description, index) => {
+                const ComputerIcon = nodeOwnershipIcon(description.ownership);
+                return (
+                  <span key={description.placement.id} className="agent-meta-computer">
+                    {index > 0 ? (
+                      <span className="agent-meta-computer-separator" aria-hidden="true">,</span>
+                    ) : null}
+                    <ComputerIcon size={ICON.xs} aria-hidden="true" />
+                    <span translate="no">{description.nodeName}</span>
+                  </span>
+                );
+              })}
+            </span>
+          ) : (
+            <span>{t("agents_page.no_placements")}</span>
+          )}
+        </>
+      ) : null}
     </span>
   );
 }

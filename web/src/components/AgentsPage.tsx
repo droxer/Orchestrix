@@ -3,6 +3,8 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
+import { groupAgentsByComputer } from "../lib/agentGroups";
+import { agentMatchesQuery } from "../lib/agentSearch";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import type { AgentName, CurrentUser, EmployeeAgent, LogicalAgentAvailability } from "../types";
@@ -146,10 +148,14 @@ function RosterRow({
             <span className="agents-roster-row-title">
               <span className="agents-roster-row-name">{agent.displayName}</span>
             </span>
+            {/* The band above this row names the computer, so the row says
+                only which runtime it is — same trade the grouped task lists
+                made when the band took over the status column. */}
             <AgentMetaLine
               executorKind={agent.executorKind}
               placements={agent.placements}
               className="agents-roster-row-meta"
+              showComputers={false}
             />
           </span>
           {/* One row, ONE place for status. Disabled used to render as a Badge
@@ -198,21 +204,9 @@ export function AgentsPage({
   );
 
   const visibleAgents = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
     return activeAgents
       .filter((agent) => availability === "all" || agent.availability === availability)
-      .filter((agent) => {
-        if (!normalized) return true;
-        const descriptor = descriptors[agent.executorKind];
-        const haystack = [
-          agent.displayName,
-          agent.id,
-          agent.executorKind,
-          descriptor.blurb,
-          agent.instructions ?? "",
-        ].join(" ").toLowerCase();
-        return haystack.includes(normalized);
-      })
+      .filter((agent) => agentMatchesQuery(agent, descriptors[agent.executorKind].blurb, query))
       .sort((left, right) => {
         const rank = (agent: EmployeeAgent) => {
           if (agent.availability === "ready") return 0;
@@ -225,6 +219,8 @@ export function AgentsPage({
         return left.displayName.localeCompare(right.displayName, undefined, { sensitivity: "base" });
       });
   }, [activeAgents, availability, descriptors, query]);
+
+  const agentGroups = useMemo(() => groupAgentsByComputer(visibleAgents), [visibleAgents]);
 
   const loading = isFetching && agents.length === 0;
   const [createOpen, setCreateOpen] = useState(false);
@@ -304,19 +300,37 @@ export function AgentsPage({
             body={activeAgents.length === 0 ? t("agents_page.empty_body") : t("agents_page.empty_filtered_body")}
           />
         ) : (
-          // Compact density: a 318px roster rail is a list layout, so names
-          // sit one rung down (16 → 15px) beside their 13px meta — the same
-          // treatment the backlog and admin tables already get.
-          <ul className="agents-roster-list" data-density="compact" aria-label={t("agents_page.title")}>
-            {visibleAgents.map((agent) => (
-              <RosterRow
-                key={agent.id}
-                agent={agent}
-                selected={detailAgent?.id === agent.id}
-                onSelect={(agent) => void handleSelectAgent(agent)}
-              />
-            ))}
-          </ul>
+          // Banded by the computer each agent runs on — the infrastructure is
+          // what a roster of agents is scanned against, and a computer hosts
+          // many agents. Same bargain the grouped task lists struck: the band
+          // names the fact, so the row stops repeating it.
+          //
+          // Compact density stays on each band's list: a 318px roster rail is
+          // a list layout, so names sit one rung down (16 → 15px) beside their
+          // 13px meta — the same treatment the backlog and admin tables get.
+          <div className="agents-roster-groups">
+            {agentGroups.map((group) => {
+              const label = group.label ?? t("agents_page.group_unplaced");
+              return (
+                <div key={group.key} className="agents-roster-group">
+                  <div className="agents-roster-group-label">
+                    <span translate={group.label ? "no" : undefined}>{label}</span>
+                    <span className="agents-roster-group-count tnum">{group.agents.length}</span>
+                  </div>
+                  <ul className="agents-roster-list" data-density="compact" aria-label={label}>
+                    {group.agents.map((agent) => (
+                      <RosterRow
+                        key={agent.id}
+                        agent={agent}
+                        selected={detailAgent?.id === agent.id}
+                        onSelect={(agent) => void handleSelectAgent(agent)}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 

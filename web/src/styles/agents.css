@@ -51,6 +51,51 @@
 /* Same rhythm as .conversation-list: rounded rows separated by a 4px gutter
    and inset from the panel edge. This is what replaced the per-row hairline —
    the wash then reads as a discrete object instead of a full-bleed stripe. */
+/* The roster bands by computer, so the SCROLLER is the set of bands — each
+   band keeps its own <ul>, which no longer scrolls on its own. */
+.agents-roster-groups {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-2) 0 var(--sp-7);
+}
+
+.agents-roster-group + .agents-roster-group {
+  margin-top: var(--sp-5);
+}
+
+/* Same section divider as the thread rail's state groups: a micro-caps name,
+   a count, and a hairline stretched across the rail. The band names the
+   computer; the rows beneath it no longer repeat it. */
+.agents-roster-group-label {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  /* --sp-3 twice over is what a row's TEXT is inset by (list padding + row
+     padding), which is what this label must line up with. */
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-list);
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.agents-roster-group-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  align-self: center;
+  background: var(--line-1);
+}
+
+.agents-roster-group-count {
+  color: var(--ink-4);
+}
+
 .agents-roster-list {
   /* The rails carry data-density="compact" for TYPE (13px names, 12px meta),
      but a two-line selectable object is not a dense table row, so the dense
@@ -58,15 +103,12 @@
      the standard row rhythm for the rail's descendants; density keeps the
      type scale. */
   --sp-row: var(--sp-3);
-  flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
   margin: 0;
-  padding: var(--sp-3) var(--sp-3) var(--sp-7);
+  padding: var(--sp-1) var(--sp-3) 0;
   list-style: none;
-  overflow-y: auto;
 }
 
 /* A roster row is the same object as a thread row and a backlog row — a
