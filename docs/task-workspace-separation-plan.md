@@ -188,18 +188,25 @@ git commit -m "feat: derive per-task workspace subpaths"
 
 ---
 
-### Task 2: Add the `task` layout to the shared protocol
+### Task 2: Daemon resolves and gates task workspaces
 
-One-line type widening in `relay-core`, which both the daemon and the backend's wire contract read.
+The daemon's `resolveProject`/`ensureProject` are already generic durable-subpath resolution with symlink rejection and realpath containment. Rename them to say so, and route the `task` layout through them. The run-gate line is the correctness-critical part: two agents in one task now share a directory.
 
 **Files:**
-- Modify: `packages/relay-core/src/session-store.ts:9`
+- Modify: `packages/relay-core/src/session-store.ts:9` — widen `WorkspaceLayout`
+- Modify: `packages/relay-daemon/src/thread-workspace.ts` — rename `resolveProject` → `resolveSubpath`, `ensureProject` → `ensureSubpath`, `validateProjectSubpath` → `validateWorkspaceSubpath`
+- Modify: `packages/relay-daemon/src/index.ts` — run-gate key (~line 521), workspace read branch (~line 588), run branch (~line 826), `requiredProjectSubpath` (~line 798), capability list (~line 287)
+- Test: `packages/relay-daemon/tests/daemon.test.ts`
 
 **Interfaces:**
-- Consumes: nothing.
-- Produces: `WorkspaceLayout = "node-root" | "thread" | "project" | "task"`, re-exported as `DaemonWorkspaceLayout` from `packages/relay-core/src/daemon-node-protocol.ts` with no change needed there.
+- Consumes: nothing from earlier tasks.
+- Produces:
+  - `WorkspaceLayout = "node-root" | "thread" | "project" | "task"` in `packages/relay-core/src/session-store.ts`, re-exported unchanged as `DaemonWorkspaceLayout`
+  - `ThreadWorkspaceManager.resolveSubpath(sessionId: string, workspaceSubpath: string): ThreadWorkspace`
+  - `ThreadWorkspaceManager.ensureSubpath(sessionId: string, workspaceSubpath: string): ThreadWorkspace`
+  - The daemon advertises `"task-workspaces"` in its registration `capabilities` array.
 
-- [ ] **Step 1: Widen the type**
+- [ ] **Step 1: Widen the layout type**
 
 In `packages/relay-core/src/session-store.ts`, replace line 9:
 
@@ -213,37 +220,7 @@ with:
 export type WorkspaceLayout = "node-root" | "thread" | "project" | "task";
 ```
 
-- [ ] **Step 2: Verify the build still compiles**
-
-Run: `npm run build`
-Expected: PASS. This step has no test of its own — it is scaffolding that Task 3's tests exercise. It is committed here so Task 3's diff stays about behavior.
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add packages/relay-core/src/session-store.ts
-git commit -m "feat: add the task workspace layout to the shared protocol"
-```
-
----
-
-### Task 3: Daemon resolves and gates task workspaces
-
-The daemon's `resolveProject`/`ensureProject` are already generic durable-subpath resolution with symlink rejection and realpath containment. Rename them to say so, and route the `task` layout through them. The run-gate line is the correctness-critical part: two agents in one task now share a directory.
-
-**Files:**
-- Modify: `packages/relay-daemon/src/thread-workspace.ts` — rename `resolveProject` → `resolveSubpath`, `ensureProject` → `ensureSubpath`, `validateProjectSubpath` → `validateWorkspaceSubpath`
-- Modify: `packages/relay-daemon/src/index.ts` — run-gate key (~line 521), workspace read branch (~line 588), run branch (~line 826), `requiredProjectSubpath` (~line 798), capability list (~line 287)
-- Test: `packages/relay-daemon/tests/daemon.test.ts`
-
-**Interfaces:**
-- Consumes: `WorkspaceLayout` including `"task"` from Task 2.
-- Produces:
-  - `ThreadWorkspaceManager.resolveSubpath(sessionId: string, workspaceSubpath: string): ThreadWorkspace`
-  - `ThreadWorkspaceManager.ensureSubpath(sessionId: string, workspaceSubpath: string): ThreadWorkspace`
-  - The daemon advertises `"task-workspaces"` in its registration `capabilities` array.
-
-- [ ] **Step 1: Write the failing tests**
+- [ ] **Step 2: Write the failing tests**
 
 Add to `packages/relay-daemon/tests/daemon.test.ts`. Follow the file's existing harness conventions for building a daemon and feeding it commands — copy the setup used by the existing project-workspace test near `cmd_ls`/`cmd_read` and substitute the task layout:
 
@@ -281,12 +258,12 @@ it("serializes two runs that share one task workspace", async () => {
 
 If `runWorkspaceCommands` / `startDaemonWithSlowAgent` do not already exist under those names, reuse whatever the neighbouring project-workspace and concurrency tests use and keep the assertions identical.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [ ] **Step 3: Run the tests to verify they fail**
 
 Run: `npm run build && node --test dist/packages/relay-daemon/tests/daemon.test.js`
 Expected: FAIL — the task layout falls through to the node root, so the escape test does not fail the command and the gate test interleaves.
 
-- [ ] **Step 3: Rename the subpath helpers**
+- [ ] **Step 4: Rename the subpath helpers**
 
 In `packages/relay-daemon/src/thread-workspace.ts`:
 
@@ -316,7 +293,7 @@ In `packages/relay-daemon/src/thread-workspace.ts`:
 
 Rename `validateProjectSubpath` to `validateWorkspaceSubpath` and change its two throw messages from `Invalid project workspace path` to `Invalid durable workspace path`. Change `rejectSymlinkComponents`'s message from `Project workspace must not contain a symbolic link` to `Durable workspace must not contain a symbolic link`. Leave every other function untouched.
 
-- [ ] **Step 4: Route the task layout through them**
+- [ ] **Step 5: Route the task layout through them**
 
 In `packages/relay-daemon/src/index.ts`, replace the `requiredProjectSubpath` helper (~line 798):
 
@@ -361,7 +338,7 @@ Replace the run branch (~line 826):
       : threadWorkspaces.nodeRoot(command.sessionId);
 ```
 
-- [ ] **Step 5: Advertise the capability**
+- [ ] **Step 6: Advertise the capability**
 
 In `packages/relay-core/src/daemon-node-protocol.ts:62`, widen the union and add the constant after `DAEMON_CAPABILITY_PROJECT_WORKSPACES` (line 71):
 
@@ -386,12 +363,12 @@ In `packages/relay-daemon/src/index.ts`, add it to the `relay-core` import list 
       DAEMON_CAPABILITY_TASK_WORKSPACES,
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [ ] **Step 7: Run the tests to verify they pass**
 
 Run: `npm run build && node --test dist/packages/relay-daemon/tests/daemon.test.js`
 Expected: PASS, including every pre-existing project-workspace test.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add packages/relay-daemon/src/thread-workspace.ts packages/relay-daemon/src/index.ts packages/relay-daemon/tests/daemon.test.ts
@@ -400,7 +377,7 @@ git commit -m "feat: resolve and gate task workspaces in the daemon"
 
 ---
 
-### Task 4: Backend accepts and forwards the task layout
+### Task 3: Backend accepts and forwards the task layout
 
 The registry builds run commands and records generated-file artifacts. Both need a `task` branch, and the capability needs registering so a daemon may advertise it.
 
@@ -410,7 +387,7 @@ The registry builds run commands and records generated-file artifacts. Both need
 - Test: `backend/tests/unit/test_daemon_registry.py`
 
 **Interfaces:**
-- Consumes: `WORKSPACE_LAYOUT_TASK` and `DAEMON_CAPABILITY_TASK_WORKSPACES` from Task 1's module.
+- Consumes: `DAEMON_CAPABILITY_TASK_WORKSPACES` from Task 1's `backend/relay/services/task_workspace.py`. The layout string is compared as the literal `"task"` here, matching how the surrounding registry code already compares `"project"` and `"thread"`.
 - Produces: a run command carrying `workspaceLayout: "task"` and `workspaceSubpath`, and `DAEMON_CAPABILITY_TASK_WORKSPACES` accepted in `DAEMON_NODE_CAPABILITIES`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -453,10 +430,12 @@ Expected: FAIL — the command omits `workspaceSubpath` for the task layout, and
 
 - [ ] **Step 3: Register the capability**
 
-In `backend/relay/daemon_registry/registry.py`, after `DAEMON_CAPABILITY_PROJECT_WORKSPACES`:
+The constant already exists — Task 1 defined it in `backend/relay/services/task_workspace.py`. Do **not** define a second copy here. `backend/relay/services/` is a namespace package with no `__init__.py`, and `task_workspace.py` imports nothing, so importing it from the registry pulls in one pure module and creates no cycle.
+
+In `backend/relay/daemon_registry/registry.py`, add to the imports:
 
 ```python
-DAEMON_CAPABILITY_TASK_WORKSPACES = "task-workspaces"
+from ..services.task_workspace import DAEMON_CAPABILITY_TASK_WORKSPACES
 ```
 
 and add `DAEMON_CAPABILITY_TASK_WORKSPACES,` to the `DAEMON_NODE_CAPABILITIES` frozenset after `DAEMON_CAPABILITY_PROJECT_WORKSPACES,`.
@@ -521,7 +500,7 @@ with:
 
 - [ ] **Step 7: Leave the command-build gate without a task branch**
 
-`registry.py` (~line 2618) fails a run request when a `thread` layout meets a daemon lacking `thread-workspaces`, or a `project` layout meets one lacking `project-workspaces`. Deliberately add **no** equivalent branch for `task`. The layout was already resolved against this node in Task 5, so a `task` session on an incapable node cannot arise from a normal dispatch, and a fail-fast here would instead punish the one real case that produces it: a daemon that re-registered advertising fewer capabilities mid-task. Such a run degrades — the daemon falls through to its node root — which is recoverable, while failing the request is not. Add this comment above the `if workspace_layout == "project":` block so the omission reads as a decision:
+`registry.py` (~line 2618) fails a run request when a `thread` layout meets a daemon lacking `thread-workspaces`, or a `project` layout meets one lacking `project-workspaces`. Deliberately add **no** equivalent branch for `task`. The layout was already resolved against this node in Task 4, so a `task` session on an incapable node cannot arise from a normal dispatch, and a fail-fast here would instead punish the one real case that produces it: a daemon that re-registered advertising fewer capabilities mid-task. Such a run degrades — the daemon falls through to its node root — which is recoverable, while failing the request is not. Add this comment above the `if workspace_layout == "project":` block so the omission reads as a decision:
 
 ```python
         # No task branch: the task layout is resolved against this node at
@@ -543,7 +522,7 @@ git commit -m "feat: forward task workspaces through the daemon registry"
 
 ---
 
-### Task 5: Dispatch chooses the task layout
+### Task 4: Dispatch chooses the task layout
 
 Three run-request builders stop hardcoding the layout. This is where the capability fallback lands, so the session records the layout the run will really get.
 
@@ -695,7 +674,7 @@ git commit -m "feat: dispatch backlog tasks and routines into task workspaces"
 
 ---
 
-### Task 6: Task workspace browse routes
+### Task 5: Task workspace browse routes
 
 Two read routes mirroring the project pair. Authorization reuses the same helper the artifacts route uses, so owner rules cannot drift between the two task surfaces.
 
@@ -910,7 +889,7 @@ git commit -m "feat: browse a task's workspace over the API"
 
 ---
 
-### Task 7: Task workspace section in the drawer
+### Task 6: Task workspace section in the drawer
 
 One new section in the drawer's existing stack, reusing the workspace browser components the project page and thread panel already share.
 
@@ -923,7 +902,7 @@ One new section in the drawer's existing stack, reusing the workspace browser co
 - Test: `web/tests/taskWorkspace.test.ts`
 
 **Interfaces:**
-- Consumes: the two routes from Task 6.
+- Consumes: the two routes from Task 5.
 - Produces: `listTaskWorkspaceFiles(input: { taskId: string; path?: string }, signal?: AbortSignal): Promise<TaskWorkspaceFilesResponse>` and `readTaskWorkspaceFile(input: { taskId: string; path: string }, signal?: AbortSignal): Promise<TaskWorkspaceFileResponse>`; component `TaskDrawerWorkspace({ taskId }: { taskId: string })`.
 
 - [ ] **Step 1: Write the failing test**
@@ -994,16 +973,18 @@ export interface TaskWorkspaceFileResponse {
   source: "live";
   nodeId: string;
   path: string;
-  name: string;
+  exists: boolean;
+  isBinary: boolean;
   bytes: number;
-  content: string;
-  encoding: string;
+  content: string | null;
+  contentBase64?: string | null;
   truncated: boolean;
+  limitBytes: number;
   generatedAt: string;
 }
 ```
 
-Match `TaskWorkspaceFileResponse`'s field list to `ProjectWorkspaceFileResponse` exactly — read it and copy, substituting `taskId` for `projectId`.
+This is `ProjectWorkspaceFileResponse` (`web/src/types.ts:239`) with `taskId` substituted for `projectId`; the backend builds both through the same `live_workspace_file` helper, so the two must stay identical apart from that one field.
 
 - [ ] **Step 4: Add the API functions**
 
@@ -1250,7 +1231,7 @@ git commit -m "feat: browse a task's workspace from the task drawer"
 
 ---
 
-### Task 8: Document the invariant
+### Task 7: Document the invariant
 
 The CLAUDE.md key-invariants list is where this codebase records rules that are easy to break from a distance. A derived-not-stored path with a capability fallback is exactly that kind of rule.
 
