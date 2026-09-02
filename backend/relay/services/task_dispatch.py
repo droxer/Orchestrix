@@ -491,7 +491,7 @@ class TaskDispatcher:
 
     async def _dispatch(self, node: dict[str, Any]) -> DispatchResult:
         try:
-            session = await self.ctx.backend.run(node["id"], self._run_request())
+            session = await self.ctx.backend.run(node["id"], self._run_request(node))
         except Exception as error:
             return self._dispatch_error_result(error)
 
@@ -517,7 +517,7 @@ class TaskDispatcher:
         )
         return _result(updated, "started", session=session)
 
-    def _run_request(self) -> dict[str, Any]:
+    def _run_request(self, node: dict[str, Any]) -> dict[str, Any]:
         request: dict[str, Any] = {
             "taskGoal": task_goal_text(self.task),
             "assignments": self.run_assignments,
@@ -549,9 +549,14 @@ class TaskDispatcher:
             request["agentFirst"] = True
         if self.task.get("assignedTeamId"):
             request["teamId"] = self.task["assignedTeamId"]
+        # Resolved against the node `_dispatch` already holds, not
+        # re-derived from run_assignments[0]["daemonNodeId"]: the legacy
+        # no-agent-record branch (ready_node_for_task, see _resolve_node)
+        # finds a node without ever writing a daemonNodeId onto the
+        # assignment, so re-deriving it here would KeyError.
         layout, subpath = resolve_task_workspace(
             self.task,
-            node=self.ctx.registry.get(self.run_assignments[0]["daemonNodeId"]),
+            node=node,
             project_snapshot=self.project_snapshot,
         )
         request["workspaceLayout"] = layout
