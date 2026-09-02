@@ -5,7 +5,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from relay.migrations_runtime.agent_computer_id import migrate_agent_computer_ids
+from relay.migrations_runtime.agent_computer_id import (
+    migrate_agent_computer_ids,
+    migrate_agent_placement_computer_ids,
+)
 from relay.persistence.agent_placement_store import (
     DatabaseAgentPlacementStore,
     LocalAgentPlacementStore,
@@ -95,6 +98,29 @@ def test_legacy_placement_without_computer_id_falls_back_to_the_registry(
 
     assert migrate_agent_computer_ids(agents, placements, registry) == 1
     assert agents.get_agent(agent["id"])["computerId"] == "device:alice:machine-a"
+
+
+@pytest.mark.parametrize("store_kind", ["local", "database"])
+def test_migrates_stable_identity_onto_active_legacy_placements(
+    tmp_path: Path, store_kind: str
+) -> None:
+    agents, placements = _stores(tmp_path, store_kind)
+    agent = agents.create_agent(
+        "alice",
+        {
+            "displayName": "Ada",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+            "computerId": "device:alice:machine-a",
+        },
+    )
+    legacy = placements.create_placement(agent, "node-1")
+    registry = SimpleNamespace(monitor_nodes=lambda: [_node()])
+
+    assert migrate_agent_placement_computer_ids(placements, registry) == 1
+    migrated = placements.get_placement(legacy["id"])
+    assert migrated["computerId"] == "device:alice:machine-a"
+    assert migrate_agent_placement_computer_ids(placements, registry) == 0
 
 
 @pytest.mark.parametrize("store_kind", ["local", "database"])

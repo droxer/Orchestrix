@@ -596,6 +596,38 @@ def test_sync_backfills_a_placement_for_a_declared_agent(tmp_path) -> None:
     assert placed[0]["daemonNodeId"] == "node-1"
 
 
+def test_sync_rebinds_a_legacy_placement_to_the_current_computer_runtime(
+    tmp_path: Path,
+) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    ctx = SimpleNamespace(agent_store=agents, agent_placement_store=placements)
+    stable_computer_id = "device:alice:machine-a"
+    agent = agents.create_agent(
+        "alice",
+        {
+            "displayName": "Ada",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+            "computerId": stable_computer_id,
+        },
+    )
+    legacy = placements.create_placement(agent, "node-old")
+    replacement = {
+        "id": "node-new",
+        "employeeId": "alice",
+        "workspaceId": "machine-a",
+        "supportedAgents": ["claude"],
+    }
+
+    sync_node_agents(ctx, replacement)
+
+    [rebound] = placements.list_placements(agent_id=agent["id"])
+    assert rebound["id"] == legacy["id"]
+    assert rebound["daemonNodeId"] == "node-new"
+    assert rebound["computerId"] == stable_computer_id
+
+
 def test_sync_does_not_backfill_across_computers(tmp_path) -> None:
     ctx, agents, placements = _registry_ctx(tmp_path, nodes=[])
     agent = agents.create_agent(
