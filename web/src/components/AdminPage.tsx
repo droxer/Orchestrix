@@ -53,6 +53,7 @@ import {
   writeStoredNodeToken,
   type StoredNodeTokenMap,
 } from "./admin/helpers";
+import { Alert } from "@/components/ui/alert";
 
 type AuthScreen = "login" | "bootstrap";
 export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null }) {
@@ -492,8 +493,7 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
                 // added, so a labelled plate restated it at cobalt volume.
                 className="page-header-icon-action"
                 onClick={() => setAddEmployeeOpen(true)}
-                aria-label={t("admin.v2.add_employee_cta")}
-                title={t("admin.v2.add_employee_cta")}
+                tooltip={t("admin.v2.add_employee_cta")}
               >
                 <ActionAdd size={ICON.md} aria-hidden="true" />
               </Button>
@@ -504,8 +504,7 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
                 variant="ghost"
                 className="page-header-icon-action"
                 onClick={() => setAddNodeOpen(true)}
-                aria-label={t("admin.v2.add_node_cta")}
-                title={t("admin.v2.add_node_cta")}
+                tooltip={t("admin.v2.add_node_cta")}
               >
                 <ActionAdd size={ICON.md} aria-hidden="true" />
               </Button>
@@ -519,7 +518,7 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
           <div className="adm-content-main">
             <div key={view} className="adm-view-stage">
               {assignmentWarning ? (
-                <div className="adm-form-error" role="alert">
+                <Alert variant="boxed" render={<div />}>
                   {t("admin.v2.add_employee_assignment_warning", { message: assignmentWarning })}
                   <Button
                     type="button"
@@ -529,7 +528,7 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
                   >
                     {t("admin.v2.dismiss")}
                   </Button>
-                </div>
+                </Alert>
               ) : null}
               {view === "dashboard" ? (
                 <DashboardView nodes={nodes} employees={employees} metrics={metrics} />

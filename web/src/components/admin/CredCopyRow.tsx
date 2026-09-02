@@ -31,8 +31,7 @@ export function CredCopyRow({ label, value, copyLabel, copied, onCopy, hint }: C
           type="button"
           className={`adm-copy-pill ${copied ? "copied" : ""}`}
           onClick={onCopy}
-          aria-label={copyLabel}
-          title={copyLabel}
+          tooltip={copyLabel}
         >
           {copied ? <ActionApprove size={ICON.sm} aria-hidden="true" /> : <ActionCopy size={ICON.sm} aria-hidden="true" />}
           <span>{copied ? t("admin.copied") : t("admin.copy")}</span>

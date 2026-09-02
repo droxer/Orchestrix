@@ -130,7 +130,11 @@ describe("tone driver vocabulary", () => {
       // Comments are stripped first: this file's own prose names the retired
       // tones, and so do the notes left at the sites that used to emit them.
       const code = src.text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
-      for (const m of code.matchAll(/\btone-([a-z]+)\b/g)) emitted.add(m[1]);
+      // `(?<!-)` skips CSS custom properties whose NAME merely starts with
+      // "tone-" — `--tone-line` is the derived hairline in roles.css, not a
+      // tone class, and a component reading it (Badge's `state` variant) is
+      // consuming the driver, not emitting a sixth tone.
+      for (const m of code.matchAll(/(?<!-)\btone-([a-z]+)\b/g)) emitted.add(m[1]);
     }
     const unknown = [...emitted].filter((t) => !DECLARED.includes(t)).sort();
     assert.deepEqual(unknown, [], `these tone names have no --tone declaration: ${unknown.join(", ")}`);

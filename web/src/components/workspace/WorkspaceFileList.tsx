@@ -37,14 +37,16 @@ export function WorkspacePathBreadcrumb({
               {isCurrent ? (
                 <span className="workspace-path-segment is-current code" title={segment.path}>{segment.label}</span>
               ) : (
-                <button
+                <Button
+                  variant="ghost"
                   type="button"
                   className="workspace-path-segment code"
-                  title={segment.path}
+                  tooltip={segment.path}
+                  aria-label={segment.label}
                   onClick={() => onNavigate(segment.path)}
                 >
                   {segment.label}
-                </button>
+                </Button>
               )}
             </li>
           );

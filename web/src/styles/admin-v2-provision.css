@@ -258,28 +258,24 @@
   border: 0.5px solid var(--line-2);
 }
 
+/* The segment IS the radio item — a `<button role="radio">` from the base-ui
+   RadioGroup, reset to a bare box so `.adm-profile-segment-btn` inside keeps
+   drawing it. Same story as `.adm-assign-node-choice` in admin-v2-drawers.css:
+   the stretched transparent input this used to wrap existed only to put the
+   ONE focus ring base.css draws on `input:focus-visible` onto the segment's
+   geometry, and base.css draws that same ring on `button:focus-visible`. */
 .adm-profile-segment-option {
   display: block;
-  position: relative;
-}
-
-/* Not hidden — stretched, the same contract as `.adm-assign-node-input` in
-   admin-v2-drawers.css. `opacity: 0` hid the outline along with the box, so the
-   ONE focus ring base.css draws on `input:focus-visible` never landed and the
-   run-mode control had no keyboard focus indicator at all. Covering the segment
-   instead lets that single ring outline the segment's own geometry, and nothing
-   here restates it. */
-.adm-profile-segment-input {
-  position: absolute;
-  inset: 0;
   width: 100%;
-  height: 100%;
   margin: 0;
+  padding: 0;
   appearance: none;
   background: transparent;
   border: 0;
   border-radius: calc(var(--r-2) - 2px);
-  pointer-events: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
 }
 
 .adm-profile-segment-btn {
@@ -306,7 +302,11 @@
   color: var(--ink-1);
 }
 
-.adm-profile-segment-input:disabled + .adm-profile-segment-btn {
+.adm-profile-segment-option[data-disabled] {
+  cursor: default;
+}
+
+.adm-profile-segment-option[data-disabled] .adm-profile-segment-btn {
   cursor: default;
   opacity: var(--opacity-disabled);
 }

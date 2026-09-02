@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Input } from "@/components/ui/input";
 
 /* Linear-style inline creation: a bare title field inside the lane/list it
    will land in. Enter commits and keeps the field open for the next one;
@@ -32,7 +33,7 @@ export function InlineTaskCreate({
   }
 
   return (
-    <input
+    <Input
       className="backlog-inline-create"
       name="backlog-inline-create"
       autoComplete="off"

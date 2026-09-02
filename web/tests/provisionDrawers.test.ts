@@ -39,15 +39,27 @@ describe("employee handle grammar", () => {
 
 describe("provision drawers", () => {
   it("gives the run-mode radio a focusable box instead of hiding the ring", () => {
+    // Same invariant, new mechanism. The segment used to be a native radio
+    // stretched invisibly across the option purely so base.css's single
+    // `input:focus-visible` ring would land on the option's geometry — and
+    // `opacity: 0` on that input would have hidden the outline along with the
+    // box. The option is a `<button role="radio">` from the shared RadioGroup
+    // now, which base.css rings directly through `button:focus-visible`, so
+    // the guard is that no hidden input has come back.
+    const source = readWeb("src/components/admin/RunModeField.tsx");
+    assert.ok(
+      source.includes("RadioGroupChoice"),
+      "the run-mode segment must go through the shared radio group",
+    );
+    assert.ok(
+      !source.includes('type="radio"'),
+      "a hand-rolled native radio cannot carry the shared focus ring here",
+    );
     const css = readWeb("src/styles/admin-v2-provision.css");
-    const segment = css.slice(css.indexOf(".adm-profile-segment-input"));
-    const block = segment.slice(0, segment.indexOf("}"));
-    // opacity: 0 hides the outline along with the box, so base.css's single
-    // input:focus-visible ring never lands — the same trap .adm-assign-node-input
-    // documents in admin-v2-drawers.css.
-    assert.ok(!/opacity:\s*0/.test(block), "the segment radio must not be opacity-hidden");
-    assert.match(block, /inset:\s*0/);
-    assert.match(block, /appearance:\s*none/);
+    assert.ok(
+      !css.includes(".adm-profile-segment-input"),
+      "the stretched-input trick is obsolete — remove its rule with it",
+    );
   });
 
   it("does not print an error string as a resting hint", () => {

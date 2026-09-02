@@ -8,6 +8,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RelayMark } from "../RelayMark";
 import { ICON } from "../icons";
+import { Alert } from "@/components/ui/alert";
 
 interface AdminLoginScreenProps {
   onLogin: () => void;
@@ -87,7 +88,7 @@ export function AdminLoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap 
             required
           />
         </Field>
-        {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
+        {error ? <Alert variant="boxed" render={<div />}>{error}</Alert> : null}
         <Button
           type="submit"
           className="w-full"
@@ -170,7 +171,7 @@ export function FirstAdminSetupScreen({ onBootstrapped, onSwitchToLogin }: First
             required
           />
         </Field>
-        {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
+        {error ? <Alert variant="boxed" render={<div />}>{error}</Alert> : null}
         <Button
           type="submit"
           className="w-full"

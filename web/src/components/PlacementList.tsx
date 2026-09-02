@@ -60,8 +60,7 @@ export function PlacementList({
                 className="adm-placement-remove"
                 onClick={() => onRemove(placement)}
                 disabled={pendingPlacementId !== null}
-                aria-label={t("admin.v2.remove_placement")}
-                title={t("admin.v2.remove_placement")}
+                tooltip={t("admin.v2.remove_placement")}
               >
                 <AdminDelete size={ICON.sm} aria-hidden="true" />
               </Button>

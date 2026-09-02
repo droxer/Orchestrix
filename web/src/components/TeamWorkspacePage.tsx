@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { deleteTeamProfileImage, getWorkspaceBrief, updateTeamProfileImage } from "../api";
@@ -24,6 +24,7 @@ import { IdentityMark } from "./IdentityMark";
 import { TeamMemberOption } from "./TeamMemberOption";
 import { ProfileImage, ProfileImagePicker } from "./ProfileImagePicker";
 import { ActivitiesSkeleton, WorkspaceActivities, WorkspaceError } from "./workspace/WorkspacePrimitives";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RecordBand, type RecordFact } from "./workspace/RecordBand";
 import { StatusPill, TonePill } from "./StatusPill";
 import { truncateId } from "../lib/adminHelpers";
@@ -213,7 +214,7 @@ function TeamProfile({
   }
 
   return (
-    <div className="workspace-profile" role="tabpanel" id="team-page-panel-profile" aria-labelledby="team-page-tab-profile">
+    <div className="workspace-profile">
       {/* Same dossier grammar as the agent record: a document column holding
           the thing you can change (the roster), an identity rail beside it,
           and record-wide management below both. Facts that only name the
@@ -241,8 +242,7 @@ function TeamProfile({
                       type="button"
                       variant="ghost"
                       className="workspace-dossier-icon-btn"
-                      aria-label={t("teams.edit_members")}
-                      title={t("teams.edit_members")}
+                      tooltip={t("teams.edit_members")}
                       onClick={startEditing}
                     >
                       <ActionEdit size={ICON.sm} aria-hidden="true" />
@@ -433,8 +433,7 @@ function TeamProfile({
                   type="button"
                   variant="ghost"
                   className="workspace-dossier-icon-btn"
-                  aria-label={t("teams.rename")}
-                  title={t("teams.rename")}
+                  tooltip={t("teams.rename")}
                   onClick={startRename}
                 >
                   <ActionEdit size={ICON.sm} aria-hidden="true" />
@@ -524,17 +523,15 @@ export function TeamWorkspacePage({
     },
   ];
 
-  function movePageTab(event: KeyboardEvent<HTMLButtonElement>, previous: TeamPageTab, next: TeamPageTab) {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-    event.preventDefault();
-    const target = event.key === "Home" ? TEAM_PAGE_TABS[0] : event.key === "End" ? TEAM_PAGE_TABS.at(-1)! : event.key === "ArrowLeft" ? previous : next;
-    setPageTab(target);
-    requestAnimationFrame(() => document.getElementById(`team-page-tab-${target}`)?.focus());
-  }
-
   const error = briefQuery.error instanceof Error ? briefQuery.error.message : briefQuery.error ? String(briefQuery.error) : "";
   return (
-    <section className="workspace-page team-workspace-page" aria-label={t("teams.profile_title", { name: team.name })}>
+    <Tabs
+      render={<section />}
+      className="workspace-page team-workspace-page"
+      aria-label={t("teams.profile_title", { name: team.name })}
+      value={pageTab}
+      onValueChange={(value) => setPageTab(value as TeamPageTab)}
+    >
       <PageHeader
         kicker={t("nav.workforce")}
         title={(
@@ -553,25 +550,18 @@ export function TeamWorkspacePage({
         titleAs="h2"
         layout="stacked"
         toolbar={(
-          <div className="workspace-page-tabs" role="tablist" aria-label={t("teams.sections")}>
-            {TEAM_PAGE_TABS.map((tab, index) => (
-              <button
+          <TabsList className="workspace-page-tabs" aria-label={t("teams.sections")}>
+            {TEAM_PAGE_TABS.map((tab) => (
+              <TabsTrigger
                 key={tab}
-                type="button"
-                role="tab"
-                id={`team-page-tab-${tab}`}
-                aria-selected={pageTab === tab}
-                aria-controls={pageTab === tab ? `team-page-panel-${tab}` : undefined}
-                tabIndex={pageTab === tab ? 0 : -1}
+                value={tab}
                 className={`workspace-page-tab${pageTab === tab ? " is-active" : ""}`}
-                onClick={() => setPageTab(tab)}
-                onKeyDown={(event) => movePageTab(event, TEAM_PAGE_TABS[index - 1] ?? TEAM_PAGE_TABS.at(-1)!, TEAM_PAGE_TABS[index + 1] ?? TEAM_PAGE_TABS[0])}
               >
                 {tab === "profile" ? t("workspace.tab_profile") : t("workspace.tab_activities")}
                 {tab === "activities" && briefQuery.data?.metrics.sessionCount ? <span className="workspace-page-tab-count tnum">{briefQuery.data.metrics.sessionCount}</span> : null}
-              </button>
+              </TabsTrigger>
             ))}
-          </div>
+          </TabsList>
         )}
       />
       <RecordBand facts={bandFacts} label={t("workspace.band_team_label")} />
@@ -579,27 +569,26 @@ export function TeamWorkspacePage({
       {/* One body shell for both tabs, matching the agent record — it
           owns the container query the profile dossier grid reads. */}
       <div className="workspace-body">
-      {pageTab === "profile" ? (
-        <TeamProfile team={team} employeeId={employeeId} onDeleted={onDeleted} />
-      ) : briefQuery.isLoading && !briefQuery.data ? (
-        <ActivitiesSkeleton panelId="team-page-panel-activities" labelledBy="team-page-tab-activities" />
-      ) : error || !briefQuery.data ? (
-        <WorkspaceError
-          message={error || t("workspace.load_failed")}
-          onRetry={() => void briefQuery.refetch()}
-          panelId="team-page-panel-activities"
-          labelledBy="team-page-tab-activities"
-        />
-      ) : (
-        <WorkspaceActivities
-          brief={briefQuery.data}
-          panelId="team-page-panel-activities"
-          labelledBy="team-page-tab-activities"
-          emptyMark={<IdentityMark kind="team" variant="bare" size={ICON.lg} />}
-          onOpenThread={onOpenThread}
-        />
-      )}
+        <TabsContent value="profile">
+          <TeamProfile team={team} employeeId={employeeId} onDeleted={onDeleted} />
+        </TabsContent>
+        <TabsContent value="activities">
+          {briefQuery.isLoading && !briefQuery.data ? (
+            <ActivitiesSkeleton />
+          ) : error || !briefQuery.data ? (
+            <WorkspaceError
+              message={error || t("workspace.load_failed")}
+              onRetry={() => void briefQuery.refetch()}
+            />
+          ) : (
+            <WorkspaceActivities
+              brief={briefQuery.data}
+              emptyMark={<IdentityMark kind="team" variant="bare" size={ICON.lg} />}
+              onOpenThread={onOpenThread}
+            />
+          )}
+        </TabsContent>
       </div>
-    </section>
+    </Tabs>
   );
 }

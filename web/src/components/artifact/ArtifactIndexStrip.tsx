@@ -83,9 +83,8 @@ export function ArtifactIndexStrip({
         <Button variant="ghost"
           type="button"
           className={`artifact-index-btn${expanded ? " is-active" : ""}`}
-          aria-label={t("artifact.search_label")}
+          tooltip={t("artifact.search_label")}
           aria-expanded={expanded}
-          title={t("artifact.search_label")}
           onClick={() => onExpandedChange(!expanded)}
         >
           <ActionSearch size={ICON.md} />
@@ -96,8 +95,7 @@ export function ArtifactIndexStrip({
             type="button"
             className={`artifact-index-btn${a.id === selectedId ? " is-active" : ""}`}
             data-kind={a.kind}
-            title={a.title}
-            aria-label={a.title}
+            tooltip={a.title}
             aria-current={a.id === selectedId || undefined}
             onClick={() => onSelect(a.id)}
           >

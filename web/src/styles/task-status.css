@@ -200,17 +200,16 @@
    "not really scheduled" states are separated by *which* thing is dashed —
    unscheduled dashes the mark (the schedule is on, the date is missing),
    paused dashes the pill border (the whole schedule is off). */
+/* Accent only. The chip itself is a Badge (variant="state"), which owns the
+   padding, hairline, radius, and label type this rule used to restate. What
+   is genuinely local is the six-step schedule-health accent below and the
+   dashed border a paused routine takes — neither is expressible as one of
+   Badge's five semantic tones. */
 .routine-state {
   --state-accent: var(--ink-3);
   --tone: var(--state-accent);
-  display: inline-flex;
-  align-items: center;
   gap: var(--sp-2);
-  padding: var(--sp-0-5) var(--sp-2);
-  border: 0.5px solid var(--tone-line);
-  border-radius: var(--r-2);
   color: var(--ink-2);
-  font: var(--type-label);
 }
 
 .routine-state .state-mark { --mark-accent: var(--state-accent); }

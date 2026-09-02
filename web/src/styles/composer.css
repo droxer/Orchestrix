@@ -250,7 +250,12 @@
   min-width: 0;
 }
 
-.composer-input textarea,
+/* Class, not `.composer-input textarea` — the field is a shared `Textarea`
+   now, and a rule that reaches through the tag name breaks the moment the
+   primitive renders anything else. Both layers are listed together because
+   they must break text identically or the mention pills slide off the names
+   they belong to. */
+.composer-textarea,
 .composer-highlight {
   grid-area: 1 / 1;
   min-width: 0;
@@ -263,7 +268,7 @@
   overflow-wrap: break-word;
 }
 
-.composer-input textarea {
+.composer-textarea {
   min-height: 56px;
   max-height: 200px;
   resize: none;
@@ -289,11 +294,11 @@
    must stay a hard literal floor — var(--fs-4) collapses to 15px under
    [data-density=compact], which would reintroduce the zoom bug. */
 @media (pointer: coarse) {
-  .composer-input textarea,
+  .composer-textarea,
   .composer-highlight { font-size: 16px; }
 }
 
-.composer-input textarea::placeholder {
+.composer-textarea::placeholder {
   color: var(--ink-3);
 }
 

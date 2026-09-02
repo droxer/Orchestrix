@@ -26,6 +26,7 @@ import { MarkdownContent } from "./Markdown";
 import { buildCollaborationTree } from "../lib/collaborationTree";
 import { SubagentTree } from "./SubagentTree";
 import { useDebouncedStreamingAnnouncement, useSmoothStreamingText } from "../hooks/useSmoothStreamingText";
+import { Button } from "@/components/ui/button";
 
 function StreamActivity({ label }: { label: string }) {
   return (
@@ -195,14 +196,15 @@ function ThinkingSegment({ text, live }: { text: string; live: boolean }) {
           <p key={`thinking-${index}`}>{line}</p>
         ))}
         {toggle ? (
-          <button
+          <Button
+            variant="ghost"
             type="button"
             className="agent-thinking-toggle"
             aria-expanded={toggle === "collapse"}
             onClick={() => setExpanded((open) => !open)}
           >
             {t(toggle === "collapse" ? "agent_stream.reasoning_collapse" : "agent_stream.reasoning_expand")}
-          </button>
+          </Button>
         ) : null}
       </div>
     </div>
@@ -244,7 +246,8 @@ function CommandSegment({ command }: { command: string }) {
       <div className="agent-command-body">
         <code className="hljs" dangerouslySetInnerHTML={{ __html: html }} />
         {toggle ? (
-          <button
+          <Button
+            variant="ghost"
             type="button"
             className="agent-command-toggle"
             aria-expanded={toggle === "collapse"}
@@ -253,7 +256,7 @@ function CommandSegment({ command }: { command: string }) {
             {toggle === "collapse"
               ? t("agent_stream.command_collapse")
               : t("agent_stream.command_expand", { count: hidden })}
-          </button>
+          </Button>
         ) : null}
       </div>
     </div>

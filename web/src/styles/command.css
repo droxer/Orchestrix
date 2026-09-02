@@ -8,7 +8,13 @@
    this surface opens dozens of times an hour.
    ===================================================================== */
 
+/* Scrim and positioner are separate elements under the Dialog primitive; the
+   layout half of this rule lives on `.command-viewport`. */
 .command-backdrop {
+  z-index: var(--z-dialog);
+}
+
+.command-viewport {
   z-index: var(--z-dialog);
   flex-direction: column;
   align-items: center;
@@ -198,7 +204,7 @@
 }
 
 @media (max-width: 640px) {
-  .command-backdrop {
+  .command-viewport {
     /* The compact tier: the palette owns the top of a small screen instead
        of floating over a page nobody can see anyway. */
     padding-top: var(--sp-8);

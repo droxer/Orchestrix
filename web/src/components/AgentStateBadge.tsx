@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
+import { Tooltip } from "@/components/ui/tooltip";
 import type { AgentName, LogicalAgentAvailability } from "../types";
 import { AgentMark } from "./AgentMark";
 import { IdentityMark } from "./IdentityMark";
@@ -42,9 +43,11 @@ export function AgentStateBadge({
   if (!agent) {
     const label = t("backlog.no_agent");
     return (
-      <span className="agent-state agent-state--empty" title={label}>
-        <span className="sr-only">{label}</span>
-      </span>
+      <Tooltip content={label}>
+        <span className="agent-state agent-state--empty">
+          <span className="sr-only">{label}</span>
+        </span>
+      </Tooltip>
     );
   }
 
@@ -65,18 +68,24 @@ export function AgentStateBadge({
       ? t("backlog.ready")
       : t("backlog.not_ready");
   const label = `${name ?? agent} · ${stateLabel}`;
+  /* The tooltip is the whole visible label here — the badge itself is an
+     avatar and a status pip. `title` put that label behind an OS delay and
+     out of reach on touch and keyboard entirely; the `sr-only` span keeps
+     carrying it for assistive tech, as it always did. */
   return (
-    <span className={cn("agent-state", tone)} data-agent={agent} title={label}>
-      {imageUrl || name ? (
-        <ProfileImage
-          src={imageUrl}
-          alt=""
-          fallback={name ? <IdentityMark kind="agent" /> : null}
-        />
-      ) : (
-        <AgentMark agent={agent} size={ICON.sm} />
-      )}
-      <span className="sr-only">{label}</span>
-    </span>
+    <Tooltip content={label}>
+      <span className={cn("agent-state", tone)} data-agent={agent}>
+        {imageUrl || name ? (
+          <ProfileImage
+            src={imageUrl}
+            alt=""
+            fallback={name ? <IdentityMark kind="agent" /> : null}
+          />
+        ) : (
+          <AgentMark agent={agent} size={ICON.sm} />
+        )}
+        <span className="sr-only">{label}</span>
+      </span>
+    </Tooltip>
   );
 }

@@ -7,6 +7,7 @@ import {
   ActionRemove,
   ICON,
 } from "./icons";
+import { Button } from "@/components/ui/button";
 
 const ACCEPTED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const MAX_PROFILE_IMAGE_BYTES = 2 * 1024 * 1024;
@@ -101,11 +102,11 @@ export function ProfileImagePicker({
             disabled={disabled}
             onChange={(event) => void selectImage(event.target.files?.[0])}
           />
-          <button
+          <Button
+            variant="ghost"
             type="button"
             className="profile-image-picker-trigger"
-            aria-label={imageUrl ? t("profile_image.change") : t("profile_image.choose")}
-            title={imageUrl ? t("profile_image.change") : t("profile_image.choose")}
+            tooltip={imageUrl ? t("profile_image.change") : t("profile_image.choose")}
             disabled={disabled}
             onClick={() => inputRef.current?.click()}
           >
@@ -113,18 +114,19 @@ export function ProfileImagePicker({
             <span className="profile-image-picker-action" aria-hidden="true">
               <ActionImage size={ICON.sm} />
             </span>
-          </button>
+          </Button>
           {imageUrl ? (
-            <button
+            <Button
+              variant="ghost"
+              danger
               type="button"
               className="profile-image-picker-remove"
-              aria-label={t("profile_image.remove")}
-              title={t("profile_image.remove")}
+              tooltip={t("profile_image.remove")}
               disabled={disabled}
               onClick={() => void removeImage()}
             >
               <ActionRemove size={ICON.xs} />
-            </button>
+            </Button>
           ) : null}
         </>
       ) : image}

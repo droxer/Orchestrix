@@ -27,8 +27,7 @@ export function AdminLayoutToggle({ layout, onChange }: AdminLayoutToggleProps) 
         className="backlog-view-btn"
         data-active={layout === "card" ? "true" : "false"}
         aria-pressed={layout === "card"}
-        aria-label={t("admin.v2.view_card")}
-        title={t("admin.v2.view_card")}
+        tooltip={t("admin.v2.view_card")}
         onClick={() => onChange("card")}
       >
         <ViewGrid size={ICON.sm} aria-hidden="true" />
@@ -39,8 +38,7 @@ export function AdminLayoutToggle({ layout, onChange }: AdminLayoutToggleProps) 
         className="backlog-view-btn"
         data-active={layout === "list" ? "true" : "false"}
         aria-pressed={layout === "list"}
-        aria-label={t("admin.v2.view_list")}
-        title={t("admin.v2.view_list")}
+        tooltip={t("admin.v2.view_list")}
         onClick={() => onChange("list")}
       >
         <ViewList size={ICON.sm} aria-hidden="true" />

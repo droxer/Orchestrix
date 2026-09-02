@@ -46,22 +46,6 @@ export function parseProjectPageTab(value: string | null): ProjectPageTab {
     : "profile";
 }
 
-export function projectPageTabForKey(
-  current: ProjectPageTab,
-  key: string,
-): ProjectPageTab | null {
-  const currentIndex = PROJECT_PAGE_TABS.indexOf(current);
-  if (key === "Home") return PROJECT_PAGE_TABS[0];
-  if (key === "End") return PROJECT_PAGE_TABS.at(-1)!;
-  if (key === "ArrowLeft") {
-    return PROJECT_PAGE_TABS[currentIndex - 1] ?? PROJECT_PAGE_TABS.at(-1)!;
-  }
-  if (key === "ArrowRight") {
-    return PROJECT_PAGE_TABS[currentIndex + 1] ?? PROJECT_PAGE_TABS[0];
-  }
-  return null;
-}
-
 export function orderedProjectMembers(project: ProjectRecord): ProjectMember[] {
   return [
     ...project.members.filter((member) => member.agentId === project.leadAgentId),

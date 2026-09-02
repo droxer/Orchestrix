@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ComponentType, type KeyboardEvent } from "react";
+import { useState, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 import {
   SUPPORTED_LANGUAGES,
@@ -8,12 +8,13 @@ import {
   type Language,
   type Theme,
 } from "../lib/appStorage";
-import { moveRadioSelection } from "../lib/radioGroupKeyboard";
 import {
   ICON,
   PrefAppearance,
   PrefLanguage,
 } from "./icons";
+import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export type { Language, Theme };
 export { SUPPORTED_LANGUAGES, SUPPORTED_THEMES };
@@ -25,7 +26,6 @@ const LANGUAGES: { code: Language; label: string; native: string }[] = [
 ];
 
 const THEME_VALUES: Theme[] = ["light", "dark", "system"];
-const LANGUAGE_VALUES: Language[] = LANGUAGES.map((l) => l.code);
 
 /* Settings categories. Adding a new settings area = one entry here plus a
    case in renderSection (and its `pref.<id>` i18n label). The left nav and
@@ -68,27 +68,12 @@ function LanguageBadge({ code }: { code: Language }) {
   );
 }
 
-function ThemeOption({
-  value,
-  selected,
-  onSelect,
-  registerRef,
-}: {
-  value: Theme;
-  selected: boolean;
-  onSelect: (theme: Theme) => void;
-  registerRef: (value: Theme, el: HTMLButtonElement | null) => void;
-}) {
+function ThemeOption({ value, selected }: { value: Theme; selected: boolean }) {
   const { t } = useTranslation();
   return (
-    <button
-      ref={(el) => { registerRef(value, el); }}
-      type="button"
-      role="radio"
+    <RadioGroupChoice
+      value={value}
       className={`pref-option-row ${selected ? "selected" : ""}`}
-      aria-checked={selected}
-      tabIndex={selected ? 0 : -1}
-      onClick={() => onSelect(value)}
     >
       <ThemeSwatch tone={value} />
       <span className="pref-option-copy">
@@ -96,7 +81,7 @@ function ThemeOption({
         <span className="pref-option-sub">{t(`pref.theme.${value}_sub`)}</span>
       </span>
       {selected ? <PrefSelectedCheck /> : null}
-    </button>
+    </RadioGroupChoice>
   );
 }
 
@@ -108,26 +93,18 @@ function AppearanceSection({
   onThemeChange: (theme: Theme) => void;
 }) {
   const { t } = useTranslation();
-  const refs = useRef<Map<Theme, HTMLButtonElement | null>>(new Map());
-  const registerRef = (value: Theme, el: HTMLButtonElement | null) => { refs.current.set(value, el); };
   return (
     <fieldset className="pref-fieldset">
       <legend className="pref-group-label">{t("pref.theme.group")}</legend>
-      <div
-        role="radiogroup"
+      <RadioGroup
         className="pref-option-list"
-        onKeyDown={(e) => moveRadioSelection(e, THEME_VALUES, theme, refs, onThemeChange)}
+        value={theme}
+        onValueChange={(value) => onThemeChange(value as Theme)}
       >
         {THEME_VALUES.map((value) => (
-          <ThemeOption
-            key={value}
-            value={value}
-            selected={theme === value}
-            onSelect={onThemeChange}
-            registerRef={registerRef}
-          />
+          <ThemeOption key={value} value={value} selected={theme === value} />
         ))}
-      </div>
+      </RadioGroup>
     </fieldset>
   );
 }
@@ -137,27 +114,18 @@ function LanguageOption({
   label,
   native,
   selected,
-  onSelect,
-  registerRef,
 }: {
   code: Language;
   label: string;
   native: string;
   selected: boolean;
-  onSelect: (language: Language) => void;
-  registerRef: (code: Language, el: HTMLButtonElement | null) => void;
 }) {
   const showSub = native !== label;
   return (
-    <button
-      ref={(el) => { registerRef(code, el); }}
-      type="button"
-      role="radio"
+    <RadioGroupChoice
+      value={code}
       className={`pref-option-row ${selected ? "selected" : ""}`}
-      aria-checked={selected}
-      tabIndex={selected ? 0 : -1}
       lang={code}
-      onClick={() => onSelect(code)}
     >
       <LanguageBadge code={code} />
       <span className="pref-option-copy">
@@ -165,7 +133,7 @@ function LanguageOption({
         {showSub ? <span className="pref-option-sub">{label}</span> : null}
       </span>
       {selected ? <PrefSelectedCheck /> : null}
-    </button>
+    </RadioGroupChoice>
   );
 }
 
@@ -177,14 +145,12 @@ function LanguageSection({
   onLanguageChange: (language: Language) => void;
 }) {
   const { t } = useTranslation();
-  const refs = useRef<Map<Language, HTMLButtonElement | null>>(new Map());
-  const registerRef = (code: Language, el: HTMLButtonElement | null) => { refs.current.set(code, el); };
   return (
-    <div
+    <RadioGroup
       className="pref-option-list"
-      role="radiogroup"
       aria-label={t("pref.language")}
-      onKeyDown={(e) => moveRadioSelection(e, LANGUAGE_VALUES, language, refs, onLanguageChange)}
+      value={language}
+      onValueChange={(value) => onLanguageChange(value as Language)}
     >
       {LANGUAGES.map(({ code, label, native }) => (
         <LanguageOption
@@ -193,11 +159,9 @@ function LanguageSection({
           label={label}
           native={native}
           selected={language === code}
-          onSelect={onLanguageChange}
-          registerRef={registerRef}
         />
       ))}
-    </div>
+    </RadioGroup>
   );
 }
 
@@ -208,29 +172,6 @@ export interface PreferencesPanelProps {
   onLanguageChange: (language: Language) => void;
 }
 
-const CATEGORY_IDS: CategoryId[] = CATEGORIES.map((c) => c.id);
-
-function moveTabSelection(
-  event: KeyboardEvent,
-  current: CategoryId,
-  onChange: (id: CategoryId) => void,
-): void {
-  const index = CATEGORY_IDS.indexOf(current);
-  if (index < 0) return;
-  let next: number;
-  switch (event.key) {
-    case "ArrowRight":
-    case "ArrowDown": next = (index + 1) % CATEGORY_IDS.length; break;
-    case "ArrowLeft":
-    case "ArrowUp":   next = (index - 1 + CATEGORY_IDS.length) % CATEGORY_IDS.length; break;
-    case "Home":      next = 0; break;
-    case "End":       next = CATEGORY_IDS.length - 1; break;
-    default: return;
-  }
-  event.preventDefault();
-  onChange(CATEGORY_IDS[next]!);
-}
-
 export function PreferencesPanel({
   theme,
   onThemeChange,
@@ -239,70 +180,39 @@ export function PreferencesPanel({
 }: PreferencesPanelProps) {
   const { t } = useTranslation();
   const [active, setActive] = useState<CategoryId>("appearance");
-  const tabRefs = useRef<Map<CategoryId, HTMLButtonElement | null>>(new Map());
 
   return (
-    <div className="pref-body">
-      <nav
-        className="pref-nav"
-        role="tablist"
-        aria-label={t("pref.title")}
-        onKeyDown={(event) => {
-          moveTabSelection(event, active, (id) => {
-            setActive(id);
-            tabRefs.current.get(id)?.focus();
-          });
-        }}
-      >
+    <Tabs
+      className="pref-body"
+      orientation="vertical"
+      value={active}
+      onValueChange={(value) => setActive(value as CategoryId)}
+    >
+      <TabsList className="pref-nav" render={<nav />} aria-label={t("pref.title")}>
         {CATEGORIES.map(({ id, labelKey, Icon }) => (
-          <button
+          <TabsTrigger
             key={id}
-            ref={(el) => { tabRefs.current.set(id, el); }}
-            type="button"
-            role="tab"
-            id={`pref-tab-${id}`}
+            value={id}
             className={`pref-nav-item ${active === id ? "active" : ""}`}
-            aria-selected={active === id}
-            aria-controls={`pref-panel-${id}`}
-            tabIndex={active === id ? 0 : -1}
             data-modal-initial-focus={active === id ? "" : undefined}
-            onClick={() => setActive(id)}
           >
             <Icon size={ICON.sm} />
             <span className="pref-nav-label">{t(labelKey)}</span>
-          </button>
+          </TabsTrigger>
         ))}
-      </nav>
+      </TabsList>
 
       <div className="pref-content">
-        <div
-          role="tabpanel"
-          id="pref-panel-appearance"
-          aria-labelledby="pref-tab-appearance"
-          hidden={active !== "appearance"}
-        >
-          {active === "appearance" && (
-            <AppearanceSection
-              theme={theme}
-              onThemeChange={onThemeChange}
-            />
-          )}
-        </div>
-        <div
-          role="tabpanel"
-          id="pref-panel-language"
-          aria-labelledby="pref-tab-language"
-          hidden={active !== "language"}
-        >
-          {active === "language" && (
-            <LanguageSection
-              language={language}
-              onLanguageChange={onLanguageChange}
-            />
-          )}
-        </div>
+        <TabsContent value="appearance">
+          <AppearanceSection theme={theme} onThemeChange={onThemeChange} />
+        </TabsContent>
+        <TabsContent value="language">
+          <LanguageSection
+            language={language}
+            onLanguageChange={onLanguageChange}
+          />
+        </TabsContent>
       </div>
-
-    </div>
+    </Tabs>
   );
 }

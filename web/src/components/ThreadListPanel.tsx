@@ -261,8 +261,7 @@ export function ThreadListPanel({
             <Button variant="ghost"
               type="button"
               className="page-header-icon-action"
-              aria-label={createLabel}
-              title={createLabel}
+              tooltip={createLabel}
               onClick={directoryMode === "projects" ? onCreateProject : () => onNewThread(null)}
             >
               <ActionAdd size={ICON.md} />
@@ -313,7 +312,8 @@ export function ThreadListPanel({
           return (
           <section key={project.id} className={`project-folder${selection ? ` ${selection}` : ""}${project.archivedAt ? " archived" : ""}${expanded ? " expanded" : " collapsed"}`}>
             <div className="project-folder-header">
-              <button
+              <Button
+                variant="ghost"
                 type="button"
                 className="project-folder-toggle"
                 aria-label={t(expanded ? "project.collapse" : "project.expand", { project: project.name })}
@@ -321,12 +321,14 @@ export function ThreadListPanel({
                 onClick={() => applyExpansion(toggleProjectExpansion(expansion, project))}
               >
                 <ChevronDownIcon size={ICON.sm} />
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
                 type="button"
                 className="project-folder-select"
                 aria-current={selection === "selected" ? "page" : undefined}
-                title={`${project.name} · ${t("project.member_count", { count: project.members.length })} · ${computerLabel}`}
+                tooltip={`${project.name} · ${t("project.member_count", { count: project.members.length })} · ${computerLabel}`}
+                aria-label={project.name}
                 onClick={() => {
                   // Selecting opens the folder, but only as a normal explicit
                   // choice — the chevron still collapses it afterwards.
@@ -346,7 +348,7 @@ export function ThreadListPanel({
                 <span className="project-folder-name">{project.name}</span>
                 {project.archivedAt ? <small>{t("project.archived")}</small> : null}
                 <span className="project-folder-count tnum">{projectThreads.length}</span>
-              </button>
+              </Button>
             </div>
             {expanded && (projectThreads.length > 0 || emptyKey) ? <div className="project-folder-threads">
                 {renderProjectThreads(projectThreads)}

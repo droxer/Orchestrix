@@ -170,8 +170,7 @@ export function RoutineViewToggle({ view, onChange }: { view: RoutineView; onCha
         className="backlog-view-btn"
         data-active={view === "card" ? "true" : "false"}
         aria-pressed={view === "card"}
-        aria-label={t("routine.view_card")}
-        title={t("routine.view_card")}
+        tooltip={t("routine.view_card")}
         onClick={() => onChange("card")}
       >
         <ViewGrid size={ICON.sm} />
@@ -181,8 +180,7 @@ export function RoutineViewToggle({ view, onChange }: { view: RoutineView; onCha
         className="backlog-view-btn"
         data-active={view === "list" ? "true" : "false"}
         aria-pressed={view === "list"}
-        aria-label={t("routine.view_list")}
-        title={t("routine.view_list")}
+        tooltip={t("routine.view_list")}
         onClick={() => onChange("list")}
       >
         <ViewList size={ICON.sm} />

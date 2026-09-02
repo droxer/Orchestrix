@@ -33,8 +33,7 @@ export function TaskBoardHeaderActions({
         // Same ghost icon family as the create plus beside it — a bordered
         // 40px square next to a 36px ghost read as two unrelated controls.
         className="page-header-icon-action"
-        aria-label={refreshLabel}
-        title={refreshLabel}
+        tooltip={refreshLabel}
         disabled={isRefreshing}
         onClick={onRefresh}
       >
@@ -47,8 +46,7 @@ export function TaskBoardHeaderActions({
         // projects/threads rail — no text label, the header already names the
         // list. aria-label carries the action for the accessibility tree.
         className="page-header-icon-action"
-        aria-label={createLabel}
-        title={createLabel}
+        tooltip={createLabel}
         onClick={onCreate}
       >
         <ActionAdd size={ICON.md} />

@@ -36,17 +36,37 @@
   to { opacity: 0; transform: translateY(8px); }
 }
 
+/* Scrim only. This used to be one element doing two jobs — painting the
+   scrim AND laying out the panel with `display: flex` — which worked while
+   the panel was its child. Under the Dialog primitive the backdrop and the
+   popup are siblings, so the layout half moved to `.overlay-viewport` below
+   and this class paints. */
 .overlay-backdrop {
   position: fixed;
   inset: 0;
-  display: flex;
   background: var(--scrim);
   overscroll-behavior: contain;
   animation: overlay-backdrop-in var(--t-fast) var(--ease) both;
 }
 
-.overlay-backdrop.is-closing {
+/* Exit is keyed on the primitive's transition state, not a class the app
+   toggles: base-ui holds the element in the DOM while `[data-ending-style]`
+   is set and removes it when the animation finishes. */
+.overlay-backdrop[data-ending-style] {
   animation: overlay-backdrop-out var(--t-fast) var(--ease) forwards;
+}
+
+/* The positioner. Transparent to the pointer so a click that misses the panel
+   lands on the backdrop and dismisses, rather than being swallowed here. */
+.overlay-viewport {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  pointer-events: none;
+}
+
+.overlay-viewport > * {
+  pointer-events: auto;
 }
 
 /* Stacked drawers — every layer uses the one scrim; nested backdrops

@@ -29,6 +29,7 @@ import { AgentProfileEditor } from "./AgentProfileEditor";
 import { PlacementList } from "./PlacementList";
 import { describeAgentPlacements, placementRuntimeNodeId } from "../lib/agentPlacements";
 import { ProfileImagePicker } from "./ProfileImagePicker";
+import { Alert } from "@/components/ui/alert";
 
 export interface AgentProfilePanelProps {
   agent: EmployeeAgent;
@@ -300,7 +301,7 @@ export function AgentProfilePanel({
           onSave={() => void handleProfileSave()}
         />
         {canEditProfile && error ? (
-          <p className="adm-form-error" role="alert">{t("admin.v2.action_failed", { message: error })}</p>
+          <Alert variant="boxed">{t("admin.v2.action_failed", { message: error })}</Alert>
         ) : null}
       </div>
 

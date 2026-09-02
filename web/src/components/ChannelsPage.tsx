@@ -37,8 +37,7 @@ export function ChannelsPage() {
               type="button"
               variant="ghost"
               className="page-header-icon-action"
-              aria-label={t("admin.v2.chat_create")}
-              title={t("admin.v2.chat_create")}
+              tooltip={t("admin.v2.chat_create")}
               onClick={() => setCreateOpen(true)}
             >
               <ActionAdd size={ICON.md} aria-hidden="true" />

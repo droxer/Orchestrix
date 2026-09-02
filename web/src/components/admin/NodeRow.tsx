@@ -17,6 +17,7 @@ import {
   ICON,
   nodeOwnershipIcon,
 } from "../icons";
+import { TableCell, TableRow } from "@/components/ui/table";
 
 interface NodeRowProps {
   node: ControlPanelDaemonNodeRecord;
@@ -44,8 +45,8 @@ export function NodeRow({ node, employeeName, storedTokens, colocated, onReveal,
   const OwnershipMark = nodeOwnershipIcon(ownership);
 
   return (
-    <li className={`adm-node-row${highlight ? " is-pulse" : ""}`} data-node={node.id} data-online={online ? "true" : "false"} role="row">
-      <div className="adm-node-row-id" role="cell">
+    <TableRow render={<li />} className={`adm-node-row${highlight ? " is-pulse" : ""}`} data-node={node.id} data-online={online ? "true" : "false"}>
+      <TableCell render={<div />} className="adm-node-row-id">
         <span
           className="adm-node-avatar adm-node-avatar--machine"
           data-ownership={ownership}
@@ -72,27 +73,27 @@ export function NodeRow({ node, employeeName, storedTokens, colocated, onReveal,
             hideSavedHere
           />
         </span>
-      </div>
+      </TableCell>
 
-      <div className="adm-node-row-employee" role="cell">
+      <TableCell render={<div />} className="adm-node-row-employee">
         {employeeName ? (
           <span className="adm-node-row-employee-label" translate="no">
             <AdminEmployees size={ICON.xs} className="adm-node-row-employee-icon" aria-hidden="true" />
             {employeeName}
           </span>
         ) : null}
-      </div>
+      </TableCell>
 
-      <div
+      <TableCell
+        render={<div />}
         className="adm-node-row-agents"
-        role="cell"
         aria-label={t("admin.v2.node_runtimes")}
         title={t("admin.v2.node_runtimes")}
       >
         <NodeRuntimeMarks node={node} t={t} />
-      </div>
+      </TableCell>
 
-      <div className="adm-node-row-actions" role="cell">
+      <TableCell render={<div />} className="adm-node-row-actions">
         <NodeActions
           node={node}
           onReveal={onReveal}
@@ -103,10 +104,10 @@ export function NodeRow({ node, employeeName, storedTokens, colocated, onReveal,
           onDeleteRequest={() => void handleDelete()}
           t={t}
         />
-      </div>
+      </TableCell>
       {deleteError ? (
         <p className="adm-node-row-error" role="alert">{t("admin.v2.action_failed", { message: deleteError })}</p>
       ) : null}
-    </li>
+    </TableRow>
   );
 }

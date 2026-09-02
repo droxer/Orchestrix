@@ -489,13 +489,13 @@
      ring. roles.css names the two roles --shadow-1 (none) and --shadow-2
      (the ring). */
 
-  /* Z layers — surface < drawer < float < dialog.
+  /* Z layers — surface < drawer < dialog < float.
      Only three tiers are real, and every one of them has consumers.
 
      --z-drawer  anchored side surfaces (admin drawer, mobile nav)
+     --z-dialog  modal surfaces that own the whole screen + the skip link
      --z-float   anything that escapes its container and follows the pointer
                  or an anchor: menus, tooltips, select popups, drag ghosts
-     --z-dialog  modal surfaces that own the whole screen + the skip link
 
      There is deliberately no `popover` tier BELOW `drawer`. The old scale had
      one (popover 20 < drawer 30) and it was unusable by construction: a select
@@ -503,12 +503,19 @@
      always floats above the surface it was opened from, so it belongs at
      --z-float.
 
+     That same rule is why `float` sits above `dialog` rather than beneath it,
+     which is the other half of the scale the old ordering got wrong: a
+     tooltip on a dialog's close button, or a select opened inside a modal,
+     is anchored to that modal and rendered behind it. The tier is only ever
+     worn by transient anchored chrome, so nothing durable can cover a modal
+     by being here.
+
      Values 1/2/3 appear throughout the surface CSS for LOCAL stacking inside
      an already-positioned component. Those are correct as literals — they
      order siblings, not app layers, and must not be promoted to tokens. */
   --z-drawer: 30;
-  --z-float: 120;
   --z-dialog: 300;
+  --z-float: 400;
 
   /* Type sizes — rem so browser font-size preference scales the UI
      (root pinned to 87.5% in base.css; 1rem = 14px at the default). */

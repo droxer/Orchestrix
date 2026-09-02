@@ -12,7 +12,7 @@ import { ICON } from "./icons";
  * This existed twice — `.adm-runtime-mark` on the fleet card and row, and
  * `.computer-runtime-row` on the computer page — and the copies had already
  * drifted: computer.css re-derived every presence rule against a
- * `.adm-agent-dot` child it borrowed from the admin stylesheet, and the two
+ * hand-drawn dot it borrowed from the admin stylesheet (since removed), and the two
  * disagreed on the healthy fill (`var(--tone)` versus `var(--ink-4)`). Both
  * also rolled their own filled/hollow rule instead of going through
  * `StateMark`, which is where that shape grammar is written down.

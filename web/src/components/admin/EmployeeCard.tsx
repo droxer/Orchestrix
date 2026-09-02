@@ -128,8 +128,7 @@ export function EmployeeCard({
                 type="button"
                 className="adm-node-card-icon-btn"
                 onClick={() => onEdit(member.id)}
-                aria-label={t("admin.v2.edit_employee_action")}
-                title={t("admin.v2.edit_employee_action")}
+                tooltip={t("admin.v2.edit_employee_action")}
               >
                 <ActionEdit size={ICON.sm} aria-hidden="true" />
               </Button>
@@ -144,8 +143,7 @@ export function EmployeeCard({
               className="adm-node-card-icon-btn"
               onClick={() => onDelete(member.id)}
               disabled={deletePending}
-              aria-label={t("admin.v2.delete_employee_action")}
-              title={t("admin.v2.delete_employee_action")}
+              tooltip={t("admin.v2.delete_employee_action")}
             >
               <AdminDelete size={ICON.sm} aria-hidden="true" />
             </Button>

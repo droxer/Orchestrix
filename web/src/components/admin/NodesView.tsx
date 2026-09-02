@@ -35,6 +35,7 @@ import { NodeRow } from "./NodeRow";
 import { AdminLayoutToggle, type AdminLayout } from "./AdminLayoutToggle";
 import { ListGroup } from "../ListGroup";
 import type { StateTone } from "../StateMark";
+import { Table, TableHead, TableRow, TableRowGroup } from "@/components/ui/table";
 
 interface NodesViewProps {
   nodes: ControlPanelDaemonNodeRecord[];
@@ -86,7 +87,7 @@ function NodeCols({
   t: TFunction;
 }) {
   return (
-    <div className="adm-node-cols" role="row">
+    <TableRow className="adm-node-cols">
       <SortableColumnHeader
         className="adm-col-label"
         label={t("admin.v2.col_node")}
@@ -110,8 +111,8 @@ function NodeCols({
         defaultDirection="desc"
       />
       {/* Actions is not a column of data — there is nothing to order by. */}
-      <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_actions")}</span>
-    </div>
+      <TableHead className="adm-col-label adm-col-label--metrics">{t("admin.v2.col_actions")}</TableHead>
+    </TableRow>
   );
 }
 
@@ -294,9 +295,9 @@ export function NodesView({ nodes, employees, storedTokens, layout, onLayoutChan
                 count={groupNodes.length}
                 tone={nodeBandTone(status)}
               >
-                <div className="list-group-rows" role="table" data-density="compact" aria-label={label}>
+                <Table className="list-group-rows" data-density="compact" aria-label={label}>
                   <NodeCols sort={sort} onSort={toggleSort} t={t} />
-                  <ul className="adm-node-list" role="rowgroup">
+                  <TableRowGroup className="adm-node-list" render={<ul />}>
                     {groupPage.items.map((node) => {
                       const employee = node.employeeId ? employeeById.get(node.employeeId) : undefined;
                       return (
@@ -315,8 +316,8 @@ export function NodesView({ nodes, employees, storedTokens, layout, onLayoutChan
                         />
                       );
                     })}
-                  </ul>
-                </div>
+                  </TableRowGroup>
+                </Table>
                 <Pagination
                   compact
                   className="list-group-pager"

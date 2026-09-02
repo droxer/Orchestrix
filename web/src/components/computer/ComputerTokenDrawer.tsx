@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/Drawer";
 import { CredCopyRow } from "../admin/CredCopyRow";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
+import { Alert } from "@/components/ui/alert";
 
 interface ComputerTokenDrawerProps {
   open: boolean;
@@ -136,7 +137,7 @@ export function ComputerTokenDrawer({ open, onClose, node }: ComputerTokenDrawer
             {unrecoverable ? t("computer.token_unrecoverable") : t("computer.token_hidden_note")}
           </p>
         )}
-        {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
+        {error ? <Alert variant="boxed" render={<div />}>{error}</Alert> : null}
         <div className="adm-form-actions">
           {credentials ? (
             <>

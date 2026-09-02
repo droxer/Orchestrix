@@ -15,6 +15,7 @@ import {
   languageForFile,
 } from "../CodeView";
 import { Markdown } from "../Markdown";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 /* One workspace file on screen — rendered when the type has a presentation,
    source otherwise. Shared by the full-page workspace tab and the thread
@@ -84,28 +85,28 @@ export function WorkspaceFilePreview({
         // Always in-flow, never floating: a floating variant made the toggle
         // overlay the content in Rendered mode but sit in normal flow in
         // Source mode, so the control visibly jumped position on toggle.
-        <div
+        <ToggleGroup
           className="code-view-toolbar"
-          role="group"
           aria-label={t("workspace.view_mode")}
+          value={[rendered ? "rendered" : "source"]}
+          onValueChange={(next) => {
+            const picked = next[0];
+            if (picked) setRendered(picked === "rendered");
+          }}
         >
-          <button
-            type="button"
+          <ToggleGroupItem
+            value="rendered"
             className={`code-view-toggle${rendered ? " is-active" : ""}`}
-            aria-pressed={rendered}
-            onClick={() => setRendered(true)}
           >
             {t("workspace.view_rendered")}
-          </button>
-          <button
-            type="button"
+          </ToggleGroupItem>
+          <ToggleGroupItem
+            value="source"
             className={`code-view-toggle${rendered ? "" : " is-active"}`}
-            aria-pressed={!rendered}
-            onClick={() => setRendered(false)}
           >
             {t("workspace.view_source")}
-          </button>
-        </div>
+          </ToggleGroupItem>
+        </ToggleGroup>
       ) : null}
       <div className={`artifact-viewer-body${bleed ? " is-bleed" : ""}`}>
         {showRendered && isMarkdownFile(name) ? (

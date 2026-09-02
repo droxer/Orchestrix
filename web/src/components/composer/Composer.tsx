@@ -16,6 +16,7 @@ import { MentionHighlight } from "./MentionHighlight";
 import { Button } from "@/components/ui/button";
 import { MENTION_LIST_ID, MentionPopup, mentionOptionId } from "./MentionPopup";
 import { ThreadRuntimeReadout, ThreadRuntimeSelect } from "./ThreadRuntimeSelect";
+import { Textarea } from "@/components/ui/textarea";
 
 
 export type ComposerHandle = {
@@ -224,8 +225,16 @@ const ComposerView = forwardRef<ComposerHandle, {
               the pills track the text through resize and scroll. */}
           <div className="composer-textarea-wrap">
             <MentionHighlight ref={highlightRef} text={composerText} mentions={parsed.mentions} />
-            <textarea
+            {/* The shared Textarea, with the composer's own geometry on top:
+                this field is one of two grid-stacked layers (the other is the
+                mention mirror) and the two must break text identically, so the
+                padding, font, and wrapping come from `.composer-textarea`
+                rather than the primitive's defaults. Going through the
+                primitive anyway keeps every multi-line field in the app one
+                component, and lets the CSS stop reaching through a tag name. */}
+            <Textarea
               ref={textareaRef}
+              className="composer-textarea"
               aria-label={selectedEmployee
                 ? t("composer.aria_label", { employee: selectedEmployee, agent: activeAgentDisplayName })
                 : t("composer.aria_label_no_employee", { agent: activeAgentDisplayName })}
@@ -290,7 +299,7 @@ const ComposerView = forwardRef<ComposerHandle, {
               onClick={running ? onCancelRun : undefined}
               aria-busy={sendPending || undefined}
               aria-label={running ? t("composer.cancel_run") : sendPending ? t("composer.sending", { defaultValue: "Sending…" }) : t("composer.send")}
-              title={running
+              tooltip={running
                 ? t("composer.cancel_run")
                 : parsed.blocked
                   ? t("composer.mention_blocked")

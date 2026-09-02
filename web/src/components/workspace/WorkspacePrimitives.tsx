@@ -60,21 +60,18 @@ export function WorkspaceLoading({ label }: { label: string }) {
   );
 }
 
-/** Tabpanel-aware skeleton for the activities tab while the brief loads. */
-export function ActivitiesSkeleton({
-  panelId,
-  labelledBy,
-}: {
-  panelId: string;
-  labelledBy: string;
-}) {
+/* The three sections below used to take `panelId` / `labelledBy` and paint
+   `role="tabpanel"` on themselves, because the pages that render them wired
+   their tabs by hand. They are inside a `TabsContent` now, which IS the panel
+   and owns the id wiring — a second `role="tabpanel"` nested in the first
+   would be the bug, not the feature. */
+
+/** Skeleton for the activities tab while the brief loads. */
+export function ActivitiesSkeleton() {
   const { t } = useTranslation();
   return (
     <div
       className="workspace-inspect workspace-activities"
-      role="tabpanel"
-      id={panelId}
-      aria-labelledby={labelledBy}
       aria-busy="true"
     >
       <span className="sr-only" role="status">{t("workspace.loading")}</span>
@@ -96,18 +93,14 @@ export function WorkspaceError({
   message,
   eyebrow,
   onRetry,
-  panelId,
-  labelledBy,
 }: {
   message: string;
   eyebrow?: string;
   onRetry: () => void;
-  panelId: string;
-  labelledBy: string;
 }) {
   const { t } = useTranslation();
   return (
-    <div className="workspace-inspect" role="tabpanel" id={panelId} aria-labelledby={labelledBy}>
+    <div className="workspace-inspect">
       <div className="workspace-error" role="alert">
         {eyebrow ? <span className="workspace-eyebrow">{eyebrow}</span> : null}
         <p>{message}</p>
@@ -173,15 +166,11 @@ function sessionStatusLabel(
 export function WorkspaceActivities({
   brief,
   onOpenThread,
-  panelId,
-  labelledBy,
   emptyMark,
   emptyPulse = false,
 }: {
   brief?: WorkspaceBriefResponse;
   onOpenThread: (sessionId: string) => void;
-  panelId: string;
-  labelledBy: string;
   emptyMark?: ReactNode;
   emptyPulse?: boolean;
 }) {
@@ -192,12 +181,7 @@ export function WorkspaceActivities({
   const hasActivity = activeRuns.length > 0 || sessions.length > 0 || tasks.length > 0;
 
   return (
-    <div
-      className="workspace-inspect workspace-activities"
-      role="tabpanel"
-      id={panelId}
-      aria-labelledby={labelledBy}
-    >
+    <div className="workspace-inspect workspace-activities">
       {/* No metric strip. It used to print active-runs / tasks / threads in the
           loudest numerals on the page, directly above three section headers
           carrying those same three counts; counts now live only in the section

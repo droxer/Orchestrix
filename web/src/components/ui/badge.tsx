@@ -30,6 +30,15 @@ const badgeVariants = cva(
         info: "border-info/30 bg-background text-info",
         warning: "border-warning/30 bg-background text-warning",
         danger: "border-danger/35 bg-background text-danger",
+        /* Chrome only — the caller's own stylesheet owns the border colour and
+           ink. For badges whose tone scale is richer than the five semantic
+           ones above: a routine's schedule health runs live → overdue → due →
+           scheduled → unscheduled → paused, and a paused one is dashed, which
+           no `variant` here expresses. Those surfaces used to redeclare the
+           whole chip — padding, border, radius, type — to get at their accent,
+           which is how two drawings of the same object appear. This keeps the
+           one chip geometry and lets them keep their accent. */
+        state: "border-(--tone-line) bg-transparent text-body",
       },
     },
     defaultVariants: {

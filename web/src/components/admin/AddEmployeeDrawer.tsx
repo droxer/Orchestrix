@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Alert } from "@/components/ui/alert";
 
 interface AddEmployeeDrawerProps {
   open: boolean;
@@ -407,7 +408,7 @@ export function AddEmployeeDrawer({
           )}
         </section>
 
-        {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
+        {error ? <Alert variant="boxed" render={<div />}>{error}</Alert> : null}
 
         <div className="adm-form-actions">
           <Button size="cta" type="button" variant="ghost" onClick={() => void requestClose()} disabled={isBusy}>

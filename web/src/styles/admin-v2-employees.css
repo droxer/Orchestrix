@@ -320,12 +320,6 @@
   justify-content: flex-end;
 }
 
-.adm-view-error {
-  margin: 0 0 var(--sp-4);
-  font-size: var(--fs-3);
-  color: var(--err);
-}
-
 @media (max-width: 820px) {
   /* Employee rows: the 3-column grid (minmax(220px,…)) can't fit a phone, so
      stack identity → agents → metrics. The column-label header is meaningless

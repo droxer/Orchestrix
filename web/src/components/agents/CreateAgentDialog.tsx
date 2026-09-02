@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent} from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createAgent, listSandboxes } from "../../api";
@@ -32,6 +32,8 @@ import {
   ICON,
   nodeOwnershipIcon,
 } from "../icons";
+import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
+import { Alert } from "@/components/ui/alert";
 
 interface CreateAgentDialogProps {
   open: boolean;
@@ -100,7 +102,6 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
   const identityHeadingId = useId();
   const computerTriggerRef = useRef<HTMLButtonElement>(null);
   const runtimeTriggerRef = useRef<HTMLButtonElement>(null);
-  const runtimeGroupRef = useRef<HTMLDivElement>(null);
   const roleTriggerRef = useRef<HTMLButtonElement>(null);
 
   const sandboxesQuery = useQuery({
@@ -149,29 +150,6 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
   function selectRuntime(kind: AgentName) {
     setExecutorKind(kind);
     clearFieldError("executorKind");
-  }
-
-  // Radio keyboard pattern: Arrow keys and Home/End move selection and focus
-  // together; Space/Enter select through the native button activation.
-  function handleRuntimeKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    if (runtimeOptions.length === 0) return;
-    let nextIndex: number | null = null;
-    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-      nextIndex = (index + 1) % runtimeOptions.length;
-    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-      nextIndex = (index - 1 + runtimeOptions.length) % runtimeOptions.length;
-    } else if (event.key === "Home") {
-      nextIndex = 0;
-    } else if (event.key === "End") {
-      nextIndex = runtimeOptions.length - 1;
-    } else {
-      return;
-    }
-    event.preventDefault();
-    selectRuntime(runtimeOptions[nextIndex]);
-    runtimeGroupRef.current
-      ?.querySelectorAll<HTMLButtonElement>('[role="radio"]')
-      [nextIndex]?.focus();
   }
 
   const runtimeOptions = useMemo(
@@ -338,33 +316,27 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
             error={fieldErrors.executorKind}
             errorId="create-agent-runtime-error"
           >
-            <div
-              ref={runtimeGroupRef}
+            {/* Roving tabindex, arrow keys, and Home/End used to be written
+                out here — the sixth copy of the radio pattern in this app.
+                The shared group owns all of it; what is left is the card. */}
+            <RadioGroup
               className="create-agent-runtime-picker"
-              role="radiogroup"
               aria-labelledby={runtimeLabelId}
-              aria-disabled={isBusy || !computerId || runtimeOptions.length === 0}
               aria-invalid={Boolean(fieldErrors.executorKind) || undefined}
               aria-describedby={fieldErrors.executorKind ? "create-agent-runtime-error" : undefined}
+              disabled={isBusy || !computerId || runtimeOptions.length === 0}
+              value={executorKind || null}
+              onValueChange={(value) => selectRuntime(value as AgentName)}
             >
               {runtimeOptions.map((kind, index) => {
                 const selected = executorKind === kind;
-                // Roving tabindex: the checked option is the single Tab stop,
-                // or the first option while nothing is checked yet.
-                const isTabStop = selected || (!executorKind && index === 0);
                 return (
-                  <button
+                  <RadioGroupChoice
                     key={kind}
-                    ref={isTabStop ? runtimeTriggerRef : undefined}
-                    type="button"
+                    ref={selected || (!executorKind && index === 0) ? runtimeTriggerRef : undefined}
+                    value={kind}
                     className={`create-agent-runtime-option${selected ? " is-selected" : ""}`}
-                    role="radio"
-                    aria-checked={selected}
                     aria-label={agentLabel(kind)}
-                    tabIndex={isTabStop ? 0 : -1}
-                    disabled={isBusy}
-                    onClick={() => selectRuntime(kind)}
-                    onKeyDown={(event) => handleRuntimeKeyDown(event, index)}
                   >
                     <span className="create-agent-runtime-mark" aria-hidden="true">
                       <AgentMark agent={kind} size={ICON.xl} />
@@ -374,10 +346,10 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
                       <span className="create-agent-runtime-option-meta">{t("agents_page.create_runtime_ready")}</span>
                     </span>
                     <span className="create-agent-runtime-check" aria-hidden="true" />
-                  </button>
+                  </RadioGroupChoice>
                 );
               })}
-            </div>
+            </RadioGroup>
             {computerId && runtimeOptions.length === 0 ? (
               <p className="adm-form-hint">{t("agents_page.create_runtime_empty")}</p>
             ) : null}
@@ -442,7 +414,7 @@ export function CreateAgentDialog({ open, onClose, employeeId, onCreated }: Crea
           </Field>
         </section>
 
-        {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
+        {error ? <Alert variant="boxed" render={<div />}>{error}</Alert> : null}
 
         <div className="adm-form-actions">
           <Button size="cta" type="button" variant="ghost" onClick={() => { void requestClose(); }} disabled={isBusy}>

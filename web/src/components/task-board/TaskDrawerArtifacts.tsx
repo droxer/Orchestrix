@@ -59,8 +59,8 @@ export function TaskDrawerArtifacts({ taskId }: { taskId: string }) {
               <Button variant="ghost"
                 type="button"
                 className="task-drawer-artifact-main"
-                // Opened over TaskDrawer — declare the stack layer instead of
-                // relying on drawerStack registration order.
+                // Opened over TaskDrawer — declare the stack layer explicitly
+                // so its backdrop z-index clears the drawer beneath it.
                 onClick={() => open(artifact, artifact.sessionId, artifacts ?? [artifact], 1)}
                 title={t("artifact.view_named", { title: artifact.title })}
               >
