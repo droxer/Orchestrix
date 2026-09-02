@@ -14,7 +14,10 @@ import type {
   CurrentUser,
   DaemonNodeMonitorRecord,
 } from "../types";
-import { nodesAssignedToEmployee } from "../lib/computerNodes";
+import {
+  countEmployeeDeviceComputers,
+  nodesAssignedToEmployee,
+} from "../lib/computerNodes";
 import { useMutationError } from "../hooks/useMutationError";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { ComputerCard } from "./computer/ComputerCard";
@@ -83,7 +86,10 @@ export function ComputerPage({
       (node) => !knownIds.has(node.id) && node.employeeId === currentUser.employeeId,
     );
     const removed = new Set(removedIds);
-    return [...newlyConnected, ...merged].filter((node) => !removed.has(node.id));
+    return nodesAssignedToEmployee(
+      [...newlyConnected, ...merged].filter((node) => !removed.has(node.id)),
+      currentUser.employeeId,
+    );
   }, [nodes, currentUser.employeeId, overrides, removedIds]);
 
   const pagedNodes = useMemo(() => paginate(myNodes, page), [myNodes, page]);
@@ -96,7 +102,7 @@ export function ComputerPage({
   // count comes from the roster on screen — not the /auth/me snapshot — so a
   // connect or disconnect in this session moves it immediately.
   const computerLimit = currentUser.effectiveMaxLocalComputers;
-  const computersUsed = myNodes.length;
+  const computersUsed = countEmployeeDeviceComputers(myNodes);
   const atLimit = computerLimit !== undefined && computersUsed >= computerLimit;
   const limitHint = atLimit
     ? t("computer.limit_reached", { used: computersUsed, limit: computerLimit })

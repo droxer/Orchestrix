@@ -18,6 +18,7 @@ from ..services.computer_names import (
     rename_computer_for_actor,
 )
 from ..services.event_notifier import daemon_command_key
+from ..services.managed_nodes import managed_node_placeholder
 from ..services.node_agents import (
     assert_node_agent_runs_drained,
     remove_node_agents,
@@ -157,32 +158,52 @@ def list_daemon_nodes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
         if node.get("desiredState") == "deleted"
     }
 
-    def visible_computers(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        return [
+    def visible_computers(
+        nodes: list[dict[str, Any]], managed_nodes: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        observed = [
             node
             for node in nodes
             if node.get("managedNodeId") not in deleted_managed_node_ids
+            and not node.get("retiredAt")
         ]
+        observed_managed_ids = {
+            node["managedNodeId"] for node in observed if node.get("managedNodeId")
+        }
+        pending = [
+            managed_node_placeholder(node)
+            for node in managed_nodes
+            if node["id"] not in observed_managed_ids
+        ]
+        presented = [present_computer(ctx, node) for node in observed]
+        return [*presented, *pending]
 
     token = bearer_token(request)
     if token:
         nodes = ctx.registry.monitor_nodes_for_token(token)
         if nodes is not None:
-            return {
-                "nodes": [
-                    present_computer(ctx, node) for node in visible_computers(nodes)
-                ]
+            managed_ids = {
+                node["managedNodeId"] for node in nodes if node.get("managedNodeId")
             }
+            managed_nodes = [
+                node
+                for node in ctx.managed_node_store.list_nodes()
+                if node["id"] in managed_ids
+            ]
+            return {"nodes": visible_computers(nodes, managed_nodes)}
     actor = request_actor_or_none(request, ctx.auth_store)
     if actor:
-        nodes = visible_computers(
-            [
-                node
-                for node in ctx.registry.monitor_nodes()
-                if actor_can_access_sandbox(actor, node)
-            ]
-        )
-        return {"nodes": [present_computer(ctx, node) for node in nodes]}
+        nodes = [
+            node
+            for node in ctx.registry.monitor_nodes()
+            if actor_can_access_sandbox(actor, node)
+        ]
+        managed_nodes = [
+            node
+            for node in ctx.managed_node_store.list_nodes()
+            if actor["isAdmin"] or node.get("employeeId") == actor["employeeId"]
+        ]
+        return {"nodes": visible_computers(nodes, managed_nodes)}
     raise HTTPException(401, "Authentication required.")
 
 

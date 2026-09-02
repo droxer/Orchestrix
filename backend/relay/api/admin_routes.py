@@ -9,7 +9,6 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, Response
 from loguru import logger
 
-from ..core.models import AGENT_NAMES
 from ..daemon_registry import public_sandbox_record
 from ..persistence.org_settings_store import (
     OrgSettingsValidationError,
@@ -30,6 +29,7 @@ from ..services.computer_names import normalize_computer_display_name, present_c
 from ..services.employee_lifecycle import (
     soft_delete_employee as soft_delete_employee_cascade,
 )
+from ..services.managed_nodes import managed_node_placeholder
 from ..services.node_agents import (
     assert_node_agent_runs_drained,
     remove_node_agents,
@@ -78,40 +78,6 @@ def _public_control_panel_node(ctx: AppContextDep, node: dict[str, Any]) -> dict
         public_sandbox_record(node),
     )
     return _with_node_display_name(ctx, public_node)
-
-
-def _managed_node_placeholder(node: dict[str, Any]) -> dict[str, Any]:
-    desired_state = node.get("desiredState")
-    phase = node.get("phase")
-    status = (
-        "stopped"
-        if desired_state != "running"
-        else "failed"
-        if phase in ("ready", "failed")
-        else "provisioning"
-    )
-    conditions = node.get("conditions") or []
-    last_error = conditions[-1].get("message") if conditions else None
-    return {
-        "id": node["id"],
-        "managedNodeId": node["id"],
-        "displayName": node.get("displayName") or node["id"],
-        **({"employeeId": node["employeeId"]} if node.get("employeeId") else {}),
-        "sandboxMode": node.get("sandboxMode") or "boxlite",
-        "nodeLocation": "managed",
-        "status": status,
-        "agents": {agent: "unknown" for agent in AGENT_NAMES},
-        "createdAt": node["createdAt"],
-        "updatedAt": node["updatedAt"],
-        "queuedCommandCount": 0,
-        "activeRuns": [],
-        "online": False,
-        # Never seen a heartbeat, so staleness does not apply — the placeholder
-        # status (provisioning/stopped/failed) must survive visualStatus.
-        "stale": False,
-        "provisioningPlaceholder": True,
-        **({"lastError": last_error} if last_error else {}),
-    }
 
 
 @router.get("/admin/settings")
@@ -543,7 +509,7 @@ def control_panel_nodes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
         node["managedNodeId"] for node in observed if node.get("managedNodeId")
     }
     pending = [
-        _managed_node_placeholder(node)
+        managed_node_placeholder(node)
         for node in ctx.managed_node_store.list_nodes()
         if node["id"] not in observed_managed_ids
     ]

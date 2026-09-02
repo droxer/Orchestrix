@@ -14,6 +14,7 @@ from threading import RLock
 from typing import Any
 from uuid import uuid4
 
+from ..core.models import AGENT_NAMES
 from ..persistence.store_common import (
     DEFAULT_RELAY_DATA_DIR,
     _read_json,
@@ -61,6 +62,42 @@ ATTEMPT_HISTORY_LIMIT = 20
 class ManagedCapacityResolution:
     node: dict[str, Any]
     provisioning_requested: bool
+
+
+def _managed_node_status(node: dict[str, Any]) -> str:
+    desired_state = node.get("desiredState")
+    phase = node.get("phase")
+    if desired_state != "running":
+        return "stopped"
+    if phase in ("ready", "failed"):
+        return "failed"
+    return "provisioning"
+
+
+def managed_node_placeholder(node: dict[str, Any]) -> dict[str, Any]:
+    """Present desired managed capacity before its current runtime is online."""
+    conditions = node.get("conditions") or []
+    last_error = conditions[-1].get("message") if conditions else None
+    return {
+        "id": node["id"],
+        "managedNodeId": node["id"],
+        "displayName": node.get("displayName") or node["id"],
+        **({"employeeId": node["employeeId"]} if node.get("employeeId") else {}),
+        "sandboxMode": node.get("sandboxMode") or "boxlite",
+        "nodeLocation": "managed",
+        "status": _managed_node_status(node),
+        "agents": {agent: "unknown" for agent in AGENT_NAMES},
+        "createdAt": node["createdAt"],
+        "updatedAt": node["updatedAt"],
+        "queuedCommandCount": 0,
+        "activeRuns": [],
+        "online": False,
+        # Never seen a heartbeat, so staleness does not apply — the placeholder
+        # status (provisioning/stopped/failed) must survive visualStatus.
+        "stale": False,
+        "provisioningPlaceholder": True,
+        **({"lastError": last_error} if last_error else {}),
+    }
 
 
 def _new_id(prefix: str) -> str:
