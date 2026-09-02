@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 from relay.persistence.employee_handle_backfill import plan_handles
 
@@ -26,17 +27,25 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade() -> None:
-    op.add_column("employees", sa.Column("handle", sa.Text(), nullable=True))
-
-    connection = op.get_bind()
-    employees = sa.table(
+def _employees_table() -> sa.Table:
+    """Describe the pre-migration employees table with its real UUID key."""
+    return sa.table(
         "employees",
-        sa.column("id"),
+        sa.column(
+            "id",
+            postgresql.UUID(as_uuid=False).with_variant(sa.Text(), "sqlite"),
+        ),
         sa.column("handle"),
         sa.column("display_name"),
         sa.column("created_at"),
     )
+
+
+def upgrade() -> None:
+    op.add_column("employees", sa.Column("handle", sa.Text(), nullable=True))
+
+    connection = op.get_bind()
+    employees = _employees_table()
     users = sa.table("auth_users", sa.column("username"), sa.column("employee_id"))
 
     usernames = {

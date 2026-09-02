@@ -6,6 +6,7 @@ from pathlib import Path
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import create_engine, text
+from sqlalchemy.dialects import postgresql
 
 MIGRATION_PATH = (
     Path(__file__).parents[2]
@@ -21,6 +22,20 @@ def load_migration():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def test_employee_handle_backfill_compares_employee_ids_as_uuids() -> None:
+    """The live table has UUID ids, so PostgreSQL must not bind them as text."""
+    migration = load_migration()
+    employees = migration._employees_table()
+
+    statement = (
+        employees.update()
+        .where(employees.c.id == "5dadd571-0557-4288-8378-90af89b20c6e")
+        .values(handle="admin")
+    )
+
+    assert "::UUID" in str(statement.compile(dialect=postgresql.dialect()))
 
 
 def test_backfill_prefers_the_username_then_the_display_name_then_the_id() -> None:
