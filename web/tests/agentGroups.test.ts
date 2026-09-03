@@ -121,6 +121,42 @@ describe("groupAgentsByComputer", () => {
       { key: "node_legacy", label: "node_legacy" },
     ]);
   });
+
+  it("coalesces legacy and stable placements on the same computer", () => {
+    const stableComputerId = "device:alice:machine-a";
+    const legacyAgent = {
+      ...agent("legacy", [placement({
+        id: "p_legacy",
+        daemonNodeId: "node_current",
+        nodeDisplayName: "Alice's MacBook",
+      })]),
+      computerId: stableComputerId,
+    };
+    const currentAgent = {
+      ...agent("current", [placement({
+        id: "p_current",
+        daemonNodeId: "node_current",
+        computerId: stableComputerId,
+        nodeDisplayName: "Alice's MacBook",
+      })]),
+      computerId: stableComputerId,
+    };
+
+    const groups = groupAgentsByComputer([legacyAgent, currentAgent]);
+
+    assert.deepEqual(
+      groups.map((group) => ({
+        key: group.key,
+        label: group.label,
+        agents: group.agents.map((entry) => entry.id),
+      })),
+      [{
+        key: stableComputerId,
+        label: "Alice's MacBook",
+        agents: ["legacy", "current"],
+      }],
+    );
+  });
 });
 
 describe("agents roster grouping", () => {

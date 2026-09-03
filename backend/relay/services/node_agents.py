@@ -4,7 +4,7 @@ from typing import Any, Protocol
 
 from loguru import logger
 
-from ..core.computer_identity import computer_id
+from ..core.computer_identity import computer_id, is_provisional_computer_id
 from ..persistence.agent_placement_store import create_node_placement
 from ..persistence.protocols import (
     AgentPlacementStore,
@@ -120,11 +120,54 @@ def sync_node_agents(ctx: NodeAgentContext, node: dict[str, Any]) -> None:
             return
         raise
     for agent in owned:
-        if agent.get("deletedAt") or agent.get("computerId") != node_computer_id:
+        if agent.get("deletedAt"):
             continue
         if agent["executorKind"] not in available:
             continue
-        if ctx.agent_placement_store.list_placements(agent_id=agent["id"]):
+        placements = ctx.agent_placement_store.list_placements(agent_id=agent["id"])
+        agent_computer_id = agent.get("computerId")
+        if agent_computer_id != node_computer_id:
+            can_promote = (
+                not is_provisional_computer_id(node_computer_id)
+                and (
+                    not agent_computer_id
+                    or is_provisional_computer_id(agent_computer_id)
+                )
+                and any(
+                    placement.get("daemonNodeId") == node["id"]
+                    for placement in placements
+                )
+            )
+            if not can_promote:
+                continue
+            agent = ctx.agent_store.set_birth_certificate(
+                agent["id"],
+                computer_id=node_computer_id,
+                default_role=agent.get("defaultRole") or "implementer",
+            )
+        if any(
+            placement.get("computerId") == node_computer_id
+            for placement in placements
+        ):
+            continue
+        legacy = next(
+            (
+                placement
+                for placement in placements
+                if not placement.get("computerId")
+                or is_provisional_computer_id(placement.get("computerId"))
+            ),
+            None,
+        )
+        if legacy:
+            ctx.agent_placement_store.rebind_placement(
+                legacy["id"],
+                node["id"],
+                managed_node_id=node.get("managedNodeId"),
+                computer_id_value=node_computer_id,
+            )
+            continue
+        if placements:
             continue
         create_node_placement(ctx.agent_placement_store, agent, node)
 

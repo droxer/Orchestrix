@@ -207,12 +207,13 @@ class LocalAgentStore:
     def set_birth_certificate(
         self, agent_id: str, *, computer_id: str, default_role: str
     ) -> dict[str, Any]:
-        """One-time migration use only: backfill a birth certificate onto a
-        legacy agent and clear its compatibility identity.
+        """Migration and identity-promotion use only: write a durable birth
+        certificate and clear any compatibility identity.
 
         These fields are fixed at creation and immutable on the normal path;
-        legacy records predate the concept and can only get it via migration.
-        Do not call this from anywhere else.
+        Legacy records predate the concept, and early migrations could persist
+        a provisional ``node:`` identity. Only migration and daemon sync may
+        repair those records through this event-sourced path.
 
         Clearing compatibilityKey must go through here too — update_agent
         won't work, because _updated_agent routes that field through
@@ -508,12 +509,13 @@ class DatabaseAgentStore:
     def set_birth_certificate(
         self, agent_id: str, *, computer_id: str, default_role: str
     ) -> dict[str, Any]:
-        """Migration-only: backfill an existing agent's birth certificate and
-        clear its compatibility identity.
+        """Migration and identity-promotion only: write a durable birth
+        certificate and clear any compatibility identity.
 
         These fields are fixed at creation and unpatchable on the normal
-        path; legacy records predate the concept, so only this migration
-        entry point backfills them. Do not call from anywhere else.
+        path. Legacy records predate the concept, and early migrations could
+        persist a provisional ``node:`` identity, so migration and daemon sync
+        repair them through this event-sourced entry point.
 
         Clearing compatibilityKey must go through here rather than
         update_agent, because _updated_agent routes that field through

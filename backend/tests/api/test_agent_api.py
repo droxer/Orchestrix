@@ -2914,6 +2914,37 @@ def test_employee_creates_an_agent_on_their_own_computer(client_with_node) -> No
     assert agent["defaultRole"] == "implementer"
 
 
+def test_agent_list_normalizes_a_legacy_placement_to_its_stable_computer(
+    client_with_node,
+) -> None:
+    client, node = client_with_node
+    agent = client.post(
+        "/api/v1/agents",
+        json={
+            "computerId": node["computerId"],
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+            "displayName": "Legacy Ada",
+        },
+    ).json()["agent"]
+    [placement] = client.app.state.agent_placement_store.list_placements(
+        agent_id=agent["id"]
+    )
+    legacy = {**placement}
+    legacy.pop("computerId")
+    _write_json(
+        client.app.state.agent_placement_store._snapshot_path(placement["id"]),
+        legacy,
+    )
+
+    listed = client.get("/api/v1/agents").json()["agents"]
+    [placement_view] = next(
+        item for item in listed if item["id"] == agent["id"]
+    )["placements"]
+
+    assert placement_view["computerId"] == node["computerId"]
+
+
 def test_creation_rejects_a_runtime_the_computer_does_not_have(
     client_with_node,
 ) -> None:
