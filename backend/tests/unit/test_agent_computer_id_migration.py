@@ -124,6 +124,75 @@ def test_migrates_stable_identity_onto_active_legacy_placements(
 
 
 @pytest.mark.parametrize("store_kind", ["local", "database"])
+def test_migration_defers_while_only_a_provisional_node_identity_exists(
+    tmp_path: Path, store_kind: str
+) -> None:
+    agents, placements = _stores(tmp_path, store_kind)
+    agent = agents.ensure_compatibility_agent("alice", "claude", "node-1")
+    legacy = placements.create_placement(agent, "node-1")
+    registry = SimpleNamespace(
+        monitor_nodes=lambda: [{"id": "node-1", "employeeId": "alice"}]
+    )
+
+    assert migrate_agent_placement_computer_ids(placements, registry) == 0
+    assert migrate_agent_computer_ids(agents, placements, registry) == 0
+
+    unchanged_agent = agents.get_agent(agent["id"])
+    unchanged_placement = placements.get_placement(legacy["id"])
+    assert unchanged_agent.get("computerId") is None
+    assert unchanged_agent["compatibilityKey"]
+    assert unchanged_placement.get("computerId") is None
+
+
+@pytest.mark.parametrize("store_kind", ["local", "database"])
+def test_migration_promotes_an_existing_provisional_agent_identity(
+    tmp_path: Path, store_kind: str
+) -> None:
+    agents, placements = _stores(tmp_path, store_kind)
+    agent = agents.create_agent(
+        "alice",
+        {
+            "displayName": "Ada",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+            "computerId": "node:node-1",
+        },
+    )
+    placements.create_placement(
+        agent, "node-1", {"computerId": "device:alice:machine-a"}
+    )
+
+    assert migrate_agent_computer_ids(agents, placements) == 1
+    assert agents.get_agent(agent["id"])["computerId"] == "device:alice:machine-a"
+
+
+@pytest.mark.parametrize("store_kind", ["local", "database"])
+def test_placement_migration_replaces_an_existing_provisional_identity(
+    tmp_path: Path, store_kind: str
+) -> None:
+    agents, placements = _stores(tmp_path, store_kind)
+    agent = agents.create_agent(
+        "alice",
+        {
+            "displayName": "Ada",
+            "executorKind": "claude",
+            "defaultRole": "implementer",
+            "computerId": "node:node-1",
+        },
+    )
+    provisional = placements.create_placement(
+        agent, "node-1", {"computerId": "node:node-1"}
+    )
+    registry = SimpleNamespace(monitor_nodes=lambda: [_node()])
+
+    assert migrate_agent_placement_computer_ids(placements, registry) == 1
+    assert (
+        placements.get_placement(provisional["id"])["computerId"]
+        == "device:alice:machine-a"
+    )
+
+
+@pytest.mark.parametrize("store_kind", ["local", "database"])
 def test_one_agent_failing_to_migrate_does_not_block_the_rest(
     tmp_path: Path, store_kind: str
 ) -> None:
