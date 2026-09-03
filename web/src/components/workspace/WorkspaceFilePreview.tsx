@@ -17,6 +17,11 @@ import {
 import { Markdown } from "../Markdown";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
+/** Every workspace-file response (project, node, task, …) shares this shape
+ *  apart from which id field names the owner — the preview never reads that
+ *  field, so it accepts any response minus its owner id. */
+type WorkspaceFileResponseLike = Omit<ProjectWorkspaceFileResponse, "projectId">;
+
 /* One workspace file on screen — rendered when the type has a presentation,
    source otherwise. Shared by the full-page workspace tab and the thread
    output panel so a file reads the same wherever it is opened. */
@@ -28,7 +33,7 @@ export function WorkspaceFilePreview({
   error,
 }: {
   name: string;
-  data?: ProjectWorkspaceFileResponse;
+  data?: WorkspaceFileResponseLike;
   isLoading: boolean;
   error: unknown;
 }) {

@@ -39,6 +39,7 @@ from ..services.task_rounds import (
     continuation_budget_exhausted,
     continuation_session_id,
 )
+from ..services.task_workspace import resolve_task_workspace
 from ..services.team_dispatch import (
     TEAM_UNAVAILABLE_MESSAGE,
     TeamDispatchError,
@@ -570,6 +571,16 @@ class TaskScheduler:
                     project_snapshot=project_snapshot,
                 )
             }
+            layout, subpath = resolve_task_workspace(
+                task,
+                node=self.registry.get(node_id),
+                project_snapshot=project_snapshot,
+            )
+            workspace_fields: dict[str, Any] = {"workspaceLayout": layout}
+            if subpath:
+                workspace_fields["workspaceSubpath"] = subpath
+            if project_snapshot:
+                workspace_fields["projectId"] = project_snapshot["projectId"]
             session = await self.backend.run(
                 node_id,
                 {
@@ -579,15 +590,7 @@ class TaskScheduler:
                     "actorIsAdmin": True,
                     "agentFirst": True,
                     **({"teamId": team_id} if team_id else {}),
-                    **(
-                        {
-                            "projectId": project_snapshot["projectId"],
-                            "workspaceLayout": "project",
-                            "workspaceSubpath": project_snapshot["workspaceSubpath"],
-                        }
-                        if project_snapshot
-                        else {}
-                    ),
+                    **workspace_fields,
                     "collaboration": collaboration,
                     **({"sessionId": session_id} if session_id else {}),
                     **({"idempotencyKey": claim_id} if claim_id else {}),

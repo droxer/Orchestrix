@@ -344,6 +344,11 @@
     "artifacts_empty": "尚無智能體執行產生的檔案。",
     "artifacts_error": "無法載入產物。",
     "artifact_download": "下載",
+    "workspace": "工作區",
+    "workspace_loading": "正在載入工作區…",
+    "workspace_empty": "此任務的工作區尚無內容。",
+    "workspace_unavailable": "執行此任務的電腦已離線，暫時無法讀取其工作區。",
+    "workspace_error": "無法載入工作區。",
     "statuses": {
       "backlog": "待辦",
       "assigned": "已分配",

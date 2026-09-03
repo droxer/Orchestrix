@@ -45,6 +45,7 @@ from ..persistence.stores import (
     infer_node_location,
     relay_event,
 )
+from ..services.task_workspace import DAEMON_CAPABILITY_TASK_WORKSPACES
 from ..sessions import (
     SessionController,
     compute_conversation_history,
@@ -197,6 +198,7 @@ DAEMON_NODE_CAPABILITIES = frozenset(
         DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
         DAEMON_CAPABILITY_THREAD_WORKSPACES,
         DAEMON_CAPABILITY_PROJECT_WORKSPACES,
+        DAEMON_CAPABILITY_TASK_WORKSPACES,
         DAEMON_CAPABILITY_ROUND_RESULT,
     }
 )
@@ -2625,6 +2627,9 @@ class DaemonNodeRegistry:
                 "The thread requires a daemon with thread-workspaces support.",
             )
             return run_request
+        # No task branch: the task layout is resolved against this node at
+        # dispatch, and a node that dropped the capability mid-task should
+        # degrade rather than have its queued work failed.
         if workspace_layout == "project":
             if DAEMON_CAPABILITY_PROJECT_WORKSPACES not in (
                 sandbox.get("capabilities") or []
@@ -2715,7 +2720,7 @@ class DaemonNodeRegistry:
             "workspaceLayout": workspace_layout,
             **(
                 {"workspaceSubpath": session_snapshot["workspaceSubpath"]}
-                if workspace_layout == "project"
+                if workspace_layout in ("project", "task")
                 else {}
             ),
             **({"role": role} if role else {}),
@@ -3318,10 +3323,14 @@ class DaemonNodeRegistry:
             artifact_workspace_path = str(Path(workspace_path) / session_id)
         elif (
             workspace_path
-            and session.get("workspaceLayout") == "project"
+            and session.get("workspaceLayout") in ("project", "task")
             and isinstance(session.get("workspaceSubpath"), str)
             and session["workspaceSubpath"]
-            and DAEMON_CAPABILITY_PROJECT_WORKSPACES
+            and (
+                DAEMON_CAPABILITY_PROJECT_WORKSPACES
+                if session.get("workspaceLayout") == "project"
+                else DAEMON_CAPABILITY_TASK_WORKSPACES
+            )
             in (sandbox.get("capabilities") or [])
         ):
             artifact_workspace_path = _confined_workspace_path(

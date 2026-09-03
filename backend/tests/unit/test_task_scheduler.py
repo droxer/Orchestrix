@@ -112,6 +112,57 @@ def test_scheduler_dispatches_assigned_task_to_ready_node() -> None:
     asyncio.run(run_flow())
 
 
+def test_scheduler_dispatches_the_task_layout_to_a_capable_node() -> None:
+    """The scheduler resolves the run's workspace layout the same way
+    ``TaskDispatcher`` does: against the node it actually dispatched to, not
+    a hardcoded default. A node that advertises ``task-workspaces`` gets the
+    task's durable per-task directory rather than the legacy per-thread one.
+    """
+
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            task_store = LocalTaskStore(root)
+            registry = DaemonNodeRegistry(
+                session_store, LocalDaemonStore(root), task_store=task_store
+            )
+            registry.register(
+                {
+                    "sandboxId": "sbx_alice",
+                    "employeeId": "alice",
+                    "token": "node_token",
+                    "workspacePath": "/workspace/alice",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "capabilities": ["thread-workspaces", "task-workspaces"],
+                    "status": "ready",
+                },
+                "ui_token",
+            )
+            backend, agent = _logical_backend(root, registry, "sbx_alice")
+            task = task_store.create_task(
+                {
+                    "title": "Ship scheduled backlog",
+                    "assignedAgent": "codex",
+                    "assignedAgentId": agent["id"],
+                    "assigneeEmployeeId": "alice",
+                    "status": "assigned",
+                }
+            )
+            scheduler = TaskScheduler(
+                task_store=task_store, registry=registry, backend=backend
+            )
+
+            result = await scheduler.tick()
+
+            assert result.dispatched == 1
+            [command] = registry.take_commands("sbx_alice", "node_token")
+            assert command["workspaceLayout"] == "task"
+            assert command["workspaceSubpath"] == f"tasks/{task['id']}"
+
+    asyncio.run(run_flow())
+
+
 def test_scheduler_dispatches_when_employee_owns_multiple_computers() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:

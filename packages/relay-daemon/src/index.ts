@@ -64,6 +64,7 @@ import {
   DAEMON_CAPABILITY_PROJECT_WORKSPACES,
   DAEMON_CAPABILITY_ROUND_RESULT,
   DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
+  DAEMON_CAPABILITY_TASK_WORKSPACES,
   DAEMON_CAPABILITY_THREAD_WORKSPACES,
   DAEMON_CAPABILITY_WORKSPACE_READ_SHARED,
   DAEMON_NODE_PROTOCOL_VERSION,
@@ -290,6 +291,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
       DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
       DAEMON_CAPABILITY_THREAD_WORKSPACES,
       DAEMON_CAPABILITY_PROJECT_WORKSPACES,
+      DAEMON_CAPABILITY_TASK_WORKSPACES,
       DAEMON_CAPABILITY_ROUND_RESULT,
     ],
     agentHealth,
@@ -515,14 +517,35 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
             } satisfies DaemonNodeEvent, token, runtimeSignal);
             continue;
           }
+          // A malformed or escaping workspaceSubpath throws out of resolveSubpath;
+          // catch it here the same way the workspace.list/read branch does, so one
+          // bad run.start command fails that command instead of crashing the daemon
+          // and taking down every other run on this node.
+          let sharedWorkspaceKey: string | undefined;
+          try {
+            sharedWorkspaceKey = durableWorkspaceLayout(command.workspaceLayout)
+              ? threadWorkspaces.resolveSubpath(command.sessionId, requiredWorkspaceSubpath(command)).hostPath
+              : undefined;
+          } catch (error) {
+            const detail = error instanceof Error ? error.message : String(error);
+            logger.warn("command rejected for invalid workspace subpath", { ...commandLogFields(sandboxId, command), error: detail });
+            await postJsonWithRetry(fetchFn, relayApiUrl(backendUrl, `/daemon-nodes/${encodeURIComponent(sandboxId)}/events`), {
+              type: "run.failed",
+              commandId: command.id,
+              ...commandLeaseEventFields(command),
+              sessionId: command.sessionId,
+              runId: command.runId,
+              agent: command.agent,
+              error: detail,
+              exitCode: 1,
+            } satisfies DaemonNodeEvent, token, runtimeSignal);
+            continue;
+          }
           logger.info("command received", commandLogFields(sandboxId, command));
           setHealth("busy", commandLogFields(sandboxId, command));
           const controller = new AbortController();
-          const projectWorkspaceKey = command.workspaceLayout === "project"
-            ? threadWorkspaces.resolveProject(command.sessionId, requiredProjectSubpath(command)).hostPath
-            : undefined;
           const promise = Promise.resolve().then(() =>
-            workspaceRunGate.run(projectWorkspaceKey, controller.signal, () => executeCommand(
+            workspaceRunGate.run(sharedWorkspaceKey, controller.signal, () => executeCommand(
               backendUrl,
               sandboxId,
               token,
@@ -585,10 +608,26 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
           });
           activeRuns.get(command.commandId)?.controller.abort(command.reason);
         } else if (command.type === "workspace.list" || command.type === "workspace.read") {
-          const commandWorkspacePath = command.workspaceLayout === "project" && command.sessionId
-            ? threadWorkspaces.resolveProject(command.sessionId, requiredProjectSubpath(command)).hostPath
-            : workspacePath;
-          const event = workspaceCommandEvent(commandWorkspacePath, command);
+          // A durable workspaceSubpath is validated before the workspace-read helpers
+          // run, so an escaping subpath throws here rather than inside workspaceCommandEvent —
+          // catch it the same way, as a workspace.error event, instead of letting it
+          // fall out of the poll loop and take the whole daemon down.
+          let event: DaemonNodeEvent;
+          try {
+            const commandWorkspacePath = durableWorkspaceLayout(command.workspaceLayout) && command.sessionId
+              ? threadWorkspaces.resolveSubpath(command.sessionId, requiredWorkspaceSubpath(command)).hostPath
+              : workspacePath;
+            event = workspaceCommandEvent(commandWorkspacePath, command);
+          } catch (error) {
+            event = {
+              type: "workspace.error",
+              commandId: command.id,
+              ...(command.leaseId ? { leaseId: command.leaseId } : {}),
+              path: command.path,
+              code: "invalid-path",
+              message: error instanceof Error ? error.message : String(error),
+            };
+          }
           await postJsonWithRetry(fetchFn, relayApiUrl(backendUrl, `/daemon-nodes/${encodeURIComponent(sandboxId)}/events`), event, token, runtimeSignal).catch((error: unknown) => {
             logger.error("workspace event post failed", { sandboxId, commandId: command.id, error: error instanceof Error ? error.message : String(error) });
           });
@@ -795,9 +834,14 @@ function checkWorkspace(workspacePath: string): void {
   accessSync(workspacePath, constants.R_OK | constants.W_OK);
 }
 
-function requiredProjectSubpath(command: { workspaceSubpath?: string }): string {
+/** "project" and "task" both resolve to a shared durable subpath below the node root. */
+function durableWorkspaceLayout(layout: string | undefined): boolean {
+  return layout === "project" || layout === "task";
+}
+
+function requiredWorkspaceSubpath(command: { workspaceSubpath?: string }): string {
   if (!command.workspaceSubpath) {
-    throw new Error("Project workspace command is missing workspaceSubpath.");
+    throw new Error("Durable workspace command is missing workspaceSubpath.");
   }
   return command.workspaceSubpath;
 }
@@ -825,8 +869,8 @@ async function executeCommand(
   }
   const threadWorkspace = command.workspaceLayout === "thread"
     ? threadWorkspaces.ensure(command.sessionId)
-    : command.workspaceLayout === "project"
-      ? threadWorkspaces.ensureProject(command.sessionId, requiredProjectSubpath(command))
+    : durableWorkspaceLayout(command.workspaceLayout)
+      ? threadWorkspaces.ensureSubpath(command.sessionId, requiredWorkspaceSubpath(command))
       : threadWorkspaces.nodeRoot(command.sessionId);
   await environment.ensureAgentReady(command.agent, signal, threadWorkspace.hostPath);
   if (signal?.aborted) {

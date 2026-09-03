@@ -13,6 +13,7 @@ from ..persistence.stores import (
     task_status,
     valid_agent,
 )
+from ..core.ids import new_database_id
 from ..persistence.task_store import TaskExecutionActiveError
 from ..services.task_deletion import (
     TaskDeletionError,
@@ -28,6 +29,7 @@ from ..services.task_dispatch import (
 from ..services.task_dispatch import (
     start_routine_occurrence_on_ready_node as dispatch_routine_occurrence,
 )
+from ..services.task_workspace import task_workspace_subpath
 from ..services.team_dispatch import (
     TeamDispatchError,
     task_thread_assignments,
@@ -56,6 +58,13 @@ from .helpers import (
     workspace_artifacts,
 )
 from .project_helpers import project_for_owner, project_session_fields
+from .workspace_transport import (
+    dispatch_workspace_command,
+    live_workspace_file,
+    live_workspace_listing,
+    raise_workspace_error,
+    workspace_path,
+)
 
 router = APIRouter()
 
@@ -1107,6 +1116,123 @@ async def task_artifacts(
         reverse=True,
     )
     return {"taskId": task_id, "artifacts": ordered}
+
+
+def _task_workspace_node(
+    ctx: Any, task: dict[str, Any], actor: dict[str, Any]
+) -> dict[str, Any]:
+    """The live computer holding this task's workspace.
+
+    Unlike a project, a task pins no computer of its own — it ran wherever its
+    sessions ran. The newest linked session names the node; a routine never runs
+    itself, so it borrows the node from its newest occurrence's session. A task
+    that has not dispatched yet has no workspace to read, which reads to the
+    caller the same way an offline computer does.
+    """
+    session_ids = list(task.get("linkedSessionIds") or [])
+    for occurrence in occurrence_tasks(ctx, task, actor):
+        session_ids.extend(occurrence.get("linkedSessionIds") or [])
+    for session_id in reversed(session_ids):
+        try:
+            session = ctx.session_store.get_session(session_id)
+        except (KeyError, FileNotFoundError):
+            continue  # A linked session may have been deleted; skip it.
+        # _task_workspace_command always browses under the "task" layout. A
+        # session recorded under a different layout (legacy tasks predating
+        # this branch, or a dispatch that degraded to "thread" because its
+        # node lacked task-workspaces) would source a node whose files live
+        # somewhere else, making a real workspace look empty. Skip it so a
+        # mismatched task instead surfaces the placement-unavailable error
+        # below rather than a false "nothing here yet".
+        if (session or {}).get("workspaceLayout") != "task":
+            continue
+        node_id = (session or {}).get("daemonNodeId")
+        if not node_id:
+            continue
+        node = next(
+            (item for item in ctx.registry.monitor_nodes() if item["id"] == node_id),
+            None,
+        )
+        if (
+            node
+            and node.get("online")
+            and "workspace-read-shared" in (node.get("capabilities") or [])
+        ):
+            return node
+    raise HTTPException(503, {"reason": "placement-unavailable"})
+
+
+def _task_workspace_command(
+    task: dict[str, Any], *, command_id: str, command_type: str, path: str
+) -> dict[str, Any]:
+    return {
+        "id": command_id,
+        "type": command_type,
+        # Task ids use the same validated database-id alphabet as sessions. The
+        # daemon treats this only as a routing identifier; workspaceSubpath is
+        # what selects the durable task root.
+        "sessionId": task["id"],
+        "workspaceLayout": "task",
+        "workspaceSubpath": task_workspace_subpath(task),
+        "path": path,
+    }
+
+
+@router.get("/tasks/{task_id}/workspace/files")
+async def task_workspace_files(
+    task_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    """Live listing of the directory this task's rounds share.
+
+    Live reads need the computer to be up. The artifact index remains the
+    durable record of what a task produced.
+    """
+    actor = request_actor(request, ctx.auth_store)
+    task = get_task_for_actor(ctx.task_store, task_id, actor)
+    path = workspace_path(request.query_params.get("path"))
+    node = _task_workspace_node(ctx, task, actor)
+    event = await dispatch_workspace_command(
+        ctx,
+        node,
+        _task_workspace_command(
+            task,
+            command_id=new_database_id(),
+            command_type="workspace.list",
+            path=path,
+        ),
+    )
+    raise_workspace_error(event)
+    return live_workspace_listing(
+        event,
+        path=path,
+        metadata={"taskId": task["id"], "scope": "shared", "nodeId": node["id"]},
+    )
+
+
+@router.get("/tasks/{task_id}/workspace/file")
+async def task_workspace_file(
+    task_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    actor = request_actor(request, ctx.auth_store)
+    task = get_task_for_actor(ctx.task_store, task_id, actor)
+    path = workspace_path(request.query_params.get("path"), required=True)
+    node = _task_workspace_node(ctx, task, actor)
+    event = await dispatch_workspace_command(
+        ctx,
+        node,
+        _task_workspace_command(
+            task,
+            command_id=new_database_id(),
+            command_type="workspace.read",
+            path=path,
+        ),
+    )
+    raise_workspace_error(event)
+    return live_workspace_file(
+        event,
+        path=path,
+        metadata={"taskId": task["id"], "scope": "shared", "nodeId": node["id"]},
+    )
 
 
 # A routine that has run nightly for a year has hundreds of occurrences; the

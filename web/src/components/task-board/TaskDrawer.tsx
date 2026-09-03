@@ -33,6 +33,7 @@ import {
 } from "../../lib/taskBoardForm";
 import { Drawer } from "@/components/ui/Drawer";
 import { TaskDrawerArtifacts } from "./TaskDrawerArtifacts";
+import { TaskDrawerWorkspace } from "./TaskDrawerWorkspace";
 import { TaskDrawerHistory } from "./TaskDrawerHistory";
 import { RoutineRunLedger } from "./RoutineRunLedger";
 import { TaskResultSummary } from "./TaskResultSummary";
@@ -660,6 +661,9 @@ export function TaskDrawer({
               <TaskResultSummary taskId={form.id} onOpenThread={onOpenThread} />
             )}
             <TaskDrawerArtifacts taskId={form.id} />
+            {/* Files produced sit next to files indexed: the artifact list is
+                the durable record, the workspace is what is there right now. */}
+            <TaskDrawerWorkspace taskId={form.id} />
             {/* A routine's runs happen in its occurrences, so it reads as a
                 ledger of runs; a plain task ran once and reads as a timeline. */}
             {form.variant === "routine" ? (
