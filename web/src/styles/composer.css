@@ -273,9 +273,19 @@
   max-height: 200px;
   resize: none;
   overflow-y: hidden;
-  outline: 0;
   background: transparent;
   color: var(--ink-1);
+}
+
+/* The card draws the one ring for this surface: focus lives on the field,
+   but .composer-input-wrap is what the eye reads as focused, so its
+   :focus-within carries the ring and the field's own is suppressed to keep
+   the two from doubling up (the .command-menu focus pattern in command.css).
+   A bare `outline: 0` on the class loses to base.css's textarea:focus-visible
+   reset inside the same @layer relay — the suppression must carry
+   :focus-visible itself to win. */
+.composer-textarea:focus-visible {
+  outline: none;
 }
 
 /* Mirror of the draft, painted under the real text: it carries the mention
