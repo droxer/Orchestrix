@@ -30,6 +30,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from relay.persistence.schema import metadata
+from relay.persistence.session_store import DatabaseSessionStore
+from relay.services.task_deletion import task_has_active_linked_session
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 REPO_ROOT = BACKEND_ROOT.parent
@@ -115,3 +117,18 @@ def test_migrated_schema_matches_declared_metadata(
         engine.dispose()
 
     assert diffs == [], "schema drift:\n" + "\n".join(str(diff) for diff in diffs)
+
+
+def test_dangling_legacy_session_id_is_treated_as_missing(
+    migrated_schema: tuple[str, str],
+) -> None:
+    url, _schema = migrated_schema
+    store = DatabaseSessionStore(url)
+
+    with pytest.raises(KeyError, match="ses_legacy"):
+        store.get_session("ses_legacy")
+
+    assert not task_has_active_linked_session(
+        store,
+        {"linkedSessionIds": ["ses_legacy"]},
+    )
