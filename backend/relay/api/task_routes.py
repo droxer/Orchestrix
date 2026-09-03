@@ -578,17 +578,12 @@ async def update_task(
         or current.get("ownerEmployeeId")
         or actor["employeeId"]
     )
-    if not (
-        assigned_team_id
-        and assigned_team_id == current.get("assignedTeamId")
-        and not assignee_changed
-    ):
-        team_for_assignment(
-            ctx,
-            actor,
-            assigned_team_id,
-            expected_employee_id=expected_team_employee_id,
-        )
+    team_for_assignment(
+        ctx,
+        actor,
+        assigned_team_id,
+        expected_employee_id=expected_team_employee_id,
+    )
     if (
         not title
         and description is None
