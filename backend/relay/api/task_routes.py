@@ -1133,7 +1133,19 @@ def _task_workspace_node(
     for occurrence in occurrence_tasks(ctx, task, actor):
         session_ids.extend(occurrence.get("linkedSessionIds") or [])
     for session_id in reversed(session_ids):
-        session = ctx.session_store.get_session(session_id)
+        try:
+            session = ctx.session_store.get_session(session_id)
+        except (KeyError, FileNotFoundError):
+            continue  # A linked session may have been deleted; skip it.
+        # _task_workspace_command always browses under the "task" layout. A
+        # session recorded under a different layout (legacy tasks predating
+        # this branch, or a dispatch that degraded to "thread" because its
+        # node lacked task-workspaces) would source a node whose files live
+        # somewhere else, making a real workspace look empty. Skip it so a
+        # mismatched task instead surfaces the placement-unavailable error
+        # below rather than a false "nothing here yet".
+        if (session or {}).get("workspaceLayout") != "task":
+            continue
         node_id = (session or {}).get("daemonNodeId")
         if not node_id:
             continue

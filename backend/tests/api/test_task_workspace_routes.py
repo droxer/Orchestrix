@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from relay.app import create_app
 from relay.core.computer_identity import computer_id
+from relay.sessions import SessionController
 
 ADMIN_PASSWORD = "kestrel-vault-7719"
 
@@ -258,3 +259,72 @@ def test_reads_a_file_from_the_task_workspace(client, task_with_run):
     )
     assert response.status_code == 200, response.text
     assert response.json()["taskId"] == task["id"]
+
+
+def test_falls_back_to_an_older_session_when_the_newest_was_deleted(client, task_with_run):
+    # The newest linked session is hard-deleted without unlinking (the path a
+    # direct store deletion takes, as opposed to the API's unlink-aware
+    # delete). The task's linkedSessionIds still names it, so resolving the
+    # workspace node must skip the now-missing session rather than 500.
+    task, node = task_with_run(capabilities=["task-workspaces", "workspace-read-shared"])
+    app = client.app
+    older_session_id = task["linkedSessionIds"][0]
+
+    controller = SessionController(
+        app.state.session_store,
+        task_store=app.state.task_store,
+        task_id=task["id"],
+        workspace_path=node["workspacePath"],
+        owner_employee_id="alice",
+        workspace_layout="task",
+        daemon_node_id=node["id"],
+    )
+    newest_session_id = controller.create_session(task["title"], ["human", "codex"])["id"]
+    app.state.session_store.delete_session(newest_session_id)
+
+    task = client.get(f"/api/v1/tasks/{task['id']}").json()
+    assert newest_session_id in task["linkedSessionIds"]
+    assert older_session_id in task["linkedSessionIds"]
+
+    response = client.get(f"/api/v1/tasks/{task['id']}/workspace/files")
+    assert response.status_code == 200, response.text
+    assert response.json()["nodeId"] == node["id"]
+
+
+def test_reports_placement_unavailable_when_only_deleted_sessions_remain(client, task_with_run):
+    task, node = task_with_run(capabilities=["task-workspaces", "workspace-read-shared"])
+    app = client.app
+    only_session_id = task["linkedSessionIds"][0]
+    app.state.session_store.delete_session(only_session_id)
+
+    response = client.get(f"/api/v1/tasks/{task['id']}/workspace/files")
+    assert response.status_code == 503
+    assert response.json()["detail"]["reason"] == "placement-unavailable"
+
+
+def test_reports_placement_unavailable_when_session_layout_is_not_task(client, task_with_run):
+    # A session recorded under a non-"task" layout (a legacy task, or a
+    # dispatch that degraded because the node lacked task-workspaces) would
+    # source a node whose files live elsewhere. Browsing must not claim the
+    # task's workspace is empty in that case.
+    task, node = task_with_run(capabilities=["task-workspaces", "workspace-read-shared"])
+    app = client.app
+    # The dispatched session already carries the "task" layout; replace it
+    # with a "thread"-layout one so no eligible session remains, matching a
+    # task whose only recorded session predates or degraded from that layout.
+    app.state.session_store.delete_session(task["linkedSessionIds"][0])
+
+    controller = SessionController(
+        app.state.session_store,
+        task_store=app.state.task_store,
+        task_id=task["id"],
+        workspace_path=node["workspacePath"],
+        owner_employee_id="alice",
+        workspace_layout="thread",
+        daemon_node_id=node["id"],
+    )
+    controller.create_session(task["title"], ["human", "codex"])
+
+    response = client.get(f"/api/v1/tasks/{task['id']}/workspace/files")
+    assert response.status_code == 503
+    assert response.json()["detail"]["reason"] == "placement-unavailable"
