@@ -18,6 +18,12 @@ describe("task workspace section state", () => {
     assert.equal(taskWorkspaceState({ isLoading: false, error: null, data }), "empty");
   });
 
+  it("keeps the browser ready inside an empty directory so the user can navigate up", () => {
+    const data = { exists: true, entries: [] };
+    const nestedQuery = { isLoading: false, error: null, data, path: "reports" };
+    assert.equal(taskWorkspaceState(nestedQuery), "ready");
+  });
+
   it("reports ready when there are entries", () => {
     const data = { exists: true, entries: [{ name: "report.md", path: "report.md", kind: "file", bytes: 12, updatedAt: "" }] };
     assert.equal(taskWorkspaceState({ isLoading: false, error: null, data }), "ready");
