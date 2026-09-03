@@ -9,12 +9,14 @@ export function taskWorkspaceState(query: {
   isLoading: boolean;
   error: unknown;
   data: { exists: boolean; entries: unknown[] } | undefined;
+  path?: string;
 }): TaskWorkspaceState {
   if (query.isLoading) return "loading";
   if (query.error) {
     const status = (query.error as { status?: number }).status;
     return status === 503 ? "unavailable" : "failed";
   }
-  if (!query.data || !query.data.exists || query.data.entries.length === 0) return "empty";
+  if (!query.data || !query.data.exists) return "empty";
+  if (query.data.entries.length === 0 && !query.path) return "empty";
   return "ready";
 }

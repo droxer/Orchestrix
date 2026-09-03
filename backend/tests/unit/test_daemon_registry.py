@@ -850,6 +850,59 @@ def test_task_dispatch_carries_shared_workspace_subpath() -> None:
     asyncio.run(run_flow())
 
 
+def test_task_dispatch_fails_if_the_daemon_loses_task_workspace_support() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            registry = DaemonNodeRegistry(session_store, LocalDaemonStore(root))
+            backend = ServerDaemonNodeBackend(registry)
+            registration = {
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "workspaceId": "machine-a",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["thread-workspaces", "task-workspaces"],
+                "status": "ready",
+            }
+            registry.register(registration, "ui_token")
+            session = session_store.create_session(
+                {
+                    "workspacePath": "/workspace/alice",
+                    "workspaceLayout": "task",
+                    "workspaceSubpath": "tasks/tsk_one",
+                    "computerId": "device:alice:machine-a",
+                    "ownerEmployeeId": "alice",
+                    "taskGoal": "keep task files isolated",
+                }
+            )
+
+            await backend.run(
+                "sbx_alice",
+                {
+                    "sessionId": session["id"],
+                    "taskGoal": session["taskGoal"],
+                    "assignments": [{"agent": "codex"}],
+                },
+            )
+            registry.register(
+                {
+                    **registration,
+                    "capabilities": ["thread-workspaces"],
+                },
+                "ui_token",
+            )
+
+            assert registry.take_commands("sbx_alice", "node_token") == []
+            failed = session_store.get_session(session["id"])
+            assert failed["status"] == "failed"
+            assert "task-workspaces support" in failed["finalOutcome"]
+
+    asyncio.run(run_flow())
+
+
 def test_command_poll_cannot_observe_run_before_request_links_command() -> None:
     class PausingDaemonStore(DatabaseDaemonStore):
         def __init__(self, database_url: str):

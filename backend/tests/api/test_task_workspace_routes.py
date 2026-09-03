@@ -261,6 +261,121 @@ def test_reads_a_file_from_the_task_workspace(client, task_with_run):
     assert response.json()["taskId"] == task["id"]
 
 
+def test_project_task_browses_the_recorded_project_workspace(
+    client, backlog_task, monkeypatch
+):
+    app = client.app
+    node = _register_node(
+        app,
+        "node_alice_project",
+        "machine-alice-project",
+        ["project-workspaces", "workspace-read-shared"],
+    )
+    controller = SessionController(
+        app.state.session_store,
+        task_store=app.state.task_store,
+        task_id=backlog_task["id"],
+        workspace_path=node["workspacePath"],
+        owner_employee_id="alice",
+        project_id="prj_launch",
+        workspace_layout="project",
+        workspace_subpath="projects/prj_launch",
+        daemon_node_id=node["id"],
+    )
+    controller.create_session(backlog_task["title"], ["human", "codex"])
+    captured: dict[str, Any] = {}
+
+    async def capture_dispatch(_ctx: Any, _node: dict, command: dict) -> dict:
+        captured.update(command)
+        return {
+            "type": "workspace.listing",
+            "path": command["path"],
+            "exists": True,
+            "entries": [],
+        }
+
+    monkeypatch.setattr(
+        "relay.api.task_routes.dispatch_workspace_command", capture_dispatch
+    )
+
+    response = client.get(
+        f"/api/v1/tasks/{backlog_task['id']}/workspace/files"
+    )
+
+    assert response.status_code == 200, response.text
+    assert captured["workspaceLayout"] == "project"
+    assert captured["workspaceSubpath"] == "projects/prj_launch"
+
+
+def test_task_workspace_rejects_a_daemon_that_lost_task_workspace_support(
+    client, backlog_task
+):
+    app = client.app
+    node = _register_node(
+        app,
+        "node_alice_downgraded",
+        "machine-alice-downgraded",
+        ["task-workspaces", "workspace-read-shared"],
+    )
+    controller = SessionController(
+        app.state.session_store,
+        task_store=app.state.task_store,
+        task_id=backlog_task["id"],
+        workspace_path=node["workspacePath"],
+        owner_employee_id="alice",
+        workspace_layout="task",
+        workspace_subpath=f"tasks/{backlog_task['id']}",
+        daemon_node_id=node["id"],
+    )
+    controller.create_session(backlog_task["title"], ["human", "codex"])
+    _register_node(
+        app,
+        node["id"],
+        "machine-alice-downgraded",
+        ["workspace-read-shared"],
+    )
+
+    response = client.get(
+        f"/api/v1/tasks/{backlog_task['id']}/workspace/files"
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["reason"] == "placement-unavailable"
+
+
+def test_newest_workspace_session_does_not_fall_back_to_an_older_node(
+    client, backlog_task
+):
+    app = client.app
+    capabilities = ["task-workspaces", "workspace-read-shared"]
+    older = _register_node(
+        app, "node_alice_older", "machine-alice-older", capabilities
+    )
+    newest = _register_node(
+        app, "node_alice_newest", "machine-alice-newest", capabilities
+    )
+    for node in (older, newest):
+        controller = SessionController(
+            app.state.session_store,
+            task_store=app.state.task_store,
+            task_id=backlog_task["id"],
+            workspace_path=node["workspacePath"],
+            owner_employee_id="alice",
+            workspace_layout="task",
+            workspace_subpath=f"tasks/{backlog_task['id']}",
+            daemon_node_id=node["id"],
+        )
+        controller.create_session(backlog_task["title"], ["human", "codex"])
+    app.state.registry.delete(newest["id"])
+
+    response = client.get(
+        f"/api/v1/tasks/{backlog_task['id']}/workspace/files"
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["reason"] == "placement-unavailable"
+
+
 def test_falls_back_to_an_older_session_when_the_newest_was_deleted(client, task_with_run):
     # The newest linked session is hard-deleted without unlinking (the path a
     # direct store deletion takes, as opposed to the API's unlink-aware
