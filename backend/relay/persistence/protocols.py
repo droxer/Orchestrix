@@ -174,6 +174,9 @@ class AgentStore(Protocol):
         compatibility_key: str,
         **kwargs: Any,
     ) -> dict[str, Any]: ...
+    def set_birth_certificate(
+        self, agent_id: str, *, computer_id: str, default_role: str
+    ) -> dict[str, Any]: ...
 
 
 class AgentPlacementStore(Protocol):

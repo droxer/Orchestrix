@@ -12,7 +12,7 @@ from typing import Any
 
 from loguru import logger
 
-from ..core.computer_identity import computer_id
+from ..core.computer_identity import computer_id, is_provisional_computer_id
 
 DEFAULT_ROLE = "implementer"
 
@@ -31,7 +31,10 @@ def migrate_agent_placement_computer_ids(
     nodes = {node["id"]: node for node in registry.monitor_nodes()}
     migrated = 0
     for placement in placement_store.list_placements():
-        if placement.get("computerId"):
+        current_computer_id = placement.get("computerId")
+        if current_computer_id and not is_provisional_computer_id(
+            current_computer_id
+        ):
             continue
         node = nodes.get(placement.get("daemonNodeId"))
         if not node:
@@ -41,12 +44,15 @@ def migrate_agent_placement_computer_ids(
                 daemon_node_id=placement.get("daemonNodeId"),
             )
             continue
+        target_computer_id = computer_id(node)
+        if is_provisional_computer_id(target_computer_id):
+            continue
         try:
             placement_store.rebind_placement(
                 placement["id"],
                 node["id"],
                 managed_node_id=node.get("managedNodeId"),
-                computer_id_value=computer_id(node),
+                computer_id_value=target_computer_id,
             )
             migrated += 1
         except Exception as error:  # noqa: BLE001 - one bad legacy placement
@@ -69,7 +75,11 @@ def migrate_agent_computer_ids(
     """
     migrated = 0
     for agent in agent_store.list_agents():
-        if agent.get("deletedAt") or not agent.get("compatibilityKey"):
+        if agent.get("deletedAt"):
+            continue
+        if not agent.get("compatibilityKey") and not is_provisional_computer_id(
+            agent.get("computerId")
+        ):
             continue
         try:
             agent_computer_id = _computer_id_from_placements(
@@ -147,13 +157,15 @@ def _computer_id_from_placements(
     for placement in newest_first:
         node = nodes.get(placement.get("daemonNodeId"))
         if node:
-            return computer_id(node)
+            computer_id_value = computer_id(node)
+            if not is_provisional_computer_id(computer_id_value):
+                return computer_id_value
     return None
 
 
 def _first_computer_id(placements: list[dict[str, Any]]) -> str | None:
     for placement in placements:
         computer_id_value = placement.get("computerId")
-        if computer_id_value:
+        if computer_id_value and not is_provisional_computer_id(computer_id_value):
             return computer_id_value
     return None

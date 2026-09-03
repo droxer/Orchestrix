@@ -37,6 +37,16 @@ def computer_id(node: Mapping[str, Any]) -> str:
     return f"node:{node['id']}"
 
 
+def is_provisional_computer_id(value: Any) -> bool:
+    """Whether an identity is only the current daemon node fallback.
+
+    A ``node:`` identity is useful for routing while a daemon is registering,
+    but it is not durable enough to persist as an agent's or placement's
+    Computer identity because the node id changes on reprovisioning.
+    """
+    return isinstance(value, str) and value.startswith("node:")
+
+
 def local_enrollment_key(employee_id: Any, workspace_path: Any) -> str | None:
     """Return the provisional identity used before a device reports machine-id.
 
