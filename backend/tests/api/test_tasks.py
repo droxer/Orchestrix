@@ -1560,6 +1560,29 @@ def test_clearing_an_assigned_task_returns_it_to_backlog(monkeypatch) -> None:
         assert "assignedTeamId" not in cleared.json()
 
 
+def test_retrying_blocked_task_revalidates_unchanged_team(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        task = client.post("/api/v1/tasks", json={"title": "Retry stale team"}).json()
+        missing_team_id = "bfb532f7-c185-404c-8648-18188433b9a5"
+        client.app.state.task_store.set_task_team_assignment(
+            task["id"], missing_team_id
+        )
+        client.app.state.task_store.update_task(task["id"], {"status": "blocked"})
+
+        retried = client.patch(
+            f"/api/v1/tasks/{task['id']}",
+            json={"assignedTeamId": missing_team_id, "status": "assigned"},
+        )
+
+        assert retried.status_code == 404
+        assert retried.json()["detail"] == "Team not found."
+        unchanged = client.get(f"/api/v1/tasks/{task['id']}").json()
+        assert unchanged["status"] == "blocked"
+
+
 def test_active_task_assignment_cannot_change(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

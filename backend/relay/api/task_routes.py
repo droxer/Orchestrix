@@ -114,6 +114,7 @@ def team_for_assignment(
     team_id: str | None,
     *,
     expected_employee_id: str,
+    require_actor_access: bool = True,
 ) -> dict[str, Any] | None:
     if not team_id:
         return None
@@ -124,7 +125,11 @@ def team_for_assignment(
         raise HTTPException(409, "team_disabled")
     if team.get("ownerEmployeeId") != expected_employee_id:
         raise HTTPException(403, "Team is not available to the task assignee.")
-    if not actor["isAdmin"] and team.get("ownerEmployeeId") != actor["employeeId"]:
+    if (
+        require_actor_access
+        and not actor["isAdmin"]
+        and team.get("ownerEmployeeId") != actor["employeeId"]
+    ):
         raise HTTPException(403, "Team access denied.")
     return team
 
@@ -578,17 +583,18 @@ async def update_task(
         or current.get("ownerEmployeeId")
         or actor["employeeId"]
     )
-    if not (
+    unchanged_team_assignment = bool(
         assigned_team_id
         and assigned_team_id == current.get("assignedTeamId")
         and not assignee_changed
-    ):
-        team_for_assignment(
-            ctx,
-            actor,
-            assigned_team_id,
-            expected_employee_id=expected_team_employee_id,
-        )
+    )
+    team_for_assignment(
+        ctx,
+        actor,
+        assigned_team_id,
+        expected_employee_id=expected_team_employee_id,
+        require_actor_access=not unchanged_team_assignment,
+    )
     if (
         not title
         and description is None
