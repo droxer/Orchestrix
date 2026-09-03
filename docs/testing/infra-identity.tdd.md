@@ -56,19 +56,29 @@ treated it as immutable and never converged on the later
 
 RED checkpoint: `b75112b9 test: reproduce provisional computer identity lock-in`.
 
+A final audit added a mixed-history case in which the active legacy placement
+had no stable id but a removed placement did. Both storage variants failed by
+selecting the retired Computer instead of resolving the active daemon.
+
+RED checkpoint: `096f1945 test: prioritize active computer identity evidence`.
+
 ### Follow-up GREEN evidence
 
-- The same focused migration and node-sync suite passed 44/44 tests.
+- The final focused migration and node-sync suite passed 46/46 tests.
 - The broader identity, placement, agent API, and daemon API suite passed
-  212/212 tests.
+  214/214 tests.
 - `npm test` completed the production build and passed 1,308/1,308 TypeScript
-  tests plus 1,061/1,061 Python tests.
+  tests. The final Python run passed 1,063/1,063 tests after the mixed-history
+  regression was added.
 - `make pre-commit-run` passed all repository hooks, including both TypeScript
   typechecks and the web design-token style check.
-- Diff coverage from the follow-up RED checkpoint is 95% (23 executable lines,
-  one uncovered defensive warning line).
+- Diff coverage from the first follow-up RED checkpoint is 93% (31 executable
+  lines, two uncovered defensive/fallback lines).
 
 GREEN checkpoint: `56dc41dc fix: promote provisional computer identities`.
+
+Final audit GREEN checkpoint:
+`f4ea38c1 fix: prefer active placement identity evidence`.
 
 ## Test specification
 
@@ -82,6 +92,7 @@ GREEN checkpoint: `56dc41dc fix: promote provisional computer identities`.
 | 6 | Startup defers migration until a durable managed or employee-device identity exists | `backend/tests/unit/test_agent_computer_id_migration.py` | Unit | PASS |
 | 7 | Startup promotes previously persisted `node:` agent and placement identities | `backend/tests/unit/test_agent_computer_id_migration.py` | Unit | PASS |
 | 8 | Daemon registration promotes compatibility and plain agents when the machine identity arrives | `backend/tests/unit/test_node_agents.py` | Integration | PASS |
+| 9 | An active legacy placement outranks stable identity stored only in removed placement history | `backend/tests/unit/test_agent_computer_id_migration.py` | Unit | PASS |
 
 ## Coverage and known gaps
 
@@ -89,8 +100,8 @@ GREEN checkpoint: `56dc41dc fix: promote provisional computer identities`.
   `agentGroups` module is 100% lines/functions and 80% branches.
 - Python diff coverage across the two task commits: 91% (46 changed executable
   lines, 4 uncovered defensive/error lines).
-- Python diff coverage for the provisional-identity follow-up is 95% (23
-  changed executable lines, 1 uncovered defensive warning line).
+- Python diff coverage for the provisional-identity follow-up is 93% (31
+  changed executable lines, 2 uncovered defensive/fallback lines).
 - Whole-module coverage across the four broad Python modules is 77.32%. The
   repository has no configured global coverage gate; the result is dominated
   by pre-existing untested branches in `node_agents.py` (51%). All changed
@@ -104,4 +115,4 @@ GREEN checkpoint: `56dc41dc fix: promote provisional computer identities`.
 ## Merge evidence
 
 Keep the RED and GREEN checkpoint messages above in the PR or squash-commit
-body if the two commits are squashed.
+body if the checkpoints are squashed.
