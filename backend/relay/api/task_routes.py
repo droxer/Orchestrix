@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
+from ..core.ids import new_database_id
 from ..persistence.stores import (
     task_priority,
     task_routine_cadence,
@@ -13,7 +14,6 @@ from ..persistence.stores import (
     task_status,
     valid_agent,
 )
-from ..core.ids import new_database_id
 from ..persistence.task_store import TaskExecutionActiveError
 from ..services.task_deletion import (
     TaskDeletionError,
@@ -29,7 +29,12 @@ from ..services.task_dispatch import (
 from ..services.task_dispatch import (
     start_routine_occurrence_on_ready_node as dispatch_routine_occurrence,
 )
-from ..services.task_workspace import task_workspace_subpath
+from ..services.task_workspace import (
+    DAEMON_CAPABILITY_TASK_WORKSPACES,
+    WORKSPACE_LAYOUT_PROJECT,
+    WORKSPACE_LAYOUT_TASK,
+    task_workspace_subpath,
+)
 from ..services.team_dispatch import (
     TeamDispatchError,
     task_thread_assignments,
@@ -1118,10 +1123,10 @@ async def task_artifacts(
     return {"taskId": task_id, "artifacts": ordered}
 
 
-def _task_workspace_node(
+def _task_workspace_target(
     ctx: Any, task: dict[str, Any], actor: dict[str, Any]
-) -> dict[str, Any]:
-    """The live computer holding this task's workspace.
+) -> tuple[dict[str, Any], str, str]:
+    """The live computer and recorded layout holding this task's workspace.
 
     Unlike a project, a task pins no computer of its own — it ran wherever its
     sessions ran. The newest linked session names the node; a routine never runs
@@ -1132,38 +1137,53 @@ def _task_workspace_node(
     session_ids = list(task.get("linkedSessionIds") or [])
     for occurrence in occurrence_tasks(ctx, task, actor):
         session_ids.extend(occurrence.get("linkedSessionIds") or [])
+    nodes = {item["id"]: item for item in ctx.registry.monitor_nodes()}
     for session_id in reversed(session_ids):
         try:
             session = ctx.session_store.get_session(session_id)
         except (KeyError, FileNotFoundError):
             continue  # A linked session may have been deleted; skip it.
-        # _task_workspace_command always browses under the "task" layout. A
-        # session recorded under a different layout (legacy tasks predating
-        # this branch, or a dispatch that degraded to "thread" because its
-        # node lacked task-workspaces) would source a node whose files live
-        # somewhere else, making a real workspace look empty. Skip it so a
-        # mismatched task instead surfaces the placement-unavailable error
-        # below rather than a false "nothing here yet".
-        if (session or {}).get("workspaceLayout") != "task":
+        if not session:
             continue
-        node_id = (session or {}).get("daemonNodeId")
-        if not node_id:
-            continue
-        node = next(
-            (item for item in ctx.registry.monitor_nodes() if item["id"] == node_id),
-            None,
+        # The newest surviving session is authoritative. Falling through to an
+        # older online node would present a stale, divergent copy of the task
+        # workspace after placement changed.
+        layout = session.get("workspaceLayout")
+        if layout not in (WORKSPACE_LAYOUT_TASK, WORKSPACE_LAYOUT_PROJECT):
+            raise HTTPException(503, {"reason": "placement-unavailable"})
+        node = nodes.get(session.get("daemonNodeId"))
+        required_capability = (
+            DAEMON_CAPABILITY_TASK_WORKSPACES
+            if layout == WORKSPACE_LAYOUT_TASK
+            else "project-workspaces"
         )
-        if (
+        capabilities = (node or {}).get("capabilities") or []
+        if not (
             node
             and node.get("online")
-            and "workspace-read-shared" in (node.get("capabilities") or [])
+            and "workspace-read-shared" in capabilities
+            and required_capability in capabilities
         ):
-            return node
+            raise HTTPException(503, {"reason": "placement-unavailable"})
+        subpath = (
+            task_workspace_subpath(task)
+            if layout == WORKSPACE_LAYOUT_TASK
+            else session.get("workspaceSubpath")
+        )
+        if not isinstance(subpath, str) or not subpath:
+            raise HTTPException(503, {"reason": "placement-unavailable"})
+        return node, layout, subpath
     raise HTTPException(503, {"reason": "placement-unavailable"})
 
 
 def _task_workspace_command(
-    task: dict[str, Any], *, command_id: str, command_type: str, path: str
+    task: dict[str, Any],
+    *,
+    command_id: str,
+    command_type: str,
+    path: str,
+    workspace_layout: str,
+    workspace_subpath: str,
 ) -> dict[str, Any]:
     return {
         "id": command_id,
@@ -1172,8 +1192,8 @@ def _task_workspace_command(
         # daemon treats this only as a routing identifier; workspaceSubpath is
         # what selects the durable task root.
         "sessionId": task["id"],
-        "workspaceLayout": "task",
-        "workspaceSubpath": task_workspace_subpath(task),
+        "workspaceLayout": workspace_layout,
+        "workspaceSubpath": workspace_subpath,
         "path": path,
     }
 
@@ -1190,7 +1210,9 @@ async def task_workspace_files(
     actor = request_actor(request, ctx.auth_store)
     task = get_task_for_actor(ctx.task_store, task_id, actor)
     path = workspace_path(request.query_params.get("path"))
-    node = _task_workspace_node(ctx, task, actor)
+    node, workspace_layout, workspace_subpath = _task_workspace_target(
+        ctx, task, actor
+    )
     event = await dispatch_workspace_command(
         ctx,
         node,
@@ -1199,6 +1221,8 @@ async def task_workspace_files(
             command_id=new_database_id(),
             command_type="workspace.list",
             path=path,
+            workspace_layout=workspace_layout,
+            workspace_subpath=workspace_subpath,
         ),
     )
     raise_workspace_error(event)
@@ -1216,7 +1240,9 @@ async def task_workspace_file(
     actor = request_actor(request, ctx.auth_store)
     task = get_task_for_actor(ctx.task_store, task_id, actor)
     path = workspace_path(request.query_params.get("path"), required=True)
-    node = _task_workspace_node(ctx, task, actor)
+    node, workspace_layout, workspace_subpath = _task_workspace_target(
+        ctx, task, actor
+    )
     event = await dispatch_workspace_command(
         ctx,
         node,
@@ -1225,6 +1251,8 @@ async def task_workspace_file(
             command_id=new_database_id(),
             command_type="workspace.read",
             path=path,
+            workspace_layout=workspace_layout,
+            workspace_subpath=workspace_subpath,
         ),
     )
     raise_workspace_error(event)

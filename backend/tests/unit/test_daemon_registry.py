@@ -898,7 +898,7 @@ def test_task_dispatch_fails_if_the_daemon_loses_task_workspace_support() -> Non
             assert registry.take_commands("sbx_alice", "node_token") == []
             failed = session_store.get_session(session["id"])
             assert failed["status"] == "failed"
-            assert "task-workspaces support" in failed["outcome"]
+            assert "task-workspaces support" in failed["finalOutcome"]
 
     asyncio.run(run_flow())
 

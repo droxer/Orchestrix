@@ -1520,6 +1520,24 @@ class DaemonNodeRegistry:
             run_request = (
                 self.daemon_store.get_run_request(request_id) if request_id else None
             )
+            workspace_layout = command.get("workspaceLayout")
+            required_workspace_capability = (
+                DAEMON_CAPABILITY_TASK_WORKSPACES
+                if workspace_layout == "task"
+                else None
+            )
+            if (
+                run_request
+                and required_workspace_capability
+                and required_workspace_capability
+                not in ((sandbox or {}).get("capabilities") or [])
+            ):
+                self._fail_run_request(
+                    run_request,
+                    f"The {workspace_layout} requires a daemon with "
+                    f"{required_workspace_capability} support.",
+                )
+                continue
             try:
                 session = self.store.get_session(command["sessionId"])
             except KeyError:
@@ -2627,23 +2645,24 @@ class DaemonNodeRegistry:
                 "The thread requires a daemon with thread-workspaces support.",
             )
             return run_request
-        # No task branch: the task layout is resolved against this node at
-        # dispatch, and a node that dropped the capability mid-task should
-        # degrade rather than have its queued work failed.
-        if workspace_layout == "project":
-            if DAEMON_CAPABILITY_PROJECT_WORKSPACES not in (
-                sandbox.get("capabilities") or []
-            ):
+        if workspace_layout in ("project", "task"):
+            required_capability = (
+                DAEMON_CAPABILITY_PROJECT_WORKSPACES
+                if workspace_layout == "project"
+                else DAEMON_CAPABILITY_TASK_WORKSPACES
+            )
+            if required_capability not in (sandbox.get("capabilities") or []):
                 self._fail_run_request(
                     run_request,
-                    "The project requires a daemon with project-workspaces support.",
+                    f"The {workspace_layout} requires a daemon with "
+                    f"{required_capability} support.",
                 )
                 return run_request
             workspace_subpath = session_snapshot.get("workspaceSubpath")
             if not isinstance(workspace_subpath, str) or not workspace_subpath:
                 self._fail_run_request(
                     run_request,
-                    "The project thread is missing its workspaceSubpath.",
+                    f"The {workspace_layout} thread is missing its workspaceSubpath.",
                 )
                 return run_request
         bridge = compute_prior_agent_bridge(

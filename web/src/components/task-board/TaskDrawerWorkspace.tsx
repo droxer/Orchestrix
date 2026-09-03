@@ -59,6 +59,7 @@ export function TaskDrawerWorkspace({ taskId }: { taskId: string }) {
     isLoading: fileQuery.isLoading,
     error: fileQuery.error,
     data: fileQuery.data,
+    path,
   });
 
   return (
