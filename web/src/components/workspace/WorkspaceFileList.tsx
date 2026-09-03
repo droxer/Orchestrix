@@ -2,16 +2,16 @@
 
 import { useTranslation } from "react-i18next";
 import type { ProjectWorkspaceFilesResponse, WorkspaceFileEntry } from "../../types";
-
-/** Every workspace-listing response (project, node, task, …) shares this
- *  shape apart from which id field names the owner — the list never reads
- *  that field, so it accepts any response minus its owner id. */
-type WorkspaceFilesResponseLike = Omit<ProjectWorkspaceFilesResponse, "projectId">;
 import { isWorkspaceRetryableError } from "../../lib/workspaceHome";
 import { compactDate, formatBytes, parentPath } from "../../lib/workspaceFormat";
 import { ICON, WorkspaceFile, WorkspaceFolder } from "../icons";
 import { WorkspaceEmpty, WorkspaceLoading } from "./WorkspacePrimitives";
 import { Button } from "@/components/ui/button";
+
+/** Every workspace-listing response (project, node, task, …) shares this
+ *  shape apart from which id field names the owner — the list never reads
+ *  that field, so it accepts any response minus its owner id. */
+type WorkspaceFilesResponseLike = Omit<ProjectWorkspaceFilesResponse, "projectId">;
 
 /* The workspace directory listing, shared by every surface that browses a
    project root: the full-page workspace tab and the thread output panel.

@@ -3,11 +3,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ProjectWorkspaceFileResponse } from "../../types";
-
-/** Every workspace-file response (project, node, task, …) shares this shape
- *  apart from which id field names the owner — the preview never reads that
- *  field, so it accepts any response minus its owner id. */
-type WorkspaceFileResponseLike = Omit<ProjectWorkspaceFileResponse, "projectId">;
 import { formatBytes } from "../../lib/workspaceFormat";
 import { WorkspaceLoading } from "./WorkspacePrimitives";
 import {
@@ -21,6 +16,11 @@ import {
 } from "../CodeView";
 import { Markdown } from "../Markdown";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
+/** Every workspace-file response (project, node, task, …) shares this shape
+ *  apart from which id field names the owner — the preview never reads that
+ *  field, so it accepts any response minus its owner id. */
+type WorkspaceFileResponseLike = Omit<ProjectWorkspaceFileResponse, "projectId">;
 
 /* One workspace file on screen — rendered when the type has a presentation,
    source otherwise. Shared by the full-page workspace tab and the thread

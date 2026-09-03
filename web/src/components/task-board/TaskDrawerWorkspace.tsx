@@ -31,12 +31,17 @@ export function TaskDrawerWorkspace({ taskId }: { taskId: string }) {
   const [selectedPath, setSelectedPath] = useState("");
   const selectedName = selectedPath ? selectedPath.split("/").at(-1) || selectedPath : "";
 
+  // The fourth key element is a refresh-version counter on the sibling
+  // ProjectWorkspaceFiles, bumped by a manual refresh button there. The
+  // drawer has no such affordance yet, so it stays a fixed 0 rather than a
+  // wired-up counter — reserving the slot without inventing a control.
   const fileQuery = useQuery({
     queryKey: ["workspace-files", `task:${taskId}`, path, 0],
     retry: false,
     queryFn: ({ signal }): Promise<TaskWorkspaceFilesResponse> =>
       listTaskWorkspaceFiles({ taskId, path }, signal),
   });
+  // Same reservation as fileQuery above: no manual refresh in the drawer yet.
   const contentQuery = useQuery({
     queryKey: ["workspace-file", `task:${taskId}`, selectedPath, 0],
     enabled: Boolean(selectedPath),
