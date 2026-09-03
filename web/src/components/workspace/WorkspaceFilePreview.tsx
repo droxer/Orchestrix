@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ProjectWorkspaceFileResponse } from "../../types";
+
+/** Every workspace-file response (project, node, task, …) shares this shape
+ *  apart from which id field names the owner — the preview never reads that
+ *  field, so it accepts any response minus its owner id. */
+type WorkspaceFileResponseLike = Omit<ProjectWorkspaceFileResponse, "projectId">;
 import { formatBytes } from "../../lib/workspaceFormat";
 import { WorkspaceLoading } from "./WorkspacePrimitives";
 import {
@@ -28,7 +33,7 @@ export function WorkspaceFilePreview({
   error,
 }: {
   name: string;
-  data?: ProjectWorkspaceFileResponse;
+  data?: WorkspaceFileResponseLike;
   isLoading: boolean;
   error: unknown;
 }) {

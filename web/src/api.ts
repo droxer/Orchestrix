@@ -64,6 +64,8 @@ import type {
 
   ProjectWorkspaceFilesResponse,
   ProjectWorkspaceFileResponse,
+  TaskWorkspaceFilesResponse,
+  TaskWorkspaceFileResponse,
 } from "./types.js";
 import type { Language, Theme } from "./lib/appStorage.js";
 
@@ -577,6 +579,24 @@ export function readProjectWorkspaceFile(
 ): Promise<ProjectWorkspaceFileResponse> {
   const params = new URLSearchParams({ path: input.path });
   return apiJson<ProjectWorkspaceFileResponse>(`/projects/${encodeURIComponent(input.projectId)}/workspace/file?${params.toString()}`, { signal });
+}
+
+export function listTaskWorkspaceFiles(
+  input: { taskId: string; path?: string },
+  signal?: AbortSignal,
+): Promise<TaskWorkspaceFilesResponse> {
+  const params = new URLSearchParams();
+  if (input.path) params.set("path", input.path);
+  const query = params.toString();
+  return apiJson<TaskWorkspaceFilesResponse>(`/tasks/${encodeURIComponent(input.taskId)}/workspace/files${query ? `?${query}` : ""}`, { signal });
+}
+
+export function readTaskWorkspaceFile(
+  input: { taskId: string; path: string },
+  signal?: AbortSignal,
+): Promise<TaskWorkspaceFileResponse> {
+  const params = new URLSearchParams({ path: input.path });
+  return apiJson<TaskWorkspaceFileResponse>(`/tasks/${encodeURIComponent(input.taskId)}/workspace/file?${params.toString()}`, { signal });
 }
 
 export function listTasks(signal?: AbortSignal): Promise<TasksResponse> {

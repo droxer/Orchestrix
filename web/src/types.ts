@@ -75,7 +75,7 @@ export interface SessionSummary {
   ownerAgentId?: string;
   teamId?: string;
   projectId?: string;
-  workspaceLayout?: "node-root" | "thread" | "project";
+  workspaceLayout?: "node-root" | "thread" | "project" | "task";
   workspaceSubpath?: string;
   computerId?: string;
   currentAgent?: AgentName;
@@ -238,6 +238,33 @@ export interface ProjectWorkspaceFilesResponse {
 
 export interface ProjectWorkspaceFileResponse {
   projectId: string;
+  scope: "shared";
+  source: "live";
+  nodeId: string;
+  path: string;
+  exists: boolean;
+  isBinary: boolean;
+  bytes: number;
+  content: string | null;
+  contentBase64?: string | null;
+  truncated: boolean;
+  limitBytes: number;
+  generatedAt: string;
+}
+
+export interface TaskWorkspaceFilesResponse {
+  taskId: string;
+  scope: "shared";
+  source: "live";
+  nodeId: string;
+  path: string;
+  exists: boolean;
+  entries: WorkspaceFileEntry[];
+  generatedAt: string;
+}
+
+export interface TaskWorkspaceFileResponse {
+  taskId: string;
   scope: "shared";
   source: "live";
   nodeId: string;

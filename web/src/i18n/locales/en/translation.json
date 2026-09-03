@@ -344,6 +344,11 @@
     "artifacts_empty": "No files from agent runs yet.",
     "artifacts_error": "Could not load artifacts.",
     "artifact_download": "Download",
+    "workspace": "Workspace",
+    "workspace_loading": "Loading workspace…",
+    "workspace_empty": "Nothing in this task's workspace yet.",
+    "workspace_unavailable": "The computer that ran this task is offline, so its workspace cannot be read right now.",
+    "workspace_error": "Could not load the workspace.",
     "statuses": {
       "backlog": "Backlog",
       "assigned": "Assigned",

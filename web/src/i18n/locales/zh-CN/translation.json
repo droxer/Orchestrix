@@ -344,6 +344,11 @@
     "artifacts_empty": "尚无智能体运行生成的文件。",
     "artifacts_error": "无法加载产物。",
     "artifact_download": "下载",
+    "workspace": "工作区",
+    "workspace_loading": "正在加载工作区…",
+    "workspace_empty": "此任务的工作区暂无内容。",
+    "workspace_unavailable": "运行此任务的电脑已离线，暂时无法读取其工作区。",
+    "workspace_error": "无法加载工作区。",
     "statuses": {
       "backlog": "待办",
       "assigned": "已分配",
