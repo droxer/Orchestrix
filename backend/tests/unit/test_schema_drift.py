@@ -26,12 +26,11 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
-from sqlalchemy import create_engine, text
-from sqlalchemy.exc import SQLAlchemyError
-
 from relay.persistence.schema import metadata
 from relay.persistence.session_store import DatabaseSessionStore
 from relay.services.task_deletion import task_has_active_linked_session
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 REPO_ROOT = BACKEND_ROOT.parent

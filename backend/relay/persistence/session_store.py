@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import RLock
 from typing import Any
+from uuid import UUID
 
 from loguru import logger
 from sqlalchemy import (
@@ -67,6 +68,13 @@ _AFFINITY_LOCKS_GUARD = RLock()
 def _shared_affinity_lock(key: str) -> RLock:
     with _AFFINITY_LOCKS_GUARD:
         return _AFFINITY_LOCKS.setdefault(key, RLock())
+
+
+def _canonical_database_session_id(session_id: str) -> str:
+    try:
+        return str(UUID(session_id))
+    except (AttributeError, TypeError, ValueError):
+        raise KeyError(session_id) from None
 
 
 class LocalSessionStore:
@@ -1103,11 +1111,12 @@ class DatabaseSessionStore:
             logger.exception("Session event listener failed", session_id=session_id)
 
     def get_session(self, session_id: str) -> dict[str, Any]:
+        session_pk = _canonical_database_session_id(session_id)
         with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.sessions.c.id, self.sessions.c.snapshot).where(
-                        self.sessions.c.id == session_id
+                        self.sessions.c.id == session_pk
                     )
                 )
                 .mappings()
