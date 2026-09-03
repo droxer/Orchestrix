@@ -291,3 +291,21 @@ def test_migration_picks_the_active_placement_over_a_removed_one(
             f"attempt {attempt}: migrated to {migrated['computerId']!r} instead "
             "of the active computer's id"
         )
+
+
+@pytest.mark.parametrize("store_kind", ["local", "database"])
+def test_active_legacy_placement_wins_over_removed_stable_history(
+    tmp_path: Path, store_kind: str
+) -> None:
+    agents, placements = _stores(tmp_path, store_kind)
+    old_node = _node("node-old")
+    current_node = {**_node("node-current"), "workspaceId": "machine-b"}
+    agent = agents.ensure_compatibility_agent(
+        "alice", "claude", "node-old", computer_id="device:alice:machine-a"
+    )
+    create_node_placement(placements, agent, old_node)
+    placements.create_placement(agent, "node-current")
+    registry = SimpleNamespace(monitor_nodes=lambda: [old_node, current_node])
+
+    assert migrate_agent_computer_ids(agents, placements, registry) == 1
+    assert agents.get_agent(agent["id"])["computerId"] == "device:alice:machine-b"
