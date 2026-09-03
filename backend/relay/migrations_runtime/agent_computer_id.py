@@ -141,20 +141,24 @@ def _computer_id_from_placements(
     if computer_id_value:
         return computer_id_value
 
-    all_placements = placement_store.list_placements(
-        agent_id=agent_id, include_removed=True
-    )
-    newest_first = sorted(
-        all_placements, key=lambda item: item.get("createdAt") or "", reverse=True
-    )
-    computer_id_value = _first_computer_id(newest_first)
-    if computer_id_value:
-        return computer_id_value
+    candidate_placements = active_placements
+    if not candidate_placements:
+        all_placements = placement_store.list_placements(
+            agent_id=agent_id, include_removed=True
+        )
+        candidate_placements = sorted(
+            all_placements,
+            key=lambda item: item.get("createdAt") or "",
+            reverse=True,
+        )
+        computer_id_value = _first_computer_id(candidate_placements)
+        if computer_id_value:
+            return computer_id_value
 
     if registry is None:
         return None
     nodes = {node["id"]: node for node in registry.monitor_nodes()}
-    for placement in newest_first:
+    for placement in candidate_placements:
         node = nodes.get(placement.get("daemonNodeId"))
         if node:
             computer_id_value = computer_id(node)
