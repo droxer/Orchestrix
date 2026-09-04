@@ -393,3 +393,23 @@
   gap: var(--sp-1);
   margin-bottom: var(--sp-2);
 }
+
+/* The card equivalent of the list's REF column. It is an address rather than
+   task metadata, so it stays quiet and moves to the far edge of the badge
+   line until a narrow card needs to wrap it. */
+.backlog-task-ref {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sp-1);
+  margin-inline-start: auto;
+  color: var(--ink-4);
+  font-size: var(--fs-1);
+  line-height: var(--leading-snug);
+  white-space: nowrap;
+}
+
+.backlog-task-ref-label {
+  font: var(--type-micro);
+  letter-spacing: var(--type-micro-track);
+  text-transform: uppercase;
+}

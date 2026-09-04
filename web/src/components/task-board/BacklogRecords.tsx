@@ -18,6 +18,7 @@ import { dueTone } from "../../lib/backlog";
 import { taskResultLine } from "../../lib/taskResult";
 import { RoutineOriginBadge } from "./RoutineOriginBadge";
 import { taskRef } from "../../lib/taskRef";
+import { TaskReference } from "./TaskReference";
 import { TaskAssignee, TaskExecutionBadge } from "../TaskAssignee";
 import { Button } from "@/components/ui/button";
 import { StateMark } from "../StateMark";
@@ -114,6 +115,7 @@ export function BacklogTaskCard({
         <PriorityBadge priority={task.priority} />
         <TaskExecutionBadge task={task} ready={ready} displayName={agentDisplayName} />
         <RoutineOriginBadge task={task} routineTitle={routineTitle} />
+        <TaskReference taskId={task.id} />
       </div>
       <Button variant="ghost" type="button" className="backlog-task-title" onClick={onEdit}>{task.title}</Button>
       {task.description ? <p className="backlog-description">{task.description}</p> : null}

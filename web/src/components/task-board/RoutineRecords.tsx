@@ -13,6 +13,7 @@ import { formatNextRunDate } from "./RoutineChrome";
 import { routineDueTone, type RoutineState } from "../../lib/routine";
 import { hrefForRoute } from "../../lib/appRoute";
 import { taskRef } from "../../lib/taskRef";
+import { TaskReference } from "./TaskReference";
 import { TaskDueCell } from "./TaskDueCell";
 import { SortableColumnHeader } from "@/components/ui/SortableColumnHeader";
 import type { SortState } from "../../lib/listSort";
@@ -116,6 +117,7 @@ export function RoutineCard({
         <RoutineStateBadge state={state} />
         <PriorityBadge priority={task.priority} />
         <TaskExecutionBadge task={task} ready={ready} displayName={agentDisplayName} />
+        <TaskReference taskId={task.id} />
       </div>
       <Button variant="ghost" type="button" className="backlog-task-title" onClick={onEdit}>{task.title}</Button>
       {task.description ? <p className="backlog-description">{task.description}</p> : null}
