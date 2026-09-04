@@ -321,6 +321,7 @@
     "reopen": "Reopen",
     "done": "Done",
     "toast_started": "Start requested.",
+    "toast_start_rejected": "This task can't be started in its current state.",
     "metrics": "Backlog metrics",
     "metric_total": "Total",
     "metric_active": "Active",

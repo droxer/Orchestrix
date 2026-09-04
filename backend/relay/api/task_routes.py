@@ -943,7 +943,11 @@ async def start_task(
             else {
                 "task": task,
                 "session": None,
-                "dispatch": {"state": "rejected", "code": "invalid_state"},
+                "dispatch": {
+                    "state": "rejected",
+                    "code": "invalid_state",
+                    "message": "This task cannot be started in its current state.",
+                },
             }
         )
     return result

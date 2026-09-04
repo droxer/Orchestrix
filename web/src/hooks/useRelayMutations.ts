@@ -259,7 +259,11 @@ export function useRelayMutations() {
       if (result.session) cacheSession(result.session);
       void invalidateNodes();
       announce({
-        message: result.dispatch.message ?? t("backlog.toast_started"),
+        message:
+          result.dispatch.message ??
+          (result.dispatch.state === "rejected"
+            ? t("backlog.toast_start_rejected")
+            : t("backlog.toast_started")),
         tone: result.dispatch.state === "rejected"
           ? "error"
           : result.dispatch.state === "started"

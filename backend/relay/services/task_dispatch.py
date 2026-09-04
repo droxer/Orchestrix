@@ -224,7 +224,13 @@ class TaskDispatcher:
 
     async def start(self) -> DispatchResult | None:
         if not self._dispatchable():
-            return None
+            return _record_result(
+                self.ctx,
+                self.task["id"],
+                "rejected",
+                code="invalid_state",
+                message=f"A {self.task.get('status')} task cannot be started.",
+            )
         project_result = self._resolve_project_assignments()
         if project_result:
             return project_result

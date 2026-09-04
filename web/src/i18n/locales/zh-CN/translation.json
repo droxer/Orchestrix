@@ -321,6 +321,7 @@
     "reopen": "重开",
     "done": "完成",
     "toast_started": "已请求开始。",
+    "toast_start_rejected": "任务在当前状态下无法开始。",
     "metrics": "待办指标",
     "metric_total": "总计",
     "metric_active": "进行中",
