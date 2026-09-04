@@ -51,7 +51,7 @@ type PromptOptions = {
   cancelLabel?: string;
 };
 
-type AnnouncementTone = "info" | "success" | "error";
+type AnnouncementTone = "info" | "success" | "warn" | "error";
 
 type AnnouncementOptions = {
   message: string;
@@ -120,7 +120,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
 
   const announce = useCallback((opts: AnnouncementOptions | string) => {
     const next = typeof opts === "string" ? { message: opts } : opts;
-    toast.add({ title: next.message, type: next.tone ?? "info" });
+    // The shadcn toast names the warn tone "warning".
+    toast.add({ title: next.message, type: next.tone === "warn" ? "warning" : (next.tone ?? "info") });
   }, []);
 
   // Resolve the pending promise and tear down. `cancelled` carries the
@@ -167,7 +168,6 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   }, [dialogClosing, request]);
 
   const isDangerConfirm = request?.kind === "confirm" && request.opts.tone === "danger";
-
   return (
     <DialogContext.Provider value={{ confirm, prompt, announce }}>
       {children}
