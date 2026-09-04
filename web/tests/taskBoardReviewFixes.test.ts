@@ -39,7 +39,7 @@ describe("task board review regressions", () => {
 
   it("only offers state sorting where it changes a flat card collection", () => {
     assert.match(routinesPage, /data-view=\{view\}/);
-    assert.match(routinesPage, /view === "card"[\s\S]{0,240}value: "state"/);
+    assert.match(routinesPage, /view === "card"[\s\S]{0,240}key: "state"/);
     assert.match(routinesPage, /next === "list" && sort\?\.key === "state"/);
     assert.match(listSortStyles, /\.routine-page\[data-view="card"\] \.list-sort-menu\s*\{\s*display:\s*flex;/);
   });
@@ -48,6 +48,7 @@ describe("task board review regressions", () => {
     for (const page of [backlogPage, routinesPage]) {
       assert.match(page, /startTaskMutation\.isPending/);
       assert.match(page, /startTaskMutation\.variables\?\.taskId/);
+      assert.match(page, /if \(startInFlight\.current\) return/);
     }
     assert.match(backlogRecords, /loading=\{starting\}/);
     assert.match(routineRecords, /loading=\{starting\}/);

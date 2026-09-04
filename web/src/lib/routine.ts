@@ -11,22 +11,20 @@ export interface RoutineFilters {
   cadence: "all" | TaskRoutineCadence;
   agent: string;
   assignee: string;
-  state: "all" | "enabled" | "disabled" | "due" | "unscheduled";
+  state: "all" | RoutineState;
 }
 
 export function filterRoutineTasks(tasks: RelayTaskListItem[], filters: RoutineFilters, today = isoToday()): RelayTaskListItem[] {
   const query = filters.query.trim().toLowerCase();
   const assignee = filters.assignee.trim().toLowerCase();
+  const running = runningRoutineIds(tasks);
   return tasks.filter((task) => {
     if (!task.isRoutine) return false;
     if (filters.type !== "all" && task.routineType !== filters.type) return false;
     if (filters.cadence !== "all" && task.routineCadence !== filters.cadence) return false;
     if (filters.agent !== "all" && task.assignedAgentId !== filters.agent) return false;
     if (assignee && !(task.assigneeEmployeeId ?? task.ownerEmployeeId ?? "").toLowerCase().includes(assignee)) return false;
-    if (filters.state === "enabled" && !task.routineEnabled) return false;
-    if (filters.state === "disabled" && task.routineEnabled) return false;
-    if (filters.state === "due" && routineDueTone(task, today) === "neutral") return false;
-    if (filters.state === "unscheduled" && task.routineNextRunDate) return false;
+    if (filters.state !== "all" && routineState(task, running, today) !== filters.state) return false;
     if (query) {
       const haystack = `${task.title} ${task.description} ${task.id}`.toLowerCase();
       if (!haystack.includes(query)) return false;

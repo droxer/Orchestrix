@@ -74,10 +74,7 @@ describe("filterRoutineTasks", () => {
     ];
 
     for (const state of ROUTINE_STATE_ORDER) {
-      const result = filterRoutineTasks(tasks, {
-        ...baseFilters,
-        state: state as unknown as RoutineFilters["state"],
-      }, "2026-06-24");
+      const result = filterRoutineTasks(tasks, { ...baseFilters, state }, "2026-06-24");
       assert.deepEqual(result.map((item) => item.id), [state], state);
     }
   });

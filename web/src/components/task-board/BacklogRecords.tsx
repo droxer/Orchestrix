@@ -62,6 +62,7 @@ export function BacklogTaskCard({
   onEdit,
   onAssign,
   onStart,
+  starting,
   onToggleBlock,
   onDone,
 }: {
@@ -83,6 +84,7 @@ export function BacklogTaskCard({
   onEdit: () => void;
   onAssign: () => void;
   onStart: () => void;
+  starting: boolean;
   onToggleBlock: () => void;
   onDone: () => void;
 }) {
@@ -167,6 +169,7 @@ export function BacklogTaskCard({
             className="backlog-action-primary backlog-action-icon"
             onClick={onStart}
             disabled={startDisabled}
+            loading={starting}
             aria-label={(task.assignedAgentId || task.assignedTeamId) ? t("backlog.start") : t("backlog.start_team")}
             title={(task.assignedAgentId || task.assignedTeamId) ? t("backlog.start") : t("backlog.start_team")}
           >
@@ -262,6 +265,7 @@ export function BacklogTaskRow({
   onEdit,
   onAssign,
   onStart,
+  starting,
   onToggleBlock,
   onDone,
 }: {
@@ -279,6 +283,7 @@ export function BacklogTaskRow({
   onEdit: () => void;
   onAssign: () => void;
   onStart: () => void;
+  starting: boolean;
   onToggleBlock: () => void;
   onDone: () => void;
 }) {
@@ -349,6 +354,7 @@ export function BacklogTaskRow({
             className="backlog-action-primary backlog-action-icon"
             onClick={onStart}
             disabled={startDisabled}
+            loading={starting}
             aria-label={(task.assignedAgentId || task.assignedTeamId) ? t("backlog.start") : t("backlog.start_team")}
             title={(task.assignedAgentId || task.assignedTeamId) ? t("backlog.start") : t("backlog.start_team")}
           >

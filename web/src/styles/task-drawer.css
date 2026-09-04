@@ -644,9 +644,11 @@
   .backlog-page {
     --backlog-lane-w: min(84vw, 280px);
   }
+}
 
-  /* Touch has no hover to reveal the overlay, so the actions return to an
-     in-flow footer — always visible and reachable, space earned not reserved. */
+/* Pointer capability, not viewport width, decides whether hover can reveal
+   card actions. This also covers landscape tablets wider than 820px. */
+@media (hover: none), (pointer: coarse) {
   .backlog-task-actions {
     position: static;
     margin-top: var(--sp-3);

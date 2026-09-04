@@ -10,6 +10,7 @@ import { FiltersBar, FilterSelect } from "../FiltersBar";
 import { readViewPreference } from "../../lib/viewPreference";
 import {
   routineDueTone,
+  ROUTINE_STATE_ORDER,
   runningRoutineCount,
   TASK_ROUTINE_CADENCES,
   TASK_ROUTINE_TYPES,
@@ -151,10 +152,10 @@ export function RoutineFiltersBar({ filters, agents, onChange, sortMenu }: { fil
         onValueChange={(state) => onChange({ ...filters, state })}
         options={[
           { value: "all", label: t("routine.all_states") },
-          { value: "enabled", label: t("routine.enabled") },
-          { value: "disabled", label: t("routine.disabled") },
-          { value: "due", label: t("routine.due") },
-          { value: "unscheduled", label: t("routine.unscheduled") },
+          ...ROUTINE_STATE_ORDER.map((state) => ({
+            value: state,
+            label: t(`routine.states.${state}`),
+          })),
         ]}
       />
     </FiltersBar>

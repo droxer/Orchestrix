@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useRelayMutations } from "../hooks/useRelayMutations";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
@@ -52,6 +52,7 @@ import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
 import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
 import { Table } from "@/components/ui/table";
+import { taskRef } from "../lib/taskRef";
 
 interface RoutinesPageProps {
   tasks: RelayTaskListItem[];
@@ -77,7 +78,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
     deleteTasksMutation,
   } = useRelayMutations();
   const [filters, setFilters] = useState(initialRoutineFilters);
-  const [view, setView] = useState<RoutineView>(() => parseRoutineView(null));
+  const [view, setView] = useState<RoutineView>("card");
   const [form, setForm] = useState<RoutineTaskFormState | null>(null);
   const [formBaseline, setFormBaseline] = useState<RoutineTaskFormState | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -86,6 +87,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
   const [deleting, setDeleting] = useState(false);
   const [selection, setSelection] = useState<TaskSelection>(EMPTY_TASK_SELECTION);
   const [deletingSelection, setDeletingSelection] = useState(false);
+  const startInFlight = useRef<string | null>(null);
   const formDirty = Boolean(form && formBaseline && !taskBoardFormsEqual(form, formBaseline));
   const confirmDiscardChanges = useUnsavedChangesGuard(formDirty && !saving && !deleting);
   const routineTasks = useMemo(() => tasks.filter((task) => task.isRoutine), [tasks]);
@@ -132,7 +134,15 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
   // drops out of the selection immediately, so a batch action can never reach
   // a record the board is no longer showing.
   const visibleSelection = useMemo(() => pruneSelection(selection, visibleIds), [selection, visibleIds]);
+
+  // Browser storage is unavailable to the server. Restore it after hydration
+  // so the initial server and client trees always agree.
+  useEffect(() => {
+    setView(parseRoutineView(null));
+  }, []);
+
   function changeView(next: RoutineView) {
+    if (next === "list" && sort?.key === "state") setSort(null);
     setView(next);
     writeViewPreference(ROUTINE_VIEW_STORAGE_KEY, next);
   }
@@ -289,14 +299,21 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
 
   function routineHandlers(task: RelayTaskListItem) {
     return {
+      starting: startTaskMutation.isPending && startTaskMutation.variables?.taskId === task.id,
       onEdit: () => editTask(task),
       onAssign: () => assignTask(task),
-      onStart: () => void startTaskMutation.mutate(taskStartMutationInput(task)),
+      onStart: () => {
+        if (startInFlight.current) return;
+        startInFlight.current = task.id;
+        startTaskMutation.mutate(taskStartMutationInput(task), {
+          onSettled: () => { startInFlight.current = null; },
+        });
+      },
     };
   }
 
   return (
-    <section id="routine-panel" className="routine-page backlog-page" aria-label={t("routine.title")} tabIndex={-1}>
+    <section id="routine-panel" className="routine-page backlog-page" data-view={view} aria-label={t("routine.title")} tabIndex={-1}>
       <PageHeader
         kicker={t("nav.workspace")}
         title={t("routine.title")}
@@ -322,7 +339,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
           <SortMenu
             options={[
               { key: "title", label: t("backlog.col_task") },
-              { key: "state", label: t("routine.state") },
+              ...(view === "card" ? [{ key: "state" as const, label: t("routine.state") }] : []),
               { key: "priority", label: t("backlog.priority") },
               { key: "assignee", label: t("backlog.assignee") },
               { key: "nextRun", label: t("routine.next_run") },
@@ -448,9 +465,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
           deleting={deleting}
           initialFocus={assignmentFocus ? "assignment" : "title"}
           title={form.id ? t("routine.edit") : t("routine.new")}
-          subtitle={form.id
-            ? `${t(`routine.types.${form.routineType}`)} · ${t(`routine.cadences.${form.routineCadence}`)}`
-            : t("routine.new_routine_id")}
+          subtitle={form.id ? `${t("backlog.col_ref")} ${taskRef(form.id)}` : t("routine.new_routine_id")}
           meta={editingTask ? (
             <RoutineDrawerMeta
               task={editingTask}

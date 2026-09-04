@@ -450,7 +450,7 @@ export function TaskDrawer({
       }}
       title={title}
       subtitle={subtitle}
-      subtitleMono={form.variant === "backlog" && Boolean(form.id)}
+      subtitleMono={Boolean(form.id)}
       width={form.variant === "routine" ? "routine" : "task"}
       closeLabel={t("drawer.close")}
       bodyClassName="adm-drawer-body--column"
