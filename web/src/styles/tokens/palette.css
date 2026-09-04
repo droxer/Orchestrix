@@ -22,7 +22,6 @@
    list is the only registry there is; keep it honest when you add a query).
 
      480px   narrow phone — backlog card grid, login stack
-     600px   dialog stack
      640px   compact — dashboard, admin shell, composer, workspace panes
      768px   CONTAINER tier, not a viewport one — the `computer` and `record`
              containers widen here. Container queries are breakpoints too and

@@ -1,8 +1,9 @@
 /* =====================================================================
    Shared overlay primitives (overlay-* namespace)
 
-   Backdrop scrim, panel entrance curves, close affordance, and toast
-   motion shared by confirm dialogs, preferences, and admin drawers.
+   Backdrop scrim, panel entrance curves, and the close affordance shared by
+   confirm dialogs, preferences, and admin drawers. Toast motion moved to the
+   shadcn/ui toast component (base-ui Toast).
    Pick surface grammar by role — see the overlay grammar note in tokens/palette.css.
    ===================================================================== */
 
@@ -29,11 +30,6 @@
 @keyframes overlay-sheet-out {
   from { opacity: 1; transform: translateY(0); }
   to { opacity: 0.72; transform: translateY(12px); }
-}
-
-@keyframes overlay-toast-out {
-  from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(8px); }
 }
 
 /* Scrim only. This used to be one element doing two jobs — painting the

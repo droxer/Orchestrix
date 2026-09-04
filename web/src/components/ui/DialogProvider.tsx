@@ -16,6 +16,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Toaster, toast } from "@/components/ui/toast";
 import {
   Dialog,
   DialogBackdrop,
@@ -25,7 +26,6 @@ import {
   DialogTitle,
   DialogViewport,
 } from "@/components/ui/dialog";
-import { ActionRemove } from "../icons";
 
 // Promise-based confirm/prompt that replaces the native window.confirm /
 // window.prompt. Those drop unstyled OS chrome into a token-driven product
@@ -62,12 +62,6 @@ type Request =
   | { kind: "confirm"; opts: ConfirmOptions; resolve: (value: boolean) => void }
   | { kind: "prompt"; opts: PromptOptions; resolve: (value: string | null) => void };
 
-type Announcement = {
-  id: number;
-  message: string;
-  tone: AnnouncementTone;
-};
-
 interface DialogApi {
   confirm: (opts: ConfirmOptions) => Promise<boolean>;
   prompt: (opts: PromptOptions) => Promise<string | null>;
@@ -76,8 +70,10 @@ interface DialogApi {
 
 const DialogContext = createContext<DialogApi | null>(null);
 
+/* Announcements go through the shadcn/ui toast (base-ui Toast): the manager
+   queues, stacks, pauses on hover, and announces to screen readers on its
+   own. The 6s dwell matches the hand-rolled toast this replaced. */
 const TOAST_VISIBLE_MS = 6000;
-const TOAST_EXIT_MS = 160;
 
 export function useDialogs(): DialogApi {
   const ctx = useContext(DialogContext);
@@ -89,10 +85,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const [request, setRequest] = useState<Request | null>(null);
   const [dialogClosing, setDialogClosing] = useState(false);
-  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
-  const [toastExiting, setToastExiting] = useState(false);
   const [inputValue, setInputValue] = useState("");
-  const announcementId = useRef(0);
   const requestRef = useRef<Request | null>(null);
   const requestQueue = useRef<Request[]>([]);
   const dialogClosingRef = useRef(false);
@@ -127,13 +120,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
 
   const announce = useCallback((opts: AnnouncementOptions | string) => {
     const next = typeof opts === "string" ? { message: opts } : opts;
-    setToastExiting(false);
-    setAnnouncement({
-      id: announcementId.current + 1,
-      message: next.message,
-      tone: next.tone ?? "info",
-    });
-    announcementId.current += 1;
+    toast.add({ title: next.message, type: next.tone ?? "info" });
   }, []);
 
   // Resolve the pending promise and tear down. `cancelled` carries the
@@ -179,50 +166,12 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     setInputValue(request.opts.defaultValue ?? "");
   }, [dialogClosing, request]);
 
-  const dismissAnnouncement = useCallback(() => {
-    setToastExiting(false);
-    setAnnouncement(null);
-  }, []);
-
-  useEffect(() => {
-    if (!announcement) return;
-    const exitTimer = window.setTimeout(() => setToastExiting(true), TOAST_VISIBLE_MS - TOAST_EXIT_MS);
-    const removeTimer = window.setTimeout(() => {
-      setAnnouncement(null);
-      setToastExiting(false);
-    }, TOAST_VISIBLE_MS);
-    return () => {
-      window.clearTimeout(exitTimer);
-      window.clearTimeout(removeTimer);
-    };
-  }, [announcement]);
-
   const isDangerConfirm = request?.kind === "confirm" && request.opts.tone === "danger";
 
   return (
     <DialogContext.Provider value={{ confirm, prompt, announce }}>
       {children}
-      {announcement ? (
-        <div
-          key={announcement.id}
-          className={`dialog-toast${toastExiting ? " dialog-toast--exit" : ""}`}
-          data-tone={announcement.tone}
-          role={announcement.tone === "error" ? "alert" : "status"}
-          aria-live={announcement.tone === "error" ? undefined : "polite"}
-          aria-atomic="true"
-        >
-          <span className="dialog-toast-message">{announcement.message}</span>
-          <Button
-            variant="ghost"
-            type="button"
-            className="dialog-toast-close"
-            tooltip={t("toast.dismiss")}
-            onClick={dismissAnnouncement}
-          >
-            <ActionRemove size={ICON.sm} aria-hidden="true" />
-          </Button>
-        </div>
-      ) : null}
+      <Toaster timeout={TOAST_VISIBLE_MS} />
       <Dialog
         open={dialogOpen && !dialogClosing}
         onOpenChange={(next) => {

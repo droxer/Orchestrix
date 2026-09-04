@@ -121,7 +121,7 @@
 
   /* Square icon buttons want the floor on BOTH axes — the rule above only
      sets height, and a 44px-tall, 28px-wide button is still a miss. */
-  .dialog-toast-close,
+  [data-slot="toast-close"],
   .profile-image-picker-remove,
   .sidenav-btn,
   .artifact-index-btn,
