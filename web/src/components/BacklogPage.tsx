@@ -34,6 +34,7 @@ import { useTouchTaskDrag } from "../hooks/useTouchTaskDrag";
 import { laneStatusAtPoint, type DragPoint } from "../lib/touchDrag";
 import { writeViewPreference } from "../lib/viewPreference";
 import { Button } from "@/components/ui/button";
+import { taskRef } from "../lib/taskRef";
 
 
 interface BacklogPageProps {
@@ -100,7 +101,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     deleteTasksMutation,
   } = useRelayMutations();
   const [filters, setFilters] = useState(initialFilters);
-  const [view, setView] = useState<BacklogView>(() => parseBacklogView(null));
+  const [view, setView] = useState<BacklogView>("board");
   const [form, setForm] = useState<BacklogTaskFormState | null>(null);
   const [formBaseline, setFormBaseline] = useState<BacklogTaskFormState | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -116,6 +117,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   const [inlineCreateStatus, setInlineCreateStatus] = useState<TaskStatus | null>(null);
   const { track: trackBoardEdge, stop: stopBoardScroll } = useEdgeAutoScroll();
   const boardRef = useRef<HTMLDivElement | null>(null);
+  const startInFlight = useRef<string | null>(null);
   const touchDrag = useTouchTaskDrag({
     onStart: (taskId) => setDraggedTaskId(taskId),
     onMove: (point) => {
@@ -170,12 +172,9 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     ])) as Record<TaskStatus, ReturnType<typeof paginate<RelayTaskListItem>>>,
     [grouped, lanePages],
   );
-  /* Selection follows what is on screen. In list view that is the current
-     page, so "select all" then Delete cannot reach a row the reader never
-     saw; on the board it stays the whole filtered set. */
-  const visibleTasks = view === "list"
-    ? TASK_STATUSES.flatMap((status) => pagedLanes[status].items)
-    : filteredTasks;
+  /* Selection follows what is on screen in both views, so "select all" then
+     Delete cannot reach a card or row on a lane page the reader never saw. */
+  const visibleTasks = TASK_STATUSES.flatMap((status) => pagedLanes[status].items);
   const visibleIds = useMemo(() => visibleTasks.map((task) => task.id), [visibleTasks]);
   // Derived, not stored: a task hidden by a filter (or deleted elsewhere) drops
   // out of the selection immediately, so a batch action can never reach a
@@ -186,6 +185,12 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     () => (draggedTaskId ? backlogTasks.find((task) => task.id === draggedTaskId) ?? null : null),
     [backlogTasks, draggedTaskId],
   );
+
+  // Keep the server and first client render deterministic, then restore the
+  // browser-only preference once hydration has completed.
+  useEffect(() => {
+    setView(parseBacklogView(null));
+  }, []);
 
   // The `c` chord and the palette's "New task" land here: the event path
   // covers an already-mounted board, the one-shot flag covers the navigation
@@ -448,16 +453,19 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
       .filter((agent) => agent.enabled && agent.availability === "ready")
       .map((agent) => ({ agentId: agent.id, agent: agent.executorKind }));
     return {
+      starting: startTaskMutation.isPending && startTaskMutation.variables?.taskId === task.id,
       onEdit: () => editTask(task),
       onAssign: () => assignTask(task),
-      onStart: () => void startTaskMutation.mutate(
-        taskStartMutationInput(task, discussionAssignments),
-        {
+      onStart: () => {
+        if (startInFlight.current) return;
+        startInFlight.current = task.id;
+        startTaskMutation.mutate(taskStartMutationInput(task, discussionAssignments), {
           onSuccess: (result) => {
             if (!task.assignedAgentId && !task.assignedTeamId && result.session) onOpenThread(result.session.id);
           },
-        },
-      ),
+          onSettled: () => { startInFlight.current = null; },
+        });
+      },
       onToggleBlock: () => void updateTaskMutation.mutate({
         taskId: task.id,
         input: { status: task.status === "blocked" ? "backlog" : "blocked" },
@@ -711,7 +719,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
           deleting={deleting}
           initialFocus={assignmentFocus ? "assignment" : "title"}
           title={form.id ? t("backlog.edit_task") : t("backlog.new_task")}
-          subtitle={form.id ?? t("backlog.new_task_id")}
+          subtitle={form.id ? `${t("backlog.col_ref")} ${taskRef(form.id)}` : t("backlog.new_task_id")}
           onClose={() => { void closeTaskForm(); }}
           onClosed={releaseTaskForm}
           onChange={(next) => {

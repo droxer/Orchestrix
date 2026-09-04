@@ -61,6 +61,23 @@ describe("filterRoutineTasks", () => {
 
     assert.deepEqual(result.map((item) => item.id), ["a"]);
   });
+
+  it("filters by the exact schedule states shown in routine records", () => {
+    const tasks = [
+      task({ id: "running", title: "Running", isRoutine: true, routineEnabled: false }),
+      task({ id: "running-occurrence", title: "Running occurrence", sourceRoutineId: "running", status: "running" }),
+      task({ id: "overdue", title: "Overdue", isRoutine: true, routineEnabled: true, routineNextRunDate: "2026-06-23" }),
+      task({ id: "due", title: "Due", isRoutine: true, routineEnabled: true, routineNextRunDate: "2026-06-24" }),
+      task({ id: "scheduled", title: "Scheduled", isRoutine: true, routineEnabled: true, routineNextRunDate: "2026-06-25" }),
+      task({ id: "unscheduled", title: "Unscheduled", isRoutine: true, routineEnabled: true }),
+      task({ id: "paused", title: "Paused", isRoutine: true, routineEnabled: false }),
+    ];
+
+    for (const state of ROUTINE_STATE_ORDER) {
+      const result = filterRoutineTasks(tasks, { ...baseFilters, state }, "2026-06-24");
+      assert.deepEqual(result.map((item) => item.id), [state], state);
+    }
+  });
 });
 
 describe("latestRoutineSession", () => {

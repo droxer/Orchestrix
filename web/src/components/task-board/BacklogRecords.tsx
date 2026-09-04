@@ -18,6 +18,7 @@ import { dueTone } from "../../lib/backlog";
 import { taskResultLine } from "../../lib/taskResult";
 import { RoutineOriginBadge } from "./RoutineOriginBadge";
 import { taskRef } from "../../lib/taskRef";
+import { TaskReference } from "./TaskReference";
 import { TaskAssignee, TaskExecutionBadge } from "../TaskAssignee";
 import { Button } from "@/components/ui/button";
 import { StateMark } from "../StateMark";
@@ -61,6 +62,7 @@ export function BacklogTaskCard({
   onEdit,
   onAssign,
   onStart,
+  starting,
   onToggleBlock,
   onDone,
 }: {
@@ -82,6 +84,7 @@ export function BacklogTaskCard({
   onEdit: () => void;
   onAssign: () => void;
   onStart: () => void;
+  starting: boolean;
   onToggleBlock: () => void;
   onDone: () => void;
 }) {
@@ -114,6 +117,7 @@ export function BacklogTaskCard({
         <PriorityBadge priority={task.priority} />
         <TaskExecutionBadge task={task} ready={ready} displayName={agentDisplayName} />
         <RoutineOriginBadge task={task} routineTitle={routineTitle} />
+        <TaskReference taskId={task.id} />
       </div>
       <Button variant="ghost" type="button" className="backlog-task-title" onClick={onEdit}>{task.title}</Button>
       {task.description ? <p className="backlog-description">{task.description}</p> : null}
@@ -165,6 +169,7 @@ export function BacklogTaskCard({
             className="backlog-action-primary backlog-action-icon"
             onClick={onStart}
             disabled={startDisabled}
+            loading={starting}
             aria-label={(task.assignedAgentId || task.assignedTeamId) ? t("backlog.start") : t("backlog.start_team")}
             title={(task.assignedAgentId || task.assignedTeamId) ? t("backlog.start") : t("backlog.start_team")}
           >
@@ -260,6 +265,7 @@ export function BacklogTaskRow({
   onEdit,
   onAssign,
   onStart,
+  starting,
   onToggleBlock,
   onDone,
 }: {
@@ -277,6 +283,7 @@ export function BacklogTaskRow({
   onEdit: () => void;
   onAssign: () => void;
   onStart: () => void;
+  starting: boolean;
   onToggleBlock: () => void;
   onDone: () => void;
 }) {
@@ -347,6 +354,7 @@ export function BacklogTaskRow({
             className="backlog-action-primary backlog-action-icon"
             onClick={onStart}
             disabled={startDisabled}
+            loading={starting}
             aria-label={(task.assignedAgentId || task.assignedTeamId) ? t("backlog.start") : t("backlog.start_team")}
             title={(task.assignedAgentId || task.assignedTeamId) ? t("backlog.start") : t("backlog.start_team")}
           >

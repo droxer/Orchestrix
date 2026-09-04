@@ -13,6 +13,7 @@ import { formatNextRunDate } from "./RoutineChrome";
 import { routineDueTone, type RoutineState } from "../../lib/routine";
 import { hrefForRoute } from "../../lib/appRoute";
 import { taskRef } from "../../lib/taskRef";
+import { TaskReference } from "./TaskReference";
 import { TaskDueCell } from "./TaskDueCell";
 import { SortableColumnHeader } from "@/components/ui/SortableColumnHeader";
 import type { SortState } from "../../lib/listSort";
@@ -30,9 +31,11 @@ import { TableCell, TableHead, TableRow } from "@/components/ui/table";
 export function RoutineStartButton({
   disabled,
   onStart,
+  starting,
 }: {
   disabled: boolean;
   onStart: () => void;
+  starting: boolean;
 }) {
   const { t } = useTranslation();
 
@@ -45,6 +48,7 @@ export function RoutineStartButton({
       className="backlog-action-icon"
       onClick={onStart}
       disabled={disabled}
+      loading={starting}
       aria-label={t("backlog.start")}
       title={t("backlog.start")}
     >
@@ -83,6 +87,7 @@ export function RoutineCard({
   onEdit,
   onAssign,
   onStart,
+  starting,
 }: {
   task: RelayTaskListItem;
   state: RoutineState;
@@ -96,6 +101,7 @@ export function RoutineCard({
   onEdit: () => void;
   onAssign: () => void;
   onStart: () => void;
+  starting: boolean;
 }) {
   const { t } = useTranslation();
   const tone = routineDueTone(task);
@@ -116,6 +122,7 @@ export function RoutineCard({
         <RoutineStateBadge state={state} />
         <PriorityBadge priority={task.priority} />
         <TaskExecutionBadge task={task} ready={ready} displayName={agentDisplayName} />
+        <TaskReference taskId={task.id} />
       </div>
       <Button variant="ghost" type="button" className="backlog-task-title" onClick={onEdit}>{task.title}</Button>
       {task.description ? <p className="backlog-description">{task.description}</p> : null}
@@ -142,7 +149,7 @@ export function RoutineCard({
       <div className="backlog-task-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
           <RoutineAssignButton onAssign={onAssign} />
-          <RoutineStartButton disabled={startDisabled} onStart={onStart} />
+          <RoutineStartButton disabled={startDisabled} onStart={onStart} starting={starting} />
         </div>
       </div>
     </article>
@@ -215,6 +222,7 @@ export function RoutineRow({
   onEdit,
   onAssign,
   onStart,
+  starting,
 }: {
   task: RelayTaskListItem;
   state: RoutineState;
@@ -228,6 +236,7 @@ export function RoutineRow({
   onEdit: () => void;
   onAssign: () => void;
   onStart: () => void;
+  starting: boolean;
 }) {
   const { t } = useTranslation();
   const tone = routineDueTone(task);
@@ -268,7 +277,7 @@ export function RoutineRow({
       <TableCell render={<div />} className="backlog-row-actions" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
           <RoutineAssignButton onAssign={onAssign} />
-          <RoutineStartButton disabled={startDisabled} onStart={onStart} />
+          <RoutineStartButton disabled={startDisabled} onStart={onStart} starting={starting} />
         </div>
       </TableCell>
     </TableRow>
