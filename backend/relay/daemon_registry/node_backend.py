@@ -20,7 +20,7 @@ from ..core.models import AGENT_NAMES, DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS
 from ..persistence.protocols import AgentPlacementStore, AgentStore, SessionStore
 from ..persistence.stores import valid_agent
 from ..sessions import SessionController, initial_agent_state
-from ..sessions.bridge import latest_user_turn_marker
+from ..sessions.bridge import latest_user_turn_marker, latest_user_turn_text
 from .credentials import sandbox_node_auth_error, sandbox_ui_auth_error
 from .registry import DaemonNodeRegistry
 from .scheduling import node_accepts_run
@@ -709,7 +709,7 @@ class ServerDaemonNodeBackend:
             for event in current_session.get("events", [])
         ):
             return (
-                current_session.get("taskGoal")
+                latest_user_turn_text(current_session)
                 if request.get("decision")
                 else request["taskGoal"]
             )
@@ -732,7 +732,7 @@ class ServerDaemonNodeBackend:
             and request["taskGoal"] == existing_session.get("taskGoal")
         )
         if existing_session and is_decision_dispatch:
-            dispatch_task_goal = existing_session.get("taskGoal") or request["taskGoal"]
+            dispatch_task_goal = latest_user_turn_text(existing_session) or request["taskGoal"]
         elif existing_session and request.get("_resumedPreparedNewThread") is not True:
             stable_event_id = request.get("_admissionId") or round_id
             message_id = request.get("userMessageId") or (

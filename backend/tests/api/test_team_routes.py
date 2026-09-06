@@ -2351,22 +2351,33 @@ def recovery_team_thread(monkeypatch, tmp_path):
     app.state.registry.update_status("test_node_alice", {"status": "ready"})
     response = client.post(
         "/api/v1/admin/teams",
-        json={"ownerEmployeeId": "alice", "name": "Delivery",
-              "leadAgentId": lead["id"], "memberAgentIds": [lead["id"], reviewer["id"]]},
+        json={
+            "ownerEmployeeId": "alice",
+            "name": "Delivery",
+            "leadAgentId": lead["id"],
+            "memberAgentIds": [lead["id"], reviewer["id"]],
+        },
     )
     assert response.status_code == 201, response.text
     team = response.json()["team"]
     controller = SessionController(
-        app.state.session_store, owner_employee_id="alice", owner_agent_id=lead["id"],
-        team_id=team["id"], daemon_node_id="test_node_alice", workspace_layout="thread",
+        app.state.session_store,
+        owner_employee_id="alice",
+        owner_agent_id=lead["id"],
+        team_id=team["id"],
+        daemon_node_id="test_node_alice",
+        workspace_layout="thread",
     )
     session = controller.create_session("Build a login page")
     return client, controller, session, team, reviewer
 
 
+@pytest.mark.parametrize("legacy", [False, True])
 @pytest.mark.parametrize("kind", ["handoff", "rerun"])
 @pytest.mark.parametrize("followup", [False, True])
-def test_recovery_dispatches_current_user_turn(recovery_team_thread, kind, followup):
+def test_recovery_dispatches_current_user_turn(
+    recovery_team_thread, kind, followup, legacy
+) -> None:
     client, controller, session, team, reviewer = recovery_team_thread
     expected = session["taskGoal"]
     if followup:
@@ -2375,25 +2386,47 @@ def test_recovery_dispatches_current_user_turn(recovery_team_thread, kind, follo
         controller.record_user_message(session["id"], expected)
     controller.fail_session(session["id"], "Agent stopped before answering")
     client.patch(f"/api/v1/admin/teams/{team['id']}", json={"enabled": False})
-    body = {"kind": kind, "targetAgentId": reviewer["id"], "idempotencyKey": "recover-1"}
-    response = client.post(f"/api/v1/threads/{session['id']}/recoveries", json=body)
+    body = {
+        "kind": kind,
+        "targetAgentId": reviewer["id"],
+        "idempotencyKey": "recover-1",
+    }
+    endpoint = f"/api/v1/threads/{session['id']}/recoveries"
+    if legacy:
+        endpoint = "/api/v1/agent-runs"
+        body = {
+            "sessionId": session["id"],
+            "taskGoal": session["taskGoal"],
+            "assignments": [{"agentId": reviewer["id"]}],
+            "decision": {"kind": kind, "targetAgentId": reviewer["id"]},
+            "idempotencyKey": "recover-1",
+        }
+    response = client.post(endpoint, json=body)
     assert response.status_code == 202, response.text
     command = client.app.state.registry.take_commands("test_node_alice", "node_token")[0]
     assert command["taskGoal"] == expected
     assert command["state"]["task_goal"] == expected
+    assert command["state"]["agent_role"] == "reviewer"
+    assert command["phase"] == "review"
     if followup:
         assert "Add a signup form" in command["state"]["prior_conversation"]
         assert expected not in command["state"]["prior_conversation"]
-    replay = client.post(f"/api/v1/threads/{session['id']}/recoveries", json=body)
+    replay = client.post(endpoint, json=body)
     assert replay.status_code == 202, replay.text
     assert len(replay.json()["agentRuns"]) == 1
-    assert len([e for e in replay.json()["events"] if e["type"] == "user.message"]) == (2 if followup else 0)
+    user_messages = [e for e in replay.json()["events"] if e["type"] == "user.message"]
+    assert len(user_messages) == (2 if followup else 0)
     assert replay.json()["taskGoal"] == "Build a login page"
 
 
-@pytest.mark.parametrize("intent,phase", [("accomplish", "review"), ("discuss", "discussion"), ("review", "review")])
-def test_addressed_team_reviewer_keeps_specialization(recovery_team_thread, intent, phase):
-    client, controller, session, team, reviewer = recovery_team_thread
+@pytest.mark.parametrize(
+    "intent,phase",
+    [("accomplish", "review"), ("discuss", "discussion"), ("review", "review")],
+)
+def test_addressed_team_reviewer_keeps_specialization(
+    recovery_team_thread, intent, phase
+) -> None:
+    client, _controller, session, _team, reviewer = recovery_team_thread
     response = client.post(
         f"/api/v1/threads/{session['id']}/messages",
         json={"text": "@Reviewer inspect the change", "intent": intent},
@@ -2403,5 +2436,9 @@ def test_addressed_team_reviewer_keeps_specialization(recovery_team_thread, inte
     assert command["phase"] == phase
     assert command["state"]["agent_role"] == "reviewer"
     assert "Review the accumulated workspace changes" in command["state"]["assignment_brief"]
-    request = client.app.state.registry.daemon_store.active_run_request_for_session_any_node(session["id"])
+    request = (
+        client.app.state.registry.daemon_store.active_run_request_for_session_any_node(
+            session["id"]
+        )
+    )
     assert [a["agentId"] for a in request["assignments"]] == [reviewer["id"]]

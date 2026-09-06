@@ -26,6 +26,7 @@ from ..services.team_dispatch import (
     team_member_assignments,
     team_runtime_snapshot,
 )
+from ..sessions.bridge import latest_user_turn_text
 from ..sessions.controller import SessionController
 from .models import (
     CollaborationIdempotencyError,
@@ -232,7 +233,7 @@ class CollaborationConductor:
         session = self._session_for_actor(intent.session_id, actor)
         session = self._backfill_runtime_affinity(session)
         task_goal = (
-            session.get("taskGoal")
+            latest_user_turn_text(session)
             if intent.source == "recovery" and session
             else intent.task_goal
         )
@@ -341,6 +342,21 @@ class CollaborationConductor:
                 team, members = self._team_for_round(team_id, session, actor)
                 team_member_ids = {agent["id"] for agent in members}
             team_snapshot = team_runtime_snapshot(team, members)
+            # Addressing chooses participants, not their specialization. Keep
+            # caller ordering and explicit overrides, but fill in team briefs
+            # and roles without turning an addressed lead into a room synthesizer.
+            member_defaults = {
+                item["agentId"]: {
+                    key: item[key] for key in ("role", "brief") if key in item
+                }
+                for item in team_member_assignments(members, team=team)
+            }
+            raw_assignments = [
+                {**member_defaults.get(item.get("agentId"), {}), **item}
+                if isinstance(item, dict) and isinstance(item.get("agentId"), str)
+                else item
+                for item in raw_assignments
+            ]
         elif session and not raw_assignments:
             # A bare message goes to the whole room: every agent the thread has
             # accumulated, not just the one it started with.
