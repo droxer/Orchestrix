@@ -18,8 +18,7 @@ interface AdminViewToggleProps {
   onChange: (next: AdminView) => void;
 }
 
-// Segmented view switcher — mirrors the backlog board/list toggle geometry
-// (hairline track, 4px corners, canvas lift on the active segment).
+// Section navigation retains pressed-state semantics and keyboard-operable buttons.
 export function AdminViewToggle({ view, onChange }: AdminViewToggleProps) {
   const { t } = useTranslation();
   const items: Array<{ id: AdminView; label: string; icon: typeof AdminEmployees }> = [

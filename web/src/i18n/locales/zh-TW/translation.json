@@ -62,7 +62,7 @@
     "routine": "例行任務",
     "agents": "智能體",
     "teams": "團隊",
-    "admin": "管理",
+    "admin": "控制面板",
     "channels": "頻道",
     "coming_soon": "即將推出",
     "coming_soon_short": "即將",
@@ -668,6 +668,21 @@
     "create": "建立例行"
   },
   "admin": {
+    "control_panel": {
+      "title": "控制面板",
+      "eyebrow": "組織 / 管理",
+      "subtitle": "管理人員、電腦和組織設定。",
+      "workspace": "工作區管理",
+      "overview": "概覽",
+      "heading": "運作狀況，一目了然。",
+      "description": "監控活動、管理容量，讓團隊持續高效運作。",
+      "fleet": "設備狀態",
+      "ready": "就緒",
+      "running": "執行中",
+      "attention": "需要關注",
+      "queued": "排隊中",
+      "manage_fleet": "管理電腦"
+    },
     "title": "管理",
     "sub": "電腦與員工",
     "updated_at": "已更新 {{time}}",
