@@ -6,6 +6,8 @@ from datetime import date
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import pytest
+
 from fastapi.testclient import TestClient
 from relay.api import task_routes
 from relay.app import create_app
@@ -2333,3 +2335,73 @@ def test_a_team_thread_narrows_to_one_member_for_the_owning_employee(
             )
         )
         assert [item["agentId"] for item in request["assignments"]] == [support["id"]]
+
+
+@pytest.fixture
+def recovery_team_thread(monkeypatch, tmp_path):
+    from relay.sessions.controller import SessionController
+
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    app = create_app(str(tmp_path))
+    client = TestClient(app)
+    _bootstrap(client)
+    _employee(client, "alice")
+    lead = _agent(client, "alice", "Lead", "codex", role="planner")
+    reviewer = _agent(client, "alice", "Reviewer", "codex", role="reviewer")
+    app.state.registry.update_status("test_node_alice", {"status": "ready"})
+    response = client.post(
+        "/api/v1/admin/teams",
+        json={"ownerEmployeeId": "alice", "name": "Delivery",
+              "leadAgentId": lead["id"], "memberAgentIds": [lead["id"], reviewer["id"]]},
+    )
+    assert response.status_code == 201, response.text
+    team = response.json()["team"]
+    controller = SessionController(
+        app.state.session_store, owner_employee_id="alice", owner_agent_id=lead["id"],
+        team_id=team["id"], daemon_node_id="test_node_alice", workspace_layout="thread",
+    )
+    session = controller.create_session("Build a login page")
+    return client, controller, session, team, reviewer
+
+
+@pytest.mark.parametrize("kind", ["handoff", "rerun"])
+@pytest.mark.parametrize("followup", [False, True])
+def test_recovery_dispatches_current_user_turn(recovery_team_thread, kind, followup):
+    client, controller, session, team, reviewer = recovery_team_thread
+    expected = session["taskGoal"]
+    if followup:
+        controller.record_user_message(session["id"], "Add a signup form")
+        expected = "Only fix the logout bug now"
+        controller.record_user_message(session["id"], expected)
+    controller.fail_session(session["id"], "Agent stopped before answering")
+    client.patch(f"/api/v1/admin/teams/{team['id']}", json={"enabled": False})
+    body = {"kind": kind, "targetAgentId": reviewer["id"], "idempotencyKey": "recover-1"}
+    response = client.post(f"/api/v1/threads/{session['id']}/recoveries", json=body)
+    assert response.status_code == 202, response.text
+    command = client.app.state.registry.take_commands("test_node_alice", "node_token")[0]
+    assert command["taskGoal"] == expected
+    assert command["state"]["task_goal"] == expected
+    if followup:
+        assert "Add a signup form" in command["state"]["prior_conversation"]
+        assert expected not in command["state"]["prior_conversation"]
+    replay = client.post(f"/api/v1/threads/{session['id']}/recoveries", json=body)
+    assert replay.status_code == 202, replay.text
+    assert len(replay.json()["agentRuns"]) == 1
+    assert len([e for e in replay.json()["events"] if e["type"] == "user.message"]) == (2 if followup else 0)
+    assert replay.json()["taskGoal"] == "Build a login page"
+
+
+@pytest.mark.parametrize("intent,phase", [("accomplish", "review"), ("discuss", "discussion"), ("review", "review")])
+def test_addressed_team_reviewer_keeps_specialization(recovery_team_thread, intent, phase):
+    client, controller, session, team, reviewer = recovery_team_thread
+    response = client.post(
+        f"/api/v1/threads/{session['id']}/messages",
+        json={"text": "@Reviewer inspect the change", "intent": intent},
+    )
+    assert response.status_code == 202, response.text
+    command = client.app.state.registry.take_commands("test_node_alice", "node_token")[0]
+    assert command["phase"] == phase
+    assert command["state"]["agent_role"] == "reviewer"
+    assert "Review the accumulated workspace changes" in command["state"]["assignment_brief"]
+    request = client.app.state.registry.daemon_store.active_run_request_for_session_any_node(session["id"])
+    assert [a["agentId"] for a in request["assignments"]] == [reviewer["id"]]
