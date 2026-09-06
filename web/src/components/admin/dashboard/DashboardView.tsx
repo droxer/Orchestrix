@@ -9,15 +9,23 @@ import { ActivityChart } from "./ActivityChart";
 import { NodeStatusCard } from "./NodeStatusCard";
 import { KpiTile } from "./KpiTile";
 import { TokenUsageChart } from "./TokenUsageChart";
+import { Button } from "@/components/ui/button";
+import { ActionAdd, AdminNode, ICON } from "../../icons";
+import { StateMark } from "../../StateMark";
 import { TopEmployees } from "./TopEmployees";
 
 interface DashboardViewProps {
   nodes: ControlPanelDaemonNodeRecord[];
   employees: EmployeeRecord[];
   metrics: NodeMetrics;
+  onManageNodes: () => void;
+  onAddNode: () => void;
+  onAddEmployee: () => void;
 }
 
-export function DashboardView({ nodes, employees, metrics }: DashboardViewProps) {
+export function DashboardView({
+  nodes, employees, metrics, onManageNodes, onAddNode, onAddEmployee,
+}: DashboardViewProps) {
   const { t, i18n } = useTranslation();
   const sessionsQuery = useDashboardSessions(true);
   const tokens = useTokenUsage();
@@ -35,6 +43,48 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
 
   return (
     <div className="adm-dash">
+      <section className="adm-control-intro" aria-labelledby="adm-overview-title">
+        <div className="adm-control-intro-copy">
+          <span className="adm-control-eyebrow">{t("admin.control_panel.overview")}</span>
+          <h2 id="adm-overview-title">{t("admin.control_panel.heading")}</h2>
+          <p>{t("admin.control_panel.description")}</p>
+        </div>
+        <div className="adm-control-actions">
+          <Button onClick={onAddNode}>
+            <ActionAdd size={ICON.sm} aria-hidden="true" />
+            {t("admin.v2.add_node_cta")}
+          </Button>
+          <Button variant="outline" onClick={onAddEmployee}>
+            {t("admin.v2.add_employee_cta")}
+          </Button>
+        </div>
+      </section>
+      <section className="adm-control-fleet" aria-label={t("admin.control_panel.fleet")}>
+        <div className="adm-control-fleet-label">
+          <AdminNode size={ICON.md} aria-hidden="true" />
+          <span>{t("admin.control_panel.fleet")}</span>
+        </div>
+        <dl className="adm-control-readings">
+          {([
+            ["ready", metrics.ready, "good"],
+            ["running", metrics.running, "live"],
+            ["attention", metrics.failed, "bad"],
+            ["queued", metrics.queued, "neutral"],
+          ] as const).map(([label, count, tone]) => (
+            <div key={label}>
+              <dt>
+                <StateMark tone={count > 0 ? tone : "neutral"} />
+                {t(`admin.control_panel.${label}`)}
+              </dt>
+              <dd>{nodesReady ? new Intl.NumberFormat(i18n.language).format(count) : dash}</dd>
+            </div>
+          ))}
+        </dl>
+        <Button variant="ghost" onClick={onManageNodes}>
+          {t("admin.control_panel.manage_fleet")}
+          <span aria-hidden="true">↗</span>
+        </Button>
+      </section>
       <div className="adm-dash-kpis-wrap">
         <section
           className={`adm-dash-kpis${showTokens ? "" : " adm-dash-kpis--lean"}`}

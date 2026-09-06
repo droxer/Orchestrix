@@ -463,12 +463,12 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
       tabIndex={-1}
     >
       <PageHeader
-        kicker={t("nav.manage")}
-        title={viewTitle}
+        kicker={t("admin.control_panel.eyebrow")}
+        title={t("admin.control_panel.title")}
+        subtitle={t("admin.control_panel.subtitle")}
         count={headerCount}
         actions={
           <>
-            <AdminViewToggle view={view} onChange={setView} />
             {headerError ? (
               <span
                 className="adm-command-status"
@@ -488,30 +488,34 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
               <Button
                 type="button"
                 variant="ghost"
-                // The shared list-header create affordance — a plain ghost
-                // plus; the header's view toggle already names what is being
-                // added, so a labelled plate restated it at cobalt volume.
-                className="page-header-icon-action"
+                className="adm-create-action"
                 onClick={() => setAddEmployeeOpen(true)}
                 tooltip={t("admin.v2.add_employee_cta")}
               >
                 <ActionAdd size={ICON.md} aria-hidden="true" />
+                {t("admin.v2.add_employee_cta")}
               </Button>
             ) : null}
             {view === "nodes" ? (
               <Button
                 type="button"
                 variant="ghost"
-                className="page-header-icon-action"
+                className="adm-create-action"
                 onClick={() => setAddNodeOpen(true)}
                 tooltip={t("admin.v2.add_node_cta")}
               >
                 <ActionAdd size={ICON.md} aria-hidden="true" />
+                {t("admin.v2.add_node_cta")}
               </Button>
             ) : null}
           </>
         }
       />
+
+      <div className="adm-section-nav">
+        <AdminViewToggle view={view} onChange={setView} />
+        <span className="adm-section-context">{t("admin.control_panel.workspace")}</span>
+      </div>
 
       <div className="adm-main">
         <div className="adm-content">
@@ -531,7 +535,12 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
                 </Alert>
               ) : null}
               {view === "dashboard" ? (
-                <DashboardView nodes={nodes} employees={employees} metrics={metrics} />
+                <DashboardView
+                  nodes={nodes} employees={employees} metrics={metrics}
+                  onManageNodes={() => setView("nodes")}
+                  onAddNode={() => setAddNodeOpen(true)}
+                  onAddEmployee={() => setAddEmployeeOpen(true)}
+                />
               ) : view === "employees" ? (
                 <EmployeesView
                   employees={employees}
