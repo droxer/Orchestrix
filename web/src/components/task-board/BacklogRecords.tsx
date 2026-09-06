@@ -153,7 +153,7 @@ export function BacklogTaskCard({
         ) : null}
       </div>
       <div className="backlog-task-actions" role="group" aria-label={t("backlog.actions")}>
-        <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
+        <div className="backlog-action-group" role="group" aria-label={t("backlog.actions_dispatch")}>
           <Button variant="outline"
             type="button"
             className="backlog-action-icon"
@@ -176,7 +176,7 @@ export function BacklogTaskCard({
             <ActionStart size={ICON.sm} />
           </Button>
         </div>
-        <div className="backlog-action-group" aria-label={t("backlog.actions_state")}>
+        <div className="backlog-action-group" role="group" aria-label={t("backlog.actions_state")}>
           <Button variant="outline"
             type="button"
             className={task.status === "blocked" ? undefined : "backlog-action-block"}
@@ -338,7 +338,7 @@ export function BacklogTaskRow({
         ) : null}
       </TableCell>
       <TableCell render={<div />} className="backlog-row-actions" aria-label={t("backlog.actions")}>
-        <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
+        <div className="backlog-action-group" role="group" aria-label={t("backlog.actions_dispatch")}>
           <Button variant="outline"
             type="button"
             className="backlog-action-icon"
@@ -361,7 +361,7 @@ export function BacklogTaskRow({
             <ActionStart size={ICON.sm} />
           </Button>
         </div>
-        <div className="backlog-action-group" aria-label={t("backlog.actions_state")}>
+        <div className="backlog-action-group" role="group" aria-label={t("backlog.actions_state")}>
           <Button variant="outline"
             type="button"
             className={cn("backlog-action-icon", task.status !== "blocked" && "backlog-action-block")}

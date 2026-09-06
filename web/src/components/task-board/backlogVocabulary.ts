@@ -7,10 +7,11 @@
  * meant the chrome and the records importing from the component that renders
  * them, which is the wrong direction.
  */
-import type { BacklogFilters } from "../../lib/backlog";
+import { TASK_PRIORITIES, TASK_STATUSES, type BacklogFilters } from "../../lib/backlog";
 import type { TaskStatus } from "../../types";
 import type { StateShape } from "../StateMark";
 import { readViewPreference } from "../../lib/viewPreference";
+import type { FilterSpec } from "../../lib/urlFilters";
 
 /**
  * Lifecycle status in the shared shape vocabulary (see StateMark). The row
@@ -37,6 +38,19 @@ export const initialFilters: BacklogFilters = {
   assignee: "",
   due: "all",
   source: "all",
+};
+
+/* The query params the backlog filter bar owns — must stay in sync with
+   LIST_FILTER_PARAMS.backlog in lib/appRoute.ts, which decides which of these
+   survive canonicalization. */
+export const BACKLOG_FILTER_SPEC: FilterSpec<BacklogFilters> = {
+  query: { param: "q" },
+  status: { param: "status", allowed: TASK_STATUSES },
+  priority: { param: "priority", allowed: TASK_PRIORITIES },
+  agent: { param: "agent" },
+  assignee: { param: "assignee" },
+  due: { param: "due", allowed: ["overdue", "today", "unscheduled"] },
+  source: { param: "source", allowed: ["direct", "routine"] },
 };
 
 export type BacklogView = "board" | "list";

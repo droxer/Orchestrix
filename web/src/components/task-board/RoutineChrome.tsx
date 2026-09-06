@@ -16,6 +16,7 @@ import {
   TASK_ROUTINE_TYPES,
   type RoutineFilters,
 } from "../../lib/routine";
+import type { FilterSpec } from "../../lib/urlFilters";
 import type { EmployeeAgent, RelayTaskListItem } from "../../types";
 
 /* Routine board chrome — the stat bar, the filter bar, and the card/list view
@@ -29,6 +30,18 @@ export const initialRoutineFilters: RoutineFilters = {
   agent: "all",
   assignee: "",
   state: "all",
+};
+
+/* The query params the routine filter bar owns — must stay in sync with
+   LIST_FILTER_PARAMS.routines in lib/appRoute.ts, which decides which of
+   these survive canonicalization. */
+export const ROUTINE_FILTER_SPEC: FilterSpec<RoutineFilters> = {
+  query: { param: "q" },
+  type: { param: "type", allowed: TASK_ROUTINE_TYPES },
+  cadence: { param: "cadence", allowed: TASK_ROUTINE_CADENCES },
+  agent: { param: "agent" },
+  assignee: { param: "assignee" },
+  state: { param: "state", allowed: ROUTINE_STATE_ORDER },
 };
 
 export type RoutineView = "card" | "list";
@@ -77,7 +90,7 @@ export function RoutineStats({ routines, tasks }: { routines: RelayTaskListItem[
   }, [routines, tasks]);
 
   return (
-    <p className="backlog-stats" aria-label={t("routine.metrics")}>
+    <p className="backlog-stats" role="group" aria-label={t("routine.metrics")}>
       <span className="backlog-stat">
         <span className="backlog-stat-eyebrow">{t("routine.metric_enabled")}</span>
         <span className="backlog-stat-value">{stats.enabled}</span>

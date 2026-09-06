@@ -169,6 +169,35 @@ const LANE_PAGE_PARAMS: Record<string, readonly string[]> = {
   admin: ["employeeLanes", "nodeLanes"],
 };
 
+/**
+ * Filter params each list path owns, by the query param the filter bar
+ * writes. Registered for the same reason as the sort keys above: without an
+ * entry the bar would rewrite the URL and canonicalization would strip its
+ * params straight back out. `null` marks a free-text field, copied verbatim;
+ * a set lists the enum values that survive, so a stale or hand-edited link
+ * cannot force a filter the bar cannot display. Keep in sync with each
+ * surface's `FilterSpec`.
+ */
+const LIST_FILTER_PARAMS: Record<string, Record<string, ReadonlySet<string> | null>> = {
+  backlog: {
+    q: null,
+    status: new Set(["backlog", "assigned", "running", "waiting_for_human", "review", "blocked", "done"]),
+    priority: new Set(["high", "normal", "low"]),
+    agent: null,
+    assignee: null,
+    due: new Set(["overdue", "today", "unscheduled"]),
+    source: new Set(["direct", "routine"]),
+  },
+  routines: {
+    q: null,
+    type: new Set(["task", "job"]),
+    cadence: new Set(["daily", "weekly", "monthly", "custom"]),
+    agent: null,
+    assignee: null,
+    state: new Set(["running", "overdue", "due", "scheduled", "unscheduled", "paused"]),
+  },
+};
+
 /** Copies `?page=n` only for a path that pages, and only for a real page. */
 function copyPageParams(head: string, source: URLSearchParams, target: URLSearchParams): void {
   for (const param of LANE_PAGE_PARAMS[head] ?? []) copyParam(source, target, param);
@@ -196,6 +225,19 @@ function copySortParams(head: string, source: URLSearchParams, target: URLSearch
 function copyParam(source: URLSearchParams, target: URLSearchParams, key: string): void {
   const value = source.get(key);
   if (value) target.set(key, value);
+}
+
+/** Copies filter params only for a path that owns them, dropping enum values
+ *  the filter cannot take. */
+function copyFilterParams(head: string, source: URLSearchParams, target: URLSearchParams): void {
+  const owned = LIST_FILTER_PARAMS[head];
+  if (!owned) return;
+  for (const [param, allowed] of Object.entries(owned)) {
+    const value = source.get(param);
+    if (!value) continue;
+    if (allowed && !allowed.has(value)) continue;
+    target.set(param, value);
+  }
 }
 
 /** Returns only query parameters owned by the current route and tab. */
@@ -252,6 +294,7 @@ export function canonicalSearchForPath(pathname: string, search = ""): string {
   } else if (!entityId) {
     copySortParams(head, source, target);
     copyPageParams(head, source, target);
+    copyFilterParams(head, source, target);
   }
 
   const encoded = target.toString();

@@ -31,7 +31,7 @@ export function BacklogStats({ tasks }: { tasks: RelayTaskListItem[] }) {
   }, [tasks]);
 
   return (
-    <p className="backlog-stats" aria-label={t("backlog.metrics")}>
+    <p className="backlog-stats" role="group" aria-label={t("backlog.metrics")}>
       <span className="backlog-stat">
         <span className="backlog-stat-eyebrow">{t("backlog.metric_total")}</span>
         <span className="backlog-stat-value">{stats.total}</span>

@@ -396,6 +396,10 @@ export function TaskDrawer({
   const assignmentSummaryId = `${fieldPrefix}-assignment-summary`;
   const busy = saving || deleting;
   const [titleError, setTitleError] = useState<string | null>(null);
+  // The submit button names the action it performs, not a generic "Confirm".
+  const submitLabel = form.id
+    ? t(form.variant === "routine" ? "routine.save" : "backlog.save_task")
+    : t(form.variant === "routine" ? "routine.create" : "backlog.create_task");
 
   function updateBase(patch: Partial<TaskBoardFormState>): void {
     onChange({ ...form, ...patch } as TaskBoardFormState);
@@ -405,6 +409,11 @@ export function TaskDrawer({
     event.preventDefault();
     if (!form.title.trim()) {
       setTitleError(t("admin.v2.chat_error_field_required", { field: t("backlog.title_field") }));
+      // Move focus to the field at fault — the error is inline, but a reader
+      // who submitted from the footer has to be taken back to it.
+      event.currentTarget
+        .querySelector<HTMLInputElement>(`[name="${fieldPrefix}-title"]`)
+        ?.focus();
       return;
     }
     onSubmit(event);
@@ -462,6 +471,7 @@ export function TaskDrawer({
           <Input
             data-modal-initial-focus={initialFocus === "title" ? "" : undefined}
             name={`${fieldPrefix}-title`}
+            autoComplete="off"
             required
             value={form.title}
             onChange={(event) => {
@@ -475,6 +485,7 @@ export function TaskDrawer({
         <Field label={t("backlog.description")}>
           <Textarea
             name={`${fieldPrefix}-description`}
+            autoComplete="off"
             value={form.description}
             rows={5}
             onChange={(event) => updateBase({ description: event.target.value })}
@@ -693,7 +704,7 @@ export function TaskDrawer({
             {t("dialog.cancel")}
           </Button>
           <Button type="submit" variant="default" size="cta" loading={saving} disabled={deleting}>
-            {saving ? t("admin.saving") : t("dialog.confirm")}
+            {saving ? t("admin.saving") : submitLabel}
           </Button>
         </div>
       </form>
