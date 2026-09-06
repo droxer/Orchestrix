@@ -425,7 +425,9 @@
     "source_direct": "任务",
     "source_routine": "例程运行",
     "routine_origin_unknown": "例程",
-    "routine_origin_of": "由例程“{{title}}”生成"
+    "routine_origin_of": "由例程“{{title}}”生成",
+    "save_task": "保存任务",
+    "create_task": "创建任务"
   },
   "workspace": {
     "title": "工作区",
@@ -661,7 +663,9 @@
     "toast_bulk_deleted_one": "已删除 {{count}} 个例行任务。",
     "toast_bulk_deleted_other": "已删除 {{count}} 个例行任务。",
     "sort_label": "例程排序",
-    "set_next_run": "设置下次运行"
+    "set_next_run": "设置下次运行",
+    "save": "保存例行",
+    "create": "创建例行"
   },
   "admin": {
     "title": "管理",

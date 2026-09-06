@@ -98,7 +98,7 @@ describe("app pathname routes", () => {
     assert.equal(canonicalBrowserUrl("/agents/agent-1", "?tab=activities"), "/agents/agent-1?tab=activities");
     assert.equal(canonicalBrowserUrl("/teams/team-1", "?tab=artifacts&artifact=old"), "/teams/team-1");
     assert.equal(canonicalBrowserUrl("/teams", "?dialog=create&tab=artifacts"), "/teams?dialog=create");
-    assert.equal(canonicalBrowserUrl("/backlog", "?q=stale"), "/backlog");
+    assert.equal(canonicalBrowserUrl("/backlog", "?bogus=stale"), "/backlog");
   });
 
   it("round-trips the thread space panel params on thread paths", () => {

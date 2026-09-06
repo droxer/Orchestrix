@@ -30,6 +30,7 @@ import { isTaskAssigneeCurrentUser, taskAssigneeDisplayName, teamReady } from ".
 import { type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTaskListItem, type TaskStatus } from "../types";
 import { useEmployeeNames } from "../hooks/useEmployeeNames";
 import { useEdgeAutoScroll } from "../hooks/useEdgeAutoScroll";
+import { useUrlFilters } from "../hooks/useUrlFilters";
 import { useTouchTaskDrag } from "../hooks/useTouchTaskDrag";
 import { laneStatusAtPoint, type DragPoint } from "../lib/touchDrag";
 import { writeViewPreference } from "../lib/viewPreference";
@@ -48,6 +49,7 @@ interface BacklogPageProps {
 }
 
 import {
+  BACKLOG_FILTER_SPEC,
   VIEW_STORAGE_KEY,
   initialFilters,
   parseBacklogView,
@@ -100,7 +102,9 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     deleteTaskMutation,
     deleteTasksMutation,
   } = useRelayMutations();
-  const [filters, setFilters] = useState(initialFilters);
+  // The filters live in the query string, so a filtered board survives
+  // opening a record and coming back, and it is a link somebody can paste.
+  const [filters, setFilters] = useUrlFilters(initialFilters, BACKLOG_FILTER_SPEC);
   const [view, setView] = useState<BacklogView>("board");
   const [form, setForm] = useState<BacklogTaskFormState | null>(null);
   const [formBaseline, setFormBaseline] = useState<BacklogTaskFormState | null>(null);

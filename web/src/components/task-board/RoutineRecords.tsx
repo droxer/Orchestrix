@@ -147,7 +147,7 @@ export function RoutineCard({
         ) : null}
       </div>
       <div className="backlog-task-actions" role="group" aria-label={t("backlog.actions")}>
-        <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
+        <div className="backlog-action-group" role="group" aria-label={t("backlog.actions_dispatch")}>
           <RoutineAssignButton onAssign={onAssign} />
           <RoutineStartButton disabled={startDisabled} onStart={onStart} starting={starting} />
         </div>
@@ -275,7 +275,7 @@ export function RoutineRow({
         <TaskAssignee task={task} ready={ready} assigneeDisplayName={assigneeDisplayName} assigneeIsSelf={assigneeIsSelf} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} />
       </TableCell>
       <TableCell render={<div />} className="backlog-row-actions" aria-label={t("backlog.actions")}>
-        <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
+        <div className="backlog-action-group" role="group" aria-label={t("backlog.actions_dispatch")}>
           <RoutineAssignButton onAssign={onAssign} />
           <RoutineStartButton disabled={startDisabled} onStart={onStart} starting={starting} />
         </div>

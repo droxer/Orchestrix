@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useRelayMutations } from "../hooks/useRelayMutations";
+import { useUrlFilters } from "../hooks/useUrlFilters";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { useTeams } from "../hooks/useTeams";
@@ -24,6 +25,7 @@ import { TaskDrawer } from "./task-board/TaskDrawer";
 import {
   initialRoutineFilters,
   parseRoutineView,
+  ROUTINE_FILTER_SPEC,
   RoutineFiltersBar,
   RoutineStats,
   RoutineViewToggle,
@@ -77,7 +79,8 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
     deleteTaskMutation,
     deleteTasksMutation,
   } = useRelayMutations();
-  const [filters, setFilters] = useState(initialRoutineFilters);
+  // The filters live in the query string — same reasoning as the backlog's.
+  const [filters, setFilters] = useUrlFilters(initialRoutineFilters, ROUTINE_FILTER_SPEC);
   const [view, setView] = useState<RoutineView>("card");
   const [form, setForm] = useState<RoutineTaskFormState | null>(null);
   const [formBaseline, setFormBaseline] = useState<RoutineTaskFormState | null>(null);
